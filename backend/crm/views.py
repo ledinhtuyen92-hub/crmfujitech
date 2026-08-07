@@ -104,6 +104,15 @@ class CustomerViewSet(TenantQuerySetMixin, viewsets.ModelViewSet):
                     qs = qs.order_by(ordering, '-created_at')
         return qs
 
+    def list(self, request, *args, **kwargs):
+        response = super().list(request, *args, **kwargs)
+        company = request.user.company
+        # Kiểm tra xem toàn bộ công ty có khách hàng nào có expected_quantity không
+        has_expected_quantity = Customer.objects.filter(company=company, expected_quantity__isnull=False).exists()
+        if isinstance(response.data, dict):
+            response.data['has_expected_quantity'] = has_expected_quantity
+        return response
+
     def perform_create(self, serializer):
         company = self.request.user.company
         user = self.request.user

@@ -232,6 +232,7 @@ function CustomerList() {
 
   // Tags
   const [allTags, setAllTags] = useState([])
+  const [globalHasExpectedQuantity, setGlobalHasExpectedQuantity] = useState(false)
 
   const fetchCustomers = useCallback(async () => {
     await Promise.resolve()
@@ -256,6 +257,10 @@ function CustomerList() {
       let data = Array.isArray(response.data)
         ? response.data
         : response.data?.results ?? []
+      
+      if (!Array.isArray(response.data)) {
+        setGlobalHasExpectedQuantity(!!response.data?.has_expected_quantity)
+      }
       
       if (isNewUnattendedFilter) {
           data = data.filter(c => c.interaction_count === 0)
@@ -765,14 +770,14 @@ function CustomerList() {
         )
       }
     },
-    {
+    ...(globalHasExpectedQuantity ? [{
       title: 'Số lượng SP dự kiến',
       dataIndex: 'expected_quantity',
       key: 'expected_quantity',
       sorter: true,
       align: 'center',
       render: (val) => val ? <Text strong>{val} SP</Text> : null
-    },
+    }] : []),
     ...(allTags.length > 0 ? [{
       title: 'Tags',
       key: 'tags',
@@ -1052,8 +1057,8 @@ function CustomerList() {
                       { label: 'Địa chỉ', value: 'address' },
                       { label: 'Trạng thái', value: 'status' },
                       { label: 'Mức độ ưu tiên', value: 'priority_level' },
-                      { label: 'Số lượng SP dự kiến', value: 'expected_quantity' },
-                      { label: 'Tags', value: 'tags' },
+                      ...(globalHasExpectedQuantity ? [{ label: 'Số lượng SP dự kiến', value: 'expected_quantity' }] : []),
+                      ...(allTags.length > 0 ? [{ label: 'Tags', value: 'tags' }] : []),
                       { label: 'Phụ trách (Sale)', value: 'assigned_to' },
                       { label: 'Thao tác', value: 'actions' },
                     ]}
