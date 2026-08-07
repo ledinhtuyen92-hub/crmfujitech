@@ -1614,6 +1614,7 @@ function CustomerList() {
                       <Col xs={24} md={12}>
                         <Form.Item label="Số lượng SP dự kiến">
                           <Input 
+                            key={currentCustomer.id}
                             type="number"
                             min={0}
                             defaultValue={currentCustomer.expected_quantity} 
