@@ -586,6 +586,11 @@ def extract_and_process_phone_fb(lead, text: str):
         updated = True
 
     if norm_phone:
+        try:
+            lead.refresh_from_db()
+        except:
+            pass
+
         # 1. Nếu Lead ĐÃ được chuyển đổi thành Khách hàng CRM (hoặc ĐÃ gắn customer),
         # tuyệt đối KHÔNG tạo thêm Khách hàng CRM thứ 2 và KHÔNG thay đổi SĐT/Khách hàng hiện tại.
         already_converted = lead.is_customer_converted or lead.customer_id
@@ -615,6 +620,26 @@ def extract_and_process_phone_fb(lead, text: str):
             else:
                 lead.is_customer_converted = False
                 updated = True
+        elif already_converted and phone_changed and lead.customer_id:
+            from crm.models import CustomerInteraction
+            from users.models import User
+            
+            creator = lead.assigned_to
+            if not creator:
+                creator = User.objects.filter(company=lead.company, is_company_admin=True).first() or User.objects.filter(company=lead.company).first()
+
+            note_content = f"Khách hàng cung cấp thêm số điện thoại phụ: {norm_phone}"
+            exists = CustomerInteraction.objects.filter(
+                customer_id=lead.customer_id, 
+                content__contains=norm_phone
+            ).exists()
+            if not exists and creator:
+                CustomerInteraction.objects.create(
+                    customer_id=lead.customer_id,
+                    type="system",
+                    content=note_content,
+                    created_by=creator
+                )
 
     # Đồng bộ sang Customer nếu đã có Customer liên kết nhưng Customer đang thiếu email/address
     if lead.customer:
@@ -654,9 +679,16 @@ def convert_facebook_lead(lead, phone_number: str, assigned_user=None, customer_
     final_email = (email or lead.detected_email or "").strip()
     final_address = (address or lead.detected_address or "").strip()
 
+    # Lock the lead row to prevent race conditions
+    from facebook_integration.models import FacebookLead
+    try:
+        lead = FacebookLead.objects.select_for_update().get(id=lead.id)
+    except FacebookLead.DoesNotExist:
+        return None
+
     # Bảo vệ: Nếu Lead đã gắn với Khách hàng CRM rồi thì trả về Khách hàng cũ, không tạo trùng
-    if lead.customer:
-        if not lead.is_customer_converted:
+    if lead.customer_id or lead.is_customer_converted:
+        if lead.customer and not lead.is_customer_converted:
             if getattr(lead, 'ai_summary', None):
                 creator = action_user or assigned_user or lead.assigned_to
                 if not creator:
@@ -664,7 +696,7 @@ def convert_facebook_lead(lead, phone_number: str, assigned_user=None, customer_
                     creator = User.objects.filter(company=lead.company).first()
                 CustomerInteraction.objects.create(
                     customer=lead.customer,
-                    type=CustomerInteraction.TYPE_CARE,
+                    type="system",
                     content=f"[AI Tóm tắt Hội thoại Facebook]\n{lead.ai_summary}",
                     created_by=creator
                 )
@@ -724,7 +756,7 @@ def convert_facebook_lead(lead, phone_number: str, assigned_user=None, customer_
         if creator:
             CustomerInteraction.objects.create(
                 customer=customer,
-                type=CustomerInteraction.TYPE_CARE,
+                type="system",
                 content=f"[AI Tóm tắt Hội thoại Facebook]\n{lead.ai_summary}",
                 created_by=creator
             )

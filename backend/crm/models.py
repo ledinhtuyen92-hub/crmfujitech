@@ -65,6 +65,17 @@ class Customer(models.Model):
         (STATUS_REPEAT_ORDER, "Mua thêm đơn hàng"),
     ]
 
+    PRIORITY_P1 = "p1"
+    PRIORITY_P2 = "p2"
+    PRIORITY_P3 = "p3"
+    PRIORITY_P4 = "p4"
+    PRIORITY_CHOICES = [
+        (PRIORITY_P1, "Ưu tiên 1 (Rất cao)"),
+        (PRIORITY_P2, "Ưu tiên 2 (Cao)"),
+        (PRIORITY_P3, "Ưu tiên 3 (Trung bình)"),
+        (PRIORITY_P4, "Ưu tiên 4 (Thấp)"),
+    ]
+
     company = models.ForeignKey(
         "users.Company",
         on_delete=models.CASCADE,
@@ -88,6 +99,12 @@ class Customer(models.Model):
         choices=STATUS_CHOICES,
         default=STATUS_NEW,
         verbose_name="Trạng thái",
+    )
+    priority_level = models.CharField(
+        max_length=10,
+        choices=PRIORITY_CHOICES,
+        default=PRIORITY_P4,
+        verbose_name="Mức độ ưu tiên",
     )
     tags = models.ManyToManyField(
         CustomerTag,
@@ -114,6 +131,11 @@ class Customer(models.Model):
         blank=True,
         related_name="created_customers",
         verbose_name="Người tạo",
+    )
+    expected_quantity = models.IntegerField(
+        null=True,
+        blank=True,
+        verbose_name="Số lượng SP dự kiến"
     )
     notes = models.TextField(blank=True, verbose_name="Ghi chú")
     # ── Liên kết Zalo Social Lead (tùy chọn) ─────────────────────────
@@ -175,6 +197,7 @@ class CustomerInteraction(models.Model):
     TYPE_ZALO = "zalo"
     TYPE_QUOTATION = "quotation"
     TYPE_CARE = "care"
+    TYPE_SYSTEM = "system"
     TYPE_CHOICES = [
         (TYPE_CALL, "Gọi điện"),
         (TYPE_MEETING, "Gặp mặt"),
@@ -182,6 +205,7 @@ class CustomerInteraction(models.Model):
         (TYPE_ZALO, "Nhắn Zalo"),
         (TYPE_QUOTATION, "Gửi báo giá"),
         (TYPE_CARE, "Chăm sóc"),
+        (TYPE_SYSTEM, "Hệ thống tự động"),
     ]
 
     RESULT_INTERESTED = "interested"

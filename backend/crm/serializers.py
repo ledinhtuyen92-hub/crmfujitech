@@ -86,6 +86,7 @@ class CustomerSerializer(serializers.ModelSerializer):
     source_display = serializers.CharField(source="get_source_display", read_only=True)
     quotation_count = serializers.IntegerField(read_only=True)
     order_count = serializers.IntegerField(read_only=True)
+    interaction_count = serializers.IntegerField(read_only=True)
 
     class Meta:
         model = Customer
@@ -98,10 +99,12 @@ class CustomerSerializer(serializers.ModelSerializer):
             "address",
             "city",
             "birthday",
+            "expected_quantity",
             "source",
             "source_display",
             "status",
             "status_display",
+            "priority_level",
             "is_inactive",
             "tags",
             "tag_ids",
@@ -117,6 +120,7 @@ class CustomerSerializer(serializers.ModelSerializer):
             "updated_at",
             "quotation_count",
             "order_count",
+            "interaction_count",
         ]
         read_only_fields = [
             "id", "company", "contacts", "interactions", "tags",

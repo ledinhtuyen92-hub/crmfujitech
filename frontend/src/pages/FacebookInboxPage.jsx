@@ -2074,8 +2074,8 @@ export default function FacebookInboxPage() {
                   tooltip="Số lượng hội thoại gần nhất kéo về (mặc định 50 - 200)"
                 >
                   <InputNumber
-                    min={10}
-                    max={500}
+                    min={1}
+                    max={1000}
                     value={syncMaxConv}
                     onChange={setSyncMaxConv}
                     style={{ width: '100%' }}
@@ -2089,8 +2089,8 @@ export default function FacebookInboxPage() {
                   tooltip="Số tin nhắn gần nhất mỗi hội thoại để Sale hiểu ngữ cảnh (mặc định 50)"
                 >
                   <InputNumber
-                    min={5}
-                    max={100}
+                    min={1}
+                    max={500}
                     value={syncLimitMsg}
                     onChange={setSyncLimitMsg}
                     style={{ width: '100%' }}

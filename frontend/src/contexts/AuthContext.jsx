@@ -34,7 +34,8 @@ export function AuthProvider({ children }) {
       .get('users/me/')
       .then(({ data }) => setUser(data))
       .catch(() => {
-        localStorage.clear()
+        localStorage.removeItem('accessToken')
+        localStorage.removeItem('refreshToken')
         setUser(null)
       })
       .finally(() => setLoading(false))
@@ -56,7 +57,8 @@ export function AuthProvider({ children }) {
 
   // ── Đăng xuất ──────────────────────────────────────────────────────
   const logout = useCallback(() => {
-    localStorage.clear()
+    localStorage.removeItem('accessToken')
+    localStorage.removeItem('refreshToken')
     setUser(null)
     navigate('/login')
   }, [navigate])

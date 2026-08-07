@@ -27,6 +27,7 @@ import {
   Switch,
   Dropdown,
   List,
+  Popover,
 } from 'antd'
 import {
   HistoryOutlined,
@@ -52,6 +53,17 @@ import {
   SettingOutlined,
   MoreOutlined,
   MailOutlined,
+  FireFilled,
+  StarFilled,
+  InfoCircleFilled,
+  MinusCircleFilled,
+  FacebookFilled,
+  TableOutlined,
+  WechatFilled,
+  TeamOutlined as ReferralIcon,
+  ShopOutlined,
+  GlobalOutlined,
+  FormOutlined,
 } from '@ant-design/icons'
 import { useNavigate } from 'react-router-dom'
 import api from '../utils/api'
@@ -75,6 +87,13 @@ const STATUS_MAP = {
   repeat_order: { label: 'Mua thêm đơn hàng', color: 'magenta' },
 }
 
+const PRIORITY_MAP = {
+  p1: { label: 'Ưu tiên 1 (Rất cao)', color: 'red', icon: <FireFilled style={{ color: '#ef4444' }} /> },
+  p2: { label: 'Ưu tiên 2 (Cao)', color: 'volcano', icon: <StarFilled style={{ color: '#f97316' }} /> },
+  p3: { label: 'Ưu tiên 3 (TB)', color: 'orange', icon: <InfoCircleFilled style={{ color: '#3b82f6' }} /> },
+  p4: { label: 'Ưu tiên 4 (Thấp)', color: 'default', icon: <MinusCircleFilled style={{ color: '#9ca3af' }} /> },
+}
+
 const SOURCE_MAP = {
   facebook: 'Facebook',
   zalo: 'Zalo',
@@ -85,12 +104,12 @@ const SOURCE_MAP = {
 }
 
 const SOURCE_ICON = {
-  facebook: '📱',
-  zalo: '💬',
-  referral: '🤝',
-  walk_in: '🚪',
-  website: '🌐',
-  other: '✏️',
+  facebook: <FacebookFilled style={{ color: '#1877f2' }} />,
+  zalo: <WechatFilled style={{ color: '#0068ff' }} />,
+  referral: <ReferralIcon style={{ color: '#10b981' }} />,
+  walk_in: <ShopOutlined style={{ color: '#8b5cf6' }} />,
+  website: <GlobalOutlined style={{ color: '#06b6d4' }} />,
+  other: <FormOutlined style={{ color: '#6b7280' }} />,
 }
 
 const INTERACTION_TYPES = {
@@ -131,6 +150,19 @@ function CustomerList() {
   const [statusFilter, setStatusFilter] = useState('')
   const [isInactiveFilter, setIsInactiveFilter] = useState(false)
   const [assignedToFilter, setAssignedToFilter] = useState('')
+  const [isNewUnattendedFilter, setIsNewUnattendedFilter] = useState(false)
+  const [tableSort, setTableSort] = useState(null)
+
+  // Column Visibility
+  const DEFAULT_COLUMNS = ['name', 'contact', 'source', 'address', 'status', 'priority_level', 'expected_quantity', 'tags', 'assigned_to', 'actions']
+  const [visibleColumns, setVisibleColumns] = useState(() => {
+    const saved = localStorage.getItem('customerListVisibleColumns')
+    return saved ? JSON.parse(saved) : DEFAULT_COLUMNS
+  })
+
+  useEffect(() => {
+    localStorage.setItem('customerListVisibleColumns', JSON.stringify(visibleColumns))
+  }, [visibleColumns])
 
   // Auto Assign Toggle State
   const [autoAssignEnabled, setAutoAssignEnabled] = useState(false)
@@ -211,18 +243,30 @@ function CustomerList() {
       if (statusFilter) params.status = statusFilter
       if (isInactiveFilter) params.is_inactive = true
       if (assignedToFilter) params.assigned_to = assignedToFilter
+      if (isNewUnattendedFilter) {
+          params.status = 'new'
+      }
+      if (tableSort && tableSort.field) {
+          let field = tableSort.field
+          if (field === 'name') field = 'created_at'
+          params.ordering = tableSort.order === 'ascend' ? field : `-${field}`
+      }
 
       const response = await api.get('/crm/customers/', { params })
-      const data = Array.isArray(response.data)
+      let data = Array.isArray(response.data)
         ? response.data
         : response.data?.results ?? []
+      
+      if (isNewUnattendedFilter) {
+          data = data.filter(c => c.interaction_count === 0)
+      }
       setCustomers(data)
     } catch {
       setError('Không thể tải danh sách khách hàng. Vui lòng thử lại sau.')
     } finally {
       setLoading(false)
     }
-  }, [searchQuery, statusFilter, isInactiveFilter, assignedToFilter])
+  }, [searchQuery, statusFilter, isInactiveFilter, assignedToFilter, isNewUnattendedFilter, tableSort])
 
   const fetchSalesUsers = useCallback(async () => {
     if (!isCompanyAdmin && !hasPermission('crm.assign')) return
@@ -294,6 +338,8 @@ function CustomerList() {
       notes: record.notes,
       tag_ids: record.tags?.map(t => t.id) || [],
       birthday: record.birthday ? dayjs(record.birthday) : null,
+      priority_level: record.priority_level || 'p4',
+      expected_quantity: record.expected_quantity,
     })
     setIsModalVisible(true)
   }
@@ -320,6 +366,7 @@ function CustomerList() {
       const payload = {
         ...values,
         birthday: values.birthday ? values.birthday.format('YYYY-MM-DD') : null,
+        expected_quantity: values.expected_quantity ? parseInt(values.expected_quantity) : null,
       }
       if (editingCustomer) {
         await api.patch(`/crm/customers/${editingCustomer.id}/`, payload)
@@ -573,24 +620,65 @@ function CustomerList() {
     }
   }
 
+  const handleUpdateSalesInfo = async (field, value) => {
+    if (!currentCustomer) return
+    try {
+      const payload = {}
+      if (field === 'priority_level') payload.priority_level = value
+      else if (field === 'tag_ids') payload.tag_ids = value
+      else if (field === 'expected_quantity') payload.expected_quantity = value
+      
+      const res = await api.patch(`/crm/customers/${currentCustomer.id}/update-sales-info/`, payload)
+      setCurrentCustomer(res.data)
+      message.success('Cập nhật thông tin thành công!')
+      // Update in main list
+      setCustomers(prev => prev.map(c => c.id === currentCustomer.id ? res.data : c))
+    } catch (err) {
+      console.error(err)
+      message.error(err.response?.data?.detail || 'Có lỗi khi cập nhật thông tin.')
+    }
+  }
+
   // ── Table Columns ──────────────────────────────────────────────────
   const columns = [
     {
       title: 'Khách hàng',
       dataIndex: 'name',
       key: 'name',
-      render: (text, record) => (
-        <Space direction="vertical" size={0}>
-          <Text
-            strong
-            style={{ color: '#1649c9', cursor: 'pointer' }}
-            onClick={() => handleOpenDrawer(record)}
-          >
-            {text}
-          </Text>
-          {record.city && <Text type="secondary" style={{ fontSize: 12 }}>{record.city}</Text>}
-        </Space>
-      ),
+      sorter: true,
+      render: (text, record) => {
+        const isNewUnattended = record.status === 'new' && record.interaction_count === 0;
+        return (
+          <Space direction="vertical" size={0}>
+            <Space>
+              <Text
+                strong={!isNewUnattended}
+                style={{ 
+                  color: '#1649c9', 
+                  cursor: 'pointer',
+                  fontWeight: isNewUnattended ? 800 : 'normal',
+                }}
+                onClick={() => handleOpenDrawer(record)}
+              >
+                {text}
+              </Text>
+              {isNewUnattended && (
+                <Tag 
+                  color="#ef4444" 
+                  style={{ borderRadius: 12, marginInlineStart: 8, border: 'none', fontWeight: 600, padding: '0 8px', fontSize: 11 }}
+                  icon={<FireFilled />}
+                >
+                  MỚI
+                </Tag>
+              )}
+            </Space>
+            {record.city && <Text type="secondary" style={{ fontSize: 12, display: 'block' }}>{record.city}</Text>}
+            <Text type="secondary" style={{ fontSize: 12, display: 'block' }}>
+              {new Date(record.created_at).toLocaleString('vi-VN', { hour: '2-digit', minute: '2-digit', day: '2-digit', month: '2-digit', year: 'numeric' })}
+            </Text>
+          </Space>
+        )
+      },
     },
     {
       title: 'Liên hệ',
@@ -664,6 +752,28 @@ function CustomerList() {
       },
     },
     {
+      title: 'Mức độ ưu tiên',
+      dataIndex: 'priority_level',
+      key: 'priority_level',
+      sorter: true,
+      render: (val) => {
+        const item = PRIORITY_MAP[val] || PRIORITY_MAP['p4']
+        return (
+          <Tag color={item.color} style={{ margin: 0 }}>
+            {item.icon} {item.label}
+          </Tag>
+        )
+      }
+    },
+    {
+      title: 'Số lượng SP dự kiến',
+      dataIndex: 'expected_quantity',
+      key: 'expected_quantity',
+      sorter: true,
+      align: 'center',
+      render: (val) => val ? <Text strong>{val} SP</Text> : null
+    },
+    ...(allTags.length > 0 ? [{
       title: 'Tags',
       key: 'tags',
       render: (_, record) => (
@@ -679,7 +789,7 @@ function CustomerList() {
           )}
         </Space>
       ),
-    },
+    }] : []),
     {
       title: 'Phụ trách (Sale)',
       key: 'assigned_to',
@@ -861,7 +971,7 @@ function CustomerList() {
       {/* Filter Bar */}
       <Card style={{ marginBottom: 16 }} bodyStyle={{ padding: 16 }}>
         <Row gutter={16} align="middle">
-          <Col xs={24} sm={12} md={(hasPermission('crm.assign') || hasPermission('crm.auto_assign') || hasPermission('crm.view_all')) ? 6 : 8} style={{ marginBottom: 8 }}>
+          <Col xs={24} sm={12} md={(hasPermission('crm.assign') || hasPermission('crm.auto_assign') || hasPermission('crm.view_all')) ? 5 : 7} style={{ marginBottom: 8 }}>
             <Input
               placeholder="Tìm theo tên hoặc SĐT..."
               prefix={<SearchOutlined style={{ color: '#bfbfbf' }} />}
@@ -870,7 +980,7 @@ function CustomerList() {
               allowClear
             />
           </Col>
-          <Col xs={24} sm={12} md={5} style={{ marginBottom: 8 }}>
+          <Col xs={24} sm={12} md={(hasPermission('crm.assign') || hasPermission('crm.auto_assign') || hasPermission('crm.view_all')) ? 4 : 5} style={{ marginBottom: 8 }}>
             <Select
               placeholder="Lọc theo trạng thái"
               style={{ width: '100%' }}
@@ -889,7 +999,7 @@ function CustomerList() {
               })}
             </Select>
           </Col>
-          <Col xs={24} sm={12} md={3} style={{ marginBottom: 8, display: 'flex', alignItems: 'center' }}>
+          <Col xs={24} sm={12} md={4} style={{ marginBottom: 8, display: 'flex', alignItems: 'center' }}>
             <Checkbox 
               checked={isInactiveFilter} 
               onChange={(e) => setIsInactiveFilter(e.target.checked)}
@@ -898,7 +1008,7 @@ function CustomerList() {
             </Checkbox>
           </Col>
           {(hasPermission('crm.assign') || hasPermission('crm.auto_assign') || hasPermission('crm.view_all')) && (
-            <Col xs={24} sm={12} md={6} style={{ marginBottom: 8 }}>
+            <Col xs={24} sm={12} md={5} style={{ marginBottom: 8 }}>
               <Select
                 placeholder="Lọc theo Sale phụ trách"
                 style={{ width: '100%' }}
@@ -917,10 +1027,46 @@ function CustomerList() {
               </Select>
             </Col>
           )}
-          <Col xs={24} sm={12} md={(hasPermission('crm.assign') || hasPermission('crm.auto_assign') || hasPermission('crm.view_all')) ? 4 : 8} style={{ textAlign: 'right', marginBottom: 8 }}>
-            <Button onClick={fetchCustomers} icon={<ReloadOutlined />}>
-              Làm mới
-            </Button>
+          <Col xs={24} sm={12} md={(hasPermission('crm.assign') || hasPermission('crm.auto_assign') || hasPermission('crm.view_all')) ? 6 : 8} style={{ textAlign: 'right', marginBottom: 8 }}>
+            <Space>
+              <Button 
+                type={isNewUnattendedFilter ? "primary" : "default"}
+                danger={isNewUnattendedFilter}
+                icon={<TeamOutlined />} 
+                onClick={() => setIsNewUnattendedFilter(!isNewUnattendedFilter)}
+              >
+                Khách mới chưa chăm
+              </Button>
+              <Button onClick={fetchCustomers} icon={<ReloadOutlined />}>
+                Làm mới
+              </Button>
+              <Popover 
+                placement="bottomRight" 
+                title="Tùy chỉnh cột hiển thị" 
+                content={
+                  <Checkbox.Group 
+                    options={[
+                      { label: 'Khách hàng', value: 'name' },
+                      { label: 'Liên hệ', value: 'contact' },
+                      { label: 'Nguồn', value: 'source' },
+                      { label: 'Địa chỉ', value: 'address' },
+                      { label: 'Trạng thái', value: 'status' },
+                      { label: 'Mức độ ưu tiên', value: 'priority_level' },
+                      { label: 'Số lượng SP dự kiến', value: 'expected_quantity' },
+                      { label: 'Tags', value: 'tags' },
+                      { label: 'Phụ trách (Sale)', value: 'assigned_to' },
+                      { label: 'Thao tác', value: 'actions' },
+                    ]}
+                    value={visibleColumns}
+                    onChange={setVisibleColumns}
+                    style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}
+                  />
+                }
+                trigger="click"
+              >
+                <Button icon={<TableOutlined />} />
+              </Popover>
+            </Space>
           </Col>
         </Row>
       </Card>
@@ -980,11 +1126,12 @@ function CustomerList() {
         />
       ) : (
         <Table scroll={{ x: 'max-content' }}
+          onChange={(pagination, filters, sorter) => setTableSort(sorter)}
           rowSelection={{
             selectedRowKeys,
             onChange: (newSelectedRowKeys) => setSelectedRowKeys(newSelectedRowKeys),
           }}
-          columns={columns}
+          columns={columns.filter(col => visibleColumns.includes(col.key))}
           dataSource={customers}
           loading={loading}
           rowKey="id"
@@ -1105,7 +1252,28 @@ function CustomerList() {
             </Col>
           </Row>
 
-          <Form.Item name="tag_ids" label="Gắn Tags">
+          <Row gutter={16}>
+            <Col xs={24} md={8}>
+              <Form.Item name="priority_level" label="Mức độ ưu tiên" initialValue="p4">
+                <Select placeholder="Chọn mức độ ưu tiên">
+                  {Object.entries(PRIORITY_MAP).map(([key, item]) => (
+                    <Option key={key} value={key}>
+                      <Space size={6}>
+                        <span>{item.icon}</span>
+                        <span>{item.label}</span>
+                      </Space>
+                    </Option>
+                  ))}
+                </Select>
+              </Form.Item>
+            </Col>
+            <Col xs={24} md={8}>
+              <Form.Item name="expected_quantity" label="Số lượng SP dự kiến">
+                <Input type="number" min={0} placeholder="Nhập số lượng..." />
+              </Form.Item>
+            </Col>
+            <Col xs={24} md={8}>
+              <Form.Item name="tag_ids" label="Gắn Tags">
             <Select
               mode="multiple"
               placeholder="Chọn tag..."
@@ -1119,6 +1287,8 @@ function CustomerList() {
               ))}
             </Select>
           </Form.Item>
+          </Col>
+        </Row>
 
           <Form.Item name="notes" label="Ghi chú thêm">
             <TextArea rows={3} placeholder="Ghi chú về nhu cầu, đặc điểm khách hàng..." />
@@ -1423,6 +1593,50 @@ function CustomerList() {
                         </Form.Item>
                       </Col>
                     </Row>
+                    <Row gutter={16}>
+                      <Col xs={24} md={12}>
+                        <Form.Item label="Mức độ ưu tiên">
+                          <Select 
+                            value={currentCustomer.priority_level} 
+                            onChange={(val) => handleUpdateSalesInfo('priority_level', val)}
+                          >
+                            {Object.entries(PRIORITY_MAP).map(([key, item]) => (
+                              <Option key={key} value={key}>{item.icon} {item.label}</Option>
+                            ))}
+                          </Select>
+                        </Form.Item>
+                      </Col>
+                      <Col xs={24} md={12}>
+                        <Form.Item label="Số lượng SP dự kiến">
+                          <Input 
+                            type="number"
+                            min={0}
+                            defaultValue={currentCustomer.expected_quantity} 
+                            onBlur={(e) => {
+                              const val = e.target.value ? parseInt(e.target.value) : null;
+                              if (val !== currentCustomer.expected_quantity) {
+                                handleUpdateSalesInfo('expected_quantity', val);
+                              }
+                            }}
+                            onPressEnter={(e) => {
+                              const val = e.target.value ? parseInt(e.target.value) : null;
+                              if (val !== currentCustomer.expected_quantity) {
+                                handleUpdateSalesInfo('expected_quantity', val);
+                              }
+                            }}
+                          />
+                        </Form.Item>
+                      </Col>
+                    </Row>
+                    <Form.Item label="Tags">
+                      <Select
+                        mode="multiple"
+                        placeholder="Chọn tags..."
+                        value={currentCustomer.tags?.map(t => t.id) || []}
+                        onChange={(val) => handleUpdateSalesInfo('tag_ids', val)}
+                        options={allTags.map(tag => ({ label: tag.name, value: tag.id }))}
+                      />
+                    </Form.Item>
                     <Form.Item label="Ghi chú">
                       <TextArea value={currentCustomer.notes || 'Không có ghi chú.'} rows={4} readOnly />
                     </Form.Item>

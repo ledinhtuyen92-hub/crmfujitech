@@ -67,6 +67,7 @@ def normalize_phone(phone: str) -> str:
 
 # ── Convert SocialLead -> Customer ───────────────────────────────────────────
 
+@transaction.atomic
 def convert_social_lead(social_lead, phone_number: str, assigned_user=None, customer_name=None, email: str = None, address: str = None, action_user=None):
     """
     Chuyển đổi SocialLead (Tầng 1) thành Customer (Tầng 2 — hồ sơ chuẩn).
@@ -81,6 +82,13 @@ def convert_social_lead(social_lead, phone_number: str, assigned_user=None, cust
         ValueError nếu lead đã được convert trước đó.
     """
     from crm.models import Customer
+    from zalo_integration.models import SocialLead
+
+    # Lock the lead row to prevent race conditions
+    try:
+        social_lead = SocialLead.objects.select_for_update().get(id=social_lead.id)
+    except SocialLead.DoesNotExist:
+        return None
 
     if social_lead.status == "converted" or social_lead.is_customer_converted:
         # Nếu đã có customer liên kết thì trả về ngay, không raise lỗi khi tự động quét
@@ -160,8 +168,8 @@ def convert_social_lead(social_lead, phone_number: str, assigned_user=None, cust
         if creator:
             from crm.models import CustomerInteraction
             CustomerInteraction.objects.create(
-                customer=customer,
-                type=CustomerInteraction.TYPE_CARE,
+                customer=social_lead.customer,
+                type="system",
                 content=f"[AI Tóm tắt Hội thoại Zalo]\n{social_lead.ai_summary}",
                 created_by=creator
             )
@@ -334,6 +342,11 @@ def extract_and_process_phone(social_lead, text: str):
         updated = True
 
     if norm_phone:
+        try:
+            social_lead.refresh_from_db()
+        except:
+            pass
+            
         if not (social_lead.is_customer_converted or hasattr(social_lead, 'customer')) and not (social_lead.detected_phone and social_lead.detected_phone != norm_phone):
             if not social_lead.detected_phone:
                 social_lead.detected_phone = norm_phone
@@ -361,6 +374,26 @@ def extract_and_process_phone(social_lead, text: str):
             else:
                 social_lead.is_customer_converted = False
                 updated = True
+        elif (social_lead.is_customer_converted or hasattr(social_lead, 'customer')) and (social_lead.detected_phone and social_lead.detected_phone != norm_phone) and hasattr(social_lead, 'customer') and social_lead.customer:
+            from crm.models import CustomerInteraction
+            from users.models import User
+            
+            creator = social_lead.assigned_to
+            if not creator:
+                creator = User.objects.filter(company=social_lead.company, is_company_admin=True).first() or User.objects.filter(company=social_lead.company).first()
+
+            note_content = f"Khách hàng cung cấp thêm số điện thoại phụ: {norm_phone}"
+            exists = CustomerInteraction.objects.filter(
+                customer_id=social_lead.customer.id, 
+                content__contains=norm_phone
+            ).exists()
+            if not exists and creator:
+                CustomerInteraction.objects.create(
+                    customer_id=social_lead.customer.id,
+                    type="system",
+                    content=note_content,
+                    created_by=creator
+                )
 
     if hasattr(social_lead, 'customer') and social_lead.customer:
         customer = social_lead.customer

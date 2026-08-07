@@ -1100,7 +1100,6 @@
     "permissions": [
       43,
       3,
-      5,
       4,
       8,
       7,
@@ -1331,7 +1330,7 @@
   "pk": 5,
   "fields": {
     "password": "pbkdf2_sha256$1000000$y0r9OZJd4RpamEVfAYmQnX$fIovSFt1DhV/rkznLp308iwXfmuWRgHjB3itunlIDbQ=",
-    "last_login": "2026-07-31T07:12:42.457Z",
+    "last_login": "2026-08-07T08:48:18.978Z",
     "is_superuser": false,
     "username": "hoaithuong_fuji",
     "first_name": "",
@@ -1874,15 +1873,6 @@
   }
 },
 {
-  "model": "crm.customertag",
-  "pk": 2,
-  "fields": {
-    "company": 15,
-    "name": "Khách VIP",
-    "color": "#1649c9"
-  }
-},
-{
   "model": "crm.customer",
   "pk": 27,
   "fields": {
@@ -1895,16 +1885,16 @@
     "birthday": "1992-09-14",
     "source": "other",
     "status": "has_order",
+    "priority_level": "p4",
     "is_inactive": false,
     "assigned_to": 5,
     "created_by": 5,
+    "expected_quantity": null,
     "notes": "",
     "social_lead": null,
     "created_at": "2026-07-17T07:07:20.573Z",
     "updated_at": "2026-07-17T07:07:20.573Z",
-    "tags": [
-      2
-    ]
+    "tags": []
   }
 },
 {
@@ -1920,13 +1910,15 @@
     "birthday": "1997-04-06",
     "source": "other",
     "status": "repeat_order",
+    "priority_level": "p4",
     "is_inactive": false,
     "assigned_to": 5,
     "created_by": 5,
+    "expected_quantity": null,
     "notes": "",
     "social_lead": null,
     "created_at": "2026-07-17T07:07:59.577Z",
-    "updated_at": "2026-07-23T16:52:29.461Z",
+    "updated_at": "2026-08-07T08:44:17.816Z",
     "tags": []
   }
 },
@@ -1943,9 +1935,11 @@
     "birthday": null,
     "source": "other",
     "status": "has_order",
+    "priority_level": "p4",
     "is_inactive": false,
     "assigned_to": null,
     "created_by": 2,
+    "expected_quantity": null,
     "notes": "",
     "social_lead": null,
     "created_at": "2026-07-24T02:56:49.751Z",
@@ -1966,9 +1960,11 @@
     "birthday": null,
     "source": "website",
     "status": "has_order",
+    "priority_level": "p4",
     "is_inactive": false,
     "assigned_to": null,
     "created_by": null,
+    "expected_quantity": null,
     "notes": "",
     "social_lead": null,
     "created_at": "2026-07-24T07:20:10.561Z",
@@ -1989,13 +1985,15 @@
     "birthday": null,
     "source": "Website",
     "status": "new",
+    "priority_level": "p2",
     "is_inactive": false,
     "assigned_to": null,
     "created_by": null,
+    "expected_quantity": null,
     "notes": "",
     "social_lead": null,
     "created_at": "2026-07-29T15:47:33.751Z",
-    "updated_at": "2026-07-29T15:47:33.751Z",
+    "updated_at": "2026-08-07T07:22:33.887Z",
     "tags": []
   }
 },
@@ -2012,16 +2010,41 @@
     "birthday": "2026-07-22",
     "source": "other",
     "status": "has_order",
+    "priority_level": "p1",
     "is_inactive": false,
     "assigned_to": 2,
     "created_by": 2,
+    "expected_quantity": null,
     "notes": "",
     "social_lead": null,
     "created_at": "2026-07-30T09:15:51.709Z",
-    "updated_at": "2026-07-30T09:15:51.709Z",
-    "tags": [
-      2
-    ]
+    "updated_at": "2026-08-07T07:21:38.695Z",
+    "tags": []
+  }
+},
+{
+  "model": "crm.customer",
+  "pk": 45,
+  "fields": {
+    "company": 15,
+    "name": "Lê Đình Tuyền",
+    "phone": "0967456325",
+    "email": "",
+    "address": "",
+    "city": "",
+    "birthday": null,
+    "source": "facebook",
+    "status": "new",
+    "priority_level": "p1",
+    "is_inactive": false,
+    "assigned_to": 5,
+    "created_by": null,
+    "expected_quantity": null,
+    "notes": "",
+    "social_lead": null,
+    "created_at": "2026-08-07T07:54:55.308Z",
+    "updated_at": "2026-08-07T08:42:12.185Z",
+    "tags": []
   }
 },
 {
@@ -2124,6 +2147,32 @@
     "result": "not_interested",
     "next_follow_up": null,
     "created_at": "2026-07-31T02:17:44.910Z"
+  }
+},
+{
+  "model": "crm.customerinteraction",
+  "pk": 15,
+  "fields": {
+    "customer": 45,
+    "created_by": 2,
+    "type": "system",
+    "content": "Khách hàng cung cấp thêm số điện thoại phụ: 0967356279",
+    "result": "",
+    "next_follow_up": null,
+    "created_at": "2026-08-07T07:54:55.375Z"
+  }
+},
+{
+  "model": "crm.customerinteraction",
+  "pk": 16,
+  "fields": {
+    "customer": 45,
+    "created_by": 2,
+    "type": "call",
+    "content": "ok",
+    "result": "interested",
+    "next_follow_up": null,
+    "created_at": "2026-08-07T07:55:13.962Z"
   }
 },
 {
@@ -3730,8 +3779,8 @@
     "customer": 38,
     "quotation": null,
     "created_by": 2,
-    "approved_by": null,
-    "status": "pending",
+    "approved_by": 2,
+    "status": "rejected",
     "financial_status": "unpaid",
     "payment_term": "Cọc 30% - Giao hàng 70%",
     "payment_terms_schedule": [
@@ -3815,7 +3864,7 @@
       }
     },
     "created_at": "2026-08-07T04:11:05.510Z",
-    "updated_at": "2026-08-07T04:11:05.510Z"
+    "updated_at": "2026-08-07T04:32:44.373Z"
   }
 },
 {
@@ -4497,22 +4546,6 @@
     "notes": "",
     "created_at": "2026-07-28T14:58:21.574Z",
     "updated_at": "2026-07-28T14:58:48.643Z"
-  }
-},
-{
-  "model": "production.productionorder",
-  "pk": 5,
-  "fields": {
-    "company": 15,
-    "production_order_code": null,
-    "order": 17,
-    "factory": null,
-    "status": "pending",
-    "start_date": "2026-08-04",
-    "end_date": null,
-    "notes": "",
-    "created_at": "2026-08-07T04:09:27.553Z",
-    "updated_at": "2026-08-07T04:09:27.553Z"
   }
 },
 {
@@ -8066,7 +8099,7 @@
     "title": "Có thông báo nội bộ mới: THÔNG BÁO CHÍNH SÁCH MỚI",
     "message": "<p>Công ty ra quyết định về chính sách áp dụng từ ngày 1/8&nbsp;<br></p>",
     "link": "/announcements",
-    "is_read": false,
+    "is_read": true,
     "created_at": "2026-07-31T03:35:23.218Z"
   }
 },
@@ -8141,7 +8174,7 @@
     "title": "Có thông báo nội bộ mới: THÔNG BÁO CHÍNH SÁCH MỚI",
     "message": "<p>Công ty ra quyết định về chính sách áp dụng từ ngày 1/8&nbsp;<br></p>",
     "link": "/announcements",
-    "is_read": false,
+    "is_read": true,
     "created_at": "2026-07-31T03:36:54.569Z"
   }
 },
@@ -8216,7 +8249,7 @@
     "title": "Có thông báo nội bộ mới: THÔNG BÁO CHÍNH SÁCH MỚI",
     "message": "<p>Công ty ra quyết định về chính sách áp dụng từ ngày 1/8&nbsp;<br></p>",
     "link": "/announcements",
-    "is_read": false,
+    "is_read": true,
     "created_at": "2026-07-31T03:37:27.191Z"
   }
 },
@@ -8291,7 +8324,7 @@
     "title": "Có thông báo nội bộ mới: THÔNG BÁO CHÍNH SÁCH MỚI",
     "message": "<p>Công ty ra quyết định về chính sách áp dụng từ ngày 1/8&nbsp;<br></p>",
     "link": "/announcements",
-    "is_read": false,
+    "is_read": true,
     "created_at": "2026-07-31T03:37:48.366Z"
   }
 },
@@ -8366,7 +8399,7 @@
     "title": "Có thông báo nội bộ mới: THÔNG BÁO CHÍNH SÁCH MỚI",
     "message": "<p>Công ty ra quyết định về chính sách áp dụng từ ngày 1/8&nbsp;<br></p>",
     "link": "/announcements",
-    "is_read": false,
+    "is_read": true,
     "created_at": "2026-07-31T14:39:17.005Z"
   }
 },
@@ -8413,6 +8446,51 @@
     "link": "/announcements",
     "is_read": false,
     "created_at": "2026-07-31T14:39:17.005Z"
+  }
+},
+{
+  "model": "notifications.notification",
+  "pk": 424,
+  "fields": {
+    "company": 15,
+    "recipient": 2,
+    "sender": 2,
+    "type": "order_rejected",
+    "title": "Đơn hàng bị từ chối",
+    "message": "Đơn hàng FUJI-DH-07082026-001 của khách Nhung đã bị từ chối.",
+    "link": "/orders/18",
+    "is_read": true,
+    "created_at": "2026-08-07T04:32:44.431Z"
+  }
+},
+{
+  "model": "notifications.notification",
+  "pk": 425,
+  "fields": {
+    "company": 15,
+    "recipient": 2,
+    "sender": 2,
+    "type": "approval",
+    "title": "Yêu cầu Phê duyệt Đơn hàng FUJI-DH-07082026-001 bị từ chối",
+    "message": "Nguyễn Anh Tuấn đã từ chối yêu cầu của bạn.",
+    "link": "/approvals",
+    "is_read": true,
+    "created_at": "2026-08-07T04:32:44.804Z"
+  }
+},
+{
+  "model": "notifications.notification",
+  "pk": 426,
+  "fields": {
+    "company": 15,
+    "recipient": 5,
+    "sender": 2,
+    "type": "crm_assigned",
+    "title": "Bạn có khách hàng mới được phân công",
+    "message": "Khách hàng Lê Đình Tuyền (0967456325) đã được phân công cho bạn.",
+    "link": "/customers/45",
+    "is_read": true,
+    "created_at": "2026-08-07T08:15:09.162Z"
   }
 },
 {
@@ -8781,9 +8859,9 @@
     "requester": 2,
     "title": "Phê duyệt Đơn hàng FUJI-DH-07082026-001",
     "description": "Đơn hàng FUJI-DH-07082026-001 — Khách hàng: Nhung",
-    "status": "pending",
+    "status": "rejected",
     "created_at": "2026-08-07T04:11:05.639Z",
-    "updated_at": "2026-08-07T04:11:05.639Z"
+    "updated_at": "2026-08-07T04:32:44.359Z"
   }
 },
 {
@@ -9049,11 +9127,11 @@
     "step_order": 1,
     "approver_user": null,
     "approver_role": null,
-    "acted_by": null,
-    "status": "pending",
+    "acted_by": 2,
+    "status": "rejected",
     "comment": "",
     "comments": "",
-    "acted_at": null
+    "acted_at": "2026-08-07T04:32:44.345Z"
   }
 },
 {
@@ -9499,6 +9577,58 @@
     "old_expires_at": "2026-07-30T15:11:34.107Z",
     "new_expires_at": null,
     "created_at": "2026-08-03T07:00:00.527Z"
+  }
+},
+{
+  "model": "zalo_integration.zalotokenrefreshlog",
+  "pk": 2,
+  "fields": {
+    "oa_config": 1,
+    "status": "failed",
+    "trigger": "auto",
+    "error_message": "Zalo error=-14014: Invalid refresh token.",
+    "old_expires_at": "2026-07-30T15:11:34.107Z",
+    "new_expires_at": null,
+    "created_at": "2026-08-07T05:00:00.656Z"
+  }
+},
+{
+  "model": "zalo_integration.zalotokenrefreshlog",
+  "pk": 3,
+  "fields": {
+    "oa_config": 1,
+    "status": "failed",
+    "trigger": "auto",
+    "error_message": "Zalo error=-14014: Invalid refresh token.",
+    "old_expires_at": "2026-07-30T15:11:34.107Z",
+    "new_expires_at": null,
+    "created_at": "2026-08-07T06:00:00.528Z"
+  }
+},
+{
+  "model": "zalo_integration.zalotokenrefreshlog",
+  "pk": 4,
+  "fields": {
+    "oa_config": 1,
+    "status": "failed",
+    "trigger": "auto",
+    "error_message": "Zalo error=-14014: Invalid refresh token.",
+    "old_expires_at": "2026-07-30T15:11:34.107Z",
+    "new_expires_at": null,
+    "created_at": "2026-08-07T07:00:00.764Z"
+  }
+},
+{
+  "model": "zalo_integration.zalotokenrefreshlog",
+  "pk": 5,
+  "fields": {
+    "oa_config": 1,
+    "status": "failed",
+    "trigger": "auto",
+    "error_message": "Zalo error=-14014: Invalid refresh token.",
+    "old_expires_at": "2026-07-30T15:11:34.107Z",
+    "new_expires_at": null,
+    "created_at": "2026-08-07T08:00:00.578Z"
   }
 },
 {
@@ -10165,19 +10295,19 @@
     "ai_agent": 1,
     "app_id": null,
     "app_secret": null,
-    "page_access_token": "",
+    "page_access_token": "EAALsyYQQicgBSC2dKoRQ4YARNLazqmFbATMXV8rJy9O2PkH4ZBJTTzjNNeG6f85wWhZBm7rP7KX1rFautBQAgZBQy7DbL4xWHZC9q5ZCD7Um5yCTSmIuAvadk06PNnw8ERK3OvBRw0sRmwBWmEZArFHDbYAlP61QNYwb2StGcZC352i9kh8aZAfNZCf4u2qA9DHLSOaR6vL76WkYglxTm8ZC59eGoZD",
     "token_expires_at": null,
     "webhook_verify_token": "",
-    "page_avatar": "https://scontent.fhan18-1.fna.fbcdn.net/v/t39.30808-1/276312741_4809681765825719_8303386643111870120_n.jpg?stp=cp0_dst-jpg_s50x50_tt6&_nc_cat=106&ccb=1-7&_nc_sid=f907e8&_nc_eui2=AeGoo-qRN_yOmup_epa6Thr2qd9-DflCPuyp334N-UI-7EGbl1SZm_NfhczUIxzPqAEJRPdlMLgK098ylQ6mp-DP&_nc_ohc=-8WfwPYOI5gQ7kNvwG7-H9s&_nc_oc=AdorQ5wivlXGQMV8wVKZ_dqJuu6ogL-_lD_CnQhAUNb7qiYHVA1wVJB87Fq2nag6jqg&_nc_zt=24&_nc_ht=scontent.fhan18-1.fna&edm=AGaHXAAEAAAA&_nc_gid=pXO5PG4iK36qNg0OjUH1oA&_nc_tpa=Q5bMBQEg8b87aHJx2VQZvNkh4DgNf9v_NqGgfZsbxYvykxxdB-eOafyD_dkGwT9_-GDaszFhpro_emhD&oh=00_AQEKFewJ2F8IW3okF9kWCSSr_5NkXQeGl7do7XC5NjgsaA&oe=6A75F6A8",
-    "is_active": false,
-    "auto_create_customer_from_phone": false,
+    "page_avatar": "https://scontent.fhan18-1.fna.fbcdn.net/v/t39.30808-1/276312741_4809681765825719_8303386643111870120_n.jpg?stp=cp0_dst-jpg_s50x50_tt6&_nc_cat=106&ccb=1-7&_nc_sid=f907e8&_nc_ohc=09DlCPLdGIMQ7kNvwEDywgJ&_nc_oc=Adq4qHbLIujPcRZy9Ut_qvmj-UPH76Fkz2_qcEdpiamJOUMpXI5gh3B9XXrzdMfIPIo&_nc_zt=24&_nc_ht=scontent.fhan18-1.fna&edm=AGaHXAAEAAAA&_nc_gid=j0tfcivOd7DF_FSwtqOsUg&_nc_tpa=Q5bMBQHdc47OSaTVJByfvYVcvqtp-38j6znArPHLvsMgr7Fg3qyoFl4juEaf9YcGPq61dgYO5y63PGBp&oh=00_AQEekSZ-Zkx17Arxon0xWhtVrlom5Sfb7Oh3A9dleaaL_g&oe=6A7B3CA8",
+    "is_active": true,
+    "auto_create_customer_from_phone": true,
     "lead_cleanup_days": 30,
     "request_phone_template": "Dạ chào bạn, để tiện chuyên viên tư vấn chi tiết và gửi bảng giá ưu đãi, bạn cho mình xin số điện thoại liên hệ với ạ ❤️",
     "request_email_template": "Dạ bạn cho mình xin địa chỉ Email để bên em gửi catalogue và thông tin chi tiết qua email cho mình nhé 📧",
     "assigned_to": null,
     "is_ai_active": true,
     "created_at": "2026-08-03T06:42:53.312Z",
-    "updated_at": "2026-08-03T06:54:28.249Z"
+    "updated_at": "2026-08-07T07:11:13.892Z"
   }
 },
 {
@@ -10202,165 +10332,634 @@
 },
 {
   "model": "facebook_integration.facebooklead",
-  "pk": 25,
+  "pk": 36,
   "fields": {
     "company": 15,
     "page_config": 9,
     "fb_user_id": "4748159361949508",
     "fb_user_name": "Lê Đình Tuyền",
-    "fb_user_avatar": "https://platform-lookaside.fbsbx.com/platform/profilepic/?eai=Aa0vDD-jy7KXHWIkecdwiDL3P4k2pAfR-jb1YlCuNuhqrEXkWXdPB6Y08On8e0rd95mR4BTKAjSz&psid=4748159361949508&width=1024&ext=1788331490&hash=AfvunMkNacwJaErx8ZMqsYEV",
-    "detected_phone": null,
+    "fb_user_avatar": "https://platform-lookaside.fbsbx.com/platform/profilepic/?eai=Aa3JTkfgjzqf46IVGvDCL5yI71e9P7o05P54a8c2-hSt7vlRCY02rnit2nJSGBd9PsiAAw4NYLqM&psid=4748159361949508&width=1024&ext=1788681321&hash=AfsP1vwjwg7K3qZAQwJ5Xo5h",
+    "detected_phone": "0967456325",
     "detected_email": null,
     "detected_address": null,
-    "is_customer_converted": false,
+    "is_customer_converted": true,
     "has_ai_followed_up": false,
-    "customer": null,
+    "customer": 45,
     "assigned_to": null,
     "is_starred": false,
     "is_ai_active": true,
     "has_unread_message": false,
     "unread_count": 0,
     "is_archived": false,
-    "last_message_at": "2026-08-03T06:53:27.587Z",
-    "last_message_preview": "Khách hỏi tư vấn cửa phòng ngủ và khóa.",
-    "ai_summary": "Khách hỏi tư vấn cửa phòng ngủ và khóa.",
-    "ai_tags": [
-      "Cần tư vấn",
-      "Cửa phòng ngủ",
-      "Khóa"
-    ],
-    "created_at": "2026-08-03T06:44:26.496Z",
-    "updated_at": "2026-08-03T06:53:35.205Z",
+    "last_message_at": "2026-08-07T08:14:46.543Z",
+    "last_message_preview": "Dạ em chào anh, không biết bộ phận chuyên viên bên em đã liên hệ tư vấn cho anh chưa ạ? Nếu anh cần tham khảo thêm các mẫu cửa vân gỗ đẹp cho công trình nhà mình thì báo em hỗ trợ ngay nhé ạ.",
+    "ai_summary": null,
+    "ai_tags": null,
+    "created_at": "2026-08-07T07:54:53.296Z",
+    "updated_at": "2026-08-07T07:54:55.336Z",
     "tags": []
   }
 },
 {
   "model": "facebook_integration.facebookmessage",
-  "pk": 911,
+  "pk": 1241,
   "fields": {
-    "lead": 25,
-    "fb_message_id": "m_AzXejGBXAnzgHbKc6CcYdD5XArWXuhqgvcgPG60c2RzPEjuWupkgdseRHMyQM8bqiloieIsoft4ak9nxi-LAsw",
+    "lead": 36,
+    "fb_message_id": "m_2-3xfmLlHDmaZDrASOVLxD5XArWXuhqgvcgPG60c2RyR1EVCrKT48Q6GoGo19DngkTVJzNtf6YSP0kurwZ7vHg",
     "sender_type": "customer",
-    "text": "hi",
+    "text": "xin chào",
     "attachment_url": null,
     "attachment_type": "",
     "payload": null,
-    "created_at": "2026-08-03T06:44:26.549Z"
+    "created_at": "2026-08-03T07:26:44Z"
   }
 },
 {
   "model": "facebook_integration.facebookmessage",
-  "pk": 912,
+  "pk": 1242,
   "fields": {
-    "lead": 25,
-    "fb_message_id": null,
+    "lead": 36,
+    "fb_message_id": "m_B2dzprZuA6NW9NqbjaOVcD5XArWXuhqgvcgPG60c2RyPMMzhnYKWgQsNUXDmu09JEKdiUAZ0ElKHSObppsosPw",
     "sender_type": "page",
-    "text": "Lỗi phản hồi tự động",
+    "text": "Dạ em chào anh/chị ạ! Em là Thu Hà, chuyên viên tư vấn cửa nhựa Composite. Anh/chị đang quan tâm đến mẫu cửa cho phòng ngủ hay nhà vệ sinh ạ?",
     "attachment_url": null,
     "attachment_type": "",
-    "payload": {
-      "error_message": "[Hệ thống AI] Lỗi API Key GEMINI: 401 UNAUTHENTICATED. {'error': {'code': 401, 'message': 'Request had invalid authentication credentials. Expected OAuth 2 access token, login cookie o...",
-      "is_system_alert": true
-    },
-    "created_at": "2026-08-03T06:44:34.222Z"
+    "payload": null,
+    "created_at": "2026-08-03T07:26:59Z"
   }
 },
 {
   "model": "facebook_integration.facebookmessage",
-  "pk": 913,
+  "pk": 1243,
   "fields": {
-    "lead": 25,
-    "fb_message_id": "m_9SnqFaJ8p5DcKLMeyPDhjT5XArWXuhqgvcgPG60c2RxZFQMIM-zG9ayIKWRSkASSzpInHiNo8wPDP0mxxSPENg",
+    "lead": 36,
+    "fb_message_id": "m_ZfiVgNHGLseBFdPC_GLjhT5XArWXuhqgvcgPG60c2RzMURcu-Yss7mrcX4t99chVBMqkSakrf2bsYoqnWHc6qQ",
     "sender_type": "customer",
-    "text": "tư vấn",
+    "text": "Phòng ngủ",
     "attachment_url": null,
     "attachment_type": "",
     "payload": null,
-    "created_at": "2026-08-03T06:46:41.696Z"
+    "created_at": "2026-08-03T07:27:09Z"
   }
 },
 {
   "model": "facebook_integration.facebookmessage",
-  "pk": 914,
+  "pk": 1244,
   "fields": {
-    "lead": 25,
-    "fb_message_id": null,
-    "sender_type": "page",
-    "text": "Dạ em chào anh/chị. Bên em chuyên cung cấp và lắp đặt cửa nhựa Composite chống nước, mối mọt và khóa thông minh ạ. Anh/chị đang cần tư vấn cửa cho phòng ngủ hay nhà vệ sinh vậy ạ?",
-    "attachment_url": null,
-    "attachment_type": "",
-    "payload": null,
-    "created_at": "2026-08-03T06:46:56.188Z"
-  }
-},
-{
-  "model": "facebook_integration.facebookmessage",
-  "pk": 915,
-  "fields": {
-    "lead": 25,
-    "fb_message_id": "m_6QCaJRvSTVWF7nDMDoINFD5XArWXuhqgvcgPG60c2Rwu4J5l8PTbtWnoGvi_R1GVz17r7MH9g5j7M0Jjsrhdkg",
+    "lead": 36,
+    "fb_message_id": "m_M9L3vDqHFlT1kJ_J8bmcKz5XArWXuhqgvcgPG60c2RzOV0q5rQxR1bTk6luFBLRXpZD227JQP6RfM9cQ5SwIOQ",
     "sender_type": "customer",
-    "text": "phòng ngủ và khoá",
+    "text": "gửi anh một số mẫu",
     "attachment_url": null,
     "attachment_type": "",
     "payload": null,
-    "created_at": "2026-08-03T06:47:12.401Z"
+    "created_at": "2026-08-03T07:27:23Z"
   }
 },
 {
   "model": "facebook_integration.facebookmessage",
-  "pk": 916,
+  "pk": 1245,
   "fields": {
-    "lead": 25,
-    "fb_message_id": null,
+    "lead": 36,
+    "fb_message_id": "m_PtZIk-pmF_NaDb4p84N7uT5XArWXuhqgvcgPG60c2Rx-cEmtPnn7qgKiNnQg1cSZWjls6M92kYIfei8LydXG_g",
     "sender_type": "page",
-    "text": "Dạ, cửa nhựa Composite bên em rất hợp làm cửa phòng ngủ vì cách âm tốt, mẫu mã đẹp và không lo mối mọt ạ. Về khóa, bên em có sẵn khóa tay gạt Inox Fujitech Look đi kèm theo bộ cửa hoặc dòng Khóa thông minh KTM01 hỗ trợ vân tay rất tiện lợi ạ. Anh/chị đang thích tông màu vân gỗ hay màu trơn hiện đại ạ?",
+    "text": "",
     "attachment_url": null,
     "attachment_type": "",
     "payload": null,
-    "created_at": "2026-08-03T06:47:26.833Z"
+    "created_at": "2026-08-03T07:27:26Z"
   }
 },
 {
   "model": "facebook_integration.facebookmessage",
-  "pk": 917,
+  "pk": 1246,
   "fields": {
-    "lead": 25,
-    "fb_message_id": null,
+    "lead": 36,
+    "fb_message_id": "m_UAQ5NJEoSd-xTNVx_OJGsj5XArWXuhqgvcgPG60c2Rz9cLc5l_LLsYxtgDzvX6-XJkrIf2Tkx905Gf_cPfpP6A",
     "sender_type": "page",
-    "text": "Dạ em chào anh/chị. Không biết anh/chị đã chọn được mẫu cửa phòng ngủ và khóa ưng ý chưa ạ? Nếu cần em hỗ trợ thêm thông tin hoặc gửi hình ảnh mẫu thực tế, anh/chị nhắn lại cho em nhé ạ.",
+    "text": "Dạ cửa nhựa Composite rất thích hợp cho phòng ngủ nhờ khả năng cách âm tốt và màu sắc vân gỗ cực kỳ sang trọng ạ. Để em gửi anh/chị xem qua một số mẫu cửa phòng ngủ bán chạy bên em nhé. Anh/chị đang thích tông màu gỗ truyền thống hay màu đơn sắc hiện đại ạ?",
     "attachment_url": null,
     "attachment_type": "",
     "payload": null,
-    "created_at": "2026-08-03T06:51:18.372Z"
+    "created_at": "2026-08-03T07:27:27Z"
   }
 },
 {
   "model": "facebook_integration.facebookmessage",
-  "pk": 918,
+  "pk": 1247,
   "fields": {
-    "lead": 25,
-    "fb_message_id": "m_5S_kIdNJAX0WJb1lSRvOuz5XArWXuhqgvcgPG60c2RyoV3IKTkcqLcuOULFrWj7KZCvXa7wXWXMMwA6JyGZizQ",
+    "lead": 36,
+    "fb_message_id": "m_RxkKeVAzHU64N5l16t3pEz5XArWXuhqgvcgPG60c2Rw5dYLBAhsfkQnENzYCbqe4zhNLZUMuVSIjFBSi3ipSJQ",
     "sender_type": "customer",
-    "text": "anh cần tư vấn",
-    "attachment_url": null,
-    "attachment_type": "",
+    "text": "",
+    "attachment_url": "https://scontent.fhan18-1.fna.fbcdn.net/v/t39.1997-6/39178562_1505197616293642_5411344281094848512_n.png?_nc_cat=1&ccb=1-7&_nc_sid=ef9b6e&_nc_ohc=Xhyw1j3bcJAQ7kNvwGbuJh7&_nc_oc=AdrN8iLF6YVNe7a7C9Tp6EosO9NWdcWyYixW3uppYZ5PE7lGeUXBuVp8fsriqD82yZI&_nc_zt=26&_nc_ht=scontent.fhan18-1.fna&edm=AKu_40MEAAAA&_nc_gid=F8xa3fUtBETD1s0jzzsPRw&_nc_tpa=Q5bMBQE4DvPOolaevh6qPF5rdp--iugvrfR3yFTd4NPx16vS9xs-YL5CiRgADF_oT2BuSjgZYB0gAjqz&oh=00_AQEXqJlTHDCQZ1u_Wl8-NuI_VNJC1X-lvBP6JSGy0-wtlg&oe=6A7B6C4B",
+    "attachment_type": "image",
     "payload": null,
-    "created_at": "2026-08-03T06:53:27.610Z"
+    "created_at": "2026-08-03T07:28:18Z"
   }
 },
 {
   "model": "facebook_integration.facebookmessage",
-  "pk": 919,
+  "pk": 1248,
   "fields": {
-    "lead": 25,
-    "fb_message_id": null,
+    "lead": 36,
+    "fb_message_id": "m_KNfqQ1PoAkVGdFkRKky_cD5XArWXuhqgvcgPG60c2RzP9D0Jx0jP7rH0T-CPIZr8UlIo7ZDwKpoGw8v8yxN3yQ",
     "sender_type": "page",
-    "text": "Dạ em đây ạ! Hiện tại anh đang cần làm mấy bộ cửa phòng ngủ và có muốn kết hợp cùng khóa thông minh vân tay không anh?",
+    "text": "Dạ, anh/chị đang cần làm mấy bộ cửa cho phòng ngủ nhà mình ạ? Để em tư vấn chi tiết và báo giá ưu đãi nhất cho mình nhé!",
     "attachment_url": null,
     "attachment_type": "",
     "payload": null,
-    "created_at": "2026-08-03T06:53:39.872Z"
+    "created_at": "2026-08-03T07:28:38Z"
+  }
+},
+{
+  "model": "facebook_integration.facebookmessage",
+  "pk": 1249,
+  "fields": {
+    "lead": 36,
+    "fb_message_id": "m_ylQlW0AlRml_D7LrIgWkRD5XArWXuhqgvcgPG60c2RyTv0MDfqTdtPYKyavM7VW7mvgM1QY6-n_KeqeibRbF_w",
+    "sender_type": "customer",
+    "text": "có các màu nào em",
+    "attachment_url": null,
+    "attachment_type": "",
+    "payload": null,
+    "created_at": "2026-08-03T07:28:40Z"
+  }
+},
+{
+  "model": "facebook_integration.facebookmessage",
+  "pk": 1250,
+  "fields": {
+    "lead": 36,
+    "fb_message_id": "m_fWi216VkkR2fhNLlx4mwtT5XArWXuhqgvcgPG60c2RwiAwm5qzl6wfg8y7qLlM-rMjJS5Oykv4z2igeNTbRzGg",
+    "sender_type": "page",
+    "text": "Dạ bên em có đến 25 bảng mã màu đa dạng từ các tông màu vân gỗ sang trọng đến màu đơn sắc hiện đại ạ. Anh/Chị đang chuộng tông màu sáng hay màu trầm gỗ ấm để em gửi bảng màu phù hợp cho mình ạ?",
+    "attachment_url": null,
+    "attachment_type": "",
+    "payload": null,
+    "created_at": "2026-08-03T07:28:56Z"
+  }
+},
+{
+  "model": "facebook_integration.facebookmessage",
+  "pk": 1251,
+  "fields": {
+    "lead": 36,
+    "fb_message_id": "m_vh-JJ0rdxMmyiycgW0BBrz5XArWXuhqgvcgPG60c2RyVjMUnU2dFCU26Tm255aHngsnYON-wGDH7THLICuF6rQ",
+    "sender_type": "page",
+    "text": "Tư vấn",
+    "attachment_url": null,
+    "attachment_type": "",
+    "payload": null,
+    "created_at": "2026-08-03T07:47:47Z"
+  }
+},
+{
+  "model": "facebook_integration.facebookmessage",
+  "pk": 1252,
+  "fields": {
+    "lead": 36,
+    "fb_message_id": "m_zPa_J_YJ_4ATcgmTGa-Mxz5XArWXuhqgvcgPG60c2RwhfG8PxO-oea8PAe_hQ3DU7gPDyH7XWKyzA8SEKIdFdw",
+    "sender_type": "page",
+    "text": "a cần tư vấn gì nữa không",
+    "attachment_url": null,
+    "attachment_type": "",
+    "payload": null,
+    "created_at": "2026-08-03T07:48:10Z"
+  }
+},
+{
+  "model": "facebook_integration.facebookmessage",
+  "pk": 1253,
+  "fields": {
+    "lead": 36,
+    "fb_message_id": "m_PmEi-h_dPmnktqAiLiuy9D5XArWXuhqgvcgPG60c2RzZUbZmNI5aBKH5Vc_xQlmlLzrMbyfz95Y_qLWT7SAQyA",
+    "sender_type": "page",
+    "text": "Kiểm tra trùng tin nhắn",
+    "attachment_url": null,
+    "attachment_type": "",
+    "payload": null,
+    "created_at": "2026-08-03T07:48:28Z"
+  }
+},
+{
+  "model": "facebook_integration.facebookmessage",
+  "pk": 1254,
+  "fields": {
+    "lead": 36,
+    "fb_message_id": "m_5ZHCqDP94KE2JXmfgjVuQz5XArWXuhqgvcgPG60c2RzrQRdjYQJl5xxaUMGXOKNOSL4DlxTCKD1soQ8mEFHAhw",
+    "sender_type": "customer",
+    "text": "có, tư vấn cho anh mẫu khoá cửa",
+    "attachment_url": null,
+    "attachment_type": "",
+    "payload": null,
+    "created_at": "2026-08-03T07:49:01Z"
+  }
+},
+{
+  "model": "facebook_integration.facebookmessage",
+  "pk": 1255,
+  "fields": {
+    "lead": 36,
+    "fb_message_id": "m_K4ouTd6FqMO0DRMBLlSj0z5XArWXuhqgvcgPG60c2Rwu3CsWteTpi6EkCiNfX7E_esb--gNI1DshrdBKNFaGyA",
+    "sender_type": "page",
+    "text": "Dạ, bên em sử dụng dòng khóa tay gạt Inox thương hiệu Fujitech Lock do chính nhà máy sản xuất, cam kết độ bền cao và bảo hành 12 tháng ạ. Ngoài ra bên em cũng có các dòng khóa điện tử, vân tay hiện đại. Anh đang muốn tham khảo dòng khóa cơ truyền thống hay khóa thông minh ạ?",
+    "attachment_url": null,
+    "attachment_type": "",
+    "payload": null,
+    "created_at": "2026-08-03T07:49:18Z"
+  }
+},
+{
+  "model": "facebook_integration.facebookmessage",
+  "pk": 1256,
+  "fields": {
+    "lead": 36,
+    "fb_message_id": "m_ufuqNPllPKvxVH0I2LPQej5XArWXuhqgvcgPG60c2RzONtwhHkI-iIyTSL9yhDRrC6MgTOrH9RYsG0Kffk3Zlw",
+    "sender_type": "customer",
+    "text": "khoá cơ",
+    "attachment_url": null,
+    "attachment_type": "",
+    "payload": null,
+    "created_at": "2026-08-03T07:49:28Z"
+  }
+},
+{
+  "model": "facebook_integration.facebookmessage",
+  "pk": 1257,
+  "fields": {
+    "lead": 36,
+    "fb_message_id": "m_V11UoahCnDD8MqQC2N73qT5XArWXuhqgvcgPG60c2RwfSW-TxogZtF5MPkbVY6R_LJB_4nTHZTH9eKD8IUL1vA",
+    "sender_type": "page",
+    "text": "",
+    "attachment_url": null,
+    "attachment_type": "",
+    "payload": null,
+    "created_at": "2026-08-03T07:49:46Z"
+  }
+},
+{
+  "model": "facebook_integration.facebookmessage",
+  "pk": 1258,
+  "fields": {
+    "lead": 36,
+    "fb_message_id": "m_ZJSWOSLWMBX7QweoaVnYCT5XArWXuhqgvcgPG60c2Rw-yRz2ptGRWn1JHUZRJMhwnRDQHRoVIjWQWVoxjJTLgw",
+    "sender_type": "page",
+    "text": "Dạ mẫu khóa cơ bên em là dòng khóa tay gạt làm bằng Inox cao cấp, thiết kế hiện đại và rất chắc chắn ạ. Dòng khóa này được bảo hành chính hãng 12 tháng. Để em gửi anh/chị xem hình ảnh một số mẫu khóa cơ bên em nhé?",
+    "attachment_url": null,
+    "attachment_type": "",
+    "payload": null,
+    "created_at": "2026-08-03T07:49:47Z"
+  }
+},
+{
+  "model": "facebook_integration.facebookmessage",
+  "pk": 1259,
+  "fields": {
+    "lead": 36,
+    "fb_message_id": "m_TKUThS3e7BEF2QLgZGsulD5XArWXuhqgvcgPG60c2Rwyh6bTSRnU3-85aWHJcpKSXsK3X0_Va6NwQKkCOH4SbA",
+    "sender_type": "customer",
+    "text": "Nhận tư vấn",
+    "attachment_url": null,
+    "attachment_type": "",
+    "payload": null,
+    "created_at": "2026-08-03T07:51:39Z"
+  }
+},
+{
+  "model": "facebook_integration.facebookmessage",
+  "pk": 1260,
+  "fields": {
+    "lead": 36,
+    "fb_message_id": "m_AWSAsV7ACT98SYecyKxhJz5XArWXuhqgvcgPG60c2Ryl5Nbmu6OuxWEIobl2N-2jp13jdRJsc6-rPDm2gwr9UA",
+    "sender_type": "page",
+    "text": "",
+    "attachment_url": "https://scontent.fhan18-1.fna.fbcdn.net/v/t1.15752-9/763860235_2351209578741088_135474276863635902_n.jpg?_nc_cat=105&ccb=1-7&_nc_sid=fc17b8&_nc_ohc=0MtXau_POcoQ7kNvwGzfU2Y&_nc_oc=AdoP5TVjCn5Y2srOwGY5QHhHHmbtwvNmIUHlmUVmL1MJFQ4o8HIy5L5-KTHQJVktdDw&_nc_zt=23&_nc_ht=scontent.fhan18-1.fna&edm=AKu_40MEAAAA&_nc_tpa=Q5bMBQED6RJ9dZOoOF0AJOiNf3VXs3PYhvONRTjy4WeigkRgGE5jiUBSelMz1Hpf_sTOMPxrqt_TVwIy&oh=03_Q7cD6AE0ZLLkKNcl2gYXLu0IQB_wuSx1WjuFwThk_i6I0O6Stg&oe=6A9CED02",
+    "attachment_type": "image",
+    "payload": null,
+    "created_at": "2026-08-03T07:52:01Z"
+  }
+},
+{
+  "model": "facebook_integration.facebookmessage",
+  "pk": 1261,
+  "fields": {
+    "lead": 36,
+    "fb_message_id": "m_fD3rSQnsRCy1j_5Zj2E02z5XArWXuhqgvcgPG60c2RwGTkAJxc82Pq2oYICZFUREqs-IVaijomT9JiIRrWWn4w",
+    "sender_type": "page",
+    "text": "Dạ mẫu KTM01 là dòng khóa thông minh Fujitech Lock cao cấp có giá 5.600.000 VNĐ/cái ạ. Mẫu này hỗ trợ mở bằng vân tay và mở từ xa qua ứng dụng rất tiện lợi. Anh/Chị định lắp khóa này cho cửa chính hay cửa phòng ạ?",
+    "attachment_url": null,
+    "attachment_type": "",
+    "payload": null,
+    "created_at": "2026-08-03T07:52:01Z"
+  }
+},
+{
+  "model": "facebook_integration.facebookmessage",
+  "pk": 1262,
+  "fields": {
+    "lead": 36,
+    "fb_message_id": "m_bNwkeYyrvvOpS9wKllndfj5XArWXuhqgvcgPG60c2RxsGkFrSonc0yY8NB9R2-fVLvgYv7ff32FKpfC6fiMkmw",
+    "sender_type": "customer",
+    "text": "a định lắp cho cửa chính, e tư vấn thêm",
+    "attachment_url": null,
+    "attachment_type": "",
+    "payload": null,
+    "created_at": "2026-08-03T07:54:02Z"
+  }
+},
+{
+  "model": "facebook_integration.facebookmessage",
+  "pk": 1263,
+  "fields": {
+    "lead": 36,
+    "fb_message_id": "m_WpUI48LDDALWRORzqyYatj5XArWXuhqgvcgPG60c2Rynz6nRYUn-2gb6LHIc53reXJY63En4HcAgejXRX5voBQ",
+    "sender_type": "page",
+    "text": "Dạ, mẫu KTM01 rất thích hợp cho cửa chính nhờ tính bảo mật cao, hỗ trợ mở khóa bằng vân tay, mã số và ứng dụng từ xa rất tiện lợi. Khóa được làm bằng chất liệu cao cấp, chống gỉ sét và bảo hành chính hãng 12 tháng ạ. Anh/Chị đã có sẵn cửa chưa hay muốn em tư vấn trọn bộ cả cửa Composite và khóa luôn ạ?",
+    "attachment_url": null,
+    "attachment_type": "",
+    "payload": null,
+    "created_at": "2026-08-03T07:54:20Z"
+  }
+},
+{
+  "model": "facebook_integration.facebookmessage",
+  "pk": 1264,
+  "fields": {
+    "lead": 36,
+    "fb_message_id": "m_uKOAVpxRGuVyO4qywgQ-4z5XArWXuhqgvcgPG60c2RyetJz8TiAeeDL86N4Z8N4u2S25hFIGi5y0TWsI-S_e4w",
+    "sender_type": "customer",
+    "text": "",
+    "attachment_url": "https://scontent.fhan18-1.fna.fbcdn.net/v/t39.1997-6/39178562_1505197616293642_5411344281094848512_n.png?_nc_cat=1&ccb=1-7&_nc_sid=ef9b6e&_nc_ohc=Xhyw1j3bcJAQ7kNvwGbuJh7&_nc_oc=AdrN8iLF6YVNe7a7C9Tp6EosO9NWdcWyYixW3uppYZ5PE7lGeUXBuVp8fsriqD82yZI&_nc_zt=26&_nc_ht=scontent.fhan18-1.fna&edm=AKu_40MEAAAA&_nc_gid=F8xa3fUtBETD1s0jzzsPRw&_nc_tpa=Q5bMBQFSvSp-2XlYQvqXbzTOlm_kUyfkrzZvb0NUsr2aAfqG8-vgHl6Qg2JZafA-aG56nXnxbqi4PrBJ&oh=00_AQGe1Kyv1QBJH0Yns5Ysw_zOUfQqIlyEgdZe8pIBqq0SNg&oe=6A7B6C4B",
+    "attachment_type": "image",
+    "payload": null,
+    "created_at": "2026-08-03T07:57:08Z"
+  }
+},
+{
+  "model": "facebook_integration.facebookmessage",
+  "pk": 1265,
+  "fields": {
+    "lead": 36,
+    "fb_message_id": "m_0LKzqAdv9oVBzJQwsuA9DD5XArWXuhqgvcgPG60c2Rz8OG8eW9iNG6soar_j33ewmmKSQpsBJorwXv3yvi2Ong",
+    "sender_type": "page",
+    "text": "Dạ, để em gửi báo giá chi tiết kèm ưu đãi khi mua trọn bộ cửa Composite và khóa KTM01, anh cho em xin số điện thoại (có Zalo) nhé ạ? Anh thích phong cách cửa màu vân gỗ sang trọng hay màu đơn sắc hiện đại ạ?",
+    "attachment_url": null,
+    "attachment_type": "",
+    "payload": null,
+    "created_at": "2026-08-03T07:57:28Z"
+  }
+},
+{
+  "model": "facebook_integration.facebookmessage",
+  "pk": 1266,
+  "fields": {
+    "lead": 36,
+    "fb_message_id": "m_ktwBLxGy_4HZnIEUGz6lSD5XArWXuhqgvcgPG60c2RxvepsSkCYYJitgX0rkQB6uT9m7V80ychm5_XoZKj5EUA",
+    "sender_type": "customer",
+    "text": "a thích màu vân gỗ",
+    "attachment_url": null,
+    "attachment_type": "",
+    "payload": null,
+    "created_at": "2026-08-03T08:06:39Z"
+  }
+},
+{
+  "model": "facebook_integration.facebookmessage",
+  "pk": 1267,
+  "fields": {
+    "lead": 36,
+    "fb_message_id": "m_2ipzi5JO_xK2op7htbdiyT5XArWXuhqgvcgPG60c2RzuZRQznyuWMK_kQkJM0oGdHbD0MUU_djoPbHKxx66HEA",
+    "sender_type": "page",
+    "text": "",
+    "attachment_url": null,
+    "attachment_type": "",
+    "payload": null,
+    "created_at": "2026-08-03T08:06:59Z"
+  }
+},
+{
+  "model": "facebook_integration.facebookmessage",
+  "pk": 1268,
+  "fields": {
+    "lead": 36,
+    "fb_message_id": "m_gjQpDQQb2ZEN8J32oCm6UT5XArWXuhqgvcgPG60c2Rxps_Iw0rPQZLRZ5hQDyxytb5YzqT8t8iNUakQwmjZQqw",
+    "sender_type": "page",
+    "text": "Dạ bên em có dòng film vân gỗ nhập khẩu 3D siêu chân thực và chống xước rất tốt, có tới 25 mã màu để anh thoải mái lựa chọn ạ. Để em gửi anh xem một số mẫu cửa vân gỗ đẹp nhé, anh định làm khoảng mấy bộ cửa ạ?",
+    "attachment_url": null,
+    "attachment_type": "",
+    "payload": null,
+    "created_at": "2026-08-03T08:07:00Z"
+  }
+},
+{
+  "model": "facebook_integration.facebookmessage",
+  "pk": 1269,
+  "fields": {
+    "lead": 36,
+    "fb_message_id": "m_7_YDTUpsAXhY5gV1xUsXJT5XArWXuhqgvcgPG60c2RzGgAdV74AyYavCo2EcgmtAvXKFkqtZZHmrXGPgKY4qGQ",
+    "sender_type": "customer",
+    "text": "10 bộ",
+    "attachment_url": null,
+    "attachment_type": "",
+    "payload": null,
+    "created_at": "2026-08-03T08:07:34Z"
+  }
+},
+{
+  "model": "facebook_integration.facebookmessage",
+  "pk": 1270,
+  "fields": {
+    "lead": 36,
+    "fb_message_id": "m_8i2P-ugGlMjFQdOKHVJ1-j5XArWXuhqgvcgPG60c2RzpnwvhkQce6z9h_DTZOxK2LrHtzIBOjfJBQvA5z_qw2A",
+    "sender_type": "page",
+    "text": "Dạ 10 bộ là bên em có chính sách chiết khấu rất tốt cho mình luôn đó ạ. Anh cho em xin số điện thoại (có Zalo) để em gửi bảng báo giá chi tiết từng bộ kèm catalogue trọn bộ 25 mã màu cho anh tham khảo nhé ạ?",
+    "attachment_url": null,
+    "attachment_type": "",
+    "payload": null,
+    "created_at": "2026-08-03T08:07:51Z"
+  }
+},
+{
+  "model": "facebook_integration.facebookmessage",
+  "pk": 1271,
+  "fields": {
+    "lead": 36,
+    "fb_message_id": "m_6CONNIA5_V3AQLIhkg5eUT5XArWXuhqgvcgPG60c2RyTvNoYNHBZAWrEePUgRMmokIsah-aWRoe7vXvoCFAtDA",
+    "sender_type": "page",
+    "text": "Dạ em chào anh ạ! Không biết công trình của mình đang ở giai đoạn hoàn thiện nào rồi anh nhỉ? Anh nhắn em hỗ trợ mình tư vấn thêm về kích thước hoặc kiểu dáng cửa nhé ạ!",
+    "attachment_url": null,
+    "attachment_type": "",
+    "payload": null,
+    "created_at": "2026-08-03T09:15:11Z"
+  }
+},
+{
+  "model": "facebook_integration.facebookmessage",
+  "pk": 1272,
+  "fields": {
+    "lead": 36,
+    "fb_message_id": "m_q9pWLEa8WU3iNYrnJUsTQT5XArWXuhqgvcgPG60c2RyQBGaWnwlqIQMWi3AptLgF4wZJlxjcOlj24LxIrPolBg",
+    "sender_type": "customer",
+    "text": "ok em, tư vấn thêm cho anh",
+    "attachment_url": null,
+    "attachment_type": "",
+    "payload": null,
+    "created_at": "2026-08-03T09:15:51Z"
+  }
+},
+{
+  "model": "facebook_integration.facebookmessage",
+  "pk": 1273,
+  "fields": {
+    "lead": 36,
+    "fb_message_id": "m_g_cfIj-ip5H4i8BXiOL7qz5XArWXuhqgvcgPG60c2RzMMTrzOUJRzfHGYV27U6H8jGKwvkC4VuToVbba1RphEg",
+    "sender_type": "customer",
+    "text": "sao không thấy tư vấn",
+    "attachment_url": null,
+    "attachment_type": "",
+    "payload": null,
+    "created_at": "2026-08-03T09:29:00Z"
+  }
+},
+{
+  "model": "facebook_integration.facebookmessage",
+  "pk": 1274,
+  "fields": {
+    "lead": 36,
+    "fb_message_id": "m_oYZ22Eohj7905TuZGJEgVz5XArWXuhqgvcgPG60c2Rypz5T4wzX8PSa1Fw703gWnVUTpLr8vSlTqhoTmPYyZag",
+    "sender_type": "page",
+    "text": "Dạ em xin lỗi anh vì phản hồi chậm trễ ạ! Với số lượng 10 bộ cửa vân gỗ, dòng Composite bên em có ưu điểm vượt trội là không cong vênh, mối mọt, chống nước 100% và giá trọn gói chỉ từ 2,950tr/bộ. Anh cho em xin số điện thoại (có Zalo) để em gửi ngay catalogue chi tiết và báo giá chiết khấu tốt nhất cho anh nhé ạ?",
+    "attachment_url": null,
+    "attachment_type": "",
+    "payload": null,
+    "created_at": "2026-08-03T09:29:19Z"
+  }
+},
+{
+  "model": "facebook_integration.facebookmessage",
+  "pk": 1275,
+  "fields": {
+    "lead": 36,
+    "fb_message_id": "m_h7IIaMncBZ6_gM---TeS8z5XArWXuhqgvcgPG60c2RzVy9rumQps7xppy2yaFZHRTSV4lC9mREwM9N9jcZBO3Q",
+    "sender_type": "page",
+    "text": "Dạ em chào anh, không biết anh đã xem qua các thông tin em gửi chưa ạ? Anh đang cần lắp cửa cho vị trí cửa phòng hay cửa nhà vệ sinh vậy anh?",
+    "attachment_url": null,
+    "attachment_type": "",
+    "payload": null,
+    "created_at": "2026-08-03T10:30:11Z"
+  }
+},
+{
+  "model": "facebook_integration.facebookmessage",
+  "pk": 1276,
+  "fields": {
+    "lead": 36,
+    "fb_message_id": "m_fE2ss6xug5YTnMJG9Tl0nT5XArWXuhqgvcgPG60c2RwVXtkoz4Sp2luLX8jchW50Y_XJzaHTy5dJFZcMi0WV8g",
+    "sender_type": "customer",
+    "text": "bên e có cửa inox không",
+    "attachment_url": null,
+    "attachment_type": "",
+    "payload": null,
+    "created_at": "2026-08-04T03:24:13Z"
+  }
+},
+{
+  "model": "facebook_integration.facebookmessage",
+  "pk": 1277,
+  "fields": {
+    "lead": 36,
+    "fb_message_id": "m_1zN-tFTrr3P9WcRq7hizRD5XArWXuhqgvcgPG60c2RwwubPg3zq40YCRfytgvSXmYD-G-1wpvWNUArJxDm-C4A",
+    "sender_type": "page",
+    "text": "Dạ bên em chuyên sản xuất và cung cấp dòng cửa nhựa Composite cao cấp thôi chứ không có cửa inox anh ạ. Dòng cửa Composite bên em chống nước tuyệt đối, không mối mọt và rất bền đẹp. Anh đang muốn làm cửa cho vị trí phòng ngủ hay nhà vệ sinh ạ?",
+    "attachment_url": null,
+    "attachment_type": "",
+    "payload": null,
+    "created_at": "2026-08-04T03:24:32Z"
+  }
+},
+{
+  "model": "facebook_integration.facebookmessage",
+  "pk": 1278,
+  "fields": {
+    "lead": 36,
+    "fb_message_id": "m_i9d8aZ16XS6MfehJl_sXAz5XArWXuhqgvcgPG60c2RyqGFxHh0h3NRtfXyhpxPqoOVk8QCHqFCQgxBWZ7TqxXg",
+    "sender_type": "page",
+    "text": "Dạ em chào anh ạ, không biết anh đã tìm được giải pháp cửa phù hợp cho nhà mình chưa ạ? Nếu anh cần làm cửa chịu nước tuyệt đối cho nhà vệ sinh hay cửa phòng bền đẹp thì cửa nhựa Composite bên em là lựa chọn rất tối ưu đó ạ.",
+    "attachment_url": null,
+    "attachment_type": "",
+    "payload": null,
+    "created_at": "2026-08-04T04:30:11Z"
+  }
+},
+{
+  "model": "facebook_integration.facebookmessage",
+  "pk": 1279,
+  "fields": {
+    "lead": 36,
+    "fb_message_id": "m_T1yQxFYRnL5WuhkNX-jYAj5XArWXuhqgvcgPG60c2RxFk5HtbEHSnIvxoqjVLIEsEev-irJs2fWu77Z04eIZzg",
+    "sender_type": "customer",
+    "text": "0967456325",
+    "attachment_url": null,
+    "attachment_type": "",
+    "payload": null,
+    "created_at": "2026-08-07T07:06:00Z"
+  }
+},
+{
+  "model": "facebook_integration.facebookmessage",
+  "pk": 1280,
+  "fields": {
+    "lead": 36,
+    "fb_message_id": "m_89WDJy7AjnoNVqqoXj6DJD5XArWXuhqgvcgPG60c2RyH0XSUy4oVocrV8tJ-Ka70fxV4OGRRieA0pgoOuWOXUw",
+    "sender_type": "page",
+    "text": "Dạ em cảm ơn anh đã để lại thông tin. Chuyên viên bên em sẽ liên hệ lại hỗ trợ anh ngay nhé ạ!",
+    "attachment_url": null,
+    "attachment_type": "",
+    "payload": null,
+    "created_at": "2026-08-07T07:06:22Z"
+  }
+},
+{
+  "model": "facebook_integration.facebookmessage",
+  "pk": 1281,
+  "fields": {
+    "lead": 36,
+    "fb_message_id": "m_NaW2YGwOHyf_eEnT0MMbRD5XArWXuhqgvcgPG60c2RyBhW6HDtjZBqHFEhZ01xX9VbGEjzELvr2uOsLkk7LvCg",
+    "sender_type": "customer",
+    "text": "0967356279",
+    "attachment_url": null,
+    "attachment_type": "",
+    "payload": null,
+    "created_at": "2026-08-07T07:11:51Z"
+  }
+},
+{
+  "model": "facebook_integration.facebookmessage",
+  "pk": 1282,
+  "fields": {
+    "lead": 36,
+    "fb_message_id": "m_cChYwidVRPtQcsK2gWC-iT5XArWXuhqgvcgPG60c2RzzwpfcL-ZCUONeyXCHnqz2yp04lMyJ0PbW5vmWNfiP-w",
+    "sender_type": "page",
+    "text": "Dạ em cảm ơn anh đã bổ sung thêm thông tin. Chuyên viên bên em sẽ liên hệ qua số này để hỗ trợ anh ngay nhé ạ!",
+    "attachment_url": null,
+    "attachment_type": "",
+    "payload": null,
+    "created_at": "2026-08-07T07:12:09Z"
+  }
+},
+{
+  "model": "facebook_integration.facebookmessage",
+  "pk": 1283,
+  "fields": {
+    "lead": 36,
+    "fb_message_id": "m_tcPzswjBLnXXl9vzXd1X3j5XArWXuhqgvcgPG60c2Ryl_KqEGmNKQsmgEMA5LITSTlnWjdQTmV_us6sA9YPe1A",
+    "sender_type": "page",
+    "text": "Dạ em chào anh, không biết bộ phận chuyên viên bên em đã liên hệ tư vấn cho anh chưa ạ? Nếu anh cần tham khảo thêm các mẫu cửa vân gỗ đẹp cho công trình nhà mình thì báo em hỗ trợ ngay nhé ạ.",
+    "attachment_url": null,
+    "attachment_type": "",
+    "payload": null,
+    "created_at": "2026-08-07T08:14:46.568Z"
   }
 },
 {

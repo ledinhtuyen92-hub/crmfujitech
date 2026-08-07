@@ -52,6 +52,7 @@ class CustomerViewSet(TenantQuerySetMixin, viewsets.ModelViewSet):
         "assign": "crm.assign",
         "round_robin_assign": "crm.auto_assign",
         "import_excel": "crm.import",
+        "update_sales_info": "crm.view",
     }
 
     def get_queryset(self):
@@ -85,11 +86,22 @@ class CustomerViewSet(TenantQuerySetMixin, viewsets.ModelViewSet):
             from django.db.models import Q
             qs = qs.filter(Q(name__icontains=search) | Q(phone__icontains=search))
             
-        from django.db.models import Count
+        from django.db.models import Count, Q
         qs = qs.annotate(
             quotation_count=Count('quotations', distinct=True),
-            order_count=Count('orders', distinct=True)
+            order_count=Count('orders', distinct=True),
+            interaction_count=Count('interactions', filter=~Q(interactions__type="system"), distinct=True)
         )
+        
+        # Sắp xếp
+        ordering = self.request.query_params.get("ordering")
+        if ordering:
+            # Cho phép sắp xếp theo priority_level, expected_quantity và created_at
+            if ordering in ['priority_level', '-priority_level', 'expected_quantity', '-expected_quantity', 'created_at', '-created_at']:
+                if ordering.endswith('created_at'):
+                    qs = qs.order_by(ordering)
+                else:
+                    qs = qs.order_by(ordering, '-created_at')
         return qs
 
     def perform_create(self, serializer):
@@ -399,6 +411,33 @@ class CustomerViewSet(TenantQuerySetMixin, viewsets.ModelViewSet):
             "errors": errors
         }, status=status.HTTP_200_OK)
 
+    @action(detail=True, methods=["patch"], url_path="update-sales-info")
+    def update_sales_info(self, request, pk=None):
+        """
+        PATCH /api/crm/customers/{id}/update-sales-info/
+        Cho phép Sale tự cập nhật Mức độ ưu tiên, Số lượng dự kiến, Tags
+        kể cả khi không có quyền sửa toàn bộ Khách hàng.
+        """
+        customer = self.get_object()
+        user = request.user
+        
+        # Chỉ cập nhật các trường được phép
+        if 'priority_level' in request.data:
+            customer.priority_level = request.data['priority_level']
+        
+        if 'expected_quantity' in request.data:
+            customer.expected_quantity = request.data['expected_quantity']
+            
+        if 'tag_ids' in request.data:
+            tag_ids = request.data['tag_ids']
+            from crm.models import CustomerTag
+            valid_tags = CustomerTag.objects.filter(company=user.company, id__in=tag_ids)
+            customer.tags.set(valid_tags)
+            
+        customer.save(update_fields=['priority_level', 'expected_quantity', 'updated_at'])
+        
+        return Response(CustomerSerializer(customer, context={"request": request}).data)
+
 
 class CustomerContactViewSet(viewsets.ModelViewSet):
     """CRUD đầu mối liên hệ — filter qua customer.company."""
@@ -480,6 +519,11 @@ class CustomerInteractionViewSet(viewsets.ModelViewSet):
         customer_id = self.request.query_params.get("customer_id")
         if customer_id:
             qs = qs.filter(customer_id=customer_id)
+        
+        customer = self.request.query_params.get("customer")
+        if customer:
+            qs = qs.filter(customer_id=customer)
+            
         return qs
 
     def perform_create(self, serializer):
