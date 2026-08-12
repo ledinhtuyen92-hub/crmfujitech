@@ -987,6 +987,13 @@ def async_extract_contact_info_hybrid(lead_id, text, platform, company_id):
         phone = data.get('phone', '')
         address = data.get('address', '')
         
+        # Nếu AI không bắt được số, nhưng regex bắt được thì lấy kết quả regex bổ sung
+        if not phone:
+            from facebook_integration.services import smart_extract_vn_phone
+            regex_phone = smart_extract_vn_phone(text)
+            if regex_phone:
+                phone = regex_phone
+        
         # Chỉ gọi update logic nếu có dữ liệu
         if phone or address:
             if platform == 'zalo':

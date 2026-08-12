@@ -894,7 +894,7 @@ def extract_and_process_phone(social_lead, text: str):
         
     # 2. Kiểm tra AI
     company = social_lead.company
-    has_active_ai = company.ai_agents.filter(is_active=True).exists()
+    has_active_ai = social_lead.is_ai_active and company.ai_agents.filter(is_active=True).exists()
     
     if has_active_ai:
         from ai_agents.tasks import async_extract_contact_info_hybrid
