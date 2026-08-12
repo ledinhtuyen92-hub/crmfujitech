@@ -108,7 +108,7 @@ def call_gemini(api_key, agent, system_prompt, conversation_history):
     client = google_genai.Client(api_key=api_key)
     
     # Build contents from conversation history  
-    contents = []
+    raw_contents = []
     for msg in conversation_history[-10:]:
         role = 'model' if msg['role'] == 'assistant' else 'user'
         parts = []
@@ -130,7 +130,22 @@ def call_gemini(api_key, agent, system_prompt, conversation_history):
         if not parts:
             parts.append(genai_types.Part.from_text(text="[Tin nhắn trống]"))
             
-        contents.append(genai_types.Content(role=role, parts=parts))
+        raw_contents.append((role, parts))
+        
+    # Gemini requires strictly alternating roles and must end with 'user'.
+    merged_contents = []
+    for role, parts in raw_contents:
+        if not merged_contents:
+            merged_contents.append({'role': role, 'parts': parts})
+        elif merged_contents[-1]['role'] == role:
+            merged_contents[-1]['parts'].extend(parts)
+        else:
+            merged_contents.append({'role': role, 'parts': parts})
+            
+    if merged_contents and merged_contents[-1]['role'] == 'model':
+        merged_contents.append({'role': 'user', 'parts': [genai_types.Part.from_text(text="[Khách hàng đang chờ phản hồi, hãy tiếp tục tư vấn]")]})
+        
+    contents = [genai_types.Content(role=c['role'], parts=c['parts']) for c in merged_contents]
     
     model_name = agent.model_name or 'gemini-2.0-flash'
     # Remove 'models/' prefix if present
