@@ -1845,7 +1845,6 @@ export default function Inventory() {
             <Col xs={24} md={24}>
               <Form.Item label="Hình ảnh sản phẩm (Tải lên ảnh mẫu cửa / sản phẩm)">
                 <Upload
-                  fileList={productImageFile ? [productImageFile] : []}
                   beforeUpload={(file) => {
                     const isImage = file.type.startsWith('image/')
                     if (!isImage) {
