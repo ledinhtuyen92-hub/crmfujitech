@@ -551,8 +551,10 @@ def process_fb_webhook_message(entry: dict):
             )
 
         # Quét SĐT trong tin nhắn (chỉ áp dụng cho tin nhắn của khách)
+        # Dùng Regex ngay lập tức để đảm bảo tự động tạo KH CRM không bị delay
+        # AI Hybrid (async) chỉ dùng cho quét lại lịch sử, không dùng cho real-time webhook
         if msg_text and sender_type == "customer":
-            extract_and_process_phone_fb(lead, msg_text)
+            extract_and_process_phone_fb_regex(lead, msg_text)
 
         # Trigger AI
         if sender_type == "customer" and lead.is_ai_active and lead.page_config and lead.page_config.is_ai_active and lead.page_config.ai_agent_id:

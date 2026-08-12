@@ -36,6 +36,7 @@ from .services import (
     debug_facebook_token,
     exchange_oauth_code_for_token,
     extract_and_process_phone_fb,
+    extract_and_process_phone_fb_regex,
     get_managed_pages,
     process_fb_webhook_message,
     send_facebook_message,
@@ -519,7 +520,8 @@ class FacebookLeadViewSet(mixins.UpdateModelMixin, mixins.DestroyModelMixin, vie
         
         messages = lead.messages.filter(sender_type="customer").order_by("-created_at")
         text_pool = "\n".join([m.text for m in messages if m.text] + [lead.last_message_preview or ""])
-        phone = extract_and_process_phone_fb(lead, text_pool)
+        # Dùng Regex trực tiếp (không qua AI) để kết quả đồng bộ ngay lập tức
+        phone = extract_and_process_phone_fb_regex(lead, text_pool)
         
         if phone or lead.detected_email or lead.detected_address:
             return Response({
@@ -663,9 +665,11 @@ class FacebookLeadViewSet(mixins.UpdateModelMixin, mixins.DestroyModelMixin, vie
         messages_qs = lead.messages.filter(sender_type="customer").order_by("-created_at")
         found_phone = None
         for msg in messages_qs:
-            found_phone = extract_and_process_phone_fb(lead, msg.text)
-            if found_phone:
-                break
+            if msg.text:
+                # Dùng Regex trực tiếp — không qua AI để kết quả đồng bộ ngay
+                found_phone = extract_and_process_phone_fb_regex(lead, msg.text)
+                if found_phone:
+                    break
 
         if found_phone:
             return Response({"detail": f"Đã phát hiện SĐT: {found_phone}", "phone": found_phone})
@@ -681,12 +685,14 @@ class FacebookLeadViewSet(mixins.UpdateModelMixin, mixins.DestroyModelMixin, vie
 
         found = 0
         for lead in qs:
-            for msg in lead.messages.filter(sender_type="customer"):
-                if msg.text:
-                    phone = extract_and_process_phone_fb(lead, msg.text)
-                    if phone:
-                        found += 1
-                        break
+            # Gộp tất cả tin nhắn của khách để tăng độ chính xác
+            msgs = lead.messages.filter(sender_type="customer").order_by("-created_at")[:50]
+            text_pool = "\n".join([m.text for m in msgs if m.text])
+            if text_pool:
+                # Dùng Regex trực tiếp — không qua AI để kết quả đồng bộ ngay lập tức
+                phone = extract_and_process_phone_fb_regex(lead, text_pool)
+                if phone:
+                    found += 1
 
         return Response({"detail": f"Đã quét xong. Phát hiện {found} SĐT mới."})
 

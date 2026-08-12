@@ -166,8 +166,9 @@ class ZaloWebhookView(APIView):
         social_lead.save()
 
         # Quét tự động SĐT & xử lý theo cấu hình
-        from .services import extract_and_process_phone
-        extract_and_process_phone(social_lead, message_text)
+        # Dùng Regex ngay lập tức (không qua AI) để đảm bảo tự động tạo KH CRM không bị delay
+        from .services import extract_and_process_phone_regex
+        extract_and_process_phone_regex(social_lead, message_text)
 
         # Lưu vào ZaloMessage
         from .models import ZaloMessage
@@ -723,15 +724,16 @@ class SocialLeadViewSet(viewsets.ModelViewSet):
     @action(detail=False, methods=["post"], url_path="scan-phones")
     def scan_phones(self, request):
         """Quét toàn bộ hội thoại Zalo để phát hiện SĐT, Email, Địa chỉ & tự động thêm khách hàng nếu bật cấu hình."""
-        from .services import extract_and_process_phone
+        from .services import extract_and_process_phone_regex
         from .models import ZaloMessage
         leads = SocialLead.objects.filter(company=request.user.company)
         scanned_count = 0
         detected_count = 0
         for lead in leads:
-            msgs = ZaloMessage.objects.filter(social_lead=lead, direction=ZaloMessage.DIRECTION_INBOUND).order_by("-created_at")[:30]
+            msgs = ZaloMessage.objects.filter(social_lead=lead, direction=ZaloMessage.DIRECTION_INBOUND).order_by("-created_at")[:50]
             text_pool = "\n".join([m.content for m in msgs if m.content] + [lead.last_message or ""])
-            phone = extract_and_process_phone(lead, text_pool)
+            # Dùng Regex trực tiếp — không qua AI để kết quả đồng bộ ngay lập tức
+            phone = extract_and_process_phone_regex(lead, text_pool)
             scanned_count += 1
             if phone or lead.detected_email or lead.detected_address:
                 detected_count += 1
@@ -744,12 +746,13 @@ class SocialLeadViewSet(viewsets.ModelViewSet):
     @action(detail=True, methods=["post"], url_path="rescan-phone")
     def rescan_phone(self, request, pk=None):
         """Quét lại tất cả tin nhắn cũ của một hội thoại Zalo để tìm SĐT, Email, Địa chỉ."""
-        from .services import extract_and_process_phone
+        from .services import extract_and_process_phone_regex
         from .models import ZaloMessage
         lead = self.get_object()
         msgs = ZaloMessage.objects.filter(social_lead=lead, direction=ZaloMessage.DIRECTION_INBOUND).order_by("-created_at")
         text_pool = "\n".join([m.content for m in msgs if m.content] + [lead.last_message or ""])
-        phone = extract_and_process_phone(lead, text_pool)
+        # Dùng Regex trực tiếp — không qua AI để kết quả đồng bộ ngay lập tức
+        phone = extract_and_process_phone_regex(lead, text_pool)
         if phone or lead.detected_email or lead.detected_address:
             return Response({
                 "detail": f"Đã quét thành công. SĐT: {lead.detected_phone or '---'}, Email: {lead.detected_email or '---'}, Địa chỉ: {lead.detected_address or '---'}",
