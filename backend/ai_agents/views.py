@@ -354,7 +354,7 @@ class AiKnowledgeDocumentViewSet(viewsets.ModelViewSet):
             provider = getattr(agent.company.ai_settings, 'default_embedding_provider', 'openai')
             doc, created = AiKnowledgeDocument.objects.get_or_create(
                 agent=agent,
-                title='📚 Cẩm nang Xử lý Từ chối (Auto)',
+                title='📚 Tổng hợp Q&A Hội thoại (Auto)',
                 doc_type='qa',
                 defaults={'content': extracted_text, 'status': 'pending', 'embedding_provider': provider}
             )
