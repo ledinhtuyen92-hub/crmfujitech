@@ -608,6 +608,7 @@ def extract_and_process_phone_fb_regex(lead, text: str):
         already_converted = lead.is_customer_converted or lead.customer_id
         phone_changed = lead.detected_phone and lead.detected_phone != norm_phone
         if not already_converted and not phone_changed:
+            # Lưu số điện thoại vào DB để UI hiển thị
             if not lead.detected_phone:
                 lead.detected_phone = norm_phone
                 updated = True
@@ -625,12 +626,16 @@ def extract_and_process_phone_fb_regex(lead, text: str):
             elif auto_create:
                 try:
                     convert_facebook_lead(lead, norm_phone)
+                    # convert_facebook_lead lưu nội bộ rồi, nhưng cần refresh để lấy trạng thái mới
+                    try: lead.refresh_from_db()
+                    except: pass
                     logger.info(f"[FacebookAutoScan] Tự động tạo KH từ SĐT {norm_phone} của Lead #{lead.id}")
                 except Exception as e:
                     logger.error(f"[FacebookAutoScan] Lỗi tự động tạo KH từ SĐT {norm_phone}: {e}")
-                    updated = True
             else:
-                lead.is_customer_converted = False
+                # Không bật auto-create: chỉ lưu detected_phone để hiển thị trong UI
+                if not lead.detected_phone:
+                    lead.detected_phone = norm_phone
                 updated = True
         elif already_converted and phone_changed and lead.customer_id:
             from crm.models import CustomerInteraction
@@ -665,6 +670,15 @@ def extract_and_process_phone_fb_regex(lead, text: str):
             cust_updated = True
         if cust_updated:
             customer.save(update_fields=["email", "address", "updated_at"])
+
+    # Đảm bảo lưu detected_phone vào DB nếu phát hiện được (dù auto_create bật hay tắt)
+    if norm_phone and not updated:
+        if lead.detected_phone != norm_phone:
+            lead.detected_phone = norm_phone
+            updated = True
+        elif not lead.detected_phone:
+            lead.detected_phone = norm_phone
+            updated = True
 
     if updated:
         update_f = ["detected_email", "detected_address", "updated_at"]
