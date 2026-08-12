@@ -603,40 +603,42 @@ def extract_and_process_phone_fb_regex(lead, text: str):
         except:
             pass
 
-        # 1. Nếu Lead ĐÃ được chuyển đổi thành Khách hàng CRM (hoặc ĐÃ gắn customer),
-        # tuyệt đối KHÔNG tạo thêm Khách hàng CRM thứ 2 và KHÔNG thay đổi SĐT/Khách hàng hiện tại.
-        already_converted = lead.is_customer_converted or lead.customer_id
+        # Đã tạo KH CRM rồi thì không làm gì thêm với số điện thoại này
+        already_converted = lead.is_customer_converted or bool(lead.customer_id)
         phone_changed = lead.detected_phone and lead.detected_phone != norm_phone
-        if not already_converted and not phone_changed:
-            # Lưu số điện thoại vào DB để UI hiển thị
-            if not lead.detected_phone:
+
+        if not already_converted:
+            # Luôn lưu detected_phone vào DB để UI hiển thị
+            if lead.detected_phone != norm_phone:
                 lead.detected_phone = norm_phone
                 updated = True
 
             from crm.models import Customer
             company = lead.company
-            already_exists = Customer.objects.filter(company=company, phone=norm_phone).exists()
             auto_create = lead.page_config.auto_create_customer_from_phone if lead.page_config else False
 
-            if already_exists:
-                existing_customer = Customer.objects.filter(company=company, phone=norm_phone).first()
-                lead.is_customer_converted = True
+            # Kiểm tra KH đã tồn tại theo SĐT chưa
+            existing_customer = Customer.objects.filter(company=company, phone=norm_phone).first()
+
+            if existing_customer:
+                # Liên kết KH có sẵn với hội thoại này
                 lead.customer = existing_customer
+                lead.is_customer_converted = True
                 updated = True
+                logger.info(f"[FacebookAutoScan] Liên kết KH #{existing_customer.id} (SĐT {norm_phone}) với Lead #{lead.id}")
             elif auto_create:
+                # Tạo KH CRM mới — convert_facebook_lead tự lưu lead và customer
                 try:
                     convert_facebook_lead(lead, norm_phone)
-                    # convert_facebook_lead lưu nội bộ rồi, nhưng cần refresh để lấy trạng thái mới
-                    try: lead.refresh_from_db()
-                    except: pass
-                    logger.info(f"[FacebookAutoScan] Tự động tạo KH từ SĐT {norm_phone} của Lead #{lead.id}")
+                    logger.info(f"[FacebookAutoScan] Tự động tạo KH từ SĐT {norm_phone} cho Lead #{lead.id}")
+                    try:
+                        lead.refresh_from_db()
+                    except:
+                        pass
                 except Exception as e:
-                    logger.error(f"[FacebookAutoScan] Lỗi tự động tạo KH từ SĐT {norm_phone}: {e}")
-            else:
-                # Không bật auto-create: chỉ lưu detected_phone để hiển thị trong UI
-                if not lead.detected_phone:
-                    lead.detected_phone = norm_phone
-                updated = True
+                    logger.error(f"[FacebookAutoScan] Lỗi tạo KH từ SĐT {norm_phone} - Lead #{lead.id}: {e}")
+            # Nếu auto_create tắt: detected_phone đã lưu ở trên, chỉ hiển thị trong UI
+
         elif already_converted and phone_changed and lead.customer_id:
             from crm.models import CustomerInteraction
             from users.models import User
