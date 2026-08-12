@@ -851,7 +851,6 @@ def sync_product_image_description(template_id):
             
     except Exception as e:
         logger.error(f"Error generating image description for template {template_id}: {e}")
-@shared_task
 
 @shared_task
 def summarize_facebook_conversation(lead_id, customer_id, action_user_id=None):
