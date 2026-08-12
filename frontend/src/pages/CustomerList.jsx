@@ -64,6 +64,7 @@ import {
   ShopOutlined,
   GlobalOutlined,
   FormOutlined,
+  RobotOutlined,
 } from '@ant-design/icons'
 import { useNavigate } from 'react-router-dom'
 import api from '../utils/api'
@@ -723,8 +724,8 @@ function CustomerList() {
               <span style={{ marginRight: 5 }}>{sourceIcon}</span>
               {sourceLabel}
             </Text>
-            <Text type="secondary" style={{ fontSize: 11 }}>
-              {creator ? `👤 ${creator}` : '🤖 Tự động'}
+            <Text type="secondary" style={{ fontSize: 11, display: 'inline-flex', alignItems: 'center' }}>
+              {creator ? `👤 ${creator}` : <><RobotOutlined style={{ marginRight: 4 }} /> Tự động</>}
             </Text>
           </Space>
         )
