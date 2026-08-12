@@ -550,8 +550,8 @@ def process_fb_webhook_message(entry: dict):
                 }
             )
 
-        # Quét SĐT trong tin nhắn
-        if msg_text:
+        # Quét SĐT trong tin nhắn (chỉ áp dụng cho tin nhắn của khách)
+        if msg_text and sender_type == "customer":
             extract_and_process_phone_fb(lead, msg_text)
 
         # Trigger AI

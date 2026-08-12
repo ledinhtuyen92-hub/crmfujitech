@@ -729,7 +729,7 @@ class SocialLeadViewSet(viewsets.ModelViewSet):
         scanned_count = 0
         detected_count = 0
         for lead in leads:
-            msgs = ZaloMessage.objects.filter(social_lead=lead).order_by("-created_at")[:30]
+            msgs = ZaloMessage.objects.filter(social_lead=lead, direction=ZaloMessage.DIRECTION_INBOUND).order_by("-created_at")[:30]
             text_pool = "\n".join([m.content for m in msgs if m.content] + [lead.last_message or ""])
             phone = extract_and_process_phone(lead, text_pool)
             scanned_count += 1
@@ -747,7 +747,7 @@ class SocialLeadViewSet(viewsets.ModelViewSet):
         from .services import extract_and_process_phone
         from .models import ZaloMessage
         lead = self.get_object()
-        msgs = ZaloMessage.objects.filter(social_lead=lead).order_by("-created_at")
+        msgs = ZaloMessage.objects.filter(social_lead=lead, direction=ZaloMessage.DIRECTION_INBOUND).order_by("-created_at")
         text_pool = "\n".join([m.content for m in msgs if m.content] + [lead.last_message or ""])
         phone = extract_and_process_phone(lead, text_pool)
         if phone or lead.detected_email or lead.detected_address:
