@@ -851,3 +851,92 @@ def sync_product_image_description(template_id):
             
     except Exception as e:
         logger.error(f"Error generating image description for template {template_id}: {e}")
+@shared_task
+
+@shared_task
+def summarize_facebook_conversation(lead_id, customer_id, action_user_id=None):
+    from facebook_integration.models import FacebookLead, FacebookMessage
+    from crm.models import Customer, CustomerInteraction
+    from users.models import User
+    from .services import generate_ai_reply
+    try:
+        lead = FacebookLead.objects.get(id=lead_id)
+        if not lead.page_config or not lead.page_config.ai_agent_id:
+            return
+            
+        messages = FacebookMessage.objects.filter(lead=lead).order_by('-created_at')[:10]
+        history = []
+        for m in reversed(messages):
+            role = 'user' if m.sender_type == 'customer' else 'assistant'
+            msg_dict = {'role': role, 'content': m.text or ''}
+            if m.attachment_url:
+                msg_dict['image_url'] = m.attachment_url
+            if not msg_dict['content'] and not msg_dict.get('image_url'):
+                msg_dict['content'] = '([File đính kèm])'
+            history.append(msg_dict)
+            
+        result = generate_ai_reply(lead.page_config.ai_agent, history, lead.fb_user_name)
+        if result and not result.get('error'):
+            summary = result.get('summary', '')
+            if summary:
+                lead.ai_summary = summary
+                lead.save(update_fields=['ai_summary'])
+                
+                customer = Customer.objects.filter(id=customer_id).first()
+                creator = User.objects.filter(id=action_user_id).first() if action_user_id else lead.assigned_to
+                if not creator:
+                    creator = User.objects.filter(company=lead.company).first()
+                    
+                if customer and creator:
+                    CustomerInteraction.objects.create(
+                        customer=customer,
+                        type="system",
+                        content=f"[AI Tóm tắt Hội thoại Facebook]\n{summary}",
+                        created_by=creator
+                    )
+    except Exception as e:
+        logger.error(f"Error summarizing facebook conversation {lead_id}: {e}")
+
+@shared_task
+def summarize_zalo_conversation(lead_id, customer_id, action_user_id=None):
+    from zalo_integration.models import SocialLead, ZaloMessage
+    from crm.models import Customer, CustomerInteraction
+    from users.models import User
+    from .services import generate_ai_reply
+    try:
+        lead = SocialLead.objects.get(id=lead_id)
+        if not lead.oa_config or not lead.oa_config.ai_agent_id:
+            return
+            
+        messages = ZaloMessage.objects.filter(social_lead=lead).order_by('-created_at')[:10]
+        history = []
+        for m in reversed(messages):
+            role = 'user' if m.direction == ZaloMessage.DIRECTION_INBOUND else 'assistant'
+            msg_dict = {'role': role, 'content': m.content or ''}
+            if m.attachment_url:
+                msg_dict['image_url'] = m.attachment_url
+            if not msg_dict['content'] and not msg_dict.get('image_url'):
+                msg_dict['content'] = '([File đính kèm])'
+            history.append(msg_dict)
+            
+        result = generate_ai_reply(lead.oa_config.ai_agent, history, lead.display_name)
+        if result and not result.get('error'):
+            summary = result.get('summary', '')
+            if summary:
+                lead.ai_summary = summary
+                lead.save(update_fields=['ai_summary'])
+                
+                customer = Customer.objects.filter(id=customer_id).first()
+                creator = User.objects.filter(id=action_user_id).first() if action_user_id else lead.assigned_to
+                if not creator:
+                    creator = User.objects.filter(company=lead.company).first()
+                    
+                if customer and creator:
+                    CustomerInteraction.objects.create(
+                        customer=customer,
+                        type="system",
+                        content=f"[AI Tóm tắt Hội thoại Zalo]\n{summary}",
+                        created_by=creator
+                    )
+    except Exception as e:
+        logger.error(f"Error summarizing zalo conversation {lead_id}: {e}")

@@ -173,6 +173,14 @@ def convert_social_lead(social_lead, phone_number: str, assigned_user=None, cust
                 content=f"[AI Tóm tắt Hội thoại Zalo]\n{social_lead.ai_summary}",
                 created_by=creator
             )
+    else:
+        # Nếu chưa có summary, trigger task để AI đọc và tóm tắt
+        try:
+            from ai_agents.tasks import summarize_zalo_conversation
+            action_user_id = action_user.id if action_user else None
+            summarize_zalo_conversation.delay(social_lead.id, customer.id, action_user_id)
+        except Exception as e:
+            logger.error(f"Failed to queue summarize_zalo_conversation: {e}")
 
     return customer
 

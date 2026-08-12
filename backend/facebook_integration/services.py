@@ -694,12 +694,20 @@ def convert_facebook_lead(lead, phone_number: str, assigned_user=None, customer_
                 if not creator:
                     from users.models import User
                     creator = User.objects.filter(company=lead.company).first()
-                CustomerInteraction.objects.create(
-                    customer=lead.customer,
-                    type="system",
-                    content=f"[AI Tóm tắt Hội thoại Facebook]\n{lead.ai_summary}",
-                    created_by=creator
-                )
+                if creator:
+                    CustomerInteraction.objects.create(
+                        customer=lead.customer,
+                        type="system",
+                        content=f"[AI Tóm tắt Hội thoại Facebook]\n{lead.ai_summary}",
+                        created_by=creator
+                    )
+            else:
+                try:
+                    from ai_agents.tasks import summarize_facebook_conversation
+                    action_user_id = action_user.id if action_user else None
+                    summarize_facebook_conversation.delay(lead.id, lead.customer.id, action_user_id)
+                except Exception as e:
+                    logger.error(f"Failed to queue summarize_facebook_conversation: {e}")
             lead.is_customer_converted = True
             lead.save(update_fields=["is_customer_converted", "updated_at"])
         # Cập nhật email/address nếu thiếu hoặc được truyền
@@ -748,18 +756,26 @@ def convert_facebook_lead(lead, phone_number: str, assigned_user=None, customer_
         lead.detected_phone = phone_number
     lead.save(update_fields=["customer", "is_customer_converted", "detected_phone", "updated_at"])
     
-    if getattr(lead, 'ai_summary', None):
-        creator = action_user or assigned_user or lead.assigned_to
-        if not creator:
-            from users.models import User
-            creator = User.objects.filter(company=lead.company).first()
-        if creator:
-            CustomerInteraction.objects.create(
-                customer=customer,
-                type="system",
-                content=f"[AI Tóm tắt Hội thoại Facebook]\n{lead.ai_summary}",
-                created_by=creator
-            )
+        if getattr(lead, 'ai_summary', None):
+            creator = action_user or assigned_user or lead.assigned_to
+            if not creator:
+                from users.models import User
+                creator = User.objects.filter(company=lead.company).first()
+            if creator:
+                CustomerInteraction.objects.create(
+                    customer=customer,
+                    type="system",
+                    content=f"[AI Tóm tắt Hội thoại Facebook]\n{lead.ai_summary}",
+                    created_by=creator
+                )
+        else:
+            # Nếu chưa có summary (do đồng bộ lịch sử thủ công), trigger task để AI đọc và tóm tắt
+            try:
+                from ai_agents.tasks import summarize_facebook_conversation
+                action_user_id = action_user.id if action_user else None
+                summarize_facebook_conversation.delay(lead.id, customer.id, action_user_id)
+            except Exception as e:
+                logger.error(f"Failed to queue summarize_facebook_conversation: {e}")
 
     return customer
 
