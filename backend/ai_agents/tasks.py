@@ -225,11 +225,15 @@ def process_ai_reply_zalo(lead_id, is_followup=False, trigger_msg_id=None):
         extracted = result.get('extracted_info', {})
         if isinstance(extracted, dict):
             phone = extracted.get('phone', '')
-            if phone and isinstance(phone, str) and 'rỗng' not in phone.lower() and len(phone) > 8 and not lead.detected_phone:
-                lead.detected_phone = phone
             address = extracted.get('address', '')
-            if address and isinstance(address, str) and 'rỗng' not in address.lower() and len(address) > 5 and not lead.detected_address:
-                lead.detected_address = address
+            
+            if phone and isinstance(phone, str) and 'rỗng' in phone.lower():
+                phone = ''
+            if address and isinstance(address, str) and 'rỗng' in address.lower():
+                address = ''
+                
+            if phone or address:
+                _apply_extracted_info(lead, phone, '', address, platform='zalo')
                 
         # 2. Gắn Tag
         if ai_agent.enable_auto_tagging:
@@ -419,11 +423,15 @@ def process_ai_reply_facebook(lead_id, is_followup=False, trigger_msg_id=None):
         extracted = result.get('extracted_info', {})
         if isinstance(extracted, dict):
             phone = extracted.get('phone', '')
-            if phone and isinstance(phone, str) and 'rỗng' not in phone.lower() and len(phone) > 8 and not lead.detected_phone:
-                lead.detected_phone = phone
             address = extracted.get('address', '')
-            if address and isinstance(address, str) and 'rỗng' not in address.lower() and len(address) > 5 and not lead.detected_address:
-                lead.detected_address = address
+            
+            if phone and isinstance(phone, str) and 'rỗng' in phone.lower():
+                phone = ''
+            if address and isinstance(address, str) and 'rỗng' in address.lower():
+                address = ''
+                
+            if phone or address:
+                _apply_extracted_info(lead, phone, '', address, platform='facebook')
                 
         # 2. Gắn Tag
         if ai_agent.enable_auto_tagging:
