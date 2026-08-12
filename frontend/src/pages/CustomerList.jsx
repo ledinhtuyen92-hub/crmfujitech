@@ -724,7 +724,7 @@ function CustomerList() {
               {sourceLabel}
             </Text>
             <Text type="secondary" style={{ fontSize: 11 }}>
-              {creator ? `👤 ${creator}` : 'Sale nhập tay'}
+              {creator ? `👤 ${creator}` : '🤖 Tự động'}
             </Text>
           </Space>
         )
