@@ -318,7 +318,7 @@ class AiKnowledgeDocumentViewSet(viewsets.ModelViewSet):
             
             # Use agent.model_name to extract
             from ai_agents.services import generate_raw_text
-            prompt = f"Bạn là chuyên gia huấn luyện AI. Hãy đọc đoạn hội thoại sau và bóc tách ra các thắc mắc khó của khách và cách Sale trả lời. Trình bày dưới dạng các cặp Hỏi - Đáp (Q&A) cực kỳ ngắn gọn, chuẩn mực. Không chứa tên riêng, số điện thoại hay khuyến mãi cá biệt.\nHội thoại:\n{transcript}"
+            prompt = f"Bạn là chuyên gia huấn luyện AI. Hãy đọc đoạn hội thoại sau và bóc tách ra các thắc mắc khó của khách và cách Sale trả lời. Trình bày dưới dạng các cặp Hỏi - Đáp (Q&A) cực kỳ ngắn gọn, chuẩn mực. Không chứa tên riêng, số điện thoại hay khuyến mãi cá biệt. CHỈ xuất ra danh sách các cặp Q&A, tuyệt đối KHÔNG viết thêm các câu dẫn dắt, giải thích hay mào đầu (ví dụ: 'Dưới đây là...').\nHội thoại:\n{transcript}"
             
             try:
                 extracted_text = generate_raw_text(agent, prompt)
