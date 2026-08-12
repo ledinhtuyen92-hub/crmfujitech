@@ -550,11 +550,22 @@ def process_fb_webhook_message(entry: dict):
                 }
             )
 
-        # Quét SĐT trong tin nhắn (chỉ áp dụng cho tin nhắn của khách)
-        # Dùng Regex ngay lập tức để đảm bảo tự động tạo KH CRM không bị delay
-        # AI Hybrid (async) chỉ dùng cho quét lại lịch sử, không dùng cho real-time webhook
+        # Phát hiện SĐT trong tin nhắn của khách (luồng Hybrid 2 bước)
         if msg_text and sender_type == "customer":
-            extract_and_process_phone_fb_regex(lead, msg_text)
+            # Bước 1: Regex phát hiện số điện thoại ngay lập tức → lưu vào DB để UI hiển thị liền
+            norm_phone = smart_extract_vn_phone(msg_text)
+            if norm_phone and not lead.detected_phone:
+                lead.detected_phone = norm_phone
+                lead.save(update_fields=['detected_phone', 'updated_at'])
+
+            # Bước 2: Nếu AI bật → gọi AI xác minh và tạo KH CRM (AI có fallback Regex nếu lỗi)
+            # Nếu AI tắt → Regex xử lý trực tiếp (email, địa chỉ, tự tạo KH CRM)
+            company_has_ai = lead.is_ai_active and company.ai_agents.filter(is_active=True).exists()
+            if company_has_ai:
+                from ai_agents.tasks import async_extract_contact_info_hybrid
+                async_extract_contact_info_hybrid.delay(lead.id, msg_text, 'facebook', company.id)
+            else:
+                extract_and_process_phone_fb_regex(lead, msg_text)
 
         # Trigger AI
         if sender_type == "customer" and lead.is_ai_active and lead.page_config and lead.page_config.is_ai_active and lead.page_config.ai_agent_id:

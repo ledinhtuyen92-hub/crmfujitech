@@ -165,10 +165,23 @@ class ZaloWebhookView(APIView):
         social_lead.has_ai_followed_up = False
         social_lead.save()
 
-        # Quét tự động SĐT & xử lý theo cấu hình
-        # Dùng Regex ngay lập tức (không qua AI) để đảm bảo tự động tạo KH CRM không bị delay
-        from .services import extract_and_process_phone_regex
-        extract_and_process_phone_regex(social_lead, message_text)
+        # Phát hiện SĐT trong tin nhắn của khách (luồng Hybrid 2 bước)
+        # Bước 1: Regex phát hiện số điện thoại ngay lập tức → lưu vào DB để UI hiển thị liền
+        from .services import smart_extract_vn_phone, extract_and_process_phone_regex
+        if message_text:
+            norm_phone = smart_extract_vn_phone(message_text)
+            if norm_phone and not social_lead.detected_phone:
+                social_lead.detected_phone = norm_phone
+                social_lead.save(update_fields=['detected_phone'])
+
+            # Bước 2: Nếu AI bật → gọi AI xác minh và tạo KH CRM (AI có fallback Regex nếu lỗi)
+            # Nếu AI tắt → Regex xử lý trực tiếp (email, địa chỉ, tự tạo KH CRM)
+            company_has_ai = social_lead.is_ai_active and company.ai_agents.filter(is_active=True).exists()
+            if company_has_ai:
+                from ai_agents.tasks import async_extract_contact_info_hybrid
+                async_extract_contact_info_hybrid.delay(social_lead.id, message_text, 'zalo', company.id)
+            else:
+                extract_and_process_phone_regex(social_lead, message_text)
 
         # Lưu vào ZaloMessage
         from .models import ZaloMessage
