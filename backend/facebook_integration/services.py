@@ -1066,11 +1066,12 @@ def extract_and_process_phone_fb(lead, text: str):
         
     # 2. Kiểm tra AI
     company = lead.company
-    has_active_ai = company.ai_agents.filter(is_active=True).exists()
+    has_active_ai = lead.is_ai_active and company.ai_agents.filter(is_active=True).exists()
     
     if has_active_ai:
         from ai_agents.tasks import async_extract_contact_info_hybrid
         async_extract_contact_info_hybrid.delay(lead.id, text, 'facebook', company.id)
+        return None # Async processing
     else:
         # Fallback
-        extract_and_process_phone_fb_regex(lead, text)
+        return extract_and_process_phone_fb_regex(lead, text)

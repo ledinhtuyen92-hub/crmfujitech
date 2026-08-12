@@ -899,6 +899,7 @@ def extract_and_process_phone(social_lead, text: str):
     if has_active_ai:
         from ai_agents.tasks import async_extract_contact_info_hybrid
         async_extract_contact_info_hybrid.delay(social_lead.id, text, 'zalo', company.id)
+        return None # Async processing
     else:
         # Fallback
-        extract_and_process_phone_regex(social_lead, text)
+        return extract_and_process_phone_regex(social_lead, text)
