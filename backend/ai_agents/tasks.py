@@ -1084,7 +1084,7 @@ def _apply_extracted_info(lead, phone, email, address, platform):
                 new_customer = Customer.objects.create(
                     company=company,
                     phone=norm_phone,
-                    name=lead.display_name or (f"Zalo Khách {norm_phone}" if platform == 'zalo' else f"FB Khách {norm_phone}"),
+                    name=getattr(lead, 'display_name', getattr(lead, 'fb_user_name', '')) or (f"Zalo Khách {norm_phone}" if platform == 'zalo' else f"FB Khách {norm_phone}"),
                     source="Zalo" if platform == 'zalo' else "Facebook",
                     status="new",
                     address=lead.detected_address or ""
