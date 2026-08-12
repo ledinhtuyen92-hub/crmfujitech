@@ -562,12 +562,11 @@ def process_fb_webhook_message(entry: dict):
 
 # ── Trích xuất và xử lý SĐT từ hội thoại Facebook ───────────────────────────
 
-def extract_and_process_phone_fb(lead, text: str):
+def extract_and_process_phone_fb_regex(lead, text: str):
     """
-    Quét SĐT, Email và Địa chỉ trong tin nhắn Facebook với thuật toán thông minh.
+    Quét SĐT, Email và Địa chỉ trong tin nhắn Facebook với thuật toán thông minh (RegEx).
     Tự động tạo KH hoặc đánh dấu trạng thái tuỳ theo cấu hình.
-    Đảm bảo: Mỗi hội thoại/Lead Facebook chỉ nhận diện 1 SĐT chính và tạo tối đa 1 Khách hàng CRM.
-    Nếu người dùng cho 2 số điện thoại (hoặc nhắn nhiều SĐT), tuyệt đối không tạo thành 2 Khách hàng CRM khác nhau.
+    Được gọi như một Fallback nếu AI tắt hoặc bị lỗi.
     """
     if not text:
         return None
@@ -1043,3 +1042,35 @@ def send_facebook_carousel(page_access_token: str, recipient_psid: str, elements
     except Exception as e:
         logger.error(f"[Facebook] Exception Carousel: {e}")
         return {"success": False, "error": str(e)}
+def extract_and_process_phone_fb(lead, text: str):
+    """
+    Điểm truy cập chính cho việc trích xuất thông tin liên hệ Facebook (Cơ chế Hybrid).
+    Kiểm tra sơ bộ xem có chứa SĐT hay Địa chỉ không.
+    Nếu có và AI đang bật, đẩy sang AI xử lý ngầm.
+    Nếu AI tắt, dùng RegEx cũ.
+    """
+    if not text:
+        return None
+        
+    import re
+    text_lower = text.lower()
+    
+    # 1. Phát hiện nhanh (Heuristics)
+    has_potential_info = (
+        bool(re.search(r'\d{8,}', text)) or
+        any(k in text_lower for k in ['tỉnh', 'thành phố', 'quận', 'huyện', 'phường', 'xã', 'đường', 'phố', 'ngõ', 'ngách', 'số nhà', 'chung cư', 'nhà', 'ship', '@'])
+    )
+    
+    if not has_potential_info:
+        return None
+        
+    # 2. Kiểm tra AI
+    company = lead.company
+    has_active_ai = company.ai_agents.filter(is_active=True).exists()
+    
+    if has_active_ai:
+        from ai_agents.tasks import async_extract_contact_info_hybrid
+        async_extract_contact_info_hybrid.delay(lead.id, text, 'facebook', company.id)
+    else:
+        # Fallback
+        extract_and_process_phone_fb_regex(lead, text)
