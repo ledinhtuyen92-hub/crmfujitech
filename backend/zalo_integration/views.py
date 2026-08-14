@@ -174,13 +174,30 @@ class ZaloWebhookView(APIView):
                 social_lead.detected_phone = norm_phone
                 social_lead.save(update_fields=['detected_phone'])
 
-            # Bước 2: Nếu AI bật → gọi AI xác minh và tạo KH CRM (AI có fallback Regex nếu lỗi)
-            # Nếu AI tắt → Regex xử lý trực tiếp (email, địa chỉ, tự tạo KH CRM)
-            company_has_ai = social_lead.is_ai_active and company.ai_agents.filter(is_active=True).exists()
-            if company_has_ai:
+            # Bước 2: Quyết định luồng xử lý tạo KH CRM
+            # - Chỉ gọi AI Hybrid task (bất đồng bộ) khi CẢ HAI cờ đều BẬT:
+            #   + oa_config.is_ai_active = True (AI toàn OA bật)
+            #   + social_lead.is_ai_active = True (AI hội thoại chưa bị Sale tắt)
+            # - Mọi trường hợp còn lại → dùng RegEx đồng bộ để đảm bảo tạo KH CRM
+            #   ngay lập tức, không phụ thuộc vào Celery worker.
+            #
+            # BUG FIX: Dùng oa_config.is_ai_active (cờ toàn OA), không phải
+            # social_lead.is_ai_active (per-conversation, mặc định=True cho mọi hội thoại mới).
+            # Đồng thời refresh từ DB để tránh đọc giá trị cũ từ memory.
+            social_lead.refresh_from_db(fields=['is_ai_active'])
+            conversation_ai_active = social_lead.is_ai_active
+            oa_ai_active = (
+                social_lead.oa_config is not None
+                and social_lead.oa_config.is_ai_active
+                and social_lead.oa_config.ai_agent_id
+            )
+            if oa_ai_active and conversation_ai_active:
+                # Cả AI OA lẫn AI hội thoại đều BẬT → gọi AI Hybrid
                 from ai_agents.tasks import async_extract_contact_info_hybrid
                 async_extract_contact_info_hybrid.delay(social_lead.id, message_text, 'zalo', company.id)
             else:
+                # AI tắt (toàn OA hoặc hội thoại cụ thể) → dùng RegEx đồng bộ
+                # để đảm bảo tự động tạo KH CRM ngay lập tức
                 extract_and_process_phone_regex(social_lead, message_text)
 
         # Lưu vào ZaloMessage
@@ -217,9 +234,15 @@ class ZaloWebhookView(APIView):
             self._push_notification(social_lead, message_text)
 
         # Trigger AI
-        if social_lead.is_ai_active and social_lead.oa_config and social_lead.oa_config.is_ai_active and social_lead.oa_config.ai_agent_id:
-            from ai_agents.tasks import trigger_zalo_ai
-            trigger_zalo_ai(social_lead.id)
+        # BUG FIX: Dùng conversation_ai_active đã được refresh từ DB ở bước phát hiện SĐT.
+        # Nếu không có message_text (tin nhắn ảnh/file thuần), cần refresh riêng để
+        # tránh đọc giá trị cũ từ memory khi Sale đã tắt AI cho hội thoại này.
+        if social_lead.oa_config and social_lead.oa_config.is_ai_active and social_lead.oa_config.ai_agent_id:
+            if not message_text:
+                social_lead.refresh_from_db(fields=['is_ai_active'])
+            if social_lead.is_ai_active:
+                from ai_agents.tasks import trigger_zalo_ai
+                trigger_zalo_ai(social_lead.id)
 
     def _handle_oa_send_message(self, company, oa_config, data):
         """Xử lý khi OA (nhân viên hoặc AI) nhắn tin cho user (webhook echo)."""
