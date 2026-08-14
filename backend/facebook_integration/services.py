@@ -558,29 +558,36 @@ def process_fb_webhook_message(entry: dict):
                 lead.detected_phone = norm_phone
                 lead.save(update_fields=['detected_phone', 'updated_at'])
 
-            # Bước 2: Nếu AI bật → gọi AI xác minh và tạo KH CRM (AI có fallback Regex nếu lỗi)
-            # Nếu AI tắt → Regex xử lý trực tiếp (email, địa chỉ, tự tạo KH CRM)
-            # BUG FIX: Dùng page_config.is_ai_active (cờ toàn page) thay vì lead.is_ai_active
-            # (per-conversation). lead.is_ai_active mặc định = True nên khi tắt AI toàn page
-            # mà dùng lead.is_ai_active sẽ vẫn kích hoạt AI task → SĐT không được xử lý RegEx
-            # → Regex tạo KH CRM bị bỏ qua hoàn toàn.
+            # Bước 2: Quyết định luồng xử lý tạo KH CRM
+            # - Chỉ gọi AI Hybrid task (bất đồng bộ) khi CẢ HAI cờ đều BẬT:
+            #   + page_config.is_ai_active = True (AI toàn page bật)
+            #   + lead.is_ai_active = True (AI hội thoại chưa bị Sale tắt)
+            # - Mọi trường hợp còn lại → dùng RegEx đồng bộ để đảm bảo tạo KH CRM
+            #   ngay lập tức, không phụ thuộc vào Celery worker.
+            #
+            # QUAN TRỌNG: Dùng lead.is_ai_active từ DB (đã refresh), không từ memory.
+            lead.refresh_from_db(fields=['is_ai_active'])
+            conversation_ai_active = lead.is_ai_active
             page_ai_active = (
                 lead.page_config is not None
                 and lead.page_config.is_ai_active
                 and lead.page_config.ai_agent_id
             )
-            if page_ai_active:
+            if page_ai_active and conversation_ai_active:
+                # Cả AI page lẫn AI hội thoại đều BẬT → gọi AI Hybrid (AI trả lời + extract thông tin)
                 from ai_agents.tasks import async_extract_contact_info_hybrid
                 async_extract_contact_info_hybrid.delay(lead.id, msg_text, 'facebook', company.id)
             else:
-                # AI toàn page đang TẮT → dùng RegEx xử lý trực tiếp (tạo KH CRM)
+                # AI tắt (toàn page hoặc hội thoại cụ thể) → dùng RegEx đồng bộ
+                # để đảm bảo tự động tạo KH CRM ngay lập tức
                 extract_and_process_phone_fb_regex(lead, msg_text)
 
         # Trigger AI chỉ khi page_config bật AI VÀ hội thoại này chưa bị Sale tiếp quản.
-        # BUG FIX: Thêm refresh_from_db để luôn đọc giá trị is_ai_active mới nhất từ DB,
-        # tránh trường hợp đọc giá trị cũ từ memory khi Sale vừa tắt AI cho hội thoại này.
+        # is_ai_active đã được refresh từ DB ở bước phát hiện SĐT bên trên (nếu có msg_text).
+        # Nếu không có msg_text, cần refresh riêng để tránh đọc giá trị cũ từ memory.
         if sender_type == "customer" and lead.page_config and lead.page_config.is_ai_active and lead.page_config.ai_agent_id:
-            lead.refresh_from_db(fields=['is_ai_active'])
+            if msg_text is None:
+                lead.refresh_from_db(fields=['is_ai_active'])
             if lead.is_ai_active:
                 from ai_agents.tasks import trigger_facebook_ai
                 trigger_facebook_ai(lead.id)
