@@ -76,7 +76,7 @@ class ZaloOaConfigWriteSerializer(serializers.ModelSerializer):
             "access_token", "refresh_token", "token_expires_at",
             "webhook_secret", "auto_send_payment_zns", "auto_send_delivery_zns", 
             "auto_send_birthday_zns", "auto_create_customer_from_phone", "lead_cleanup_days",
-            "request_phone_template", "request_email_template", "is_active", "ai_agent"
+            "request_phone_template", "request_email_template", "is_active", "ai_agent", "is_ai_active"
         ]
 
     def validate(self, attrs):
