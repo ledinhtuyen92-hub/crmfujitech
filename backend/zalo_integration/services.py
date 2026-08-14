@@ -356,7 +356,11 @@ def extract_and_process_phone_regex(social_lead, text: str):
         except:
             pass
             
-        if not (social_lead.is_customer_converted or hasattr(social_lead, 'customer')) and not (social_lead.detected_phone and social_lead.detected_phone != norm_phone):
+        # BUG FIX: Dùng is_customer_converted thay vì hasattr(social_lead, 'customer').
+        # Customer model có OneToOneField reverse relation tên 'customer' về SocialLead,
+        # khiến hasattr(social_lead, 'customer') LUÔN trả về True dù chưa có KH nào.
+        # → Điều kiện "not (... or hasattr(...))" luôn False → không bao giờ tạo được KH.
+        if not social_lead.is_customer_converted and not (social_lead.detected_phone and social_lead.detected_phone != norm_phone):
             if not social_lead.detected_phone:
                 social_lead.detected_phone = norm_phone
                 updated = True
@@ -383,26 +387,31 @@ def extract_and_process_phone_regex(social_lead, text: str):
             else:
                 social_lead.is_customer_converted = False
                 updated = True
-        elif (social_lead.is_customer_converted or hasattr(social_lead, 'customer')) and (social_lead.detected_phone and social_lead.detected_phone != norm_phone) and hasattr(social_lead, 'customer') and social_lead.customer:
-            from crm.models import CustomerInteraction
-            from users.models import User
-            
-            creator = social_lead.assigned_to
-            if not creator:
-                creator = User.objects.filter(company=social_lead.company, is_company_admin=True).first() or User.objects.filter(company=social_lead.company).first()
+        elif social_lead.is_customer_converted and (social_lead.detected_phone and social_lead.detected_phone != norm_phone):
+            try:
+                linked_customer = social_lead.customer  # OneToOne reverse - có thể raise DoesNotExist
+            except Exception:
+                linked_customer = None
+            if linked_customer:
+                from crm.models import CustomerInteraction
+                from users.models import User
 
-            note_content = f"Khách hàng cung cấp thêm số điện thoại phụ: {norm_phone}"
-            exists = CustomerInteraction.objects.filter(
-                customer_id=social_lead.customer.id, 
-                content__contains=norm_phone
-            ).exists()
-            if not exists and creator:
-                CustomerInteraction.objects.create(
-                    customer_id=social_lead.customer.id,
-                    type="system",
-                    content=note_content,
-                    created_by=creator
-                )
+                creator = social_lead.assigned_to
+                if not creator:
+                    creator = User.objects.filter(company=social_lead.company, is_company_admin=True).first() or User.objects.filter(company=social_lead.company).first()
+
+                note_content = f"Khách hàng cung cấp thêm số điện thoại phụ: {norm_phone}"
+                exists = CustomerInteraction.objects.filter(
+                    customer_id=linked_customer.id,
+                    content__contains=norm_phone
+                ).exists()
+                if not exists and creator:
+                    CustomerInteraction.objects.create(
+                        customer_id=linked_customer.id,
+                        type="system",
+                        content=note_content,
+                        created_by=creator
+                    )
 
     if hasattr(social_lead, 'customer') and social_lead.customer:
         customer = social_lead.customer
