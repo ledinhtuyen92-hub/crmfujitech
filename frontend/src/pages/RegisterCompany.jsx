@@ -74,7 +74,7 @@ function RegisterCompany() {
             }}
           >
             <Space size={12} style={{ marginBottom: 28 }}>
-              <img src="/logo.png" alt="Fujitech Logo" style={{ height: 28, width: 'auto', objectFit: 'contain' }} />
+              <img src="/logo.png" alt="Fujitech Logo" style={{ height: 48, width: 'auto', objectFit: 'contain' }} />
               <Text strong style={{ color: '#fff', fontSize: 18 }}>
                 Fujitech Hub
               </Text>
