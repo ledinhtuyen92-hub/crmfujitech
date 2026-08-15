@@ -425,8 +425,8 @@ function MainLayout({ children, isDarkMode, toggleTheme }) {
       >
           <div
             style={{
-              width: 48,
-              height: 48,
+              width: 64,
+              height: 64,
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
