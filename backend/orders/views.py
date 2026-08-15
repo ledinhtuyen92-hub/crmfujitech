@@ -58,6 +58,12 @@ class OrderViewSet(TenantQuerySetMixin, viewsets.ModelViewSet):
 
         # Filter theo thanh toán & công nợ
         fin_status = self.request.query_params.get("financial_status")
+        
+        # Filter theo đối tượng thanh toán
+        payment_target = self.request.query_params.get("payment_target")
+        if payment_target:
+            qs = qs.filter(payment_target=payment_target)
+
         if fin_status == "pending_credit":
             from approvals.models import ApprovalRequest
             from django.contrib.contenttypes.models import ContentType

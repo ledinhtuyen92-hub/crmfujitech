@@ -55,6 +55,7 @@ class OrderSerializer(serializers.ModelSerializer):
     created_by_name = serializers.CharField(source="created_by.full_name", read_only=True)
     approved_by_name = serializers.CharField(source="approved_by.full_name", read_only=True)
     financial_status_display = serializers.CharField(source="get_financial_status_display", read_only=True)
+    payment_target_display = serializers.CharField(source="get_payment_target_display", read_only=True)
     paid_amount = serializers.FloatField(read_only=True)
     remaining_debt = serializers.FloatField(read_only=True)
     company_info = serializers.SerializerMethodField()
@@ -86,6 +87,8 @@ class OrderSerializer(serializers.ModelSerializer):
             "financial_status_display",
             "payment_term",
             "payment_terms_schedule",
+            "payment_target",
+            "payment_target_display",
             "paid_amount",
             "remaining_debt",
             "installation_date",

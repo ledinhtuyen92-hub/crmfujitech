@@ -79,6 +79,7 @@ export default function OrderList() {
   const [searchText, setSearchText] = useState('')
   const [statusFilter, setStatusFilter] = useState('')
   const [financialFilter, setFinancialFilter] = useState('')
+  const [paymentTargetFilter, setPaymentTargetFilter] = useState('')
   const [exportFilter, setExportFilter] = useState('')
 
   // Modal Add / Edit
@@ -190,6 +191,7 @@ export default function OrderList() {
       amount: defaultAmount,
       payment_method: 'transfer',
       note: note,
+      payment_target: selectedOrder?.payment_target || undefined,
     })
     setReceiptModalVisible(true)
   }
@@ -256,6 +258,9 @@ export default function OrderList() {
   const handleCreateReceipt = async (values) => {
     setReceiptSubmitting(true)
     try {
+      if (!selectedOrder.payment_target && values.payment_target) {
+        await api.patch(`/orders/orders/${selectedOrder.id}/`, { payment_target: values.payment_target })
+      }
       await api.post('/finance/receipts/', {
         order: selectedOrder.id,
         milestone: values.milestone || null,
@@ -361,6 +366,7 @@ export default function OrderList() {
       const params = {}
       if (statusFilter) params.status = statusFilter
       if (financialFilter) params.financial_status = financialFilter
+      if (paymentTargetFilter) params.payment_target = paymentTargetFilter
       if (exportFilter) params.export_status = exportFilter
       const res = await api.get('/orders/orders/', { params })
       const data = Array.isArray(res.data) ? res.data : res.data?.results ?? []
@@ -370,7 +376,7 @@ export default function OrderList() {
     } finally {
       setLoading(false)
     }
-  }, [statusFilter, financialFilter, exportFilter, messageApi])
+  }, [statusFilter, financialFilter, paymentTargetFilter, exportFilter, messageApi])
 
   const fetchCustomersAndProducts = useCallback(async () => {
     await Promise.resolve()
@@ -1239,6 +1245,7 @@ export default function OrderList() {
           ? order.payment_terms_schedule 
           : [{ title: 'Thanh toán đợt 1', percentage: 100, type: 'deposit' }],
         vat_rate: Number(order.vat_rate || 0),
+        payment_target: order.payment_target || undefined,
       })
       if (order.items && order.items.length > 0) {
         const mainItems = order.items.filter(it => it.item_type !== 'service')
@@ -1367,6 +1374,7 @@ export default function OrderList() {
           ...(editingOrder?.custom_data || {}),
           ...(templateSnapshot ? { template_snapshot: templateSnapshot } : {}),
         },
+        payment_target: values.payment_target || null,
       }
 
       let orderId
@@ -1922,7 +1930,7 @@ export default function OrderList() {
               <Option value="completed"><Badge status="success" text="Hoàn thành" /></Option>
             </Select>
           </Col>
-          <Col xs={24} sm={12} md={7}>
+          <Col xs={24} sm={12} md={5}>
             <Select
               placeholder="Thanh toán & Công nợ"
               value={financialFilter || undefined}
@@ -1931,13 +1939,25 @@ export default function OrderList() {
               style={{ width: '100%' }}
             >
               <Option value="unpaid"><Badge status="default" text="Chờ thanh toán / Chờ cọc" /></Option>
-              <Option value="deposit_paid"><Badge status="processing" text="Đã cọc (Đủ ĐK sản xuất)" /></Option>
-              <Option value="fully_paid"><Badge status="success" text="Đã thanh toán đủ (Đủ ĐK XK)" /></Option>
+              <Option value="deposit_paid"><Badge status="processing" text="Đã cọc" /></Option>
+              <Option value="fully_paid"><Badge status="success" text="Đã thanh toán đủ" /></Option>
               <Option value="credit_approved"><Badge status="warning" text="Duyệt xuất nợ ngoại lệ" /></Option>
               <Option value="pending_credit"><Badge status="error" text="Đang chờ duyệt kho nợ" /></Option>
             </Select>
           </Col>
           <Col xs={24} sm={12} md={5}>
+            <Select
+              placeholder="Đối tượng TT"
+              value={paymentTargetFilter || undefined}
+              onChange={(val) => setPaymentTargetFilter(val || '')}
+              allowClear
+              style={{ width: '100%' }}
+            >
+              <Option value="personal">Cá nhân</Option>
+              <Option value="company">Công ty</Option>
+            </Select>
+          </Col>
+          <Col xs={24} sm={12} md={4}>
             <Select
               placeholder="Vận hành Kho"
               value={exportFilter || undefined}
@@ -2164,19 +2184,27 @@ export default function OrderList() {
           </Card>
 
           <Row gutter={16}>
-            <Col xs={24} sm={8}>
-              <Form.Item name="delivery_time" label="Thời gian giao hàng / thi công">
-                <Input placeholder="3-5 ngày làm việc..." />
+            <Col xs={24} sm={6}>
+              <Form.Item name="delivery_time" label="Thời gian giao hàng">
+                <Input placeholder="3-5 ngày..." />
               </Form.Item>
             </Col>
-            <Col xs={24} sm={8}>
-              <Form.Item name="warranty_months" label="Thời hạn bảo hành (tháng)">
+            <Col xs={24} sm={6}>
+              <Form.Item name="warranty_months" label="Bảo hành (tháng)">
                 <InputNumber min={0} style={{ width: '100%' }} />
               </Form.Item>
             </Col>
-            <Col xs={24} sm={8}>
-              <Form.Item name="validity_days" label="Hiệu lực báo giá (ngày)">
+            <Col xs={24} sm={6}>
+              <Form.Item name="validity_days" label="Hiệu lực giá (ngày)">
                 <InputNumber min={1} style={{ width: '100%' }} />
+              </Form.Item>
+            </Col>
+            <Col xs={24} sm={6}>
+              <Form.Item name="payment_target" label="Đối tượng thanh toán">
+                <Radio.Group>
+                  <Radio value="personal">Cá nhân</Radio>
+                  <Radio value="company">Công ty</Radio>
+                </Radio.Group>
               </Form.Item>
             </Col>
           </Row>
@@ -2546,6 +2574,16 @@ export default function OrderList() {
               <Option value="cash">Tiền mặt</Option>
               <Option value="card">Thẻ / POS</Option>
             </Select>
+          </Form.Item>
+          <Form.Item
+            name="payment_target"
+            label="Đối tượng thanh toán (Hóa đơn)"
+            rules={[{ required: true, message: 'Vui lòng chọn Đối tượng thanh toán' }]}
+          >
+            <Radio.Group disabled={!!selectedOrder?.payment_target}>
+              <Radio value="personal">Cá nhân</Radio>
+              <Radio value="company">Công ty</Radio>
+            </Radio.Group>
           </Form.Item>
           <Form.Item name="note" label="Ghi chú Kế toán">
             <TextArea rows={2} placeholder="Nhập ghi chú giao dịch, số UNC..." />

@@ -84,6 +84,19 @@ class Order(models.Model):
         verbose_name="Trạng thái tài chính",
         db_index=True,
     )
+    
+    PAYMENT_TARGET_CHOICES = [
+        ("personal", "Cá nhân"),
+        ("company", "Công ty"),
+    ]
+    payment_target = models.CharField(
+        max_length=20,
+        choices=PAYMENT_TARGET_CHOICES,
+        null=True,
+        blank=True,
+        verbose_name="Đối tượng thanh toán",
+        db_index=True,
+    )
     payment_term = models.CharField(
         max_length=150,
         default="Cọc 30% - Giao hàng 70%",
