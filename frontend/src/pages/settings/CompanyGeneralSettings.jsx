@@ -270,7 +270,7 @@ export default function CompanyGeneralSettings() {
                     <img
                       src={companyInfo.logo}
                       alt="Logo"
-                      style={{ maxHeight: 70, maxWidth: '100%', objectFit: 'contain', marginBottom: 8, border: '1px solid #e2e8f0', padding: 4, borderRadius: 6 }}
+                      style={{ display: 'block', margin: '0 auto', maxHeight: 70, maxWidth: '100%', objectFit: 'contain', marginBottom: 8, border: '1px solid #e2e8f0', padding: 4, borderRadius: 6 }}
                     />
                   ) : (
                     <div style={{ padding: 12, background: '#f8fafc', border: '1px dashed #cbd5e1', borderRadius: 8, marginBottom: 8 }}>
@@ -295,7 +295,7 @@ export default function CompanyGeneralSettings() {
                     <img
                       src={companyInfo.stamp_image}
                       alt="Stamp"
-                      style={{ maxHeight: 70, maxWidth: '100%', objectFit: 'contain', marginBottom: 8, border: '1px solid #e2e8f0', padding: 4, borderRadius: 6 }}
+                      style={{ display: 'block', margin: '0 auto', maxHeight: 70, maxWidth: '100%', objectFit: 'contain', marginBottom: 8, border: '1px solid #e2e8f0', padding: 4, borderRadius: 6 }}
                     />
                   ) : (
                     <div style={{ padding: 12, background: '#f8fafc', border: '1px dashed #cbd5e1', borderRadius: 8, marginBottom: 8 }}>
@@ -320,7 +320,7 @@ export default function CompanyGeneralSettings() {
                     <img
                       src={companyInfo.director_signature}
                       alt="Signature"
-                      style={{ maxHeight: 70, maxWidth: '100%', objectFit: 'contain', marginBottom: 8, border: '1px solid #e2e8f0', padding: 4, borderRadius: 6 }}
+                      style={{ display: 'block', margin: '0 auto', maxHeight: 70, maxWidth: '100%', objectFit: 'contain', marginBottom: 8, border: '1px solid #e2e8f0', padding: 4, borderRadius: 6 }}
                     />
                   ) : (
                     <div style={{ padding: 12, background: '#f8fafc', border: '1px dashed #cbd5e1', borderRadius: 8, marginBottom: 8 }}>
