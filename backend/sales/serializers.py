@@ -1,6 +1,6 @@
 from rest_framework import serializers
 
-from .models import Quotation, QuotationItem, QuotationTemplate
+from .models import Quotation, QuotationItem, QuotationTemplate, SavedTemplateBlock
 
 
 def get_company_info_dict(serializer_instance, obj):
@@ -204,3 +204,18 @@ class QuotationSerializer(serializers.ModelSerializer):
         if latest_order:
             return latest_order.status
         return None
+
+
+class SavedTemplateBlockSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = SavedTemplateBlock
+        fields = [
+            "id",
+            "company",
+            "name",
+            "block_type",
+            "props",
+            "created_at",
+            "updated_at",
+        ]
+        read_only_fields = ["id", "company", "created_at", "updated_at"]

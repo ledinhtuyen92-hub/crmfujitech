@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
+import { useNavigate } from 'react-router-dom'
 import {
   CheckCircleOutlined,
   DeleteOutlined,
@@ -34,6 +35,7 @@ import {
   Tooltip,
 } from 'antd'
 import api from '../../utils/api'
+import QuotationRenderer from '../../components/QuotationRenderer'
 
 const { Title, Text, Paragraph } = Typography
 const { Option } = Select
@@ -58,6 +60,7 @@ const THEME_COLORS = [
 ]
 
 export default function QuotationTemplateManagement() {
+  const navigate = useNavigate()
   const { token } = theme.useToken()
   const [messageApi, contextHolder] = message.useMessage()
   const [loading, setLoading] = useState(false)
@@ -240,7 +243,7 @@ export default function QuotationTemplateManagement() {
     {
       title: 'Thao tác',
       key: 'actions',
-      width: 220,
+      width: 320,
       align: 'right',
       render: (_, record) => (
         <Space>
@@ -248,7 +251,10 @@ export default function QuotationTemplateManagement() {
             Xem
           </Button>
           <Button size="small" type="primary" ghost icon={<EditOutlined />} onClick={() => handleOpenEdit(record)}>
-            Sửa & Thiết kế
+            Sửa
+          </Button>
+          <Button size="small" type="primary" style={{ background: '#722ed1' }} icon={<LayoutOutlined />} onClick={() => navigate(`/admin/quotation-templates/${record.id}/builder`)}>
+            Thiết kế Kéo thả
           </Button>
           <Popconfirm
             title="Xác nhận xóa mẫu này?"
@@ -751,16 +757,20 @@ export default function QuotationTemplateManagement() {
               color: '#1e293b',
             }}
           >
-            {(() => {
-              const cfg = previewTemplate.layout_config || {}
-              const clr = cfg.theme_color || '#1649c9'
-              const tblSt = cfg.table_style || previewTemplate.layout_style || 'classic_border'
-              const secs = cfg.sections && cfg.sections.length > 0 ? cfg.sections : DEFAULT_SECTIONS
-              const orient = cfg.paper_orientation || 'portrait'
-              return secs.map((sec) =>
-                renderSimulatedSection(sec, clr, tblSt, previewTemplate.footer_content, orient)
-              )
-            })()}
+            {previewTemplate.layout_config?.blocks ? (
+              <QuotationRenderer layoutConfig={previewTemplate.layout_config} data={{
+                customer: { name: 'Công ty Cổ phần ABC', address: '123 Nguyễn Văn Linh', phone: '0901234567', email: 'contact@abc.vn', tax_code: '0123456789' },
+                items: [
+                  { product_name: 'Dịch vụ Tư vấn', unit: 'Gói', quantity: 1, unit_price: 5000000, total_price: 5000000 },
+                  { product_name: 'Phần mềm Quản lý', unit: 'License', quantity: 2, unit_price: 2000000, total_price: 4000000 }
+                ],
+                totals: { subtotal: 9000000, discount: 0, vat: 900000, grandTotal: 9900000 }
+              }} />
+            ) : (
+              <div style={{ textAlign: 'center', padding: 40, color: '#888' }}>
+                Mẫu báo giá này chưa được thiết kế Kéo thả. Hãy ấn nút "Thiết kế Kéo thả" để cấu hình.
+              </div>
+            )}
           </div>
         )}
       </Modal>

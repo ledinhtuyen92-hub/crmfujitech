@@ -384,3 +384,27 @@ class QuotationTemplate(models.Model):
             # Đảm bảo chỉ có 1 mẫu mặc định trong toàn hệ thống
             QuotationTemplate.objects.filter(is_default=True).exclude(pk=self.pk).update(is_default=False)
         super().save(*args, **kwargs)
+
+
+class SavedTemplateBlock(models.Model):
+    """Lưu trữ các Block đã cấu hình sẵn của người dùng để kéo thả nhanh."""
+
+    company = models.ForeignKey(
+        "users.Company",
+        on_delete=models.CASCADE,
+        related_name="saved_blocks",
+        verbose_name="Công ty",
+    )
+    name = models.CharField(max_length=100, verbose_name="Tên Block")
+    block_type = models.CharField(max_length=50, verbose_name="Loại Block")
+    props = models.JSONField(default=dict, verbose_name="Cấu hình Block")
+    created_at = models.DateTimeField(auto_now_add=True, verbose_name="Ngày tạo")
+    updated_at = models.DateTimeField(auto_now=True, verbose_name="Ngày cập nhật")
+
+    class Meta:
+        verbose_name = "Block mẫu đã lưu"
+        verbose_name_plural = "Block mẫu đã lưu"
+        ordering = ["-created_at"]
+
+    def __str__(self):
+        return f"{self.name} ({self.block_type})"

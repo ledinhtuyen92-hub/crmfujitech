@@ -7,8 +7,8 @@ from django.utils import timezone
 from users.views import TenantQuerySetMixin
 from users.permissions import ActionBasedPermission
 
-from .models import Quotation, QuotationItem, QuotationTemplate
-from .serializers import QuotationItemSerializer, QuotationSerializer, QuotationTemplateSerializer
+from .models import Quotation, QuotationItem, QuotationTemplate, SavedTemplateBlock
+from .serializers import QuotationItemSerializer, QuotationSerializer, QuotationTemplateSerializer, SavedTemplateBlockSerializer
 
 
 class QuotationViewSet(TenantQuerySetMixin, viewsets.ModelViewSet):
@@ -510,3 +510,10 @@ class PublicQuotationView(APIView):
 
         return Response({"detail": "Ký duyệt báo giá thành công."})
 
+
+class SavedTemplateBlockViewSet(TenantQuerySetMixin, viewsets.ModelViewSet):
+    """CRUD Block mẫu đã lưu."""
+    module_code = "sales"
+
+    queryset = SavedTemplateBlock.objects.all().order_by("-created_at")
+    serializer_class = SavedTemplateBlockSerializer
