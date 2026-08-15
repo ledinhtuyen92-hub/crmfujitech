@@ -89,6 +89,7 @@ export default function CompanyGeneralSettings() {
         continuous_sequence_numbering: settingsRes.data.continuous_sequence_numbering || false,
         lead_routing: settingsRes.data.lead_routing || 'manual',
         timezone: settingsRes.data.timezone || 'Asia/Ho_Chi_Minh',
+        inactive_days_threshold: settingsRes.data.inactive_days_threshold || 0,
         quotation_template: settingsRes.data.quotation_template || null,
         default_quotation_terms: settingsRes.data.default_quotation_terms || '',
         custom_quotation_title: settingsRes.data.custom_quotation_title || '',
