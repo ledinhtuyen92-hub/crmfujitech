@@ -74,7 +74,7 @@ function RegisterCompany() {
             }}
           >
             <Space size={12} style={{ marginBottom: 28 }}>
-              <AppstoreOutlined style={{ color: '#67e8f9', fontSize: 28 }} />
+              <img src="/logo.png" alt="Fujitech Logo" style={{ height: 28, width: 'auto', objectFit: 'contain' }} />
               <Text strong style={{ color: '#fff', fontSize: 18 }}>
                 Fujitech Hub
               </Text>

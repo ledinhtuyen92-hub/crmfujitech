@@ -423,21 +423,17 @@ function MainLayout({ children, isDarkMode, toggleTheme }) {
           flexShrink: 0,
         }}
       >
-        <div
-          style={{
-            width: 36,
-            height: 36,
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            borderRadius: 10,
-            color: '#ffffff',
-            background: 'linear-gradient(135deg, #38bdf8 0%, #2563eb 100%)',
-            boxShadow: '0 10px 24px rgba(37, 99, 235, 0.35)',
-          }}
-        >
-          <AppstoreOutlined style={{ fontSize: 20 }} />
-        </div>
+          <div
+            style={{
+              width: 32,
+              height: 32,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+            }}
+          >
+            <img src="/logo.png" alt="Fujitech Logo" style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
+          </div>
         {!collapsed && (
           <Title
             level={4}
