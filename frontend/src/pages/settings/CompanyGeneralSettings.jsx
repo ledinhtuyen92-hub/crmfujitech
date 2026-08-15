@@ -513,22 +513,22 @@ export default function CompanyGeneralSettings() {
 
           <Row gutter={16}>
             <Col xs={24} sm={12} md={8}>
-              <Form.Item name={['pipeline_status_labels', 'new']} label="Trạng thái: Khách mới (new)">
+              <Form.Item name={['pipeline_status_labels', 'new']} label="Khách mới (new)">
                 <Input placeholder="VD: Khách mới" />
               </Form.Item>
             </Col>
             <Col xs={24} sm={12} md={8}>
-              <Form.Item name={['pipeline_status_labels', 'potential']} label="Trạng thái: Tiềm năng (potential)">
+              <Form.Item name={['pipeline_status_labels', 'potential']} label="Tiềm năng (potential)">
                 <Input placeholder="VD: Tìm hiểu nhu cầu" />
               </Form.Item>
             </Col>
             <Col xs={24} sm={12} md={8}>
-              <Form.Item name={['pipeline_status_labels', 'active']} label="Trạng thái: Đang hoạt động (active)">
+              <Form.Item name={['pipeline_status_labels', 'active']} label="Đang hoạt động (active)">
                 <Input placeholder="VD: Sắp chốt" />
               </Form.Item>
             </Col>
             <Col xs={24} sm={12} md={8}>
-              <Form.Item name={['pipeline_status_labels', 'lost']} label="Trạng thái: Đã mất (lost)">
+              <Form.Item name={['pipeline_status_labels', 'lost']} label="Đã mất (lost)">
                 <Input placeholder="VD: Không còn nhu cầu" />
               </Form.Item>
             </Col>
