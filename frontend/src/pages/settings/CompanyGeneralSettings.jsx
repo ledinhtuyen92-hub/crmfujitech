@@ -533,12 +533,12 @@ export default function CompanyGeneralSettings() {
               </Form.Item>
             </Col>
             <Col xs={24} sm={12} md={8}>
-              <Form.Item name={['pipeline_status_labels', 'has_order']} label="Trạng thái: Đã có đơn hàng (has_order) ⚡">
+              <Form.Item name={['pipeline_status_labels', 'has_order']} label="Đã có đơn hàng (has_order) ⚡">
                 <Input placeholder="VD: Đã có đơn hàng" />
               </Form.Item>
             </Col>
             <Col xs={24} sm={12} md={8}>
-              <Form.Item name={['pipeline_status_labels', 'repeat_order']} label="Trạng thái: Mua thêm đơn hàng (repeat_order) ⚡">
+              <Form.Item name={['pipeline_status_labels', 'repeat_order']} label="Mua thêm đơn hàng (repeat_order) ⚡">
                 <Input placeholder="VD: Mua thêm đơn hàng" />
               </Form.Item>
             </Col>
