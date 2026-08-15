@@ -533,7 +533,7 @@ function MainLayout({ children, isDarkMode, toggleTheme }) {
           closable={false}
           onClose={() => setDrawerVisible(false)}
           open={drawerVisible}
-          styles={{ body: { padding: 0, background: 'linear-gradient(180deg, #111827 0%, #172554 100%)' } }}
+          styles={{ body: { padding: 0, background: 'radial-gradient(circle at 50% 0%, rgba(14, 165, 233, 0.15) 0%, transparent 60%), linear-gradient(180deg, #0f172a 0%, #020617 100%)' } }}
           width={260}
         >
           {siderContent}
@@ -548,7 +548,7 @@ function MainLayout({ children, isDarkMode, toggleTheme }) {
             theme="dark"
             className="custom-sider-scrollbar"
             style={{
-              background: 'linear-gradient(180deg, #111827 0%, #172554 100%)',
+              background: 'radial-gradient(circle at 50% 0%, rgba(14, 165, 233, 0.15) 0%, transparent 60%), linear-gradient(180deg, #0f172a 0%, #020617 100%)',
               boxShadow: '8px 0 24px rgba(15, 23, 42, 0.16)',
               minHeight: '100vh',
               position: 'fixed',
