@@ -76,7 +76,7 @@ function RegisterCompany() {
             <Space size={12} style={{ marginBottom: 28 }}>
               <AppstoreOutlined style={{ color: '#67e8f9', fontSize: 28 }} />
               <Text strong style={{ color: '#fff', fontSize: 18 }}>
-                Fujitech Care
+                Fujitech Hub
               </Text>
             </Space>
             <Title style={{ margin: 0, color: '#fff', fontSize: 42, lineHeight: 1.18 }}>
