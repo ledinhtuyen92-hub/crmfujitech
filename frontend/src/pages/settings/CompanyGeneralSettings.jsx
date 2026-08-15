@@ -32,6 +32,7 @@ import {
   Upload,
   message,
   theme,
+  Switch,
 } from 'antd'
 import api from '../../utils/api'
 import { useAuth } from '../../contexts/AuthContext'
@@ -85,6 +86,7 @@ export default function CompanyGeneralSettings() {
       }
       form.setFieldsValue({
         order_prefix: settingsRes.data.order_prefix || 'DH',
+        continuous_sequence_numbering: settingsRes.data.continuous_sequence_numbering || false,
         lead_routing: settingsRes.data.lead_routing || 'manual',
         timezone: settingsRes.data.timezone || 'Asia/Ho_Chi_Minh',
         quotation_template: settingsRes.data.quotation_template || null,
@@ -366,7 +368,7 @@ export default function CompanyGeneralSettings() {
           form={form}
           layout="vertical"
           onFinish={handleSaveGeneral}
-          style={{ maxWidth: 600 }}
+          style={{ maxWidth: 900 }}
         >
           <Row gutter={16}>
             <Col xs={24} md={12}>
@@ -377,6 +379,14 @@ export default function CompanyGeneralSettings() {
                 help="Ví dụ: 'ABC' → Mã Đơn: ABC-DH-..., Báo Giá: ABC-BG-..., Xuất Kho: ABC-EXP-..., Phiếu Thu: ABC-PT-..."
               >
                 <Input placeholder="VD: ABC hoặc CTY1" maxLength={10} style={{ textTransform: 'uppercase' }} />
+              </Form.Item>
+              <Form.Item
+                name="continuous_sequence_numbering"
+                valuePropName="checked"
+                label="Sinh số thứ tự liên tục toàn bộ thời gian"
+                help="Khi bật, số thứ tự (001, 002...) sẽ tăng liên tục qua các ngày và không bị làm mới mỗi ngày."
+              >
+                <Switch checkedChildren="Bật" unCheckedChildren="Tắt" />
               </Form.Item>
             </Col>
             <Col xs={24} md={12}>

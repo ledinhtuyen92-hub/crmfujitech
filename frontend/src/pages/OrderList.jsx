@@ -1,4 +1,4 @@
-import { AlertOutlined, CheckCircleOutlined, ClockCircleOutlined, CloseCircleOutlined, DeleteOutlined, EditOutlined, FileDoneOutlined, FileTextOutlined, MessageOutlined, MinusCircleOutlined, PlusOutlined, PrinterOutlined, SearchOutlined, UploadOutlined, PictureOutlined, CameraOutlined } from '@ant-design/icons'
+import { AlertOutlined, CheckCircleOutlined, ClockCircleOutlined, CloseCircleOutlined, DeleteOutlined, EditOutlined, FileDoneOutlined, FileTextOutlined, MessageOutlined, MinusCircleOutlined, PlusOutlined, PrinterOutlined, SearchOutlined, UploadOutlined, PictureOutlined, CameraOutlined, TableOutlined } from '@ant-design/icons'
 import {
   AutoComplete,
   Badge,
@@ -30,6 +30,9 @@ import {
   Upload,
   Avatar,
   List,
+  Radio,
+  Checkbox,
+  Popover,
 } from 'antd' 
 import dayjs from 'dayjs'
 import { useCallback, useEffect, useState, useRef } from 'react'
@@ -74,6 +77,17 @@ export default function OrderList() {
   const [loading, setLoading] = useState(false)
   const [templates, setTemplates] = useState([])
   const [companyTemplate, setCompanyTemplate] = useState(null)
+
+  // Column Visibility
+  const DEFAULT_COLUMNS = ['order_number', 'customer_name', 'status', 'financial_status', 'payment_target', 'people', 'total_amount', 'action']
+  const [visibleColumns, setVisibleColumns] = useState(() => {
+    const saved = localStorage.getItem('orderListVisibleColumns')
+    return saved ? JSON.parse(saved) : DEFAULT_COLUMNS
+  })
+
+  useEffect(() => {
+    localStorage.setItem('orderListVisibleColumns', JSON.stringify(visibleColumns))
+  }, [visibleColumns])
 
   // Filters
   const [searchText, setSearchText] = useState('')
@@ -279,9 +293,17 @@ export default function OrderList() {
       if (err.response?.data) {
         if (typeof err.response.data === 'string') msg = err.response.data
         else if (err.response.data.amount) msg = err.response.data.amount[0]
+        else if (err.response.data.milestone) msg = err.response.data.milestone[0]
         else if (err.response.data.detail) msg = err.response.data.detail
         else if (Array.isArray(err.response.data)) msg = err.response.data[0]
         else if (err.response.data.non_field_errors) msg = err.response.data.non_field_errors[0]
+        else if (typeof err.response.data === 'object') {
+          // If it's another field error
+          const firstKey = Object.keys(err.response.data)[0]
+          if (firstKey && Array.isArray(err.response.data[firstKey])) {
+            msg = err.response.data[firstKey][0]
+          }
+        }
       }
       messageApi.error(msg)
     } finally {
@@ -1681,15 +1703,6 @@ export default function OrderList() {
         return (
           <Space direction="vertical" size={2}>
             <Tag color={cfg.color} icon={cfg.icon}>{cfg.label}</Tag>
-            {r.financial_status && (
-              <Tag color={r.financial_status === 'fully_paid' ? 'success' : r.financial_status === 'deposit_paid' ? 'processing' : 'warning'} style={{ fontSize: 11 }}>
-                {r.has_pending_credit_request 
-                  ? 'Chờ duyệt kho nợ' 
-                  : (r.financial_status === 'deposit_paid' && Number(r.paid_amount) > 0 
-                      ? `Đã thu ${r.total_amount ? Math.round((Number(r.paid_amount) / Number(r.total_amount)) * 100) : 0}% (${Number(r.paid_amount).toLocaleString()}đ)` 
-                      : r.financial_status_display || 'Chờ cọc')}
-              </Tag>
-            )}
             {r.needs_export_request && ['fully_paid', 'deposit_paid', 'credit_approved'].includes(r.financial_status) && (
               <Tag color="error" style={{ fontSize: 11, cursor: 'pointer' }} onClick={(e) => {
                 e.stopPropagation()
@@ -1711,6 +1724,28 @@ export default function OrderList() {
           </Space>
         )
       },
+    },
+    {
+      title: 'Thanh toán & Công nợ',
+      key: 'financial_status',
+      render: (_, r) => {
+        if (!r.financial_status) return '-'
+        return (
+          <Tag color={r.financial_status === 'fully_paid' ? 'success' : r.financial_status === 'deposit_paid' ? 'processing' : 'warning'} style={{ fontSize: 11 }}>
+            {r.has_pending_credit_request 
+              ? 'Chờ duyệt kho nợ' 
+              : (r.financial_status === 'deposit_paid' && Number(r.paid_amount) > 0 
+                  ? `Đã thu ${r.total_amount ? Math.round((Number(r.paid_amount) / Number(r.total_amount)) * 100) : 0}% (${Number(r.paid_amount).toLocaleString()}đ)` 
+                  : r.financial_status_display || 'Chờ cọc')}
+          </Tag>
+        )
+      }
+    },
+    {
+      title: 'Đối tượng TT',
+      dataIndex: 'payment_target',
+      key: 'payment_target',
+      render: (val) => val === 'company' ? 'Công ty' : (val === 'personal' ? 'Cá nhân' : '-'),
     },
     {
       title: 'Người tạo / duyệt',
@@ -1759,22 +1794,48 @@ export default function OrderList() {
           </Text>
         </Col>
         <Col>
-          {canCreate && (
-            <Button
-              type="primary"
-              size="large"
-              icon={<PlusOutlined />}
-              onClick={() => openModal()}
-              style={{
-                borderRadius: 10,
-                fontWeight: 600,
-                background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
-                boxShadow: '0 4px 12px rgba(16, 185, 129, 0.25)',
-              }}
+          <Space>
+            <Popover 
+              placement="bottomRight" 
+              title="Tùy chỉnh cột hiển thị" 
+              content={
+                <Checkbox.Group 
+                  options={[
+                    { label: 'Mã đơn hàng', value: 'order_number' },
+                    { label: 'Khách hàng', value: 'customer_name' },
+                    { label: 'Trạng thái', value: 'status' },
+                    { label: 'Thanh toán & Công nợ', value: 'financial_status' },
+                    { label: 'Đối tượng TT', value: 'payment_target' },
+                    { label: 'Người tạo / duyệt', value: 'people' },
+                    { label: 'Tổng tiền', value: 'total_amount' },
+                    { label: 'Hành động', value: 'action' },
+                  ]}
+                  value={visibleColumns}
+                  onChange={setVisibleColumns}
+                  style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}
+                />
+              }
+              trigger="click"
             >
-              Tạo Đơn Hàng Mới
-            </Button>
-          )}
+              <Button size="large" icon={<TableOutlined />} />
+            </Popover>
+            {canCreate && (
+              <Button
+                type="primary"
+                size="large"
+                icon={<PlusOutlined />}
+                onClick={() => openModal()}
+                style={{
+                  borderRadius: 10,
+                  fontWeight: 600,
+                  background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+                  boxShadow: '0 4px 12px rgba(16, 185, 129, 0.25)',
+                }}
+              >
+                Tạo Đơn Hàng Mới
+              </Button>
+            )}
+          </Space>
         </Col>
       </Row>
 
@@ -1905,7 +1966,7 @@ export default function OrderList() {
         bodyStyle={{ padding: 16 }}
       >
         <Row gutter={[16, 16]} align="middle">
-          <Col xs={24} sm={12} md={7}>
+          <Col xs={24} sm={12} md={6}>
             <Input
               placeholder="Tìm theo mã đơn hàng, tên khách hàng..."
               prefix={<SearchOutlined style={{ color: '#94a3b8' }} />}
@@ -1915,7 +1976,7 @@ export default function OrderList() {
               style={{ borderRadius: 8 }}
             />
           </Col>
-          <Col xs={24} sm={12} md={5}>
+          <Col xs={24} sm={12} md={4}>
             <Select
               placeholder="Tình trạng Đơn hàng"
               value={statusFilter || undefined}
@@ -1945,7 +2006,7 @@ export default function OrderList() {
               <Option value="pending_credit"><Badge status="error" text="Đang chờ duyệt kho nợ" /></Option>
             </Select>
           </Col>
-          <Col xs={24} sm={12} md={5}>
+          <Col xs={24} sm={12} md={4}>
             <Select
               placeholder="Đối tượng TT"
               value={paymentTargetFilter || undefined}
@@ -1957,7 +2018,7 @@ export default function OrderList() {
               <Option value="company">Công ty</Option>
             </Select>
           </Col>
-          <Col xs={24} sm={12} md={4}>
+          <Col xs={24} sm={12} md={5}>
             <Select
               placeholder="Vận hành Kho"
               value={exportFilter || undefined}
@@ -2016,7 +2077,7 @@ export default function OrderList() {
           />
         ) : (
           <Table
-            columns={columns}
+            columns={columns.filter(col => visibleColumns.includes(col.key))}
             dataSource={filteredOrders}
             rowKey="id"
             loading={loading}

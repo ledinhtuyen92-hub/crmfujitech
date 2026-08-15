@@ -307,6 +307,11 @@ class CompanySettings(models.Model):
         verbose_name="Tiền tố mã đơn hàng",
         help_text="VD: 'DH' → Mã đơn: DH-20240101-001",
     )
+    continuous_sequence_numbering = models.BooleanField(
+        default=False,
+        verbose_name="Sinh số thứ tự liên tục",
+        help_text="Nếu bật, số thứ tự (001, 002...) sẽ tăng liên tục không reset về 1 mỗi ngày.",
+    )
     inactive_days_threshold = models.PositiveIntegerField(
         default=0,
         verbose_name="Số ngày tính là khách ngủ đông",

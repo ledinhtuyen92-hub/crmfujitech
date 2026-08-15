@@ -185,6 +185,14 @@ class OrderViewSet(TenantQuerySetMixin, viewsets.ModelViewSet):
 
     def perform_update(self, serializer):
         instance = self.get_object()
+        
+        # Nếu chỉ cập nhật các trường phụ (như payment_target), không reset trạng thái
+        safe_fields = {"payment_target"}
+        updated_fields = set(serializer.validated_data.keys())
+        if updated_fields and updated_fields.issubset(safe_fields):
+            serializer.save()
+            return
+            
         old_status = instance.status
         new_status = serializer.validated_data.get("status", instance.status)
         if new_status != instance.status:

@@ -37,7 +37,10 @@ def _generate_code(company, prefix: str) -> str:
     Dùng CompanySequence làm bộ đếm trung tâm.
     """
     today_str = date.today().strftime("%d%m%Y")
-    seq = _next_seq(company, prefix, today_str)
+    is_continuous = getattr(company, "settings", None) and company.settings.continuous_sequence_numbering
+    seq_date_str = "ALL_TIME" if is_continuous else today_str
+    
+    seq = _next_seq(company, prefix, seq_date_str)
     return f"{prefix}-{today_str}-{seq:03d}"
 
 
