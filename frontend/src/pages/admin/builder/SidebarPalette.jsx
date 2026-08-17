@@ -13,6 +13,7 @@ const PALETTE_ITEMS = [
   { type: BLOCK_TYPES.CUSTOMER_INFO, title: '👤 Khối Thông tin Khách hàng' },
   { type: BLOCK_TYPES.PRODUCT_TABLE, title: '📊 Khối Bảng Sản phẩm' },
   { type: BLOCK_TYPES.TOTALS, title: '💰 Khối Tổng kết Thanh toán' },
+  { type: BLOCK_TYPES.PAYMENT_PROGRESS, title: '📈 Khối Tiến độ thanh toán' },
   { type: BLOCK_TYPES.TERMS, title: '📝 Khối Ghi chú & Điều khoản' },
   { type: BLOCK_TYPES.SIGNATURES, title: '✍️ Khối Chữ ký Xác nhận' },
   { type: BLOCK_TYPES.TEXT, title: '📄 Khối Văn bản tự do' },

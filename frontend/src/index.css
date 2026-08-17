@@ -118,9 +118,6 @@ h4.ant-typography,
 
 /* ── Print Styles for Quotations & Multi-page Tables ────────────── */
 @media print {
-  @page {
-    margin: 12mm;
-  }
 
   /* Warranty: landscape by default */
   .warranty-print-container + * {
@@ -180,7 +177,6 @@ h4.ant-typography,
     width: 100% !important;
     height: auto !important;
     overflow: visible !important;
-    zoom: 1 !important;
   }
 
   table {

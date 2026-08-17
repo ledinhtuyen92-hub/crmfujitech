@@ -142,8 +142,20 @@ export default function SettingsPanel({ block, onChange }) {
             <Form.Item name="showVAT" label="Thuế GTGT (VAT)" valuePropName="checked">
               <Switch />
             </Form.Item>
+            <Form.Item name="showShippingFee" label="Phí vận chuyển" valuePropName="checked">
+              <Switch />
+            </Form.Item>
+            <Form.Item name="showInstallationFee" label="Phí thi công/lắp đặt" valuePropName="checked">
+              <Switch />
+            </Form.Item>
             <Form.Item name="showWords" label="Viết bằng chữ" valuePropName="checked">
               <Switch />
+            </Form.Item>
+            <Form.Item name="showBorder" label="Hiển thị khung viền" valuePropName="checked">
+              <Switch />
+            </Form.Item>
+            <Form.Item name="backgroundColor" label="Màu nền khối">
+              <Input type="color" />
             </Form.Item>
             <Form.Item name="themeColor" label="Màu Sắc Chủ Đạo">
               <Input type="color" />

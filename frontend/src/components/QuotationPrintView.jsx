@@ -1,114 +1,101 @@
-import React, { useState, useRef, useEffect } from 'react'
-import { Card, Col, Divider, Row, Space, Table, Tag, Typography, Button, Slider, Switch } from 'antd'
-import { SettingOutlined } from '@ant-design/icons'
-import dayjs from 'dayjs'
+import React, { useState, useRef, useEffect } from 'react';
+import { Slider, Switch } from 'antd';
+import QuotationRenderer from './QuotationRenderer';
+import { BLOCK_TYPES, DEFAULT_BLOCK_PROPS } from '../pages/admin/builder/constants';
 
-const { Title, Text, Paragraph } = Typography
+const DEFAULT_LAYOUT_BLOCKS = [
+  { id: 'header_1', type: BLOCK_TYPES.HEADER_LOGO, props: { ...DEFAULT_BLOCK_PROPS[BLOCK_TYPES.HEADER_LOGO], companyName: 'CÔNG TY CỦA BẠN' } },
+  { id: 'title_1', type: BLOCK_TYPES.TITLE, props: { ...DEFAULT_BLOCK_PROPS[BLOCK_TYPES.TITLE] } },
+  { id: 'customer_1', type: BLOCK_TYPES.CUSTOMER_INFO, props: { ...DEFAULT_BLOCK_PROPS[BLOCK_TYPES.CUSTOMER_INFO], columns: 2 } },
+  { id: 'table_1', type: BLOCK_TYPES.PRODUCT_TABLE, props: { ...DEFAULT_BLOCK_PROPS[BLOCK_TYPES.PRODUCT_TABLE] } },
+  { id: 'summary_1', type: BLOCK_TYPES.TOTALS, props: { ...DEFAULT_BLOCK_PROPS[BLOCK_TYPES.TOTALS] } },
+  { id: 'payment_1', type: BLOCK_TYPES.PAYMENT_PROGRESS, props: { ...DEFAULT_BLOCK_PROPS[BLOCK_TYPES.PAYMENT_PROGRESS] } },
+  { id: 'terms_1', type: BLOCK_TYPES.TERMS, props: { ...DEFAULT_BLOCK_PROPS[BLOCK_TYPES.TERMS] } },
+  { id: 'signature_1', type: BLOCK_TYPES.SIGNATURES, props: { ...DEFAULT_BLOCK_PROPS[BLOCK_TYPES.SIGNATURES], columns: 2 } },
+];
 
-// Helper to compute line total consistently
-const computeLineTotal = (item, templateOverride) => {
-  const qty = Number(item.quantity || 1)
-  const price = Number(item.unit_price || 0)
-  const discount = Number(item.discount_percent || 0)
-  const tmpl = templateOverride
-  const tmplCode = tmpl?.code || 'STANDARD'
-  const isLandscape = tmplCode === 'production_landscape_a4' || tmpl?.layout_config?.paper_orientation === 'landscape'
-  if (isLandscape) {
-    return Number((qty * price * (1 - discount / 100)).toFixed(0))
-  }
-  const area = Number(item.area || 0)
-  if ((item.unit === 'm²' || item.custom_data?.unit === 'm²' || (area > 0 && item.width > 0 && item.height > 0)) && area > 0) {
-    return Number((area * qty * price * (1 - discount / 100)).toFixed(0))
-  }
-  return Number((qty * price * (1 - discount / 100)).toFixed(0))
-}
-
-const computeRowSpan = (data, index, field = 'product') => {
-  if (!data || !data[index]) return 1
-  if (data[index].item_type === 'service') return 1
-  const currentVal = data[index]?.[field]
-  if (!currentVal) return 1
-  if (index > 0 && data[index - 1]?.[field] === currentVal && data[index - 1].item_type !== 'service') {
-    return 0
-  }
-  let count = 1
-  for (let i = index + 1; i < data.length; i++) {
-    if (data[i]?.[field] === currentVal) {
-      count++
-    } else {
-      break
-    }
-  }
-  return count
-}
-
-const computeProductSTT = (data, index, field = 'product') => {
-  if (!data) return 0
-  let count = 0
-  for (let i = 0; i <= index; i++) {
-    if (data[i].item_type === 'service') {
-      count++
-    } else if (i === 0 || data[i]?.[field] !== data[i - 1]?.[field] || data[i - 1]?.item_type === 'service') {
-      count++
-    }
-  }
-  return count
-}
-
-export default function QuotationPrintView({ quotation, type = 'quotation', effectiveTemplate, isCompanyAdmin, products = [], renderCustomerSignature, hidePricing = false, hideCustomerInfo = false }) {
+export default function QuotationPrintView({ quotation, type = 'quotation', effectiveTemplate, hidePricing = false, hideCustomerInfo = false }) {
   const [scale, setScale] = useState(1);
   const [showPageBreaks, setShowPageBreaks] = useState(true);
   const [zoomedHeight, setZoomedHeight] = useState(0);
   const contentRef = useRef(null);
 
-  const isLand = effectiveTemplate?.layout_config?.paper_orientation === 'landscape' || effectiveTemplate?.code === 'production_landscape_a4'
+  const rawConfig = effectiveTemplate?.layout_config || {};
+  const isLegacyArray = Array.isArray(rawConfig);
   
-  // A4 Printable Dimensions in pixels (assuming 12mm margin, 96 DPI)
-  // Portrait: ~703x1032, Landscape: ~1032x703
-  const A4_PRINTABLE_HEIGHT = isLand ? 703 : 1032;
+  const layoutConfig = {
+    paper_orientation: rawConfig.paper_orientation || (effectiveTemplate?.code === 'production_landscape_a4' ? 'landscape' : 'portrait'),
+    blocks: isLegacyArray ? rawConfig : (rawConfig.blocks?.length > 0 ? rawConfig.blocks : DEFAULT_LAYOUT_BLOCKS),
+    theme_color: rawConfig.theme_color || '#1649c9',
+    table_style: rawConfig.table_style || 'classic_border'
+  };
+
+  const isLand = layoutConfig.paper_orientation === 'landscape';
+  
+  // A4 Printable Dimensions in pixels (chừa thêm margin an toàn cho header/footer của Chrome)
+  const A4_PRINTABLE_HEIGHT = isLand ? 650 : 970;
 
   useEffect(() => {
     if (!contentRef.current) return;
+    let timeout;
     const resizeObserver = new ResizeObserver(() => {
-      if (contentRef.current) {
-        setZoomedHeight(contentRef.current.getBoundingClientRect().height);
-      }
+      clearTimeout(timeout);
+      timeout = setTimeout(() => {
+        if (contentRef.current) {
+          setZoomedHeight(contentRef.current.getBoundingClientRect().height);
+        }
+      }, 200);
     });
     resizeObserver.observe(contentRef.current);
-    
-    // Also trigger on scale change just to be sure
-    setZoomedHeight(contentRef.current.getBoundingClientRect().height);
-    
-    return () => resizeObserver.disconnect();
+    if (contentRef.current) {
+      setZoomedHeight(contentRef.current.getBoundingClientRect().height);
+    }
+    return () => {
+      clearTimeout(timeout);
+      resizeObserver.disconnect();
+    };
   }, [scale]);
 
   const estimatedPages = Math.max(1, Math.ceil(zoomedHeight / A4_PRINTABLE_HEIGHT));
 
-  if (!quotation) return null
-  
-  const themeColor = effectiveTemplate?.layout_config?.theme_color || '#1649c9'
+  if (!quotation) return null;
 
-  const docNumber = type === 'order' ? quotation.order_number : quotation.quotation_number;
-  const defaultTitle = type === 'order' ? 'ĐƠN HÀNG SẢN XUẤT' : (isLand ? 'BÁO GIÁ SẢN XUẤT CỬA COMPOSITE' : 'Bảng Báo Giá Chi Tiết');
-  
-  let docTitle = effectiveTemplate?.layout_config?.custom_title || defaultTitle;
-  if (type === 'quotation' && quotation?.company_info?.custom_quotation_title) {
-      docTitle = quotation.company_info.custom_quotation_title;
-  } else if (type === 'order' && quotation?.company_info?.custom_order_title) {
-      docTitle = quotation.company_info.custom_order_title;
-  }
+  // Map backend quotation data to QuotationRenderer format
+  const quotationData = {
+    ...quotation,
+    totals: {
+      subtotal: quotation.subtotal || quotation.sub_total || 0,
+      discount: quotation.discount_total || quotation.discount_amount || 0,
+      tax: quotation.vat_amount || quotation.tax_amount || 0,
+      tax_percent: quotation.vat_rate || quotation.tax_percent || 0,
+      shipping_fee: quotation.shipping_fee || 0,
+      installation_fee: quotation.installation_fee || 0,
+      total: quotation.total_amount || 0,
+    },
+    customer: {
+      name: quotation.customer_name,
+      phone: quotation.customer_phone,
+      address: quotation.customer_address,
+      ...quotation.customer_info
+    },
+    company_info: quotation.company_info || effectiveTemplate?.company_info
+  };
 
   return (
     <div>
-      {/* ── Zoom Controls (No Print) ───────────── */}
+      <style>{`
+        @media print {
+          @page {
+            size: ${isLand ? 'A4 landscape' : 'A4 portrait'};
+            margin: 12mm;
+          }
+        }
+      `}</style>
+      {/* Zoom Controls (No Print) */}
       <div className="no-print" style={{ marginBottom: 16, display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 12, background: '#f8fafc', padding: '8px 16px', borderRadius: 8, border: '1px solid #e2e8f0' }}>
         <span style={{ fontWeight: 600, color: '#334155' }}>Thu phóng (Scale):</span>
         <Slider 
-          min={0.5} 
-          max={1.5} 
-          step={0.05} 
-          value={scale} 
-          onChange={setScale} 
+          min={0.5} max={1.5} step={0.05} value={scale} onChange={setScale} 
           style={{ width: 150, margin: 0 }} 
           tooltip={{ formatter: (val) => `${Math.round(val * 100)}%` }}
         />
@@ -127,27 +114,14 @@ export default function QuotationPrintView({ quotation, type = 'quotation', effe
       <div 
         ref={contentRef}
         className="printable-quotation-content" 
-        style={{ 
-          fontFamily: effectiveTemplate?.layout_config?.font_family || 'Inter, sans-serif', 
-          zoom: scale,
-          position: 'relative'
-        }}
+        style={{ zoom: scale, position: 'relative', background: '#fff' }}
       >
         {/* Draw simulated page breaks */}
         {showPageBreaks && zoomedHeight > 0 && Array.from({ length: estimatedPages - 1 }).map((_, i) => (
           <div 
             key={i}
             className="no-print"
-            style={{
-              position: 'absolute',
-              top: ((i + 1) * A4_PRINTABLE_HEIGHT) / scale,
-              left: -20,
-              right: -20,
-              borderTop: '2px dashed #ef4444',
-              zIndex: 999,
-              opacity: 0.7,
-              pointerEvents: 'none'
-            }}
+            style={{ position: 'absolute', top: ((i + 1) * A4_PRINTABLE_HEIGHT) / scale, left: -20, right: -20, borderTop: '2px dashed #ef4444', zIndex: 999, opacity: 0.7, pointerEvents: 'none' }}
           >
             <div style={{ position: 'absolute', right: 0, top: -11, background: '#fee2e2', color: '#ef4444', fontSize: 11, padding: '2px 8px', borderRadius: 12, border: '1px solid #ef4444', fontWeight: 600 }}>
               Cắt trang {i + 1}
@@ -155,586 +129,12 @@ export default function QuotationPrintView({ quotation, type = 'quotation', effe
           </div>
         ))}
 
-      {/* ── Header: Bên trái Logo, Bên phải TT Công ty ───────────── */}
-      <div
-        style={{
-          marginBottom: 20,
-          padding: '20px 24px',
-          background: '#f8fafc',
-          border: '1px solid #e2e8f0',
-          borderRadius: 12,
-          boxShadow: '0 2px 6px rgba(0,0,0,0.02)',
-        }}
-      >
-        <Row justify="space-between" align="middle" gutter={24}>
-          <Col xs={24} sm={8} style={{ textAlign: 'left' }}>
-            {(quotation?.company_info?.logo || effectiveTemplate?.company_info?.logo) ? (
-              <img
-                src={quotation?.company_info?.logo || effectiveTemplate?.company_info?.logo}
-                alt="Logo công ty"
-                style={{ maxHeight: 75, maxWidth: '100%', objectFit: 'contain', borderRadius: 4 }}
-              />
-            ) : (
-              <div
-                style={{
-                  width: 64,
-                  height: 64,
-                  borderRadius: 8,
-                  background: '#e0e7ff',
-                  color: '#3730a3',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  fontWeight: 700,
-                  fontSize: 18,
-                }}
-              >
-                LOGO
-              </div>
-            )}
-          </Col>
-
-          <Col xs={24} sm={16} style={{ textAlign: 'right' }}>
-            <Title level={4} style={{ margin: '0 0 4px 0', color: '#1e3a8a', fontWeight: 700 }}>
-              {quotation?.company_info?.name || effectiveTemplate?.company_info?.name || 'TÊN CÔNG TY CỦA BẠN'}
-            </Title>
-            <div style={{ color: '#475569', fontSize: 13.5, lineHeight: '1.6' }}>
-              <div><strong>MST:</strong> {quotation?.company_info?.tax_code || effectiveTemplate?.company_info?.tax_code || 'Chưa cập nhật'}</div>
-              <div><strong>Địa chỉ:</strong> {quotation?.company_info?.address || effectiveTemplate?.company_info?.address || 'Chưa cập nhật'}</div>
-              <div><strong>Hotline:</strong> {quotation?.company_info?.phone || effectiveTemplate?.company_info?.phone || 'Chưa cập nhật'}</div>
-            </div>
-            {isCompanyAdmin && (
-              <div style={{ marginTop: 8 }}>
-                <Button
-                  size="small"
-                  type="dashed"
-                  icon={<SettingOutlined />}
-                  onClick={() => window.location.href = '/settings/general'}
-                >
-                  ⚙️ Sửa thông tin & Logo
-                </Button>
-              </div>
-            )}
-          </Col>
-        </Row>
+        <QuotationRenderer 
+          layoutConfig={layoutConfig} 
+          layoutStyle={effectiveTemplate?.layout_style || quotation.layout_style} 
+          data={quotationData} 
+        />
       </div>
-
-      <div style={{ textAlign: 'center', margin: '24px 0 24px', padding: '0 16px' }}>
-        <Title level={2} style={{ margin: '0 0 8px 0', color: '#1649c9', textTransform: 'uppercase', letterSpacing: '0.5px', fontWeight: 700 }}>
-          {docTitle}
-        </Title>
-        <div style={{ marginBottom: 12 }}>
-          <Space size={16} style={{ justifyContent: 'center', display: 'inline-flex', background: '#eff6ff', padding: '4px 16px', borderRadius: 20, border: '1px solid #bfdbfe' }}>
-            <span style={{ color: '#1d4ed8', fontSize: 13.5 }}>Số {type === 'order' ? 'đơn hàng' : 'báo giá'}: <strong>{docNumber}</strong></span>
-            <span style={{ color: '#cbd5e1' }}>|</span>
-            <span style={{ color: '#334155', fontSize: 13.5 }}>Ngày {type === 'order' ? 'tạo' : 'báo giá'}: <strong>{dayjs(quotation.created_at).format('DD/MM/YYYY')}</strong></span>
-          </Space>
-        </div>
-        {!hideCustomerInfo && (
-          <div
-            style={{
-              color: '#475569',
-              fontSize: 14,
-              fontStyle: 'italic',
-              maxWidth: 680,
-              margin: '0 auto',
-              lineHeight: '1.6',
-            }}
-          >
-            Kính gửi Quý khách hàng, chúng tôi xin trân trọng gửi bảng {type === 'order' ? 'đơn hàng' : 'báo giá'} các hạng mục sản phẩm / dịch vụ chi tiết dưới đây:
-          </div>
-        )}
-      </div>
-
-      {!hideCustomerInfo && (
-        isLand ? (
-          <Row gutter={16} style={{ marginBottom: 20 }}>
-            <Col xs={24} sm={12}>
-              <Card size="small" style={{ background: '#f8fafc', borderColor: '#cbd5e1', borderRadius: 10, height: '100%' }}>
-                <div style={{ fontWeight: 700, color: '#1e3a8a', fontSize: 13.5, marginBottom: 8, borderBottom: '1px solid #e2e8f0', paddingBottom: 4 }}>
-                  🏢 BÊN BÁN (BÊN B): {quotation?.company_info?.name || effectiveTemplate?.company_info?.name || 'CÔNG TY CỦA BẠN'}
-                </div>
-                <div style={{ fontSize: 13, color: '#334155', lineHeight: '1.7' }}>
-                  <div><strong>Đại diện:</strong> {quotation?.company_info?.director_name || effectiveTemplate?.company_info?.director_name || 'Nguyễn Anh Tuấn'} • <strong>Chức vụ:</strong> {quotation?.company_info?.director_title || effectiveTemplate?.company_info?.director_title || 'Giám đốc'}</div>
-                  <div><strong>Mã số thuế:</strong> {quotation?.company_info?.tax_code || effectiveTemplate?.company_info?.tax_code || '0111100289'}</div>
-                  <div><strong>Điện thoại:</strong> {quotation?.company_info?.phone || effectiveTemplate?.company_info?.phone || '0961442882'}</div>
-                  <div><strong>Địa chỉ:</strong> {quotation?.company_info?.address || effectiveTemplate?.company_info?.address || 'Hà Đông, Hà Nội'}</div>
-                </div>
-              </Card>
-            </Col>
-            <Col xs={24} sm={12}>
-              <Card size="small" style={{ background: '#eff6ff', borderColor: '#bfdbfe', borderRadius: 10, height: '100%' }}>
-                <div style={{ fontWeight: 700, color: '#1d4ed8', fontSize: 13.5, marginBottom: 8, borderBottom: '1px solid #bfdbfe', paddingBottom: 4 }}>
-                  👤 BÊN MUA (BÊN A): {quotation.customer_name || 'Khách hàng lẻ'}
-                </div>
-                <div style={{ fontSize: 13, color: '#334155', lineHeight: '1.7' }}>
-                  <div><strong>Khách hàng:</strong> {quotation.customer_name || 'Khách hàng lẻ'}</div>
-                  <div><strong>Số điện thoại:</strong> <Text strong>{quotation.customer_phone || '—'}</Text></div>
-                  <div><strong>Email / MST:</strong> {quotation.customer_email || '—'}</div>
-                  <div><strong>Địa chỉ:</strong> {quotation.customer_address || quotation.customer_city || '—'}</div>
-                  <div>
-                    <strong>Ngày lắp đặt dự kiến:</strong>{' '}
-                    <strong style={{ color: '#2563eb' }}>
-                      {quotation.installation_date ? dayjs(quotation.installation_date).format('DD/MM/YYYY') : 'Chưa xác định'}
-                    </strong>
-                  </div>
-                </div>
-              </Card>
-            </Col>
-          </Row>
-        ) : (
-          <div
-            style={{
-              marginBottom: 18,
-              padding: '12px 18px',
-              background: '#eff6ff',
-              border: '1px solid #bfdbfe',
-              borderRadius: 8,
-            }}
-          >
-            <div style={{ fontWeight: 700, color: '#1d4ed8', fontSize: 13.5, marginBottom: 8, borderBottom: '1px solid #dbeafe', paddingBottom: 6, display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 8 }}>
-              <span>👤 THÔNG TIN KHÁCH HÀNG / ĐỐI TÁC</span>
-              {quotation.installation_date && (
-                <span style={{ fontSize: 13, fontWeight: 600, color: '#2563eb' }}>
-                  📅 Ngày lắp đặt dự kiến: {dayjs(quotation.installation_date).format('DD/MM/YYYY')}
-                </span>
-              )}
-            </div>
-            <Row gutter={[20, 6]} style={{ fontSize: 13.5, color: '#1e293b', lineHeight: 1.7 }}>
-              <Col xs={24} sm={12}>
-                <strong>Khách hàng:</strong> <span style={{ fontWeight: 600, color: '#1e3a8a' }}>{quotation.customer_name || 'Khách hàng lẻ'}</span>
-              </Col>
-              <Col xs={24} sm={12}>
-                <strong>Điện thoại:</strong> <span style={{ fontWeight: 600 }}>{quotation.customer_phone || '—'}</span>
-              </Col>
-              <Col xs={24} sm={12}>
-                <strong>Địa chỉ:</strong> {quotation.customer_address || quotation.customer_city || '—'}
-              </Col>
-              <Col xs={24} sm={12}>
-                <strong>Email:</strong> {quotation.customer_email || '—'}
-              </Col>
-            </Row>
-          </div>
-        )
-      )}
-
-      <Title level={5}>Danh sách hạng mục báo giá</Title>
-      {(() => {
-        const productItems = (quotation.items || []).filter(i => i.item_type !== 'service');
-        const serviceItems = (quotation.items || []).filter(i => i.item_type === 'service');
-        
-        const getColumns = (data, isServiceTable) => (
-          isLand ? [
-            {
-              title: 'STT',
-              key: 'stt',
-              width: 50,
-              align: 'center',
-              render: (_, __, idx) => {
-                if (isServiceTable) return { children: <Text strong>{idx + 1}</Text>, props: { rowSpan: 1 } };
-                const rowSpan = isServiceTable ? 1 : computeRowSpan(data, idx, 'product')
-                const sttNum = computeProductSTT(data, idx, 'product')
-                return {
-                  children: <Text strong>{sttNum}</Text>,
-                  props: { rowSpan },
-                }
-              },
-            },
-            {
-              title: 'MẪU CỬA / SẢN PHẨM',
-              key: 'product_info',
-              width: 240,
-              render: (_, r, idx) => {
-                const prodObj = (products || []).find((p) => p && p.id === r?.product)
-                const imgUrl = r?.product_image || (prodObj ? (prodObj.image_url || prodObj.image) : null)
-                const rowSpan = computeRowSpan(data, idx, 'product')
-                return {
-                  children: (
-                    <div style={{ display: 'flex', gap: 10, alignItems: 'center', width: '100%' }}>
-                      {imgUrl ? (
-                        <img src={imgUrl} alt="prod" style={{ width: 36, height: 36, objectFit: 'cover', borderRadius: 4, border: '1px solid #cbd5e1', flexShrink: 0 }} />
-                      ) : null}
-                      <div style={{ display: 'flex', flexDirection: 'column', flex: 1, minWidth: 0 }}>
-                        <Text strong style={{ display: 'block', color: '#0f172a', fontSize: 13.5, textAlign: 'left', lineHeight: 1.3 }}>
-                          {r.product_name || (prodObj ? prodObj.name : '—')}
-                        </Text>
-                        {(r.spec || (prodObj && prodObj.description)) && (
-                          <div style={{ fontSize: 11.5, color: '#475569', textAlign: 'left', lineHeight: 1.4, marginTop: 2, fontStyle: 'italic', whiteSpace: 'pre-wrap' }}>
-                            {r.spec || (prodObj && prodObj.description)}
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  ),
-                  props: { rowSpan },
-                }
-              },
-            },
-            {
-              title: 'KÍCH THƯỚC Ô CHỜ (mm)',
-              children: [
-                {
-                  title: 'Cao',
-                  dataIndex: 'height',
-                  width: 70,
-                  align: 'center',
-                  render: (v) => <Text>{Number(v) > 0 ? Number(v) : ''}</Text>,
-                },
-                {
-                  title: 'Rộng',
-                  dataIndex: 'width',
-                  width: 70,
-                  align: 'center',
-                  render: (v) => <Text>{Number(v) > 0 ? Number(v) : ''}</Text>,
-                },
-                {
-                  title: 'Dày',
-                  dataIndex: 'thickness',
-                  width: 70,
-                  align: 'center',
-                  render: (v, r) => {
-                    const thickness = v || r.custom_data?.thickness
-                    return <Text>{Number(thickness) > 0 ? Number(thickness) : ''}</Text>
-                  },
-                },
-              ],
-            },
-            {
-              title: 'KÝ HIỆU',
-              key: 'symbol',
-              width: 90,
-              align: 'center',
-              render: (_, r) => {
-                const sym = r.custom_data?.symbol || r.symbol
-                return sym ? <Tag color="blue" style={{ fontWeight: 600 }}>{sym}</Tag> : null
-              },
-            },
-            {
-              title: 'GHI CHÚ KỸ THUẬT',
-              dataIndex: 'note',
-              key: 'note',
-              width: 150,
-              render: (val) => <Text style={{ fontSize: 12 }}>{val || ''}</Text>,
-            },
-            {
-              title: 'SL',
-              dataIndex: 'quantity',
-              key: 'quantity',
-              align: 'center',
-              width: 50,
-            },
-            {
-              title: 'ĐVT',
-              key: 'unit',
-              align: 'center',
-              width: 60,
-              render: (_, r) => <Text>{r.unit || r.custom_data?.unit || 'bộ'}</Text>,
-            },
-            !hidePricing && {
-              title: 'ĐƠN GIÁ/BỘ',
-              dataIndex: 'unit_price',
-              key: 'unit_price',
-              align: 'right',
-              width: 120,
-              render: (v) => `${Number(v || 0).toLocaleString('vi-VN')} đ`,
-            },
-            !hidePricing && {
-              title: 'TỔNG TIỀN',
-              key: 'total',
-              align: 'right',
-              width: 130,
-              render: (_, r) => {
-                const tot = computeLineTotal(r, effectiveTemplate)
-                return <Text strong style={{ color: '#16a34a' }}>{tot.toLocaleString('vi-VN')} đ</Text>
-              },
-            },
-          ].filter(Boolean) : [
-            {
-              title: 'STT',
-              key: 'stt',
-              width: 42,
-              align: 'center',
-              render: (_, __, idx) => <Text strong style={{ color: themeColor }}>{idx + 1}</Text>,
-            },
-            {
-              title: 'Sản phẩm / Hàng hoá',
-              key: 'product_info',
-              width: 240,
-              render: (_, r) => {
-                const prodObj = (products || []).find((p) => p && p.id === r?.product)
-                const imgUrl = r?.product_image || (prodObj ? (prodObj.image_url || prodObj.image) : null)
-                return (
-                  <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
-                    {imgUrl ? (
-                      <img src={imgUrl} alt="prod" style={{ width: 36, height: 36, objectFit: 'cover', borderRadius: 4, border: '1px solid #cbd5e1', flexShrink: 0 }} />
-                    ) : null}
-                    <Text strong style={{ color: '#0f172a', lineHeight: 1.4 }}>{r.product_name || (prodObj ? prodObj.name : '—')}</Text>
-                  </div>
-                )
-              },
-            },
-            {
-              title: 'Kích thước / Ghi chú',
-              dataIndex: 'note',
-              key: 'note',
-              width: 175,
-              render: (val) => val
-                ? <Text style={{ fontSize: 12.5, whiteSpace: 'pre-wrap', color: '#334155', lineHeight: 1.4 }}>{val}</Text>
-                : null,
-            },
-            {
-              title: 'ĐVT',
-              key: 'unit',
-              width: 55,
-              align: 'center',
-              render: (_, r) => <Text>{r.unit || r.custom_data?.unit || 'cái'}</Text>,
-            },
-            {
-              title: 'SL',
-              dataIndex: 'quantity',
-              key: 'quantity',
-              align: 'center',
-              width: 48,
-              render: (v) => <Text strong>{v || 1}</Text>,
-            },
-            !hidePricing && {
-              title: 'Đơn giá',
-              dataIndex: 'unit_price',
-              key: 'unit_price',
-              align: 'right',
-              width: 110,
-              render: (v) => `${Number(v || 0).toLocaleString('vi-VN')} đ`,
-            },
-            !hidePricing && {
-              title: 'CK%',
-              dataIndex: 'discount_percent',
-              key: 'discount_percent',
-              align: 'center',
-              width: 50,
-              render: (v) => v > 0 ? <Text type="warning">{v}%</Text> : null,
-            },
-            !hidePricing && {
-              title: 'Thành tiền',
-              key: 'total',
-              align: 'right',
-              width: 125,
-              render: (_, r) => {
-                const tot = computeLineTotal(r, effectiveTemplate)
-                return <Text strong style={{ color: '#16a34a' }}>{tot.toLocaleString('vi-VN')} đ</Text>
-              },
-            },
-          ].filter(Boolean)
-        );
-
-        return (
-          <>
-            {productItems.length > 0 && (
-              <Table scroll={{ x: 1200 }}
-                className="compact-print-table no-bg-table"
-                dataSource={productItems}
-                rowKey="id"
-                pagination={false}
-                size="small"
-                columns={getColumns(productItems, false)}
-              />
-            )}
-            {serviceItems.length > 0 && (
-              <div style={{ marginTop: 24, pageBreakInside: 'avoid', breakInside: 'avoid' }}>
-                <Title level={5} style={{ color: '#0f172a', marginBottom: 8, fontSize: 14, fontWeight: 'bold', marginLeft: 16 }}>Chi phí phát sinh:</Title>
-                <Table scroll={{ x: 1200 }}
-                  className="compact-print-table no-bg-table"
-                  dataSource={serviceItems}
-                  rowKey="id"
-                  pagination={false}
-                  size="small"
-                  showHeader={false}
-                  columns={getColumns(serviceItems, true)}
-                />
-              </div>
-            )}
-          </>
-        );
-      })()}
-
-      <Divider />
-      {!hidePricing && (
-        <Row gutter={24} className="print-row-nowrap" style={{ pageBreakInside: 'avoid', breakInside: 'avoid' }}>
-          <Col xs={24} md={12}>
-            {quotation.payment_terms_schedule && quotation.payment_terms_schedule.length > 0 && (
-              <div>
-                <Text strong style={{ fontSize: 13, textDecoration: 'underline' }}>Tiến độ thanh toán:</Text>
-                <ul style={{ paddingLeft: 20, marginTop: 8, fontSize: 13, color: '#334155' }}>
-                  {quotation.payment_terms_schedule.map((term, idx) => (
-                    <li key={idx} style={{ marginBottom: 4 }}>
-                      {term.title} ({term.percentage}%): <Text strong style={{ color: '#0f172a' }}>{(Number(quotation.total_amount || 0) * (term.percentage / 100)).toLocaleString('vi-VN')} đ</Text>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            )}
-            {type === 'order' && (
-              <div style={{ marginTop: 12, padding: '10px 14px', background: '#f8fafc', border: '1px dashed #cbd5e1', borderRadius: 8, width: 'fit-content' }}>
-                <div style={{ marginBottom: 4, fontSize: 13 }}>
-                  <Text type="secondary" style={{ display: 'inline-block', width: 110 }}>Đã thanh toán:</Text>
-                  <Text strong style={{ color: '#16a34a' }}>{Number(quotation.paid_amount || 0).toLocaleString('vi-VN')} đ</Text>
-                </div>
-                <div style={{ fontSize: 13 }}>
-                  <Text type="secondary" style={{ display: 'inline-block', width: 110 }}>Còn nợ:</Text>
-                  <Text strong style={{ color: quotation.remaining_debt > 0 ? '#ef4444' : '#16a34a' }}>
-                    {Number(quotation.remaining_debt || 0).toLocaleString('vi-VN')} đ
-                  </Text>
-                </div>
-              </div>
-            )}
-          </Col>
-          <Col xs={24} md={12} style={{ textAlign: 'right' }}>
-            <div><Text>Tổng Phí Trước Thuế:</Text> <Text strong>{Number(quotation.subtotal || 0).toLocaleString('vi-VN')} đ</Text></div>
-            {Number(quotation.vat_rate || 0) > 0 && (
-              <div><Text>Thuế VAT ({quotation.vat_rate}%):</Text> <Text strong>+{Number(quotation.vat_amount || 0).toLocaleString('vi-VN')} đ</Text></div>
-            )}
-            {Number(quotation.shipping_fee || 0) > 0 && (
-              <div><Text>Phí vận chuyển:</Text> <Text strong>+{Number(quotation.shipping_fee).toLocaleString('vi-VN')} đ</Text></div>
-            )}
-            {Number(quotation.installation_fee || 0) > 0 && (
-              <div><Text>Phí thi công / lắp đặt:</Text> <Text strong>+{Number(quotation.installation_fee).toLocaleString('vi-VN')} đ</Text></div>
-            )}
-            {Number(quotation.discount_total || 0) > 0 && (
-              <div><Text>Chiết khấu chung:</Text> <Text strong>-{Number(quotation.discount_total || 0).toLocaleString('vi-VN')} đ</Text></div>
-            )}
-            <div style={{ marginTop: 8 }}>
-              <Text>TỔNG THANH TOÁN:</Text>{' '}
-              <Title level={4} style={{ display: 'inline', color: '#16a34a', margin: 0 }}>
-                {Number(quotation.total_amount || 0).toLocaleString('vi-VN')} đ
-              </Title>
-            </div>
-          </Col>
-        </Row>
-      )}
-
-      {!hideCustomerInfo && (
-        <div style={{ marginTop: 24, pageBreakInside: 'avoid', breakInside: 'avoid' }}>
-          {quotation.delivery_time && (
-            <div style={{ marginBottom: 4 }}>
-              <Text>Thời gian giao hàng / thi công: </Text>
-              <Text strong>{quotation.delivery_time}</Text>
-            </div>
-          )}
-          {quotation.validity_days && (
-            <div style={{ marginBottom: 4 }}>
-              <Text>Báo giá có giá trị trong vòng: </Text>
-              <Text strong>{quotation.validity_days} ngày</Text>
-            </div>
-          )}
-        </div>
-      )}
-
-      {!hidePricing && (quotation.notes || effectiveTemplate?.company_default_terms || effectiveTemplate?.footer_content) && (
-        <Card size="small" style={{ marginTop: 12, background: '#f8fafc', borderColor: '#e2e8f0', pageBreakInside: 'avoid', breakInside: 'avoid' }}>
-          <Text strong style={{ color: '#0f172a' }}>Ghi chú & Điều khoản khác:</Text>
-          <Paragraph style={{ margin: '8px 0 0', color: '#334155', whiteSpace: 'pre-wrap' }}>
-            {quotation.notes || effectiveTemplate?.company_default_terms || effectiveTemplate?.footer_content}
-          </Paragraph>
-        </Card>
-      )}
-
-      {/* Khối Chữ Ký & Con Dấu */}
-      {hideCustomerInfo ? (
-        // Chỉ hiển thị chữ ký công ty bên phải cho xưởng sản xuất
-        <div className="signature-block" style={{ marginTop: 40, display: 'flex', justifyContent: 'flex-end', pageBreakInside: 'avoid', breakInside: 'avoid' }}>
-          <div style={{ width: '40%', textAlign: 'center', position: 'relative' }}>
-            <Text strong style={{ display: 'block', fontSize: 13, color: '#1e293b' }}>
-              {quotation?.company_info?.director_title || effectiveTemplate?.company_info?.director_title || 'ĐẠI DIỆN CÔNG TY'}
-            </Text>
-            <Text type="secondary" style={{ fontSize: 11, fontStyle: 'italic' }}>(Ký, đóng dấu)</Text>
-            <div style={{ height: 145, display: 'flex', alignItems: 'center', justifyContent: 'center', position: 'relative', marginTop: 12 }}>
-              {(() => {
-                const stImg = quotation?.company_info?.stamp || quotation?.company_info?.stamp_image || effectiveTemplate?.company_info?.stamp || effectiveTemplate?.company_info?.stamp_image
-                const sigImg = quotation?.company_info?.signature || quotation?.company_info?.director_signature || effectiveTemplate?.company_info?.signature || effectiveTemplate?.company_info?.director_signature
-                return (
-                  <>
-                    {stImg && (
-                      <img
-                        src={stImg}
-                        alt="Stamp"
-                        style={{ height: 135, maxWidth: 165, position: 'absolute', opacity: 0.88, zIndex: 1, objectFit: 'contain' }}
-                      />
-                    )}
-                    {sigImg && (
-                      <img
-                        src={sigImg}
-                        alt="Signature"
-                        style={{ height: 115, maxWidth: 200, position: 'relative', zIndex: 2, objectFit: 'contain' }}
-                      />
-                    )}
-                  </>
-                )
-              })()}
-            </div>
-            <Text strong style={{ display: 'block', fontSize: 15, color: '#0f172a', marginTop: 8 }}>
-              {quotation?.company_info?.director_name || effectiveTemplate?.company_info?.director_name || ''}
-            </Text>
-          </div>
-        </div>
-      ) : (
-        <Row justify="space-between" className="signature-block print-row-nowrap" style={{ marginTop: 40, textAlign: 'center', pageBreakInside: 'avoid', breakInside: 'avoid' }}>
-          <Col xs={24} md={10}>
-            <Text strong style={{ display: 'block', fontSize: 13, color: '#1e293b' }}>BÊN MUA / KHÁCH HÀNG</Text>
-            <Text type="secondary" style={{ fontSize: 11, fontStyle: 'italic' }}>(Ký, ghi rõ họ tên)</Text>
-            
-            {renderCustomerSignature ? (
-              renderCustomerSignature()
-            ) : (
-              quotation?.status === 'accepted' && quotation?.signature_image ? (
-                <div style={{ height: 145, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', marginTop: 12 }}>
-                  <img 
-                    src={quotation.signature_image} 
-                    alt="Customer Signature" 
-                    style={{ height: 100, objectFit: 'contain' }}
-                  />
-                  <Text strong style={{ fontSize: 14, color: '#0f172a', marginTop: 8 }}>{quotation.customer_name_signed}</Text>
-                  <Tag color="green" style={{ marginTop: 4 }}>Đã ký: {dayjs(quotation.signed_at).format('DD/MM/YYYY HH:mm')}</Tag>
-                </div>
-              ) : (
-                <div style={{ height: 130 }} />
-              )
-            )}
-          </Col>
-          <Col xs={24} md={10} style={{ position: 'relative' }}>
-            <Text strong style={{ display: 'block', fontSize: 13, color: '#1e293b' }}>
-              {quotation?.company_info?.director_title || effectiveTemplate?.company_info?.director_title || 'ĐẠI DIỆN CÔNG TY'}
-            </Text>
-            <Text type="secondary" style={{ fontSize: 11, fontStyle: 'italic' }}>(Ký, đóng dấu)</Text>
-            <div style={{ height: 145, display: 'flex', alignItems: 'center', justifyContent: 'center', position: 'relative', marginTop: 12 }}>
-              {(() => {
-                const stImg = quotation?.company_info?.stamp || quotation?.company_info?.stamp_image || effectiveTemplate?.company_info?.stamp || effectiveTemplate?.company_info?.stamp_image
-                const sigImg = quotation?.company_info?.signature || quotation?.company_info?.director_signature || effectiveTemplate?.company_info?.signature || effectiveTemplate?.company_info?.director_signature
-                return (
-                  <>
-                    {stImg && (
-                      <img
-                        src={stImg}
-                        alt="Stamp"
-                        style={{ height: 135, maxWidth: 165, position: 'absolute', opacity: 0.88, zIndex: 1, objectFit: 'contain' }}
-                      />
-                    )}
-                    {sigImg && (
-                      <img
-                        src={sigImg}
-                        alt="Signature"
-                        style={{ height: 115, maxWidth: 200, position: 'relative', zIndex: 2, objectFit: 'contain' }}
-                      />
-                    )}
-                  </>
-                )
-              })()}
-            </div>
-            <Text strong style={{ display: 'block', fontSize: 15, color: '#0f172a', marginTop: 8 }}>
-              {quotation?.company_info?.director_name || effectiveTemplate?.company_info?.director_name || ''}
-            </Text>
-          </Col>
-        </Row>
-      )}
     </div>
-    </div>
-  )
+  );
 }

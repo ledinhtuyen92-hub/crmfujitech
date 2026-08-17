@@ -2198,50 +2198,68 @@ export default function OrderList() {
           </Button>
 
           <Card size="small" style={{ background: '#f8fafc', borderRadius: 8, marginBottom: 16 }}>
-            <Row gutter={16} align="bottom">
-              <Col xs={24} sm={4}>
-                <Form.Item name="shipping_fee" label="Phí vận chuyển" style={{ marginBottom: 8 }}>
-                  <InputNumber min={0} step={50000} style={{ width: '100%' }} formatter={(v) => `${v}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',')} parser={(v) => v.replace(/\$\s?|(,*)/g, '')} />
-                </Form.Item>
-              </Col>
-              <Col xs={24} sm={4}>
-                <Form.Item name="installation_fee" label="Phí thi công" style={{ marginBottom: 8 }}>
-                  <InputNumber min={0} step={50000} style={{ width: '100%' }} formatter={(v) => `${v}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',')} parser={(v) => v.replace(/\$\s?|(,*)/g, '')} />
-                </Form.Item>
-              </Col>
-              <Col xs={24} sm={4}>
-                <Form.Item name="discount_total" label="Chiết khấu" style={{ marginBottom: 8 }}>
-                  <InputNumber min={0} step={10000} style={{ width: '100%' }} formatter={(val) => `${val}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',')} parser={(val) => val.replace(/\$\s?|(,*)/g, '')} />
-                </Form.Item>
-              </Col>
-              <Col xs={24} sm={4}>
-                <Form.Item name="vat_rate" label="% VAT" style={{ marginBottom: 8 }}>
-                  <InputNumber min={0} max={100} step={1} style={{ width: '100%' }} />
-                </Form.Item>
-              </Col>
-              <Col xs={24} sm={8}>
-                <Form.Item shouldUpdate noStyle>
-                  {() => {
-                    const shipping = Number(form.getFieldValue('shipping_fee') || 0)
-                    const install = Number(form.getFieldValue('installation_fee') || 0)
-                    const discount = Number(form.getFieldValue('discount_total') || 0)
-                    const vatRate = Number(form.getFieldValue('vat_rate') || 0)
-                    const subtotal = calculateModalTotal()
-                    const vatAmount = (subtotal * vatRate) / 100.0
-                    const total = Math.max(0, subtotal + vatAmount + shipping + install - discount)
-                    return (
-                      <div style={{ textAlign: 'right', paddingRight: 8, marginBottom: 8 }}>
-                        <Text type="secondary" style={{ fontSize: 12, display: 'block' }}>Tổng Trước Thuế: {subtotal.toLocaleString('vi-VN')} đ</Text>
-                        <Text type="secondary" style={{ fontSize: 12, display: 'block' }}>Tiền VAT: {vatAmount.toLocaleString('vi-VN')} đ</Text>
-                        <Text strong style={{ fontSize: 18, color: '#e11d48', display: 'block', marginTop: 4 }}>
-                          Tổng: {total.toLocaleString('vi-VN')} đ
-                        </Text>
-                      </div>
-                    )
-                  }}
-                </Form.Item>
-              </Col>
-            </Row>
+            {(() => {
+              const effTmpl = getEffectiveTemplate(editingOrder);
+              const totalsBlock = effTmpl?.layout_config?.blocks?.find(b => b.type === 'totals')?.props || {};
+              const showShipping = totalsBlock.showShippingFee !== false;
+              const showInstallation = totalsBlock.showInstallationFee !== false;
+              const showDiscount = totalsBlock.showDiscount !== false;
+              const showVAT = totalsBlock.showVAT !== false;
+              return (
+                <Row gutter={16} align="bottom" justify="end">
+                  {showShipping && (
+                    <Col xs={24} sm={4}>
+                      <Form.Item name="shipping_fee" label="Phí vận chuyển" style={{ marginBottom: 8 }}>
+                        <InputNumber min={0} step={50000} style={{ width: '100%' }} formatter={(v) => `${v}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',')} parser={(v) => v.replace(/\$\s?|(,*)/g, '')} />
+                      </Form.Item>
+                    </Col>
+                  )}
+                  {showInstallation && (
+                    <Col xs={24} sm={4}>
+                      <Form.Item name="installation_fee" label="Phí thi công" style={{ marginBottom: 8 }}>
+                        <InputNumber min={0} step={50000} style={{ width: '100%' }} formatter={(v) => `${v}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',')} parser={(v) => v.replace(/\$\s?|(,*)/g, '')} />
+                      </Form.Item>
+                    </Col>
+                  )}
+                  {showDiscount && (
+                    <Col xs={24} sm={4}>
+                      <Form.Item name="discount_total" label="Chiết khấu" style={{ marginBottom: 8 }}>
+                        <InputNumber min={0} step={10000} style={{ width: '100%' }} formatter={(val) => `${val}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',')} parser={(val) => val.replace(/\$\s?|(,*)/g, '')} />
+                      </Form.Item>
+                    </Col>
+                  )}
+                  {showVAT && (
+                    <Col xs={24} sm={4}>
+                      <Form.Item name="vat_rate" label="% VAT" style={{ marginBottom: 8 }}>
+                        <InputNumber min={0} max={100} step={1} style={{ width: '100%' }} />
+                      </Form.Item>
+                    </Col>
+                  )}
+                  <Col xs={24} sm={8}>
+                    <Form.Item shouldUpdate noStyle>
+                      {() => {
+                        const shipping = Number(form.getFieldValue('shipping_fee') || 0)
+                        const install = Number(form.getFieldValue('installation_fee') || 0)
+                        const discount = Number(form.getFieldValue('discount_total') || 0)
+                        const vatRate = Number(form.getFieldValue('vat_rate') || 0)
+                        const subtotal = calculateModalTotal()
+                        const vatAmount = (subtotal * vatRate) / 100.0
+                        const total = Math.max(0, subtotal + vatAmount + shipping + install - discount)
+                        return (
+                          <div style={{ textAlign: 'right', paddingRight: 8, marginBottom: 8 }}>
+                            <Text type="secondary" style={{ fontSize: 12, display: 'block' }}>Tổng Trước Thuế: {subtotal.toLocaleString('vi-VN')} đ</Text>
+                            <Text type="secondary" style={{ fontSize: 12, display: 'block' }}>Tiền VAT: {vatAmount.toLocaleString('vi-VN')} đ</Text>
+                            <Text strong style={{ fontSize: 18, color: '#e11d48', display: 'block', marginTop: 4 }}>
+                              Tổng: {total.toLocaleString('vi-VN')} đ
+                            </Text>
+                          </div>
+                        )
+                      }}
+                    </Form.Item>
+                  </Col>
+                </Row>
+              );
+            })()}
           </Card>
 
           <Row gutter={16}>

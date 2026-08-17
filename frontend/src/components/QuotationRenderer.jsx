@@ -1,25 +1,114 @@
 import React from 'react';
-import { Row, Col, Divider, Typography } from 'antd';
+import { Typography, Row, Col, Divider } from 'antd';
+
+const ChuSo = ["không", "một", "hai", "ba", "bốn", "năm", "sáu", "bảy", "tám", "chín"];
+const Tien = ["", " nghìn", " triệu", " tỷ", " nghìn tỷ", " triệu tỷ"];
+
+function docSo(so) {
+    if (so === 0) return "Không đồng";
+    let str = parseInt(so).toString();
+    let result = "";
+    let len = str.length;
+    let i = 0;
+    while (i < len) {
+        let n = parseInt(str[i]);
+        let p = len - i - 1;
+        let t = p % 3;
+        if (n === 0) {
+            if (t === 0 && p > 0 && (parseInt(str[i-1]) !== 0 || parseInt(str[i-2]) !== 0)) {
+                result += Tien[p/3] + " ";
+            } else if (t === 1 && parseInt(str[i+1]) !== 0) {
+                result += "lẻ ";
+            } else if (t === 2 && (parseInt(str[i+1]) !== 0 || parseInt(str[i+2]) !== 0)) {
+                result += "không trăm ";
+            }
+        } else {
+            if (t === 1 && n === 1) {
+                result += "mười ";
+            } else {
+                if (n === 5 && t === 0 && i > 0 && parseInt(str[i-1]) !== 0) {
+                    result += "lăm ";
+                } else if (n === 1 && t === 0 && i > 0 && parseInt(str[i-1]) !== 0 && parseInt(str[i-1]) !== 1) {
+                    result += "mốt ";
+                } else {
+                    result += ChuSo[n] + " ";
+                }
+                if (t === 2) result += "trăm ";
+                if (t === 1 && n !== 1) result += "mươi ";
+            }
+            if (t === 0) result += Tien[p/3] + " ";
+        }
+        i++;
+    }
+    result = result.trim() + " đồng.";
+    return result.charAt(0).toUpperCase() + result.slice(1);
+}
 
 const { Text } = Typography;
 
-// Constant block types (must match builder)
 const BLOCK_TYPES = {
   TEXT: 'rich_text',
   IMAGE: 'image',
+  HEADER_LOGO: 'header_logo',
+  TITLE: 'title',
   CUSTOMER_INFO: 'customer_info',
   PRODUCT_TABLE: 'product_table',
   TOTALS: 'totals',
+  TERMS: 'terms',
   SIGNATURES: 'signatures',
+  PAYMENT_PROGRESS: 'payment_progress',
   DIVIDER: 'divider',
   LAYOUT_ROW: 'layout_row'
+};
+
+const computeLineTotal = (item) => {
+  const qty = Number(item.quantity || 1)
+  const price = Number(item.unit_price || 0)
+  const discount = Number(item.discount_percent || 0)
+  const area = Number(item.area || 0)
+  if ((item.unit === 'm²' || item.custom_data?.unit === 'm²' || (area > 0 && item.width > 0 && item.height > 0)) && area > 0) {
+    return Number((area * qty * price * (1 - discount / 100)).toFixed(0))
+  }
+  return Number((qty * price * (1 - discount / 100)).toFixed(0))
+};
+
+const computeRowSpan = (data, index, field = 'product') => {
+  if (!data || !data[index]) return 1
+  if (data[index].item_type === 'service') return 1
+  const currentVal = data[index]?.[field]
+  if (!currentVal) return 1
+  if (index > 0 && data[index - 1]?.[field] === currentVal && data[index - 1].item_type !== 'service') {
+    return 0
+  }
+  let count = 1
+  for (let i = index + 1; i < data.length; i++) {
+    if (data[i]?.[field] === currentVal) {
+      count++
+    } else {
+      break
+    }
+  }
+  return count
+};
+
+const computeProductSTT = (data, index, field = 'product') => {
+  if (!data) return 0
+  let count = 0
+  for (let i = 0; i <= index; i++) {
+    if (data[i].item_type === 'service') {
+      count++
+    } else if (i === 0 || data[i]?.[field] !== data[i - 1]?.[field] || data[i - 1]?.item_type === 'service') {
+      count++
+    }
+  }
+  return count
 };
 
 /**
  * QuotationRenderer takes the layout_config JSON and actual data (customer, items, totals)
  * and renders the final read-only HTML view.
  */
-export default function QuotationRenderer({ layoutConfig, data }) {
+export default function QuotationRenderer({ layoutConfig, layoutStyle, data }) {
   if (!layoutConfig || !Array.isArray(layoutConfig.blocks)) {
     return <div style={{ padding: 20, textAlign: 'center' }}>Mẫu báo giá chưa được thiết kế.</div>;
   }
@@ -27,7 +116,18 @@ export default function QuotationRenderer({ layoutConfig, data }) {
   const { customer, items, totals, company } = data || {};
 
   const renderBlock = (block) => {
-    const clr = block.props.themeColor || '#1649c9';
+    const clr = block.props.themeColor || layoutConfig.theme_color || '#1649c9';
+    const isNoBorder = layoutConfig.table_style === 'modern_navy';
+    const thStyle = { 
+      border: isNoBorder ? 'none' : '1px solid #e2e8f0', 
+      borderBottom: '1px solid #e2e8f0',
+      padding: '8px 4px' 
+    };
+    const tdStyle = { 
+      border: isNoBorder ? 'none' : '1px solid #e2e8f0', 
+      borderBottom: '1px solid #e2e8f0',
+      padding: 8 
+    };
     switch (block.type) {
       case BLOCK_TYPES.HEADER_LOGO:
         return (
@@ -87,7 +187,7 @@ export default function QuotationRenderer({ layoutConfig, data }) {
           <Row gutter={16} style={{ marginBottom: 16 }}>
             <Col xs={24} md={block.props.columns === 1 ? 24 : 12} style={{ marginBottom: block.props.columns === 1 ? 16 : 0 }}>
               <div style={{ padding: '10px 14px', background: '#f8fafc', border: `1px solid ${clr}40`, borderRadius: 6, height: '100%' }}>
-                <div style={{ fontWeight: 700, color: clr, fontSize: 13, marginBottom: 4 }}>🔹 BÊN BÁN (BÊN B): {block.props.companyName || 'CÔNG TY CỦA BẠN'}</div>
+                <div style={{ fontWeight: 700, color: clr, fontSize: 13, marginBottom: 4 }}>BÊN BÁN (BÊN B): {block.props.companyName || 'CÔNG TY CỦA BẠN'}</div>
                 <div style={{ fontSize: 12, color: '#334155' }}><strong>Đại diện:</strong> Nguyễn Anh Tuấn • <strong>Chức vụ:</strong> Giám đốc</div>
                 <div style={{ fontSize: 12, color: '#334155' }}><strong>Mã số thuế:</strong> 0111100289 • <strong>Điện thoại:</strong> 0961442882</div>
                 <div style={{ fontSize: 12, color: '#334155' }}><strong>Địa chỉ:</strong> KĐT Xa La, Hà Đông, TP Hà Nội</div>
@@ -95,7 +195,7 @@ export default function QuotationRenderer({ layoutConfig, data }) {
             </Col>
             <Col xs={24} md={block.props.columns === 1 ? 24 : 12}>
               <div style={{ padding: '10px 14px', background: '#fff', border: '1px solid #e2e8f0', borderRadius: 6, height: '100%' }}>
-                <div style={{ fontWeight: 700, color: '#0f172a', fontSize: 13, marginBottom: 4 }}>🔸 BÊN MUA (BÊN A): CÔNG TY KHÁCH HÀNG</div>
+                <div style={{ fontWeight: 700, color: '#0f172a', fontSize: 13, marginBottom: 4 }}>BÊN MUA (BÊN A): CÔNG TY KHÁCH HÀNG</div>
                 <div style={{ fontSize: 12, color: '#334155' }}><strong>Khách hàng:</strong> {custName}</div>
                 <div style={{ fontSize: 12, color: '#334155' }}><strong>Mã số thuế:</strong> {custTax} • <strong>Điện thoại:</strong> {custPhone}</div>
                 <div style={{ fontSize: 12, color: '#334155' }}><strong>Địa chỉ:</strong> {custAddress}</div>
@@ -106,33 +206,53 @@ export default function QuotationRenderer({ layoutConfig, data }) {
 
       case BLOCK_TYPES.PRODUCT_TABLE:
         const tableData = items || [];
+        const isLandscape = layoutConfig?.paper_orientation === 'landscape';
         return (
           <div style={{ marginBottom: 16 }}>
             <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
               <thead>
                 <tr style={{ background: '#fafafa' }}>
-                  {block.props.columns?.includes('stt') && <th style={{ border: '1px solid #e2e8f0', padding: '8px 4px', color: clr }}>STT</th>}
-                  {block.props.columns?.includes('name') && <th style={{ border: '1px solid #e2e8f0', padding: '8px 4px' }}>Tên hàng hóa / Dịch vụ</th>}
-                  {block.props.columns?.includes('unit') && <th style={{ border: '1px solid #e2e8f0', padding: '8px 4px' }}>ĐVT</th>}
-                  {block.props.columns?.includes('qty') && <th style={{ border: '1px solid #e2e8f0', padding: '8px 4px' }}>SL</th>}
-                  {block.props.columns?.includes('price') && <th style={{ border: '1px solid #e2e8f0', padding: '8px 4px' }}>Đơn giá</th>}
-                  {block.props.columns?.includes('total') && <th style={{ border: '1px solid #e2e8f0', padding: '8px 4px' }}>Thành tiền</th>}
+                  {block.props.columns?.includes('stt') && <th style={{ ...thStyle, color: clr }}>STT</th>}
+                  {block.props.columns?.includes('name') && <th style={thStyle}>Tên hàng hóa / Dịch vụ</th>}
+                  {block.props.columns?.includes('unit') && <th style={thStyle}>ĐVT</th>}
+                  {block.props.columns?.includes('qty') && <th style={thStyle}>SL</th>}
+                  {block.props.columns?.includes('price') && <th style={thStyle}>Đơn giá</th>}
+                  {block.props.columns?.includes('total') && <th style={thStyle}>Thành tiền</th>}
                 </tr>
               </thead>
               <tbody>
                 {tableData.length === 0 ? (
-                  <tr><td colSpan={6} style={{ border: '1px solid #e2e8f0', padding: 8, textAlign: 'center', color: '#888' }}>[Danh sách sản phẩm trống]</td></tr>
+                  <tr><td colSpan={6} style={{ ...tdStyle, textAlign: 'center', color: '#888' }}>[Danh sách sản phẩm trống]</td></tr>
                 ) : (
-                  tableData.map((item, index) => (
-                    <tr key={index}>
-                      {block.props.columns?.includes('stt') && <td style={{ border: '1px solid #e2e8f0', padding: 8, textAlign: 'center', fontWeight: 600, color: clr }}>{index + 1}</td>}
-                      {block.props.columns?.includes('name') && <td style={{ border: '1px solid #e2e8f0', padding: 8 }}><strong style={{ color: '#1e293b' }}>{item.product_name}</strong></td>}
-                      {block.props.columns?.includes('unit') && <td style={{ border: '1px solid #e2e8f0', padding: 8, textAlign: 'center' }}>{item.unit}</td>}
-                      {block.props.columns?.includes('qty') && <td style={{ border: '1px solid #e2e8f0', padding: 8, textAlign: 'center' }}>{item.quantity}</td>}
-                      {block.props.columns?.includes('price') && <td style={{ border: '1px solid #e2e8f0', padding: 8, textAlign: 'right' }}>{Number(item.unit_price).toLocaleString()} đ</td>}
-                      {block.props.columns?.includes('total') && <td style={{ border: '1px solid #e2e8f0', padding: 8, textAlign: 'right' }}><strong style={{ color: clr }}>{Number(item.total_price).toLocaleString()} đ</strong></td>}
-                    </tr>
-                  ))
+                  tableData.map((item, index) => {
+                    const rowSpan = isLandscape ? computeRowSpan(tableData, index, 'product') : 1;
+                    const sttNum = isLandscape ? computeProductSTT(tableData, index, 'product') : index + 1;
+                    const lineTotal = computeLineTotal(item);
+
+                    return (
+                      <tr key={index}>
+                        {block.props.columns?.includes('stt') && rowSpan > 0 && <td rowSpan={rowSpan} style={{ ...tdStyle, textAlign: 'center', fontWeight: 600, color: clr, verticalAlign: 'top' }}>{sttNum}</td>}
+                        {block.props.columns?.includes('name') && rowSpan > 0 && <td rowSpan={rowSpan} style={{...tdStyle, verticalAlign: 'top'}}>
+                          <strong style={{ color: '#1e293b' }}>{item.product_name || item.name}</strong>
+                          {(item.description || item.spec) && <div style={{ fontSize: 11, color: '#64748b', fontStyle: 'italic', whiteSpace: 'pre-wrap', marginTop: 2 }}>{item.description || item.spec}</div>}
+                          {item.product_image && <div style={{marginTop: 4}}><img src={item.product_image} alt="" style={{ maxWidth: 80, maxHeight: 80, borderRadius: 4, objectFit: 'contain' }} /></div>}
+                        </td>}
+                        
+                        {block.props.columns?.includes('unit') && <td style={{ ...tdStyle, textAlign: 'center' }}>
+                          <span style={{fontWeight: 500, color: item.item_type === 'accessory' ? '#64748b' : '#334155'}}>{item.unit || item.custom_data?.unit}</span>
+                        </td>}
+                        {block.props.columns?.includes('qty') && <td style={{ ...tdStyle, textAlign: 'center' }}>
+                          <span style={{fontWeight: 500, color: item.item_type === 'accessory' ? '#64748b' : '#334155'}}>{item.quantity}</span>
+                        </td>}
+                        {block.props.columns?.includes('price') && <td style={{ ...tdStyle, textAlign: 'right' }}>
+                          <span style={{color: item.item_type === 'accessory' ? '#64748b' : '#334155'}}>{Number(item.unit_price).toLocaleString()} đ</span>
+                        </td>}
+                        {block.props.columns?.includes('total') && <td style={{ ...tdStyle, textAlign: 'right' }}>
+                          <strong style={{ color: item.item_type === 'accessory' ? '#64748b' : clr }}>{lineTotal.toLocaleString()} đ</strong>
+                        </td>}
+                      </tr>
+                    );
+                  })
                 )}
               </tbody>
             </table>
@@ -140,22 +260,62 @@ export default function QuotationRenderer({ layoutConfig, data }) {
         );
 
       case BLOCK_TYPES.TOTALS:
-        const subtotal = totals?.subtotal || 0;
-        const discount = totals?.discount || 0;
-        const vat = totals?.vat || 0;
-        const grandTotal = totals?.grandTotal || 0;
         return (
           <Row justify="end" style={{ marginBottom: 16 }}>
-            <Col xs={24} md={11} style={{ textAlign: 'right', padding: '10px 14px', background: '#f8fafc', borderRadius: 6, border: '1px solid #e2e8f0' }}>
-              {block.props.showSubtotal && <div style={{ fontSize: 12, color: '#64748b' }}>Cộng tiền hàng: {Number(subtotal).toLocaleString()} đ</div>}
-              {block.props.showDiscount && <div style={{ fontSize: 12, color: '#64748b' }}>Chiết khấu chung: {Number(discount).toLocaleString()} đ</div>}
-              {block.props.showVAT && <div style={{ fontSize: 12, color: '#64748b' }}>Thuế GTGT (VAT): {Number(vat).toLocaleString()} đ</div>}
+            <Col xs={24} md={11} style={{ textAlign: 'right', padding: '10px 14px', background: block.props.backgroundColor ?? '#f8fafc', borderRadius: 6, border: (block.props.showBorder ?? true) ? `1px solid ${clr}40` : 'none' }}>
+              {block.props.showSubtotal && <div style={{ fontSize: 12, color: '#64748b' }}>Cộng tiền hàng: {Number(totals?.subtotal || 0).toLocaleString()} đ</div>}
+              {block.props.showDiscount && Number(totals?.discount || 0) > 0 && <div style={{ fontSize: 12, color: '#64748b' }}>Chiết khấu chung: -{Number(totals?.discount || 0).toLocaleString()} đ</div>}
+              {block.props.showVAT && Number(totals?.tax || 0) > 0 && <div style={{ fontSize: 12, color: '#64748b' }}>Thuế GTGT ({totals?.tax_percent || 0}%): {Number(totals?.tax || 0).toLocaleString()} đ</div>}
+              {block.props.showShippingFee && Number(totals?.shipping_fee || data?.shipping_fee || 0) > 0 && <div style={{ fontSize: 12, color: '#64748b' }}>Phí vận chuyển: {Number(totals?.shipping_fee || data?.shipping_fee || 0).toLocaleString()} đ</div>}
+              {block.props.showInstallationFee && Number(totals?.installation_fee || data?.installation_fee || 0) > 0 && <div style={{ fontSize: 12, color: '#64748b' }}>Phí thi công / lắp đặt: {Number(totals?.installation_fee || data?.installation_fee || 0).toLocaleString()} đ</div>}
               <div style={{ fontSize: 15, fontWeight: 700, color: clr, marginTop: 4 }}>
-                TỔNG THANH TOÁN: {Number(grandTotal).toLocaleString()} đ
+                TỔNG THANH TOÁN: {Number(totals?.total || data?.total_amount || 0).toLocaleString()} đ
               </div>
-              {block.props.showWords && <div style={{ fontStyle: 'italic', fontSize: 12, marginTop: 4, color: '#334155' }}>Bằng chữ: ...</div>}
+              {block.props.showWords && <div style={{ fontStyle: 'italic', fontSize: 12, marginTop: 4, color: '#334155' }}>Bằng chữ: {docSo(totals?.total || data?.total_amount || 0)}</div>}
             </Col>
           </Row>
+        );
+
+      case BLOCK_TYPES.PAYMENT_PROGRESS:
+        const payments = data?.payment_terms_schedule || [];
+        const paidAmount = Number(data?.paid_amount || 0);
+        const totalAmount = Number(data?.total_amount || totals?.total || 0);
+        const debtAmount = totalAmount - paidAmount;
+        return (
+          <div style={{ marginBottom: 16 }}>
+            <div style={{ fontWeight: 600, color: '#0f172a', fontSize: 13, marginBottom: 8, textDecoration: 'underline' }}>Tiến độ thanh toán:</div>
+            {payments.length > 0 ? (
+              <ul style={{ paddingLeft: 20, marginBottom: 12, fontSize: 12, color: '#334155' }}>
+                {payments.map((p, idx) => (
+                  <li key={idx}>{p.title} ({p.percentage}%): <strong style={{ color: clr }}>{Number(totalAmount * (p.percentage / 100)).toLocaleString()} đ</strong></li>
+                ))}
+              </ul>
+            ) : (
+              <ul style={{ paddingLeft: 20, marginBottom: 12, fontSize: 12, color: '#334155' }}>
+                <li>Thanh toán đợt 1 (100%): <strong style={{ color: clr }}>{totalAmount.toLocaleString()} đ</strong></li>
+              </ul>
+            )}
+            <div style={{ border: '1px dashed #cbd5e1', padding: '10px 14px', borderRadius: 8, background: '#f8fafc', display: 'inline-block', minWidth: 200, marginBottom: 12 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4, fontSize: 12 }}>
+                <span style={{ color: '#475569' }}>Đã thanh toán:</span>
+                <strong style={{ color: '#16a34a' }}>{paidAmount.toLocaleString()} đ</strong>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12 }}>
+                <span style={{ color: '#475569' }}>Còn nợ:</span>
+                <strong style={{ color: '#ef4444' }}>{debtAmount.toLocaleString()} đ</strong>
+              </div>
+            </div>
+            {block.props.showDeliveryTime && (data?.delivery_time || data?.delivery_time === '') && (
+              <div style={{ fontSize: 12, color: '#334155', marginBottom: 4 }}>
+                Thời gian giao hàng / thi công: <strong>{data.delivery_time || '3-5 ngày làm việc'}</strong>
+              </div>
+            )}
+            {block.props.showValidity && (data?.validity_days || data?.validity_days === 0) && (
+              <div style={{ fontSize: 12, color: '#334155' }}>
+                Báo giá có giá trị trong vòng: <strong>{data.validity_days || 30} ngày</strong>
+              </div>
+            )}
+          </div>
         );
 
       case BLOCK_TYPES.TERMS:
@@ -172,14 +332,41 @@ export default function QuotationRenderer({ layoutConfig, data }) {
         );
 
       case BLOCK_TYPES.SIGNATURES:
+        const stImg = data?.company_info?.stamp || data?.company_info?.stamp_image;
+        const sigImg = data?.company_info?.signature || data?.company_info?.director_signature;
+        const directorName = data?.company_info?.director_name || '';
+        const hasCustomerSignature = data?.status === 'accepted' && data?.signature_image;
+
         return (
           <Row justify="space-around" style={{ marginTop: 24, textAlign: 'center', paddingBottom: 16 }}>
             {Array.from({ length: block.props.columns || 2 }).map((_, idx) => (
               <Col xs={24} md={24 / (block.props.columns || 2)} key={idx}>
                 <div style={{ fontWeight: 700, color: clr, fontSize: 13 }}>{block.props.titles?.[idx] || 'CHỮ KÝ'}</div>
-                <div style={{ fontSize: 11, color: '#64748b', fontStyle: 'italic' }}>(Ký, đóng dấu & ghi rõ họ tên)</div>
-                <div style={{ height: 60 }} />
-                {idx === 0 && <div style={{ fontWeight: 600, color: '#334155', fontSize: 12 }}>Người lập báo giá</div>}
+                <div style={{ fontSize: 11, color: '#64748b', fontStyle: 'italic', marginBottom: 12 }}>(Ký, đóng dấu & ghi rõ họ tên)</div>
+                
+                {/* Customer Signature (Left column usually) */}
+                {idx === 0 && block.props.columns > 1 ? (
+                  hasCustomerSignature ? (
+                    <div style={{ height: 115, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
+                      <img src={data.signature_image} alt="Customer Signature" style={{ height: 90, objectFit: 'contain' }} />
+                    </div>
+                  ) : (
+                    <div style={{ height: 115 }} />
+                  )
+                ) : (
+                  /* Company Signature (Right column usually, or single column) */
+                  <div style={{ height: 115, display: 'flex', alignItems: 'center', justifyContent: 'center', position: 'relative' }}>
+                    {stImg && <img src={stImg} alt="Stamp" style={{ height: 115, maxWidth: 165, position: 'absolute', opacity: 0.88, zIndex: 1, objectFit: 'contain' }} />}
+                    {sigImg && <img src={sigImg} alt="Signature" style={{ height: 95, maxWidth: 200, position: 'relative', zIndex: 2, objectFit: 'contain' }} />}
+                  </div>
+                )}
+                
+                {idx === 0 && block.props.columns > 1 && hasCustomerSignature && (
+                  <div style={{ fontWeight: 600, color: '#0f172a', fontSize: 14 }}>{data.customer_name_signed || customer?.name}</div>
+                )}
+                {(idx === 1 || block.props.columns === 1) && (
+                  <div style={{ fontWeight: 600, color: '#0f172a', fontSize: 14 }}>{directorName}</div>
+                )}
               </Col>
             ))}
           </Row>
@@ -204,8 +391,10 @@ export default function QuotationRenderer({ layoutConfig, data }) {
     }
   };
 
+  const fontFamily = layoutStyle === 'classic_border' ? '"Times New Roman", Times, serif' : (layoutStyle === 'modern_navy' ? 'Inter, sans-serif' : 'Arial, sans-serif');
+
   return (
-    <div style={{ fontFamily: 'Arial, sans-serif' }}>
+    <div style={{ fontFamily }}>
       {layoutConfig.blocks.map((block) => (
         <div key={block.id} style={{ marginBottom: 16 }}>
           {renderBlock(block)}
