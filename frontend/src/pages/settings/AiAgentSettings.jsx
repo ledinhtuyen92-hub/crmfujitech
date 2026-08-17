@@ -151,6 +151,25 @@ export default function AiAgentSettings() {
     }
   };
 
+  const handleResetStats = () => {
+    Modal.confirm({
+      title: 'Xác nhận thiết lập lại',
+      content: 'Bạn có chắc chắn muốn xoá toàn bộ thống kê chi phí AI? Dữ liệu đã xoá sẽ không thể khôi phục.',
+      okText: 'Xoá thống kê',
+      okType: 'danger',
+      cancelText: 'Hủy',
+      onOk: async () => {
+        try {
+          await api.post('ai_agents/agents/reset_usage_stats/');
+          message.success('Đã làm mới thống kê chi phí.');
+          fetchStats();
+        } catch (error) {
+          message.error('Không thể làm mới thống kê.');
+        }
+      }
+    });
+  };
+
 
   const handleFetchModels = async (provider) => {
     if (!provider) return;
@@ -575,28 +594,34 @@ export default function AiAgentSettings() {
                 </Title>
                 <div onClick={e => e.stopPropagation()} style={{ width: isMobile ? '100%' : 'auto', paddingBottom: isMobile ? 4 : 0 }}>
                   {isMobile ? (
-                    <Select
-                      value={statsPeriod}
-                      onChange={setStatsPeriod}
-                      style={{ width: '100%', marginTop: 8 }}
-                      options={[
-                        { label: 'Hôm nay', value: 'today' },
-                        { label: 'Tuần này', value: 'week' },
-                        { label: 'Tháng này', value: 'month' },
-                        { label: 'Trọn đời', value: 'all' },
-                      ]}
-                    />
+                    <Space direction="vertical" style={{ width: '100%', marginTop: 8 }}>
+                      <Select
+                        value={statsPeriod}
+                        onChange={setStatsPeriod}
+                        style={{ width: '100%' }}
+                        options={[
+                          { label: 'Hôm nay', value: 'today' },
+                          { label: 'Tuần này', value: 'week' },
+                          { label: 'Tháng này', value: 'month' },
+                          { label: 'Trọn đời', value: 'all' },
+                        ]}
+                      />
+                      <Button danger icon={<DeleteOutlined />} onClick={handleResetStats} block>Thiết lập lại</Button>
+                    </Space>
                   ) : (
-                    <Segmented 
-                      options={[
-                        { label: 'Hôm nay', value: 'today' },
-                        { label: 'Tuần này', value: 'week' },
-                        { label: 'Tháng này', value: 'month' },
-                        { label: 'Trọn đời', value: 'all' },
-                      ]} 
-                      value={statsPeriod} 
-                      onChange={setStatsPeriod} 
-                    />
+                    <Space>
+                      <Segmented 
+                        options={[
+                          { label: 'Hôm nay', value: 'today' },
+                          { label: 'Tuần này', value: 'week' },
+                          { label: 'Tháng này', value: 'month' },
+                          { label: 'Trọn đời', value: 'all' },
+                        ]} 
+                        value={statsPeriod} 
+                        onChange={setStatsPeriod} 
+                      />
+                      <Button danger type="text" icon={<DeleteOutlined />} onClick={handleResetStats} title="Thiết lập lại thống kê"></Button>
+                    </Space>
                   )}
                 </div>
               </div>
