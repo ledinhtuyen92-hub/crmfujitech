@@ -112,22 +112,76 @@ export default function BlockRenderer({ block, isActive, onSelect, onDelete, glo
             <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
               <thead>
                 <tr style={{ background: '#fafafa' }}>
-                  {block.props.columns?.includes('stt') && <th style={{ ...thStyle, color: clr }}>STT</th>}
-                  {block.props.columns?.includes('name') && <th style={thStyle}>Tên hàng hóa / Dịch vụ</th>}
-                  {block.props.columns?.includes('unit') && <th style={thStyle}>ĐVT</th>}
-                  {block.props.columns?.includes('qty') && <th style={thStyle}>SL</th>}
-                  {block.props.columns?.includes('price') && <th style={thStyle}>Đơn giá</th>}
-                  {block.props.columns?.includes('total') && <th style={thStyle}>Thành tiền</th>}
+                  {(block.props.columns || []).map(col => {
+                    const colId = typeof col === 'object' ? col.id : col;
+                    const colTitle = typeof col === 'object' ? col.title : null;
+                    if (colId === 'stt') return <th key="stt" style={{ ...thStyle, color: clr, width: 40 }}>STT</th>;
+                    if (colId === 'name') return <th key="name" style={{...thStyle, width: 200}}>Tên hàng hóa / Dịch vụ</th>;
+                    if (colId === 'symbol') return <th key="symbol" style={{...thStyle, width: 80}}>Ký hiệu</th>;
+                    if (colId === 'specs') return <th key="specs" style={{...thStyle, width: 150}}>Quy cách kỹ thuật</th>;
+                    if (colId === 'dimensions') return (
+                      <th key="dimensions" style={{...thStyle, padding: 0, width: 180}}>
+                        <div style={{ borderBottom: '1px solid #e2e8f0', padding: '4px 6px' }}>Kích thước (mm)</div>
+                        <div style={{ display: 'flex' }}>
+                          <div style={{ flex: 1, borderRight: '1px solid #e2e8f0', padding: '2px 6px' }}>Cao</div>
+                          <div style={{ flex: 1, borderRight: '1px solid #e2e8f0', padding: '2px 6px' }}>Rộng</div>
+                          <div style={{ flex: 1, padding: '2px 6px' }}>Dày</div>
+                        </div>
+                      </th>
+                    );
+                    if (colId === 'note') return <th key="note" style={{...thStyle, width: 120}}>Ghi chú</th>;
+                    if (colId === 'unit') return <th key="unit" style={{...thStyle, width: 50}}>ĐVT</th>;
+                    if (colId === 'qty') return <th key="qty" style={{...thStyle, width: 50}}>SL</th>;
+                    if (colId === 'price') return <th key="price" style={{...thStyle, width: 90}}>Đơn giá</th>;
+                    if (colId === 'total') return <th key="total" style={{...thStyle, width: 100}}>Thành tiền</th>;
+                    
+                    if (colId.startsWith('custom_')) {
+                      return <th key={colId} style={{...thStyle, width: 100}}>{colTitle || 'Cột tuỳ chỉnh'}</th>;
+                    }
+                    
+                    return null;
+                  })}
                 </tr>
               </thead>
               <tbody>
                 <tr>
-                  {block.props.columns?.includes('stt') && <td style={{ ...tdStyle, textAlign: 'center', fontWeight: 600, color: clr }}>1</td>}
-                  {block.props.columns?.includes('name') && <td style={tdStyle}><strong style={{ color: '#1e293b' }}>Sản phẩm demo A</strong><br/><span style={{ color: '#64748b', fontSize: 11 }}>Ghi chú sản phẩm</span></td>}
-                  {block.props.columns?.includes('unit') && <td style={{ ...tdStyle, textAlign: 'center' }}>Cái</td>}
-                  {block.props.columns?.includes('qty') && <td style={{ ...tdStyle, textAlign: 'center' }}>2</td>}
-                  {block.props.columns?.includes('price') && <td style={{ ...tdStyle, textAlign: 'right' }}>1,250,000 đ</td>}
-                  {block.props.columns?.includes('total') && <td style={{ ...tdStyle, textAlign: 'right' }}><strong style={{ color: clr }}>2,500,000 đ</strong></td>}
+                  {(block.props.columns || []).map(col => {
+                    const colId = typeof col === 'object' ? col.id : col;
+                    const showSpecs = typeof block.props.columns?.[0] === 'object' 
+                      ? block.props.columns.some(c => c.id === 'specs')
+                      : block.props.columns?.includes('specs');
+
+                    if (colId === 'stt') return <td key="stt" style={{ ...tdStyle, textAlign: 'center', fontWeight: 600, color: clr }}>1</td>;
+                    if (colId === 'name') return (
+                      <td key="name" style={tdStyle}>
+                        <strong style={{ color: '#1e293b' }}>Sản phẩm demo A</strong>
+                        {!showSpecs && <br/>}
+                        {!showSpecs && <span style={{ color: '#64748b', fontSize: 11 }}>Mô tả sản phẩm demo</span>}
+                      </td>
+                    );
+                    if (colId === 'symbol') return <td key="symbol" style={{ ...tdStyle, textAlign: 'center', fontWeight: 600, color: '#2563eb' }}>D1</td>;
+                    if (colId === 'specs') return <td key="specs" style={{ ...tdStyle, color: '#475569', fontSize: 11 }}>Mô tả sản phẩm demo</td>;
+                    if (colId === 'dimensions') return (
+                      <td key="dimensions" style={{ ...tdStyle, padding: 0 }}>
+                        <div style={{ display: 'flex', height: '100%' }}>
+                          <div style={{ flex: 1, borderRight: '1px dashed #e2e8f0', padding: '4px 6px', textAlign: 'center' }}>2200</div>
+                          <div style={{ flex: 1, borderRight: '1px dashed #e2e8f0', padding: '4px 6px', textAlign: 'center' }}>900</div>
+                          <div style={{ flex: 1, padding: '4px 6px', textAlign: 'center' }}>45</div>
+                        </div>
+                      </td>
+                    );
+                    if (colId === 'note') return <td key="note" style={{ ...tdStyle, color: '#475569', fontSize: 11 }}>Khung ngoại 45x110</td>;
+                    if (colId === 'unit') return <td key="unit" style={{ ...tdStyle, textAlign: 'center' }}>Bộ</td>;
+                    if (colId === 'qty') return <td key="qty" style={{ ...tdStyle, textAlign: 'center' }}>2</td>;
+                    if (colId === 'price') return <td key="price" style={{ ...tdStyle, textAlign: 'right' }}>1,250,000 đ</td>;
+                    if (colId === 'total') return <td key="total" style={{ ...tdStyle, textAlign: 'right' }}><strong style={{ color: clr }}>2,500,000 đ</strong></td>;
+                    
+                    if (colId.startsWith('custom_')) return (
+                      <td key={colId} style={{ ...tdStyle, textAlign: 'center', color: '#64748b', fontSize: 11, fontStyle: 'italic' }}>Dữ liệu mẫu</td>
+                    );
+                    
+                    return null;
+                  })}
                 </tr>
               </tbody>
             </table>
@@ -138,14 +192,14 @@ export default function BlockRenderer({ block, isActive, onSelect, onDelete, glo
           <Row justify="end" style={{ marginBottom: 16 }}>
             <Col xs={24} md={11} style={{ textAlign: 'right', padding: '10px 14px', background: block.props.backgroundColor ?? '#f8fafc', borderRadius: 6, border: (block.props.showBorder ?? true) ? `1px solid ${clr}40` : 'none' }}>
               {block.props.showSubtotal && <div style={{ fontSize: 12, color: '#64748b' }}>Cộng tiền hàng: 2,500,000 đ</div>}
-              {block.props.showDiscount && <div style={{ fontSize: 12, color: '#64748b' }}>Chiết khấu chung: -0 đ</div>}
+              {block.props.showDiscount && <div style={{ fontSize: 12, color: '#64748b' }}>Chiết khấu chung: -50,000 đ</div>}
               {block.props.showVAT && <div style={{ fontSize: 12, color: '#64748b' }}>Thuế GTGT (10%): 250,000 đ</div>}
               {block.props.showShippingFee && <div style={{ fontSize: 12, color: '#64748b' }}>Phí vận chuyển: 50,000 đ</div>}
               {block.props.showInstallationFee && <div style={{ fontSize: 12, color: '#64748b' }}>Phí thi công / lắp đặt: 100,000 đ</div>}
               <div style={{ fontSize: 15, fontWeight: 700, color: clr, marginTop: 4 }}>
-                TỔNG THANH TOÁN: 2,750,000 đ
+                TỔNG THANH TOÁN: 2,850,000 đ
               </div>
-              {block.props.showWords && <div style={{ fontStyle: 'italic', fontSize: 12, marginTop: 4, color: '#334155' }}>Bằng chữ: Hai triệu bảy trăm năm mươi nghìn đồng.</div>}
+              {block.props.showWords && <div style={{ fontStyle: 'italic', fontSize: 12, marginTop: 4, color: '#334155' }}>Bằng chữ: Hai triệu tám trăm năm mươi nghìn đồng.</div>}
             </Col>
           </Row>
         );

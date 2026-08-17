@@ -212,17 +212,41 @@ export default function QuotationRenderer({ layoutConfig, layoutStyle, data }) {
             <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
               <thead>
                 <tr style={{ background: '#fafafa' }}>
-                  {block.props.columns?.includes('stt') && <th style={{ ...thStyle, color: clr }}>STT</th>}
-                  {block.props.columns?.includes('name') && <th style={thStyle}>Tên hàng hóa / Dịch vụ</th>}
-                  {block.props.columns?.includes('unit') && <th style={thStyle}>ĐVT</th>}
-                  {block.props.columns?.includes('qty') && <th style={thStyle}>SL</th>}
-                  {block.props.columns?.includes('price') && <th style={thStyle}>Đơn giá</th>}
-                  {block.props.columns?.includes('total') && <th style={thStyle}>Thành tiền</th>}
+                  {(block.props.columns || []).map(col => {
+                    const colId = typeof col === 'object' ? col.id : col;
+                    const colTitle = typeof col === 'object' ? col.title : null;
+                    if (colId === 'stt') return <th key="stt" style={{ ...thStyle, color: clr, width: 40 }}>STT</th>;
+                    if (colId === 'name') return <th key="name" style={{...thStyle, width: 200}}>Tên hàng hóa / Dịch vụ</th>;
+                    if (colId === 'symbol') return <th key="symbol" style={{...thStyle, width: 80}}>Ký hiệu</th>;
+                    if (colId === 'specs') return <th key="specs" style={{...thStyle, width: 150}}>Quy cách kỹ thuật</th>;
+                    if (colId === 'dimensions') return (
+                      <th key="dimensions" style={{...thStyle, padding: 0, width: 180}}>
+                        <div style={{ borderBottom: '1px solid #e2e8f0', padding: '4px 6px' }}>Kích thước (mm)</div>
+                        <div style={{ display: 'flex' }}>
+                          <div style={{ flex: 1, borderRight: '1px solid #e2e8f0', padding: '2px 6px' }}>Cao</div>
+                          <div style={{ flex: 1, borderRight: '1px solid #e2e8f0', padding: '2px 6px' }}>Rộng</div>
+                          <div style={{ flex: 1, padding: '2px 6px' }}>Dày</div>
+                        </div>
+                      </th>
+                    );
+                    if (colId === 'note') return <th key="note" style={{...thStyle, width: 120}}>Ghi chú</th>;
+                    if (colId === 'unit') return <th key="unit" style={{...thStyle, width: 50}}>ĐVT</th>;
+                    if (colId === 'qty') return <th key="qty" style={{...thStyle, width: 50}}>SL</th>;
+                    if (colId === 'price') return <th key="price" style={{...thStyle, width: 90}}>Đơn giá</th>;
+                    if (colId === 'total') return <th key="total" style={{...thStyle, width: 100}}>Thành tiền</th>;
+                    
+                    // Xử lý Custom Column
+                    if (colId.startsWith('custom_')) {
+                      return <th key={colId} style={{...thStyle, width: 100}}>{colTitle || 'Cột tuỳ chỉnh'}</th>;
+                    }
+                    
+                    return null;
+                  })}
                 </tr>
               </thead>
               <tbody>
                 {tableData.length === 0 ? (
-                  <tr><td colSpan={6} style={{ ...tdStyle, textAlign: 'center', color: '#888' }}>[Danh sách sản phẩm trống]</td></tr>
+                  <tr><td colSpan={10} style={{ ...tdStyle, textAlign: 'center', color: '#888' }}>[Danh sách sản phẩm trống]</td></tr>
                 ) : (
                   tableData.map((item, index) => {
                     const rowSpan = isLandscape ? computeRowSpan(tableData, index, 'product') : 1;
@@ -231,25 +255,74 @@ export default function QuotationRenderer({ layoutConfig, layoutStyle, data }) {
 
                     return (
                       <tr key={index}>
-                        {block.props.columns?.includes('stt') && rowSpan > 0 && <td rowSpan={rowSpan} style={{ ...tdStyle, textAlign: 'center', fontWeight: 600, color: clr, verticalAlign: 'top' }}>{sttNum}</td>}
-                        {block.props.columns?.includes('name') && rowSpan > 0 && <td rowSpan={rowSpan} style={{...tdStyle, verticalAlign: 'top'}}>
-                          <strong style={{ color: '#1e293b' }}>{item.product_name || item.name}</strong>
-                          {(item.description || item.spec) && <div style={{ fontSize: 11, color: '#64748b', fontStyle: 'italic', whiteSpace: 'pre-wrap', marginTop: 2 }}>{item.description || item.spec}</div>}
-                          {item.product_image && <div style={{marginTop: 4}}><img src={item.product_image} alt="" style={{ maxWidth: 80, maxHeight: 80, borderRadius: 4, objectFit: 'contain' }} /></div>}
-                        </td>}
-                        
-                        {block.props.columns?.includes('unit') && <td style={{ ...tdStyle, textAlign: 'center' }}>
-                          <span style={{fontWeight: 500, color: item.item_type === 'accessory' ? '#64748b' : '#334155'}}>{item.unit || item.custom_data?.unit}</span>
-                        </td>}
-                        {block.props.columns?.includes('qty') && <td style={{ ...tdStyle, textAlign: 'center' }}>
-                          <span style={{fontWeight: 500, color: item.item_type === 'accessory' ? '#64748b' : '#334155'}}>{item.quantity}</span>
-                        </td>}
-                        {block.props.columns?.includes('price') && <td style={{ ...tdStyle, textAlign: 'right' }}>
-                          <span style={{color: item.item_type === 'accessory' ? '#64748b' : '#334155'}}>{Number(item.unit_price).toLocaleString()} đ</span>
-                        </td>}
-                        {block.props.columns?.includes('total') && <td style={{ ...tdStyle, textAlign: 'right' }}>
-                          <strong style={{ color: item.item_type === 'accessory' ? '#64748b' : clr }}>{lineTotal.toLocaleString()} đ</strong>
-                        </td>}
+                        {(block.props.columns || []).map(col => {
+                          const colId = typeof col === 'object' ? col.id : col;
+                          const showSpecs = typeof block.props.columns?.[0] === 'object' 
+                            ? block.props.columns.some(c => c.id === 'specs')
+                            : block.props.columns?.includes('specs');
+                            
+                          if (colId === 'stt') return rowSpan > 0 ? <td key="stt" rowSpan={rowSpan} style={{ ...tdStyle, textAlign: 'center', fontWeight: 600, color: clr, verticalAlign: 'top' }}>{sttNum}</td> : null;
+                          if (colId === 'name') return rowSpan > 0 ? (
+                            <td key="name" rowSpan={rowSpan} style={{...tdStyle, verticalAlign: 'top'}}>
+                              <strong style={{ color: '#1e293b' }}>{item.product_name || item.name}</strong>
+                              {!showSpecs && (item.description || item.spec) && <div style={{ fontSize: 11, color: '#64748b', fontStyle: 'italic', whiteSpace: 'pre-wrap', marginTop: 2 }}>{item.description || item.spec}</div>}
+                              {item.product_image && <div style={{marginTop: 4}}><img src={item.product_image} alt="" style={{ maxWidth: 80, maxHeight: 80, borderRadius: 4, objectFit: 'contain' }} /></div>}
+                            </td>
+                          ) : null;
+                          if (colId === 'symbol') return (
+                            <td key="symbol" style={{ ...tdStyle, textAlign: 'center' }}>
+                              <span style={{fontWeight: 600, color: '#2563eb'}}>{item.custom_data?.symbol || item.symbol}</span>
+                            </td>
+                          );
+                          if (colId === 'specs') return (
+                            <td key="specs" style={{ ...tdStyle, textAlign: 'left', whiteSpace: 'pre-wrap' }}>
+                              <span style={{color: '#475569', fontSize: 11}}>{item.description || item.spec}</span>
+                            </td>
+                          );
+                          if (colId === 'dimensions') return (
+                            <td key="dimensions" style={{ ...tdStyle, padding: 0, verticalAlign: 'top' }}>
+                              <div style={{ display: 'flex', height: '100%' }}>
+                                <div style={{ flex: 1, borderRight: '1px dashed #e2e8f0', padding: '4px 6px', textAlign: 'center' }}>{item.height || ''}</div>
+                                <div style={{ flex: 1, borderRight: '1px dashed #e2e8f0', padding: '4px 6px', textAlign: 'center' }}>{item.width || ''}</div>
+                                <div style={{ flex: 1, padding: '4px 6px', textAlign: 'center' }}>{item.custom_data?.thickness || item.thickness || ''}</div>
+                              </div>
+                            </td>
+                          );
+                          if (colId === 'note') return (
+                            <td key="note" style={{ ...tdStyle, textAlign: 'left', whiteSpace: 'pre-wrap' }}>
+                              <span style={{color: '#475569', fontSize: 11}}>{item.note || item.custom_data?.note}</span>
+                            </td>
+                          );
+                          if (colId === 'unit') return (
+                            <td key="unit" style={{ ...tdStyle, textAlign: 'center' }}>
+                              <span style={{fontWeight: 500, color: item.item_type === 'accessory' ? '#64748b' : '#334155'}}>{item.unit || item.custom_data?.unit}</span>
+                            </td>
+                          );
+                          if (colId === 'qty') return (
+                            <td key="qty" style={{ ...tdStyle, textAlign: 'center' }}>
+                              <span style={{fontWeight: 500, color: item.item_type === 'accessory' ? '#64748b' : '#334155'}}>{item.quantity}</span>
+                            </td>
+                          );
+                          if (colId === 'price') return (
+                            <td key="price" style={{ ...tdStyle, textAlign: 'right' }}>
+                              <span style={{color: item.item_type === 'accessory' ? '#64748b' : '#334155'}}>{Number(item.unit_price).toLocaleString()} đ</span>
+                            </td>
+                          );
+                          if (colId === 'total') return (
+                            <td key="total" style={{ ...tdStyle, textAlign: 'right' }}>
+                              <strong style={{ color: item.item_type === 'accessory' ? '#64748b' : clr }}>{lineTotal.toLocaleString()} đ</strong>
+                            </td>
+                          );
+                          
+                          // Xử lý Custom Column
+                          if (colId.startsWith('custom_')) return (
+                            <td key={colId} style={{ ...tdStyle, textAlign: 'center' }}>
+                              <span style={{color: '#334155'}}>{item.custom_data?.[colId] || ''}</span>
+                            </td>
+                          );
+                          
+                          return null;
+                        })}
                       </tr>
                     );
                   })

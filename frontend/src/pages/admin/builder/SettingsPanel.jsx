@@ -1,6 +1,7 @@
 import React from 'react';
 import { Form, Input, Select, Switch, InputNumber, Divider, Typography } from 'antd';
 import { BLOCK_TYPES } from './constants';
+import ColumnManager from './ColumnManager';
 
 const { Option } = Select;
 const { TextArea } = Input;
@@ -115,15 +116,8 @@ export default function SettingsPanel({ block, onChange }) {
       case BLOCK_TYPES.PRODUCT_TABLE:
         return (
           <>
-            <Form.Item name="columns" label="Các cột hiển thị">
-              <Select mode="multiple" placeholder="Chọn các cột">
-                <Option value="stt">STT</Option>
-                <Option value="name">Tên hàng hóa</Option>
-                <Option value="unit">ĐVT</Option>
-                <Option value="qty">Số lượng</Option>
-                <Option value="price">Đơn giá</Option>
-                <Option value="total">Thành tiền</Option>
-              </Select>
+            <Form.Item name="columns" label="Quản lý cột hiển thị">
+              <ColumnManager />
             </Form.Item>
             <Form.Item name="themeColor" label="Màu Sắc Chủ Đạo">
               <Input type="color" />

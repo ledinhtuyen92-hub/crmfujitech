@@ -226,7 +226,17 @@ export default function QuotationTemplateManagement() {
               <QuotationRenderer 
                 layoutConfig={previewTemplate.layout_config || {}}
                 layoutStyle={previewTemplate.layout_style}
-                data={{}}
+                data={{
+                  customer: { name: 'CÔNG TY KHÁCH HÀNG', phone: '0912345678', address: 'Tòa nhà văn phòng XYZ', tax_code: '0109999999' },
+                  company: { name: 'CÔNG TY CỦA BẠN', phone: '0912345678', address: 'Hà Nội', tax_code: '0101234567' },
+                  items: [
+                    { product_name: 'Sản phẩm demo A', spec: 'Mô tả sản phẩm demo', width: 900, height: 2200, thickness: 45, symbol: 'D1', note: 'Khung ngoại 45x110', unit: 'Bộ', quantity: 2, unit_price: 1250000, total_price: 2500000, custom_data: { custom_1: 'Dữ liệu mẫu' } }
+                  ],
+                  totals: { subtotal: 2500000, discount: 50000, tax_percent: 10, tax: 250000, shipping_fee: 50000, installation_fee: 100000, total: 2850000 },
+                  payment_terms_schedule: [ { title: 'Tạm ứng', percentage: 50 }, { title: 'Thanh toán', percentage: 50 } ],
+                  paid_amount: 0,
+                  total_amount: 2850000
+                }}
               />
             </div>
           </div>

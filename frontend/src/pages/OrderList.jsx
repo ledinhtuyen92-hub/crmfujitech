@@ -685,9 +685,11 @@ export default function OrderList() {
     const et = getEffectiveTemplate(editingOrder)
     const tmplCode = et?.code || 'STANDARD'
     const isLandscape = tmplCode === 'production_landscape_a4' || et?.layout_config?.paper_orientation === 'landscape'
+    
+    let baseCols = [];
 
     if (isLandscape) {
-      return [
+      baseCols = [
         {
           title: 'STT',
           key: 'stt',
@@ -860,11 +862,10 @@ export default function OrderList() {
           ) : null,
         },
       ]
-    }
-
-    const baseCols = [
-      {
-        title: 'Sản phẩm / Dịch vụ',
+    } else {
+      baseCols = [
+        {
+          title: 'Sản phẩm / Dịch vụ',
         dataIndex: 'product',
         key: 'product',
         width: 220,
@@ -1003,6 +1004,36 @@ export default function OrderList() {
           ),
         }
       )
+    }
+    } // End of else block for non-landscape
+
+    // --- Inject Custom Columns from Template ---
+    const productTableBlock = et?.layout_config?.blocks?.find(b => b.type === 'PRODUCT_TABLE');
+    const customColumns = (productTableBlock?.props?.columns || []).filter(col => typeof col === 'object' && col.id.startsWith('custom_'));
+
+    if (customColumns.length > 0) {
+      customColumns.forEach(col => {
+        baseCols.push({
+          title: col.title,
+          dataIndex: col.id,
+          width: 140,
+          render: (val, record, idx) => (
+            <Input 
+              placeholder={`Nhập ${col.title.toLowerCase()}...`}
+              value={record.custom_data?.[col.id] || ''} 
+              onChange={(e) => {
+                const newData = { ...(record.custom_data || {}) };
+                newData[col.id] = e.target.value;
+                handleLineChange(idx, 'custom_data', newData);
+              }} 
+            />
+          ),
+        });
+      });
+    }
+
+    if (isLandscape) {
+       return baseCols;
     }
 
     baseCols.push(
