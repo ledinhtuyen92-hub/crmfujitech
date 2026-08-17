@@ -112,6 +112,13 @@ class AiAgentViewSet(viewsets.ModelViewSet):
         from .services import DEFAULT_JSON_TEMPLATE
         return Response({'template': DEFAULT_JSON_TEMPLATE})
 
+    @action(detail=False, methods=['POST'])
+    def reset_usage_stats(self, request):
+        from .models import ApiUsageLog
+        # Xoá toàn bộ lịch sử log của công ty này
+        ApiUsageLog.objects.filter(company=request.user.company).delete()
+        return Response({'status': 'ok'})
+
     @action(detail=False, methods=['GET'])
     def usage_stats(self, request):
         from .models import ApiUsageLog
@@ -137,20 +144,27 @@ class AiAgentViewSet(viewsets.ModelViewSet):
         total_output = logs.aggregate(Sum('output_tokens'))['output_tokens__sum'] or 0
         total_cost = logs.aggregate(Sum('total_cost_usd'))['total_cost_usd__sum'] or 0
         
+        # Group by agent and model directly from logs to show historical data
+        from django.db.models import F
+        grouped_logs = logs.values(
+            'model_name',
+            agent_name_str=F('agent__name')
+        ).annotate(
+            input_sum=Sum('input_tokens'),
+            output_sum=Sum('output_tokens'),
+            cost_sum=Sum('total_cost_usd')
+        ).order_by('-cost_sum')
+
         agent_stats = []
-        for agent in AiAgent.objects.filter(company=request.user.company):
-            agent_logs = logs.filter(agent=agent)
-            if agent_logs.exists():
-                a_in = agent_logs.aggregate(Sum('input_tokens'))['input_tokens__sum'] or 0
-                a_out = agent_logs.aggregate(Sum('output_tokens'))['output_tokens__sum'] or 0
-                a_cost = agent_logs.aggregate(Sum('total_cost_usd'))['total_cost_usd__sum'] or 0
-                agent_stats.append({
-                    'agent_name': agent.name,
-                    'model_name': agent.model_name,
-                    'input_tokens': a_in,
-                    'output_tokens': a_out,
-                    'total_cost_usd': a_cost
-                })
+        for g in grouped_logs:
+            agent_name = g['agent_name_str'] or 'Trợ lý đã xoá / Hệ thống'
+            agent_stats.append({
+                'agent_name': agent_name,
+                'model_name': g['model_name'],
+                'input_tokens': g['input_sum'],
+                'output_tokens': g['output_sum'],
+                'total_cost_usd': g['cost_sum']
+            })
                 
         return Response({
             'total_input_tokens': total_input,
