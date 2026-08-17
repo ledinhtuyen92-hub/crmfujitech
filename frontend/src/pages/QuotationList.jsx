@@ -1637,27 +1637,49 @@ export default function QuotationList() {
     } // End of else block for non-landscape
 
     // --- Inject Custom Columns from Template ---
-    const productTableBlock = effectiveTmpl?.layout_config?.blocks?.find(b => b.type === 'PRODUCT_TABLE');
-    const customColumns = (productTableBlock?.props?.columns || []).filter(col => typeof col === 'object' && col.id.startsWith('custom_'));
+    const productTableBlock = effectiveTmpl?.layout_config?.blocks?.find(b => b.type === 'product_table');
+    const customColumns = (productTableBlock?.props?.columns || []).filter(col => typeof col === 'object' && (col.id.startsWith('custom_') || col.id.startsWith('group_')));
 
     if (customColumns.length > 0) {
       customColumns.forEach(col => {
-        baseCols.push({
-          title: col.title,
-          dataIndex: col.id,
-          width: 140,
-          render: (val, record, idx) => (
-            <Input 
-              placeholder={`Nhập ${col.title.toLowerCase()}...`}
-              value={record.custom_data?.[col.id] || ''} 
-              onChange={(e) => {
-                const newData = { ...(record.custom_data || {}) };
-                newData[col.id] = e.target.value;
-                handleLineChange(idx, 'custom_data', newData);
-              }} 
-            />
-          ),
-        });
+        if (col.id.startsWith('group_') && col.children && col.children.length > 0) {
+          baseCols.push({
+            title: col.title,
+            children: col.children.map(child => ({
+              title: child.title,
+              dataIndex: child.id,
+              width: 100,
+              render: (val, record, idx) => (
+                <Input 
+                  placeholder={`Nhập ${child.title.toLowerCase()}...`}
+                  value={record.custom_data?.[child.id] || ''} 
+                  onChange={(e) => {
+                    const newData = { ...(record.custom_data || {}) };
+                    newData[child.id] = e.target.value;
+                    handleLineChange(idx, 'custom_data', newData);
+                  }} 
+                />
+              ),
+            }))
+          });
+        } else if (col.id.startsWith('custom_')) {
+          baseCols.push({
+            title: col.title,
+            dataIndex: col.id,
+            width: 140,
+            render: (val, record, idx) => (
+              <Input 
+                placeholder={`Nhập ${col.title.toLowerCase()}...`}
+                value={record.custom_data?.[col.id] || ''} 
+                onChange={(e) => {
+                  const newData = { ...(record.custom_data || {}) };
+                  newData[col.id] = e.target.value;
+                  handleLineChange(idx, 'custom_data', newData);
+                }} 
+              />
+            ),
+          });
+        }
       });
     }
 

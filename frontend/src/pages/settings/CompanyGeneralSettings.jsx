@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
+import { useNavigate } from 'react-router-dom'
 import {
   BankOutlined,
   CheckCircleOutlined,
@@ -12,6 +13,9 @@ import {
   SafetyCertificateOutlined,
   PartitionOutlined,
   ProfileOutlined,
+  CopyOutlined,
+  FormatPainterOutlined,
+  DeleteOutlined,
 } from '@ant-design/icons'
 import {
   Badge,
@@ -33,15 +37,18 @@ import {
   message,
   theme,
   Switch,
+  Popconfirm,
 } from 'antd'
 import api from '../../utils/api'
 import { useAuth } from '../../contexts/AuthContext'
 import { useResponsive } from '../../hooks/useResponsive'
+import QuotationRenderer from '../../components/QuotationRenderer'
 
 const { Title, Text, Paragraph } = Typography
 const { Option } = Select
 
 export default function CompanyGeneralSettings() {
+  const navigate = useNavigate()
   const { token } = theme.useToken()
   const { checkMaintenance, hasPermission, isCompanyAdmin } = useAuth()
   const { isMobile } = useResponsive()
@@ -149,6 +156,31 @@ export default function CompanyGeneralSettings() {
     } catch {
       messageApi.error('Lỗi khi cập nhật thông tin công ty.')
     } finally {
+      setLoading(false)
+    }
+  }
+
+  const handleCloneTemplate = async (id) => {
+    try {
+      setLoading(true)
+      const res = await api.post(`sales/quotation-templates/${id}/clone/`)
+      messageApi.success('Đã tạo bản sao thành công!')
+      fetchData()
+      navigate(`/admin/quotation-templates/${res.data.id}/builder`)
+    } catch (err) {
+      messageApi.error('Lỗi khi tạo bản sao.')
+      setLoading(false)
+    }
+  }
+
+  const handleDeleteTemplate = async (id) => {
+    try {
+      setLoading(true)
+      await api.delete(`sales/quotation-templates/${id}/`)
+      messageApi.success('Đã xóa mẫu báo giá!')
+      fetchData()
+    } catch (err) {
+      messageApi.error('Lỗi khi xóa mẫu báo giá.')
       setLoading(false)
     }
   }
@@ -677,32 +709,55 @@ export default function CompanyGeneralSettings() {
                     background: '#fafbfc',
                     borderTop: '1px solid #f1f5f9',
                     display: 'flex',
-                    justifyContent: 'space-between',
-                    alignItems: 'center',
+                    flexDirection: 'column',
                     gap: 8,
                   }}
                 >
-                  <Button
-                    type="default"
-                    icon={<EyeOutlined />}
-                    style={{ borderRadius: 8, fontWeight: 500, flexShrink: 0 }}
-                    onClick={() => handlePreview(tmpl)}
-                  >
-                    Xem mẫu
-                  </Button>
-                  <Button
-                    type={isCurrent ? 'default' : 'primary'}
-                    icon={<CheckCircleOutlined />}
-                    disabled={isCurrent}
-                    style={
-                      isCurrent
-                        ? { background: '#dcfce7', borderColor: '#86efac', color: '#15803d', borderRadius: 8, fontWeight: 600, flex: 1, whiteSpace: 'nowrap' }
-                        : { background: 'linear-gradient(90deg, #1649c9 0%, #2563eb 100%)', border: 'none', borderRadius: 8, fontWeight: 600, flex: 1, boxShadow: '0 4px 10px rgba(37, 99, 235, 0.2)', whiteSpace: 'nowrap' }
-                    }
-                    onClick={() => handleApplyTemplate(tmpl.id)}
-                  >
-                    {isCurrent ? 'Đang áp dụng' : 'Áp dụng'}
-                  </Button>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8 }}>
+                    <Button
+                      type="default"
+                      icon={<EyeOutlined />}
+                      style={{ borderRadius: 8, fontWeight: 500, flexShrink: 0 }}
+                      onClick={() => handlePreview(tmpl)}
+                    >
+                      Xem mẫu
+                    </Button>
+                    <Button
+                      type={isCurrent ? 'default' : 'primary'}
+                      icon={<CheckCircleOutlined />}
+                      disabled={isCurrent}
+                      style={
+                        isCurrent
+                          ? { background: '#dcfce7', borderColor: '#86efac', color: '#15803d', borderRadius: 8, fontWeight: 600, flex: 1, whiteSpace: 'nowrap' }
+                          : { background: 'linear-gradient(90deg, #1649c9 0%, #2563eb 100%)', border: 'none', borderRadius: 8, fontWeight: 600, flex: 1, boxShadow: '0 4px 10px rgba(37, 99, 235, 0.2)', whiteSpace: 'nowrap' }
+                      }
+                      onClick={() => handleApplyTemplate(tmpl.id)}
+                    >
+                      {isCurrent ? 'Đang áp dụng' : 'Áp dụng'}
+                    </Button>
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
+                    {tmpl.is_system_template ? (
+                      <Button size="small" type="primary" ghost icon={<CopyOutlined />} onClick={() => handleCloneTemplate(tmpl.id)}>
+                        Tạo bản sao
+                      </Button>
+                    ) : (
+                      <>
+                        <Button 
+                          size="small" 
+                          type="primary" 
+                          style={{ background: '#722ed1' }} 
+                          icon={<FormatPainterOutlined />} 
+                          onClick={() => navigate(`/admin/quotation-templates/${tmpl.id}/builder`)}
+                        >
+                          Thiết kế
+                        </Button>
+                        <Popconfirm title="Xóa mẫu này?" onConfirm={() => handleDeleteTemplate(tmpl.id)} okText="Xóa" cancelText="Hủy">
+                          <Button size="small" danger icon={<DeleteOutlined />} />
+                        </Popconfirm>
+                      </>
+                    )}
+                  </div>
                 </div>
               </Card>
             </Col>
@@ -747,331 +802,52 @@ export default function CompanyGeneralSettings() {
             : 920
         }
       >
-        {selectedTemplate && (() => {
-          const isLand = selectedTemplate.layout_config?.paper_orientation === 'landscape' ||
-            selectedTemplate.code?.includes('landscape') ||
-            selectedTemplate.name?.toLowerCase()?.includes('khổ ngang');
-          const themeClr = selectedTemplate.layout_config?.theme_color || '#1649c9';
-
-          return (
-            <div
+        {selectedTemplate && (
+          <div style={{ background: '#f0f2f5', padding: 24, display: 'flex', justifyContent: 'center' }}>
+            <div 
               style={{
-                padding: '28px 32px',
-                border: '1px solid #e2e8f0',
-                borderRadius: 8,
-                background: '#fff',
-                color: '#1e293b',
-                boxShadow: '0 4px 12px rgba(0,0,0,0.05)',
-                minWidth: isLand ? 980 : undefined,
-                overflowX: 'auto',
+                width: selectedTemplate.layout_config?.paper_orientation === 'landscape' ? '297mm' : '210mm',
+                minHeight: selectedTemplate.layout_config?.paper_orientation === 'landscape' ? '210mm' : '297mm',
+                background: 'white',
+                padding: '20mm',
+                boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
+                transform: selectedTemplate.layout_config?.paper_orientation === 'landscape' ? 'scale(0.85)' : 'scale(0.95)',
+                transformOrigin: 'top center'
               }}
             >
-              {/* ── Header: Bên trái Logo, Bên phải TT Công ty ───────────── */}
-              <div
-                style={{
-                  marginBottom: 20,
-                  padding: '20px 24px',
-                  background: '#f8fafc',
-                  border: '1px solid #e2e8f0',
-                  borderRadius: 12,
-                  boxShadow: '0 2px 6px rgba(0,0,0,0.02)',
+              <QuotationRenderer 
+                layoutConfig={selectedTemplate.layout_config || {}}
+                layoutStyle={selectedTemplate.layout_style}
+                data={{
+                  customer: { name: 'CÔNG TY KHÁCH HÀNG', phone: '0912345678', address: 'Tòa nhà văn phòng XYZ', tax_code: '0109999999' },
+                  company: { 
+                    name: companyInfo?.name || 'CÔNG TY CỦA BẠN', 
+                    phone: companyInfo?.phone || '0912345678', 
+                    address: companyInfo?.address || 'Hà Nội', 
+                    tax_code: companyInfo?.tax_code || '0101234567',
+                    logo: companyInfo?.logo,
+                    stamp_image: companyInfo?.stamp_image || companyInfo?.stamp,
+                    director_signature: companyInfo?.director_signature || companyInfo?.signature,
+                    director_name: companyInfo?.director_name || 'Nguyễn Anh Tuấn',
+                    director_title: companyInfo?.director_title || 'Giám đốc'
+                  },
+                  items: [
+                    { id: 1, product: 'Sản phẩm 1', unit: 'Cái', quantity: 10, unit_price: 150000, discount_percent: 0, line_total: 1500000 },
+                    { id: 2, product: 'Sản phẩm 2', unit: 'Bộ', quantity: 5, unit_price: 300000, discount_percent: 10, line_total: 1350000 },
+                    { id: 3, product: 'Sản phẩm 3', unit: 'Chiếc', quantity: 2, unit_price: 500000, discount_percent: 0, line_total: 1000000 },
+                  ],
+                  totals: {
+                    subtotal: 3850000,
+                    discount: 0,
+                    tax_percent: 10,
+                    tax: 385000,
+                    total: 4235000,
+                  }
                 }}
-              >
-                <Row justify="space-between" align="middle" gutter={24}>
-                  {/* Cột trái: Logo */}
-                  <Col xs={24} sm={8} style={{ textAlign: 'left' }}>
-                    {(companyInfo?.logo || selectedTemplate?.company_info?.logo) ? (
-                      <img
-                        src={companyInfo?.logo || selectedTemplate?.company_info?.logo}
-                        alt="Logo công ty"
-                        style={{ maxHeight: 75, maxWidth: '100%', objectFit: 'contain', borderRadius: 4 }}
-                      />
-                    ) : (
-                      <div
-                        style={{
-                          width: 64,
-                          height: 64,
-                          borderRadius: 8,
-                          background: '#e0e7ff',
-                          color: '#3730a3',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          fontWeight: 700,
-                          fontSize: 18,
-                        }}
-                      >
-                        LOGO
-                      </div>
-                    )}
-                  </Col>
-
-                  {/* Cột phải: Thông tin công ty */}
-                  <Col xs={24} sm={16} style={{ textAlign: 'right' }}>
-                    <Title level={4} style={{ margin: '0 0 4px 0', color: themeClr, fontWeight: 700 }}>
-                      {companyInfo?.name || selectedTemplate?.company_info?.name || 'TÊN CÔNG TY CỦA BẠN'}
-                    </Title>
-                    <div style={{ color: '#475569', fontSize: 13.5, lineHeight: '1.6' }}>
-                      <div><strong>MST:</strong> {companyInfo?.tax_code || selectedTemplate?.company_info?.tax_code || 'Chưa cập nhật'}</div>
-                      <div><strong>Địa chỉ:</strong> {companyInfo?.address || selectedTemplate?.company_info?.address || 'Chưa cập nhật'}</div>
-                      <div><strong>Hotline:</strong> {companyInfo?.phone || selectedTemplate?.company_info?.phone || 'Chưa cập nhật'}</div>
-                    </div>
-                  </Col>
-                </Row>
-              </div>
-
-              {/* ── Tiêu đề Bảng Báo Giá (Căn giữa) ──────────────────────── */}
-              <div style={{ textAlign: 'center', margin: '24px 0 24px', padding: '0 16px' }}>
-                <Title level={2} style={{ margin: '0 0 8px 0', color: themeClr, textTransform: 'uppercase', letterSpacing: '0.5px', fontWeight: 700 }}>
-                  {selectedTemplate?.layout_config?.custom_title || (isLand ? 'BÁO GIÁ SẢN XUẤT CỬA COMPOSITE' : 'Bảng Báo Giá Chi Tiết')}
-                </Title>
-                <div style={{ marginBottom: 12 }}>
-                  <Space size={16} style={{ justifyContent: 'center', display: 'inline-flex', background: '#eff6ff', padding: '4px 16px', borderRadius: 20, border: '1px solid #bfdbfe' }}>
-                    <span style={{ color: '#1d4ed8', fontSize: 13.5 }}>Số báo giá: <strong>BG-202607-001</strong></span>
-                    <span style={{ color: '#cbd5e1' }}>|</span>
-                    <span style={{ color: '#334155', fontSize: 13.5 }}>Ngày báo giá: <strong>07/07/2026</strong></span>
-                  </Space>
-                </div>
-                <div
-                  style={{
-                    color: '#475569',
-                    fontSize: 14,
-                    fontStyle: 'italic',
-                    maxWidth: 680,
-                    margin: '0 auto',
-                    lineHeight: '1.6',
-                  }}
-                >
-                  Kính gửi Quý khách hàng, chúng tôi xin trân trọng gửi bảng báo giá các hạng mục sản phẩm / dịch vụ chi tiết dưới đây:
-                </div>
-              </div>
-
-              {/* ── Thông tin Khách hàng / Bên bán & Bên mua ───────────── */}
-              {isLand ? (
-                <Row gutter={24} style={{ marginBottom: 20 }}>
-                  {/* BÊN BÁN */}
-                  <Col xs={24} md={12}>
-                    <div style={{ padding: '16px 20px', background: '#f8fafc', border: '1px solid #94a3b8', borderRadius: 8, height: '100%' }}>
-                      <div style={{ fontWeight: 700, color: '#1e3a8a', fontSize: 14, marginBottom: 8, borderBottom: '1px solid #cbd5e1', paddingBottom: 6 }}>
-                        🏢 BÊN BÁN (BÊN B): {companyInfo?.name || selectedTemplate?.company_info?.name || 'CÔNG TY CỦA BẠN'}
-                      </div>
-                      <div style={{ fontSize: 13, color: '#334155', lineHeight: 1.7 }}>
-                        <div><strong>Đại diện:</strong> Nguyễn Anh Tuấn &nbsp;•&nbsp; <strong>Chức vụ:</strong> Giám đốc</div>
-                        <div><strong>Mã số thuế:</strong> {companyInfo?.tax_code || selectedTemplate?.company_info?.tax_code || '0111100289'}</div>
-                        <div><strong>Điện thoại:</strong> {companyInfo?.phone || selectedTemplate?.company_info?.phone || '0961442882'}</div>
-                        <div><strong>Địa chỉ:</strong> {companyInfo?.address || selectedTemplate?.company_info?.address || 'KĐT Xa La, Hà Đông, Hà Nội'}</div>
-                      </div>
-                    </div>
-                  </Col>
-                  {/* BÊN MUA */}
-                  <Col xs={24} md={12}>
-                    <div style={{ padding: '16px 20px', background: '#fff', border: '1px solid #cbd5e1', borderRadius: 8, height: '100%', boxShadow: '0 2px 6px rgba(0,0,0,0.02)' }}>
-                      <div style={{ fontWeight: 700, color: '#0f172a', fontSize: 14, marginBottom: 8, borderBottom: '1px solid #e2e8f0', paddingBottom: 6 }}>
-                        👤 BÊN MUA (BÊN A): CÔNG TY KHÁCH HÀNG
-                      </div>
-                      <div style={{ fontSize: 13, color: '#334155', lineHeight: 1.7 }}>
-                        <div><strong>Khách hàng:</strong> Công ty Kiến trúc và Nội thất K2</div>
-                        <div><strong>Mã số thuế:</strong> 0109999999 &nbsp;•&nbsp; <strong>Điện thoại:</strong> 0912345678</div>
-                        <div><strong>Địa chỉ:</strong> Vườn Cam, Hoài Đức, TP Hà Nội</div>
-                        <div><strong>Ngày lắp đặt dự kiến:</strong> <strong style={{ color: '#2563eb' }}>15/07/2026</strong></div>
-                      </div>
-                    </div>
-                  </Col>
-                </Row>
-              ) : (
-                <div
-                  style={{
-                    marginBottom: 18,
-                    padding: '12px 18px',
-                    background: '#eff6ff',
-                    border: '1px solid #bfdbfe',
-                    borderRadius: 8,
-                  }}
-                >
-                  <div style={{ fontWeight: 700, color: '#1d4ed8', fontSize: 13.5, marginBottom: 8, borderBottom: '1px solid #dbeafe', paddingBottom: 6, display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 8 }}>
-                    <span>👤 THÔNG TIN KHÁCH HÀNG / ĐỐI TÁC (MẪU)</span>
-                    <span style={{ fontSize: 13, fontWeight: 600, color: '#2563eb' }}>
-                      📅 Ngày lắp đặt dự kiến: 15/07/2026
-                    </span>
-                  </div>
-                  <Row gutter={[20, 6]} style={{ fontSize: 13.5, color: '#1e293b', lineHeight: 1.7 }}>
-                    <Col xs={24} md={12}>
-                      <strong>Khách hàng:</strong> <span style={{ fontWeight: 600, color: '#1e3a8a' }}>Anh Nguyễn Văn A — Công ty ABC</span>
-                    </Col>
-                    <Col xs={24} md={12}>
-                      <strong>Điện thoại:</strong> <span style={{ fontWeight: 600 }}>0988.123.456</span>
-                    </Col>
-                    <Col xs={24} md={12}>
-                      <strong>Địa chỉ:</strong> Số 10, Đường Phố Huế, Q. Hai Bà Trưng, Hà Nội
-                    </Col>
-                    <Col xs={24} md={12}>
-                      <strong>Email:</strong> contact@congtyabc.vn
-                    </Col>
-                  </Row>
-                </div>
-              )}
-
-              {/* Sample Items Table */}
-              <Table
-                dataSource={
-                  isLand
-                    ? [
-                        { id: 1, prodId: 'P1', name: 'Cửa Gỗ Nhựa Composite Cao Cấp - Cánh Phẳng', img: 'https://images.unsplash.com/photo-1513694203232-719a280e022f?w=150&auto=format&fit=crop&q=80', height: 2355, width: 997, thickness: 125, symbol: 'D1.1', note: 'Phòng Ngủ 1 (ko khoét lỗ khoá)', qty: 1, unit: 'bộ', price: 3370000, total: 3370000 },
-                        { id: 2, prodId: 'P1', name: 'Cửa Gỗ Nhựa Composite Cao Cấp - Cánh Phẳng', img: 'https://images.unsplash.com/photo-1513694203232-719a280e022f?w=150&auto=format&fit=crop&q=80', height: 2355, width: 810, thickness: 125, symbol: 'D1.2', note: 'Phòng Ngủ 2 (khoá FT-103)', qty: 1, unit: 'bộ', price: 3370000, total: 3370000 },
-                        { id: 3, prodId: 'P2', name: 'Cửa Gỗ Nhựa Composite - Có Ô Kính (DW1.1)', img: 'https://images.unsplash.com/photo-1506377247377-2a5b3b417ebb?w=150&auto=format&fit=crop&q=80', height: 2365, width: 690, thickness: 135, symbol: 'DW1.1', note: 'Phòng Vệ Sinh', qty: 1, unit: 'bộ', price: 2970000, total: 2970000 },
-                      ]
-                    : [
-                        { id: 1, name: 'Cửa Composite Grand Door màu óc chó', note: 'KT: 800x2200mm, khung bao 100', unit: 'bộ', qty: 2, price: 3950000, total: 7900000 },
-                        { id: 2, name: 'Khóa tay gạt hợp kim cao cấp FT-103', note: 'Màu đen nhám, bao lăp đặt', unit: 'chiếc', qty: 2, price: 450000, total: 900000 },
-                      ]
-                }
-                rowKey="id"
-                pagination={false}
-                size="small"
-                bordered={selectedTemplate.layout_style === 'classic_border'}
-                style={{ marginBottom: 20 }}
-                scroll={{ x: isLand ? 980 : undefined }}
-                columns={
-                  isLand
-                    ? [
-                        {
-                          title: 'STT',
-                          dataIndex: 'id',
-                          width: 50,
-                          align: 'center',
-                          render: (v, __, idx) => {
-                            let rowSpan = 1
-                            if (idx === 0) rowSpan = 2
-                            else if (idx === 1) rowSpan = 0
-                            else rowSpan = 1
-                            const sttNum = idx <= 1 ? 1 : 2
-                            return {
-                              children: <span style={{ color: themeClr, fontWeight: 600 }}>{sttNum}</span>,
-                              props: { rowSpan },
-                            }
-                          },
-                        },
-                        {
-                          title: 'MẪU CỬA / SẢN PHẨM',
-                          key: 'product_info',
-                          width: 260,
-                          render: (_, r, idx) => {
-                            let rowSpan = 1
-                            if (idx === 0) rowSpan = 2
-                            else if (idx === 1) rowSpan = 0
-                            else rowSpan = 1
-
-                            return {
-                              children: (
-                                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', padding: '6px 4px', gap: 6, width: '100%' }}>
-                                  {r.img ? (
-                                    <img src={r.img} alt="prod" style={{ width: 68, height: 68, objectFit: 'cover', borderRadius: 6, border: '1px solid #cbd5e1', boxShadow: '0 2px 4px rgba(0,0,0,0.05)' }} />
-                                  ) : null}
-                                  <strong style={{ display: 'block', color: '#0f172a', fontSize: 13.5, textAlign: 'left', width: '100%', lineHeight: 1.3 }}>{r.name}</strong>
-                                  {r.note && (
-                                    <div style={{ fontSize: 11.5, color: '#475569', textAlign: 'left', width: '100%', lineHeight: 1.4, marginTop: 2, fontStyle: 'italic', whiteSpace: 'pre-wrap' }}>
-                                      {r.note}
-                                    </div>
-                                  )}
-                                </div>
-                              ),
-                              props: { rowSpan },
-                            }
-                          },
-                        },
-                        {
-                          title: 'KÍCH THƯỚC Ô CHỜ (mm)',
-                          children: [
-                            { title: 'Cao', dataIndex: 'height', width: 70, align: 'center', render: v => <strong style={{ color: '#1e293b' }}>{v}</strong> },
-                            { title: 'Rộng', dataIndex: 'width', width: 70, align: 'center', render: v => <strong style={{ color: '#1e293b' }}>{v}</strong> },
-                            { title: 'Dày', dataIndex: 'thickness', width: 70, align: 'center', render: v => <span>{v}</span> },
-                          ],
-                        },
-                        { title: 'KÝ HIỆU', dataIndex: 'symbol', width: 90, align: 'center', render: v => <Tag color="blue" style={{ fontWeight: 600 }}>{v}</Tag> },
-                        { title: 'GHI CHÚ KỸ THUẬT', dataIndex: 'note', width: 160, render: v => <span style={{ fontSize: 12 }}>{v}</span> },
-                        { title: 'SL', dataIndex: 'qty', align: 'center', width: 50 },
-                        { title: 'ĐVT', dataIndex: 'unit', align: 'center', width: 60 },
-                        { title: 'ĐƠN GIÁ/BỘ', dataIndex: 'price', align: 'right', width: 120, render: v => v.toLocaleString('vi-VN') + ' đ' },
-                        { title: 'TỔNG TIỀN', dataIndex: 'total', align: 'right', width: 130, render: v => <strong style={{ color: themeClr }}>{v.toLocaleString('vi-VN')} đ</strong> },
-                      ]
-                    : [
-                        { title: 'STT', dataIndex: 'id', width: 42, align: 'center', render: (v) => <span style={{ color: themeClr, fontWeight: 600 }}>{v}</span> },
-                        { title: 'Tên hàng hóa / Dịch vụ', dataIndex: 'name', width: 240, render: (v) => <strong style={{ color: '#0f172a' }}>{v}</strong> },
-                        { title: 'Kích thước / Ghi chú', dataIndex: 'note', width: 175, render: (v) => <span style={{ fontSize: 12, color: '#334155' }}>{v || '—'}</span> },
-                        { title: 'ĐVT', dataIndex: 'unit', width: 55, align: 'center' },
-                        { title: 'SL', dataIndex: 'qty', align: 'center', width: 48 },
-                        { title: 'Đơn giá', dataIndex: 'price', align: 'right', width: 110, render: (v) => v.toLocaleString('vi-VN') + ' đ' },
-                        { title: 'Thành tiền', dataIndex: 'total', align: 'right', width: 125, render: (v) => <strong style={{ color: '#16a34a' }}>{v.toLocaleString('vi-VN')} đ</strong> },
-                      ]
-                }
               />
-
-              <Row justify="end" style={{ marginBottom: 24 }}>
-                <Col xs={24} md={10} style={{ textAlign: 'right' }}>
-                  <div style={{ color: '#64748b' }}>Chiết khấu: {isLand ? '0 đ' : '-500,000 đ'}</div>
-                  <div style={{ fontSize: 16, fontWeight: 700, color: themeClr, marginTop: 4 }}>
-                    TỔNG THANH TOÁN: {isLand ? '9,710,000 đ' : '10,500,000 đ'}
-                  </div>
-                </Col>
-              </Row>
-              <Divider style={{ margin: '16px 0' }} />
-
-              {/* Footer terms section */}
-              <div>
-                <Text strong style={{ color: '#0f172a', display: 'block', marginBottom: 8 }}>
-                  Ghi chú & Điều khoản (mặc định áp dụng cho mẫu này):
-                </Text>
-                <div
-                  style={{
-                    background: '#f8fafc',
-                    padding: '12px 16px',
-                    borderRadius: 6,
-                    borderLeft: '4px solid #3b82f6',
-                    whiteSpace: 'pre-wrap',
-                    fontSize: 13,
-                    color: '#334155',
-                  }}
-                >
-                  {settings?.default_quotation_terms || selectedTemplate.footer_content || 'Không có điều khoản đặc biệt.'}
-                </div>
-              </div>
-
-              {/* Signatures & Stamp preview */}
-              <Row justify="space-between" style={{ marginTop: 32, textAlign: 'center' }}>
-                <Col xs={24} md={10}>
-                  <Text strong style={{ display: 'block', fontSize: 13, color: '#1e293b' }}>BÊN MUA / KHÁCH HÀNG</Text>
-                  <Text type="secondary" style={{ fontSize: 11, fontStyle: 'italic' }}>(Ký, ghi rõ họ tên)</Text>
-                  <div style={{ height: 80 }} />
-                </Col>
-                <Col xs={24} md={10}>
-                  <Text strong style={{ display: 'block', fontSize: 13, color: '#1e293b' }}>
-                    {settings?.director_title || 'ĐẠI DIỆN CÔNG TY'}
-                  </Text>
-                  <Text type="secondary" style={{ fontSize: 11, fontStyle: 'italic' }}>(Ký, đóng dấu)</Text>
-                  <div style={{ height: 145, display: 'flex', alignItems: 'center', justifyContent: 'center', position: 'relative', marginTop: 12 }}>
-                    {settings?.stamp_image && (
-                      <img
-                        src={settings.stamp_image}
-                        alt="Stamp"
-                        style={{ height: 135, maxWidth: 165, position: 'absolute', opacity: 0.88, zIndex: 1, objectFit: 'contain' }}
-                      />
-                    )}
-                    {settings?.director_signature && (
-                      <img
-                        src={settings.director_signature}
-                        alt="Signature"
-                        style={{ height: 115, maxWidth: 200, position: 'relative', zIndex: 2, objectFit: 'contain' }}
-                      />
-                    )}
-                  </div>
-                  <Text strong style={{ display: 'block', fontSize: 15, color: '#0f172a', marginTop: 8 }}>
-                    {settings?.director_name || ''}
-                  </Text>
-                </Col>
-              </Row>
             </div>
-          );
-        })()}
+          </div>
+        )}
       </Modal>
     </div>
   )

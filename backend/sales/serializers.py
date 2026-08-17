@@ -75,6 +75,8 @@ class QuotationTemplateSerializer(serializers.ModelSerializer):
             "layout_config",
             "is_default",
             "is_active",
+            "is_system_template",
+            "company",
             "created_at",
             "updated_at",
             "company_info",

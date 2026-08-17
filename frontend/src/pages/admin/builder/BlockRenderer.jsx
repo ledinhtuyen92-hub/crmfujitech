@@ -2,7 +2,8 @@ import React from 'react';
 import { BLOCK_TYPES } from './constants';
 import { Card, Typography, Row, Col, Space, Divider } from 'antd';
 import { HolderOutlined, DeleteOutlined } from '@ant-design/icons';
-import { useSortable } from '@dnd-kit/sortable';
+import { useSortable, SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable';
+import { useDroppable } from '@dnd-kit/core';
 import { CSS } from '@dnd-kit/utilities';
 
 const { Text } = Typography;
@@ -17,8 +18,45 @@ function PlaceholderBlock({ title, description, icon }) {
   );
 }
 
+function DroppableColumn({ id, colBlocks, allBlocks, isActive, onSelect, onDelete, globalThemeColor, globalTableStyle, globalLayoutStyle }) {
+  const { isOver, setNodeRef } = useDroppable({ id });
+  return (
+    <div 
+      ref={setNodeRef} 
+      style={{ 
+        minHeight: 80, 
+        border: isOver ? '2px dashed #1677ff' : '1px dashed #d9d9d9', 
+        background: isOver ? '#e6f4ff' : 'transparent', 
+        padding: 8,
+        transition: 'all 0.2s',
+        height: '100%'
+      }}
+    >
+      <SortableContext items={colBlocks.map(b => b.id)} strategy={verticalListSortingStrategy}>
+        {colBlocks.length === 0 ? (
+          <Text type="secondary" style={{ fontSize: 12, display: 'block', textAlign: 'center', margin: '20px 0' }}>Thả nội dung vào cột này</Text>
+        ) : (
+          colBlocks.map(b => (
+            <BlockRenderer 
+              key={b.id} 
+              block={b} 
+              allBlocks={allBlocks}
+              isActive={isActive} 
+              onSelect={onSelect} 
+              onDelete={onDelete} 
+              globalThemeColor={globalThemeColor} 
+              globalTableStyle={globalTableStyle} 
+              globalLayoutStyle={globalLayoutStyle} 
+            />
+          ))
+        )}
+      </SortableContext>
+    </div>
+  );
+}
+
 // Basic rendering logic for blocks in the canvas
-export default function BlockRenderer({ block, isActive, onSelect, onDelete, globalThemeColor, globalTableStyle, globalLayoutStyle }) {
+export default function BlockRenderer({ block, allBlocks, isActive, onSelect, onDelete, globalThemeColor, globalTableStyle, globalLayoutStyle }) {
   const {
     attributes,
     listeners,
@@ -41,30 +79,41 @@ export default function BlockRenderer({ block, isActive, onSelect, onDelete, glo
   const renderContent = () => {
     const clr = block.props.themeColor || globalThemeColor || '#1649c9';
     const isNoBorder = globalTableStyle === 'modern_navy';
+    const hideAllBorders = block.props.showBorder === false;
     const thStyle = { 
-      border: isNoBorder ? 'none' : '1px solid #e2e8f0', 
-      borderBottom: '1px solid #e2e8f0',
+      border: hideAllBorders || isNoBorder ? 'none' : '1px solid #e2e8f0', 
+      borderBottom: hideAllBorders ? 'none' : '1px solid #e2e8f0',
       padding: '8px 4px' 
     };
     const tdStyle = { 
-      border: isNoBorder ? 'none' : '1px solid #e2e8f0', 
-      borderBottom: '1px solid #e2e8f0',
-      padding: 8 
+      border: hideAllBorders || isNoBorder ? 'none' : '1px solid #e2e8f0',
+      borderBottom: hideAllBorders ? 'none' : '1px solid #e2e8f0',
+      padding: '8px 4px',
+      verticalAlign: 'middle'
     };
     switch (block.type) {
       case BLOCK_TYPES.HEADER_LOGO:
+        const hasLogoUrl = block.props.logoUrl && !block.props.logoUrl.includes('{{');
         return (
           <div style={{ padding: '14px 18px', background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: 8 }}>
             <Row justify="space-between" align="middle">
-              <Col xs={24} md={8}>
-                <div style={{ width: 56, height: 56, borderRadius: 6, background: '#e0e7ff', color: clr, display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700, fontSize: 16 }}>
-                  LOGO
-                </div>
+              <Col xs={24} md={8} style={{ textAlign: 'left' }}>
+                {hasLogoUrl ? (
+                  <img
+                    src={block.props.logoUrl}
+                    alt="Logo"
+                    style={{ maxHeight: 75, maxWidth: '100%', objectFit: 'contain', borderRadius: 4 }}
+                  />
+                ) : (
+                  <div style={{ width: 56, height: 56, borderRadius: 6, background: '#e0e7ff', color: clr, display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700, fontSize: 16 }}>
+                    LOGO
+                  </div>
+                )}
               </Col>
               <Col xs={24} md={16} style={{ textAlign: 'right' }}>
-                <div style={{ fontWeight: 700, color: clr, fontSize: 16 }}>{block.props.companyName}</div>
-                <div style={{ fontSize: 12, color: '#64748b', marginTop: 2 }}>MST: {block.props.taxCode} • Hotline: {block.props.phone}</div>
-                <div style={{ fontSize: 12, color: '#64748b' }}>Địa chỉ: {block.props.address}</div>
+                <div style={{ fontWeight: 700, color: clr, fontSize: 16 }}>{block.props.companyName || 'TÊN CÔNG TY'}</div>
+                <div style={{ fontSize: 12, color: '#64748b', marginTop: 2 }}>MST: {block.props.taxCode || '0101234567'} • Hotline: {block.props.phone || '0912345678'}</div>
+                <div style={{ fontSize: 12, color: '#64748b' }}>Địa chỉ: {block.props.address || 'Hà Nội'}</div>
               </Col>
             </Row>
           </div>
@@ -89,15 +138,15 @@ export default function BlockRenderer({ block, isActive, onSelect, onDelete, glo
         return (
           <Row gutter={16} style={{ marginBottom: 16 }}>
             <Col xs={24} md={block.props.columns === 1 ? 24 : 12} style={{ marginBottom: block.props.columns === 1 ? 16 : 0 }}>
-              <div style={{ padding: '10px 14px', background: '#f8fafc', border: `1px solid ${clr}40`, borderRadius: 6, height: '100%' }}>
+              <div style={{ padding: '10px 14px', background: block.props.sellerBackgroundColor || '#f8fafc', border: (block.props.showBorder ?? true) ? `1px solid ${block.props.borderColor || clr + '40'}` : 'none', borderRadius: 6, height: '100%' }}>
                 <div style={{ fontWeight: 700, color: clr, fontSize: 13, marginBottom: 4 }}>BÊN BÁN (BÊN B): {block.props.companyName || 'CÔNG TY CỦA BẠN'}</div>
-                <div style={{ fontSize: 12, color: '#334155' }}><strong>Đại diện:</strong> Nguyễn Anh Tuấn • <strong>Chức vụ:</strong> Giám đốc</div>
-                <div style={{ fontSize: 12, color: '#334155' }}><strong>Mã số thuế:</strong> 0111100289 • <strong>Điện thoại:</strong> 0961442882</div>
-                <div style={{ fontSize: 12, color: '#334155' }}><strong>Địa chỉ:</strong> KĐT Xa La, Hà Đông, TP Hà Nội</div>
+                <div style={{ fontSize: 12, color: '#334155' }}><strong>Đại diện:</strong> {block.props.representative || 'Nguyễn Anh Tuấn'} • <strong>Chức vụ:</strong> {block.props.position || 'Giám đốc'}</div>
+                <div style={{ fontSize: 12, color: '#334155' }}><strong>Mã số thuế:</strong> {block.props.taxCode || '0111100289'} • <strong>Điện thoại:</strong> {block.props.phone || '0961442882'}</div>
+                <div style={{ fontSize: 12, color: '#334155' }}><strong>Địa chỉ:</strong> {block.props.address || 'KĐT Xa La, Hà Đông, TP Hà Nội'}</div>
               </div>
             </Col>
             <Col xs={24} md={block.props.columns === 1 ? 24 : 12}>
-              <div style={{ padding: '10px 14px', background: '#fff', border: '1px solid #e2e8f0', borderRadius: 6, height: '100%' }}>
+              <div style={{ padding: '10px 14px', background: block.props.buyerBackgroundColor || '#fff', border: (block.props.showBorder ?? true) ? `1px solid ${block.props.borderColor || '#e2e8f0'}` : 'none', borderRadius: 6, height: '100%' }}>
                 <div style={{ fontWeight: 700, color: '#0f172a', fontSize: 13, marginBottom: 4 }}>BÊN MUA (BÊN A): CÔNG TY KHÁCH HÀNG</div>
                 <div style={{ fontSize: 12, color: '#334155' }}><strong>Khách hàng:</strong> Công ty ABC</div>
                 <div style={{ fontSize: 12, color: '#334155' }}><strong>Mã số thuế:</strong> 0109999999 • <strong>Điện thoại:</strong> 0912345678</div>
@@ -106,19 +155,24 @@ export default function BlockRenderer({ block, isActive, onSelect, onDelete, glo
             </Col>
           </Row>
         );
+      case BLOCK_TYPES.SERVICE_TABLE:
       case BLOCK_TYPES.PRODUCT_TABLE:
+        const isService = block.type === BLOCK_TYPES.SERVICE_TABLE;
+        const tableTitle = block.props.tableTitle;
         return (
           <div style={{ marginBottom: 16 }}>
+            {tableTitle && <div style={{ fontWeight: 600, color: '#0f172a', fontSize: 13, marginBottom: 8 }}>{tableTitle}</div>}
             <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
-              <thead>
-                <tr style={{ background: '#fafafa' }}>
+              {block.props.showHeader !== false && (
+                <thead>
+                  <tr style={{ background: '#fafafa' }}>
                   {(block.props.columns || []).map(col => {
                     const colId = typeof col === 'object' ? col.id : col;
                     const colTitle = typeof col === 'object' ? col.title : null;
                     if (colId === 'stt') return <th key="stt" style={{ ...thStyle, color: clr, width: 40 }}>STT</th>;
-                    if (colId === 'name') return <th key="name" style={{...thStyle, width: 200}}>Tên hàng hóa / Dịch vụ</th>;
+                    if (colId === 'name') return <th key="name" style={{...thStyle, width: 200, textAlign: 'left'}}>{isService ? 'Tên dịch vụ / chi phí' : 'Tên hàng hóa / Dịch vụ'}</th>;
                     if (colId === 'symbol') return <th key="symbol" style={{...thStyle, width: 80}}>Ký hiệu</th>;
-                    if (colId === 'specs') return <th key="specs" style={{...thStyle, width: 150}}>Quy cách kỹ thuật</th>;
+                    if (colId === 'specs') return <th key="specs" style={{...thStyle, width: 150, textAlign: 'left'}}>{isService ? 'Ghi chú kỹ thuật' : 'Quy cách kỹ thuật'}</th>;
                     if (colId === 'dimensions') return (
                       <th key="dimensions" style={{...thStyle, padding: 0, width: 180}}>
                         <div style={{ borderBottom: '1px solid #e2e8f0', padding: '4px 6px' }}>Kích thước (mm)</div>
@@ -129,20 +183,36 @@ export default function BlockRenderer({ block, isActive, onSelect, onDelete, glo
                         </div>
                       </th>
                     );
-                    if (colId === 'note') return <th key="note" style={{...thStyle, width: 120}}>Ghi chú</th>;
+                    if (colId === 'note') return <th key="note" style={{...thStyle, width: 120, textAlign: 'left'}}>Ghi chú</th>;
                     if (colId === 'unit') return <th key="unit" style={{...thStyle, width: 50}}>ĐVT</th>;
                     if (colId === 'qty') return <th key="qty" style={{...thStyle, width: 50}}>SL</th>;
-                    if (colId === 'price') return <th key="price" style={{...thStyle, width: 90}}>Đơn giá</th>;
-                    if (colId === 'total') return <th key="total" style={{...thStyle, width: 100}}>Thành tiền</th>;
+                    if (colId === 'price') return <th key="price" style={{...thStyle, width: 90, textAlign: 'right'}}>Đơn giá</th>;
+                    if (colId === 'total') return <th key="total" style={{...thStyle, width: 100, textAlign: 'right'}}>Thành tiền</th>;
                     
                     if (colId.startsWith('custom_')) {
                       return <th key={colId} style={{...thStyle, width: 100}}>{colTitle || 'Cột tuỳ chỉnh'}</th>;
+                    }
+                    if (colId.startsWith('group_')) {
+                      const children = col.children || [];
+                      return (
+                        <th key={colId} style={{...thStyle, padding: 0, width: Math.max(100, children.length * 60)}}>
+                          <div style={{ borderBottom: children.length > 0 ? '1px solid #e2e8f0' : 'none', padding: '4px 6px' }}>{colTitle}</div>
+                          {children.length > 0 && (
+                            <div style={{ display: 'flex' }}>
+                              {children.map((child, idx) => (
+                                <div key={child.id} style={{ flex: 1, borderRight: idx < children.length - 1 ? '1px solid #e2e8f0' : 'none', padding: '2px 6px' }}>{child.title}</div>
+                              ))}
+                            </div>
+                          )}
+                        </th>
+                      );
                     }
                     
                     return null;
                   })}
                 </tr>
               </thead>
+              )}
               <tbody>
                 <tr>
                   {(block.props.columns || []).map(col => {
@@ -154,13 +224,13 @@ export default function BlockRenderer({ block, isActive, onSelect, onDelete, glo
                     if (colId === 'stt') return <td key="stt" style={{ ...tdStyle, textAlign: 'center', fontWeight: 600, color: clr }}>1</td>;
                     if (colId === 'name') return (
                       <td key="name" style={tdStyle}>
-                        <strong style={{ color: '#1e293b' }}>Sản phẩm demo A</strong>
+                        <strong style={{ color: '#1e293b' }}>{isService ? 'Dịch vụ demo' : 'Sản phẩm demo A'}</strong>
                         {!showSpecs && <br/>}
                         {!showSpecs && <span style={{ color: '#64748b', fontSize: 11 }}>Mô tả sản phẩm demo</span>}
                       </td>
                     );
-                    if (colId === 'symbol') return <td key="symbol" style={{ ...tdStyle, textAlign: 'center', fontWeight: 600, color: '#2563eb' }}>D1</td>;
-                    if (colId === 'specs') return <td key="specs" style={{ ...tdStyle, color: '#475569', fontSize: 11 }}>Mô tả sản phẩm demo</td>;
+                    if (colId === 'symbol') return <td key="symbol" style={{ ...tdStyle, textAlign: 'center', fontWeight: 600, color: '#2563eb' }}>{isService ? 'SV1' : 'D1'}</td>;
+                    if (colId === 'specs') return <td key="specs" style={{ ...tdStyle, color: '#475569', fontSize: 11 }}>{isService ? 'Ghi chú dịch vụ demo' : 'Mô tả sản phẩm demo'}</td>;
                     if (colId === 'dimensions') return (
                       <td key="dimensions" style={{ ...tdStyle, padding: 0 }}>
                         <div style={{ display: 'flex', height: '100%' }}>
@@ -171,14 +241,29 @@ export default function BlockRenderer({ block, isActive, onSelect, onDelete, glo
                       </td>
                     );
                     if (colId === 'note') return <td key="note" style={{ ...tdStyle, color: '#475569', fontSize: 11 }}>Khung ngoại 45x110</td>;
-                    if (colId === 'unit') return <td key="unit" style={{ ...tdStyle, textAlign: 'center' }}>Bộ</td>;
-                    if (colId === 'qty') return <td key="qty" style={{ ...tdStyle, textAlign: 'center' }}>2</td>;
-                    if (colId === 'price') return <td key="price" style={{ ...tdStyle, textAlign: 'right' }}>1,250,000 đ</td>;
-                    if (colId === 'total') return <td key="total" style={{ ...tdStyle, textAlign: 'right' }}><strong style={{ color: clr }}>2,500,000 đ</strong></td>;
+                    if (colId === 'unit') return <td key="unit" style={{ ...tdStyle, textAlign: 'center' }}>{isService ? 'Lần' : 'Bộ'}</td>;
+                    if (colId === 'qty') return <td key="qty" style={{ ...tdStyle, textAlign: 'center' }}>{isService ? '1' : '2'}</td>;
+                    if (colId === 'price') return <td key="price" style={{ ...tdStyle, textAlign: 'right' }}>{isService ? '500,000 đ' : '1,250,000 đ'}</td>;
+                    if (colId === 'total') return <td key="total" style={{ ...tdStyle, textAlign: 'right' }}><strong style={{ color: clr }}>{isService ? '500,000 đ' : '2,500,000 đ'}</strong></td>;
                     
                     if (colId.startsWith('custom_')) return (
                       <td key={colId} style={{ ...tdStyle, textAlign: 'center', color: '#64748b', fontSize: 11, fontStyle: 'italic' }}>Dữ liệu mẫu</td>
                     );
+                    
+                    if (colId.startsWith('group_')) {
+                      const children = col.children || [];
+                      return (
+                        <td key={colId} style={{ ...tdStyle, padding: 0, verticalAlign: 'top' }}>
+                          <div style={{ display: 'flex', height: '100%' }}>
+                            {children.length > 0 ? children.map((child, idx) => (
+                              <div key={child.id} style={{ flex: 1, borderRight: idx < children.length - 1 ? '1px dashed #e2e8f0' : 'none', padding: '4px 6px', textAlign: 'center', color: '#64748b', fontSize: 11, fontStyle: 'italic' }}>
+                                Mẫu
+                              </div>
+                            )) : <div style={{ padding: '4px 6px', flex: 1 }} />}
+                          </div>
+                        </td>
+                      );
+                    }
                     
                     return null;
                   })}
@@ -188,9 +273,10 @@ export default function BlockRenderer({ block, isActive, onSelect, onDelete, glo
           </div>
         );
       case BLOCK_TYPES.TOTALS:
+        const isNested = !!block.parentId && block.parentId !== 'canvas';
         return (
-          <Row justify="end" style={{ marginBottom: 16 }}>
-            <Col xs={24} md={11} style={{ textAlign: 'right', padding: '10px 14px', background: block.props.backgroundColor ?? '#f8fafc', borderRadius: 6, border: (block.props.showBorder ?? true) ? `1px solid ${clr}40` : 'none' }}>
+          <Row justify={isNested ? "center" : "end"} style={{ marginBottom: 16 }}>
+            <Col xs={24} md={isNested ? 24 : 11} style={{ textAlign: 'right', padding: '10px 14px', background: block.props.backgroundColor ?? '#f8fafc', borderRadius: 6, border: (block.props.showBorder ?? true) ? `1px solid ${clr}40` : 'none' }}>
               {block.props.showSubtotal && <div style={{ fontSize: 12, color: '#64748b' }}>Cộng tiền hàng: 2,500,000 đ</div>}
               {block.props.showDiscount && <div style={{ fontSize: 12, color: '#64748b' }}>Chiết khấu chung: -50,000 đ</div>}
               {block.props.showVAT && <div style={{ fontSize: 12, color: '#64748b' }}>Thuế GTGT (10%): 250,000 đ</div>}
@@ -204,22 +290,25 @@ export default function BlockRenderer({ block, isActive, onSelect, onDelete, glo
           </Row>
         );
       case BLOCK_TYPES.PAYMENT_PROGRESS:
+        const progressTitle = block.props.title || 'Tiến độ thanh toán:';
         return (
           <div style={{ marginBottom: 16 }}>
-            <div style={{ fontWeight: 600, color: '#0f172a', fontSize: 13, marginBottom: 8, textDecoration: 'underline' }}>Tiến độ thanh toán:</div>
+            <div style={{ fontWeight: 600, color: '#0f172a', fontSize: 13, marginBottom: 8, textDecoration: 'underline' }}>{progressTitle}</div>
             <ul style={{ paddingLeft: 20, marginBottom: 12, fontSize: 12, color: '#334155' }}>
               <li>Thanh toán đợt 1 (100%): <strong style={{ color: clr }}>2,750,000 đ</strong></li>
             </ul>
-            <div style={{ border: '1px dashed #cbd5e1', padding: '10px 14px', borderRadius: 8, background: '#f8fafc', display: 'inline-block', minWidth: 200, marginBottom: 12 }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4, fontSize: 12 }}>
-                <span style={{ color: '#475569' }}>Đã thanh toán:</span>
-                <strong style={{ color: '#16a34a' }}>0 đ</strong>
+            {block.props.showPaidAndDebt !== false && (
+              <div style={{ border: '1px dashed #cbd5e1', padding: '10px 14px', borderRadius: 8, background: '#f8fafc', display: 'inline-block', minWidth: 200, marginBottom: 12 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4, fontSize: 12 }}>
+                  <span style={{ color: '#475569' }}>Đã thanh toán:</span>
+                  <strong style={{ color: '#16a34a' }}>0 đ</strong>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12 }}>
+                  <span style={{ color: '#475569' }}>Còn nợ:</span>
+                  <strong style={{ color: '#ef4444' }}>2,750,000 đ</strong>
+                </div>
               </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12 }}>
-                <span style={{ color: '#475569' }}>Còn nợ:</span>
-                <strong style={{ color: '#ef4444' }}>2,750,000 đ</strong>
-              </div>
-            </div>
+            )}
             {block.props.showDeliveryTime && (
               <div style={{ fontSize: 12, color: '#334155', marginBottom: 4 }}>
                 Thời gian giao hàng / thi công: <strong>3-5 ngày làm việc</strong>
@@ -239,9 +328,6 @@ export default function BlockRenderer({ block, isActive, onSelect, onDelete, glo
             <div style={{ background: '#f8fafc', padding: '10px 14px', borderRadius: 6, borderLeft: `4px solid ${clr}`, whiteSpace: 'pre-wrap', fontSize: 12, color: '#334155' }}>
               {block.props.content}
             </div>
-            <div style={{ fontSize: 11, color: '#94a3b8', fontStyle: 'italic', marginTop: 4 }}>
-              * Lưu ý: Khi áp dụng, Admin Công ty có thể tùy chỉnh điều khoản và số tài khoản ngân hàng riêng của công ty họ.
-            </div>
           </div>
         );
       case BLOCK_TYPES.SIGNATURES:
@@ -250,9 +336,17 @@ export default function BlockRenderer({ block, isActive, onSelect, onDelete, glo
             {Array.from({ length: block.props.columns || 2 }).map((_, idx) => (
               <Col xs={24} md={24 / (block.props.columns || 2)} key={idx}>
                 <div style={{ fontWeight: 700, color: clr, fontSize: 13 }}>{block.props.titles?.[idx] || 'CHỮ KÝ'}</div>
-                <div style={{ fontSize: 11, color: '#64748b', fontStyle: 'italic' }}>(Ký, đóng dấu & ghi rõ họ tên)</div>
-                <div style={{ height: 60 }} />
-                {idx === 0 && <div style={{ fontWeight: 600, color: '#334155', fontSize: 12 }}>Người lập báo giá</div>}
+                <div style={{ fontSize: 11, color: '#64748b', fontStyle: 'italic', marginBottom: 12 }}>(Ký, đóng dấu & ghi rõ họ tên)</div>
+                <div style={{ height: 115, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  {idx === 0 && block.props.columns > 1 ? (
+                    <div style={{ width: 100, height: 60, border: '1px dashed #cbd5e1', borderRadius: 4, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#94a3b8', fontSize: 11 }}>Chữ ký khách hàng</div>
+                  ) : (
+                    <div style={{ position: 'relative', width: 140, height: 100 }}>
+                      <div style={{ width: 100, height: 100, border: '1px dashed #ef4444', borderRadius: '50%', position: 'absolute', right: 0, opacity: 0.3, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#ef4444', fontSize: 11 }}>Dấu c.ty</div>
+                      <div style={{ width: 120, height: 60, border: '1px dashed #cbd5e1', borderRadius: 4, position: 'absolute', bottom: 10, left: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#94a3b8', fontSize: 11 }}>Chữ ký ĐD</div>
+                    </div>
+                  )}
+                </div>
               </Col>
             ))}
           </Row>
@@ -271,14 +365,26 @@ export default function BlockRenderer({ block, isActive, onSelect, onDelete, glo
         return <Divider type="horizontal" style={{ borderTopWidth: block.props.thickness, borderColor: block.props.color, margin: `${block.props.margin}px 0` }} />;
       case BLOCK_TYPES.LAYOUT_ROW:
         return (
-          <Row gutter={block.props.gap || 16}>
-            {Array.from({ length: block.props.columns || 2 }).map((_, idx) => (
-              <Col span={24 / (block.props.columns || 2)} key={idx}>
-                <div style={{ minHeight: 60, border: '1px dashed #d9d9d9', background: '#fafafa', padding: 8 }}>
-                  <Text type="secondary" style={{ fontSize: 12 }}>Cột {idx + 1}</Text>
-                </div>
-              </Col>
-            ))}
+          <Row gutter={block.props.gap || 16} style={{ minHeight: 100 }}>
+            {Array.from({ length: block.props.columns || 2 }).map((_, idx) => {
+              const colId = `${block.id}_col_${idx}`;
+              const colBlocks = (allBlocks || []).filter(b => b.parentId === colId);
+              return (
+                <Col span={24 / (block.props.columns || 2)} key={idx}>
+                  <DroppableColumn 
+                    id={colId}
+                    colBlocks={colBlocks}
+                    allBlocks={allBlocks}
+                    isActive={isActive}
+                    onSelect={onSelect}
+                    onDelete={onDelete}
+                    globalThemeColor={globalThemeColor}
+                    globalTableStyle={globalTableStyle}
+                    globalLayoutStyle={globalLayoutStyle}
+                  />
+                </Col>
+              );
+            })}
           </Row>
         );
       default:

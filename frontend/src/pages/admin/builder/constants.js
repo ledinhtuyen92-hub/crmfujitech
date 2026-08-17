@@ -10,7 +10,8 @@ export const BLOCK_TYPES = {
   SIGNATURES: 'signatures',
   PAYMENT_PROGRESS: 'payment_progress',
   DIVIDER: 'divider',
-  LAYOUT_ROW: 'layout_row'
+  LAYOUT_ROW: 'layout_row',
+  SERVICE_TABLE: 'service_table'
 };
 
 export const DEFAULT_BLOCK_PROPS = {
@@ -19,11 +20,12 @@ export const DEFAULT_BLOCK_PROPS = {
   [BLOCK_TYPES.HEADER_LOGO]: { companyName: 'TÊN CÔNG TY CỦA BẠN', phone: '1900 xxxx', address: 'Tòa nhà SaaS, TP. Hà Nội', taxCode: '0101234567' },
   [BLOCK_TYPES.TITLE]: { title: 'BẢNG BÁO GIÁ CHI TIẾT', subtitle: 'Kính gửi Quý khách hàng, chúng tôi xin trân trọng gửi bảng báo giá các hạng mục chi tiết dưới đây:', showDate: true },
   [BLOCK_TYPES.CUSTOMER_INFO]: { columns: 2 },
-  [BLOCK_TYPES.PRODUCT_TABLE]: { columns: ['stt', 'name', 'unit', 'qty', 'price', 'total'] },
+  [BLOCK_TYPES.PRODUCT_TABLE]: { columns: ['stt', 'name', 'unit', 'qty', 'price', 'total'], showHeader: true, tableTitle: '', showBorder: true },
   [BLOCK_TYPES.TOTALS]: { showSubtotal: true, showVAT: true, showDiscount: true, showShippingFee: true, showInstallationFee: true, showWords: true, showBorder: true, backgroundColor: '#f8fafc' },
   [BLOCK_TYPES.TERMS]: { content: '1. Báo giá có hiệu lực trong vòng 15 ngày.\n2. Thanh toán: Tạm ứng 50% ngay sau khi xác nhận.' },
   [BLOCK_TYPES.SIGNATURES]: { columns: 2, titles: ['ĐẠI DIỆN CÔNG TY', 'ĐẠI DIỆN KHÁCH HÀNG'] },
-  [BLOCK_TYPES.PAYMENT_PROGRESS]: { showDeliveryTime: true, showValidity: true },
+  [BLOCK_TYPES.PAYMENT_PROGRESS]: { title: 'Tiến độ thanh toán:', showPaidAndDebt: true, showDeliveryTime: true, showValidity: true },
   [BLOCK_TYPES.DIVIDER]: { style: 'solid', thickness: 1, color: '#e8e8e8', margin: 16 },
-  [BLOCK_TYPES.LAYOUT_ROW]: { columns: 2, ratios: [50, 50], gap: 16 }
+  [BLOCK_TYPES.LAYOUT_ROW]: { columns: 2, ratios: [50, 50], gap: 16 },
+  [BLOCK_TYPES.SERVICE_TABLE]: { columns: ['stt', 'name', 'symbol', 'specs', 'qty', 'unit', 'price', 'total'], showHeader: true, tableTitle: 'DỊCH VỤ & CHI PHÍ PHÁT SINH:', showBorder: true }
 };

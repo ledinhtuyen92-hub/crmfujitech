@@ -3,7 +3,7 @@ import { Select, Button, Typography, Space, Input, Divider } from 'antd';
 import { DndContext, closestCenter, PointerSensor, useSensor, useSensors } from '@dnd-kit/core';
 import { arrayMove, SortableContext, verticalListSortingStrategy, useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
-import { HolderOutlined, CloseOutlined } from '@ant-design/icons';
+import { HolderOutlined, CloseOutlined, PlusOutlined } from '@ant-design/icons';
 
 const { Text } = Typography;
 const { Option } = Select;
@@ -21,8 +21,9 @@ const PREDEFINED_COLUMNS = [
   { id: 'total', title: 'Thành tiền' }
 ];
 
-function SortableItem({ id, title, onRemove }) {
+function SortableItem({ id, title, childrenColumns, onRemove, onAddChild, onRemoveChild }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id });
+  const [childTitle, setChildTitle] = useState('');
 
   const style = {
     transform: CSS.Transform.toString(transform),
@@ -33,23 +34,56 @@ function SortableItem({ id, title, onRemove }) {
     background: '#fff',
     border: '1px solid #e2e8f0',
     borderRadius: 6,
-    display: 'flex',
-    justifyContent: 'space-between',
-    alignItems: 'center',
     cursor: 'default',
     zIndex: isDragging ? 999 : 'auto',
     position: 'relative'
   };
 
+  const isGroup = id.startsWith('group_');
+
   return (
     <div ref={setNodeRef} style={style}>
-      <Space>
-        <span {...attributes} {...listeners} style={{ cursor: 'grab', color: '#94a3b8', marginRight: 4, display: 'inline-flex', padding: 4 }}>
-          <HolderOutlined />
-        </span>
-        <Text strong style={{ fontSize: 13, color: '#334155' }}>{title}</Text>
-      </Space>
-      <CloseOutlined style={{ color: '#ef4444', cursor: 'pointer', fontSize: 12, padding: 4 }} onClick={() => onRemove(id)} />
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <Space>
+          <span {...attributes} {...listeners} style={{ cursor: 'grab', color: '#94a3b8', marginRight: 4, display: 'inline-flex', padding: 4 }}>
+            <HolderOutlined />
+          </span>
+          <Text strong style={{ fontSize: 13, color: '#334155' }}>{title}</Text>
+          {isGroup && <Text type="secondary" style={{ fontSize: 11, fontStyle: 'italic' }}>(Cột gộp)</Text>}
+        </Space>
+        <CloseOutlined style={{ color: '#ef4444', cursor: 'pointer', fontSize: 12, padding: 4 }} onClick={() => onRemove(id)} />
+      </div>
+
+      {isGroup && (
+        <div style={{ marginTop: 12, paddingLeft: 28 }}>
+          {childrenColumns && childrenColumns.map(child => (
+            <div key={child.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#f8fafc', padding: '4px 8px', marginBottom: 4, borderRadius: 4, border: '1px dashed #e2e8f0' }}>
+              <Text style={{ fontSize: 12, color: '#475569' }}>- {child.title}</Text>
+              <CloseOutlined style={{ color: '#ef4444', cursor: 'pointer', fontSize: 10 }} onClick={() => onRemoveChild(id, child.id)} />
+            </div>
+          ))}
+          <div style={{ display: 'flex', gap: 4, marginTop: 6 }}>
+            <Input 
+              size="small" 
+              placeholder="Nhập tên cột con..." 
+              value={childTitle}
+              onChange={e => setChildTitle(e.target.value)}
+              onPressEnter={() => {
+                if(childTitle.trim()) {
+                  onAddChild(id, childTitle.trim());
+                  setChildTitle('');
+                }
+              }}
+            />
+            <Button size="small" type="dashed" icon={<PlusOutlined />} onClick={() => {
+              if(childTitle.trim()) {
+                onAddChild(id, childTitle.trim());
+                setChildTitle('');
+              }
+            }}>Thêm cột con</Button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -57,6 +91,7 @@ function SortableItem({ id, title, onRemove }) {
 export default function ColumnManager({ value = [], onChange }) {
   const [selectedToAdd, setSelectedToAdd] = useState(null);
   const [customTitle, setCustomTitle] = useState('');
+  const [groupTitle, setGroupTitle] = useState('');
 
   // Normalize value to always be an array of objects
   const normalizedValue = value.map(col => {
@@ -102,6 +137,40 @@ export default function ColumnManager({ value = [], onChange }) {
     }
   };
 
+  const handleAddGroup = () => {
+    if (groupTitle.trim()) {
+      const newId = `group_${Date.now()}`;
+      onChange([...normalizedValue, { id: newId, title: groupTitle.trim(), children: [] }]);
+      setGroupTitle('');
+    }
+  };
+
+  const handleAddChild = (groupId, childTitle) => {
+    const updated = normalizedValue.map(col => {
+      if (col.id === groupId) {
+        return {
+          ...col,
+          children: [...(col.children || []), { id: `custom_${Date.now()}_${Math.random().toString(36).substring(7)}`, title: childTitle }]
+        };
+      }
+      return col;
+    });
+    onChange(updated);
+  };
+
+  const handleRemoveChild = (groupId, childId) => {
+    const updated = normalizedValue.map(col => {
+      if (col.id === groupId) {
+        return {
+          ...col,
+          children: (col.children || []).filter(c => c.id !== childId)
+        };
+      }
+      return col;
+    });
+    onChange(updated);
+  };
+
   const availableColumns = PREDEFINED_COLUMNS.filter(col => !normalizedValue.find(c => c.id === col.id));
 
   return (
@@ -111,7 +180,15 @@ export default function ColumnManager({ value = [], onChange }) {
         <SortableContext items={normalizedValue.map(c => c.id)} strategy={verticalListSortingStrategy}>
           {normalizedValue.map(col => {
             return (
-              <SortableItem key={col.id} id={col.id} title={col.title} onRemove={handleRemove} />
+              <SortableItem 
+                key={col.id} 
+                id={col.id} 
+                title={col.title} 
+                childrenColumns={col.children}
+                onRemove={handleRemove} 
+                onAddChild={handleAddChild}
+                onRemoveChild={handleRemoveChild}
+              />
             );
           })}
         </SortableContext>
@@ -135,16 +212,30 @@ export default function ColumnManager({ value = [], onChange }) {
       )}
 
       <Divider style={{ margin: '12px 0' }} />
-      <div style={{ fontSize: 13, fontWeight: 500, marginBottom: 8, color: '#334155' }}>Hoặc tự tạo cột mới:</div>
-      <div style={{ display: 'flex', gap: 8 }}>
-        <Input 
-          placeholder="Nhập tên cột (VD: Màu sắc)" 
-          value={customTitle} 
-          onChange={e => setCustomTitle(e.target.value)} 
-          onPressEnter={handleAddCustom}
-        />
-        <Button onClick={handleAddCustom} disabled={!customTitle.trim()}>Tạo cột</Button>
+      <div style={{ fontSize: 13, fontWeight: 500, marginBottom: 8, color: '#334155' }}>Hoặc tự tạo cột:</div>
+      
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+        <div style={{ display: 'flex', gap: 8 }}>
+          <Input 
+            placeholder="Tên cột đơn (VD: Màu sắc)" 
+            value={customTitle} 
+            onChange={e => setCustomTitle(e.target.value)} 
+            onPressEnter={handleAddCustom}
+          />
+          <Button onClick={handleAddCustom} disabled={!customTitle.trim()}>Tạo cột đơn</Button>
+        </div>
+
+        <div style={{ display: 'flex', gap: 8 }}>
+          <Input 
+            placeholder="Tên cột gộp cha (VD: Kích thước)" 
+            value={groupTitle} 
+            onChange={e => setGroupTitle(e.target.value)} 
+            onPressEnter={handleAddGroup}
+          />
+          <Button onClick={handleAddGroup} disabled={!groupTitle.trim()}>Tạo cột gộp</Button>
+        </div>
       </div>
+
     </div>
   );
 }

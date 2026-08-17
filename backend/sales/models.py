@@ -368,6 +368,15 @@ class QuotationTemplate(models.Model):
     )
     is_default = models.BooleanField(default=False, verbose_name="Mẫu mặc định hệ thống")
     is_active = models.BooleanField(default=True, verbose_name="Hoạt động")
+    is_system_template = models.BooleanField(default=True, verbose_name="Mẫu hệ thống")
+    company = models.ForeignKey(
+        'users.Company',
+        on_delete=models.CASCADE,
+        null=True,
+        blank=True,
+        related_name='quotation_templates',
+        verbose_name="Công ty sở hữu"
+    )
     created_at = models.DateTimeField(auto_now_add=True, verbose_name="Ngày tạo")
     updated_at = models.DateTimeField(auto_now=True, verbose_name="Ngày cập nhật")
 

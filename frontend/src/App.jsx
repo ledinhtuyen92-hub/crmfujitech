@@ -305,6 +305,14 @@ function App() {
                   </PermissionRoute>
                 }
               />
+              <Route
+                path="/admin/quotation-templates/:id/builder"
+                element={
+                  <CompanyAdminRoute>
+                    <QuotationBuilder />
+                  </CompanyAdminRoute>
+                }
+              />
 
               {/* System Admin routes */}
               <Route
@@ -344,14 +352,6 @@ function App() {
                 element={
                   <SuperAdminRoute>
                     <QuotationTemplateManagement />
-                  </SuperAdminRoute>
-                }
-              />
-              <Route
-                path="/admin/quotation-templates/:id/builder"
-                element={
-                  <SuperAdminRoute>
-                    <QuotationBuilder />
                   </SuperAdminRoute>
                 }
               />

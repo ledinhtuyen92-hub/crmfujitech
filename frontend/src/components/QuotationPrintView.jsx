@@ -8,6 +8,7 @@ const DEFAULT_LAYOUT_BLOCKS = [
   { id: 'title_1', type: BLOCK_TYPES.TITLE, props: { ...DEFAULT_BLOCK_PROPS[BLOCK_TYPES.TITLE] } },
   { id: 'customer_1', type: BLOCK_TYPES.CUSTOMER_INFO, props: { ...DEFAULT_BLOCK_PROPS[BLOCK_TYPES.CUSTOMER_INFO], columns: 2 } },
   { id: 'table_1', type: BLOCK_TYPES.PRODUCT_TABLE, props: { ...DEFAULT_BLOCK_PROPS[BLOCK_TYPES.PRODUCT_TABLE] } },
+  { id: 'service_1', type: BLOCK_TYPES.SERVICE_TABLE, props: { ...DEFAULT_BLOCK_PROPS[BLOCK_TYPES.SERVICE_TABLE] } },
   { id: 'summary_1', type: BLOCK_TYPES.TOTALS, props: { ...DEFAULT_BLOCK_PROPS[BLOCK_TYPES.TOTALS] } },
   { id: 'payment_1', type: BLOCK_TYPES.PAYMENT_PROGRESS, props: { ...DEFAULT_BLOCK_PROPS[BLOCK_TYPES.PAYMENT_PROGRESS] } },
   { id: 'terms_1', type: BLOCK_TYPES.TERMS, props: { ...DEFAULT_BLOCK_PROPS[BLOCK_TYPES.TERMS] } },

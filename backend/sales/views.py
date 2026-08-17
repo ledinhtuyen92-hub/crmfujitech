@@ -430,23 +430,51 @@ class QuotationTemplateViewSet(viewsets.ModelViewSet):
     serializer_class = QuotationTemplateSerializer
 
     def get_permissions(self):
-        if self.action in ["list", "retrieve", "active_templates", "my_company_template"]:
-            return [permissions.IsAuthenticated()]
-        from users.permissions import IsSuperAdmin
-        return [permissions.IsAuthenticated(), IsSuperAdmin()]
+        return [permissions.IsAuthenticated()]
 
     def get_queryset(self):
         qs = super().get_queryset()
         user = self.request.user
         if not user.is_superuser:
-            qs = qs.filter(is_active=True)
+            from django.db import models
+            if hasattr(user, 'company') and user.company:
+                qs = qs.filter(models.Q(is_system_template=True) | models.Q(company=user.company)).filter(is_active=True)
+            else:
+                qs = qs.filter(is_system_template=True, is_active=True)
         return qs
+
+    def perform_create(self, serializer):
+        user = self.request.user
+        if user.is_superuser:
+            serializer.save()
+        else:
+            serializer.save(company=user.company, is_system_template=False, is_default=False)
 
     @action(detail=False, methods=["get"], url_path="active")
     def active_templates(self, request):
-        qs = QuotationTemplate.objects.filter(is_active=True).order_by("-is_default", "name")
+        qs = self.get_queryset()
         serializer = self.get_serializer(qs, many=True)
         return Response(serializer.data)
+
+    @action(detail=True, methods=["post"], url_path="clone")
+    def clone(self, request, pk=None):
+        import uuid
+        original = self.get_object()
+        user = request.user
+        
+        if not hasattr(user, 'company') or not user.company:
+            return Response({"detail": "Bạn phải thuộc một công ty để tạo bản sao."}, status=status.HTTP_400_BAD_REQUEST)
+            
+        original.pk = None
+        original.name = f"{original.name} (Bản sao)"
+        original.code = f"{original.code}-{uuid.uuid4().hex[:6]}"
+        original.is_system_template = False
+        original.company = user.company
+        original.is_default = False
+        original.save()
+        
+        serializer = self.get_serializer(original)
+        return Response(serializer.data, status=status.HTTP_201_CREATED)
 
     @action(detail=False, methods=["get"], url_path="my-company-template")
     def my_company_template(self, request):
@@ -455,9 +483,11 @@ class QuotationTemplateViewSet(viewsets.ModelViewSet):
         if company and company.quotation_template and company.quotation_template.is_active:
             template = company.quotation_template
         if not template:
-            template = QuotationTemplate.objects.filter(is_default=True, is_active=True).first()
+            template = QuotationTemplate.objects.filter(company=company, is_active=True).first()
         if not template:
-            template = QuotationTemplate.objects.filter(is_active=True).first()
+            template = QuotationTemplate.objects.filter(is_default=True, is_active=True, is_system_template=True).first()
+        if not template:
+            template = QuotationTemplate.objects.filter(is_active=True, is_system_template=True).first()
         if not template:
             return Response({"detail": "Chưa có mẫu báo giá nào."}, status=status.HTTP_404_NOT_FOUND)
         serializer = self.get_serializer(template)

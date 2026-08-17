@@ -6,15 +6,18 @@ import {
 } from 'antd'
 import {
   PlusOutlined, EditOutlined, DeleteOutlined,
-  EyeOutlined, LayoutOutlined, FormatPainterOutlined
+  EyeOutlined, LayoutOutlined, FormatPainterOutlined, CopyOutlined
 } from '@ant-design/icons'
 import api from '../../utils/api'
 import QuotationRenderer from '../../components/QuotationRenderer'
+import { useAuth } from '../../contexts/AuthContext'
 
 const { Title, Text } = Typography
 
 export default function QuotationTemplateManagement() {
   const navigate = useNavigate()
+  const { user, isSuperAdmin } = useAuth()
+  const isSystemPlatformAdmin = isSuperAdmin && !user?.company_id;
   const { token } = theme.useToken()
   const [messageApi, contextHolder] = message.useMessage()
   const [loading, setLoading] = useState(false)
@@ -94,6 +97,18 @@ export default function QuotationTemplateManagement() {
     }
   }
 
+  const handleClone = async (id) => {
+    try {
+      setLoading(true)
+      const res = await api.post(`sales/quotation-templates/${id}/clone/`)
+      messageApi.success('Đã nhân bản mẫu thành công!')
+      navigate(`/admin/quotation-templates/${res.data.id}/builder`)
+    } catch (err) {
+      messageApi.error('Lỗi khi tạo bản sao.')
+      setLoading(false)
+    }
+  }
+
   const handlePreview = (record) => {
     setPreviewTemplate(record)
     setPreviewVisible(true)
@@ -118,7 +133,12 @@ export default function QuotationTemplateManagement() {
         <Space direction="vertical" size={4} style={{ display: 'flex' }}>
           <Text strong style={{ wordBreak: 'break-word', display: 'block' }}>{name}</Text>
           <Space wrap size={[4, 4]}>
-            {record.is_default && <Tag color="blue" style={{ margin: 0 }}>Mặc định hệ thống</Tag>}
+            {record.is_system_template ? (
+              <Tag color="volcano" style={{ margin: 0 }}>Mẫu Hệ Thống</Tag>
+            ) : (
+              <Tag color="cyan" style={{ margin: 0 }}>Mẫu Của Bạn</Tag>
+            )}
+            {record.is_default && <Tag color="blue" style={{ margin: 0 }}>Mặc định</Tag>}
             {!record.is_active && <Tag color="default" style={{ margin: 0 }}>Đã ẩn</Tag>}
           </Space>
         </Space>
@@ -149,25 +169,33 @@ export default function QuotationTemplateManagement() {
     {
       title: 'Thao tác',
       key: 'actions',
-      width: 300,
+      width: 320,
       align: 'right',
       render: (_, record) => (
         <Space>
           <Button size="small" icon={<EyeOutlined />} onClick={() => handlePreview(record)}>
             Xem
           </Button>
-          <Button 
-            size="small" 
-            type="primary" 
-            style={{ background: '#722ed1' }} 
-            icon={<FormatPainterOutlined />} 
-            onClick={() => navigate(`/admin/quotation-templates/${record.id}/builder`)}
-          >
-            Thiết kế
-          </Button>
-          <Popconfirm title="Xóa mẫu này?" onConfirm={() => handleDelete(record.id)} okText="Xóa" cancelText="Hủy">
-            <Button size="small" danger icon={<DeleteOutlined />} />
-          </Popconfirm>
+          {record.is_system_template && !isSystemPlatformAdmin ? (
+            <Button size="small" type="primary" ghost icon={<CopyOutlined />} onClick={() => handleClone(record.id)}>
+              Tạo bản sao
+            </Button>
+          ) : (
+            <>
+              <Button 
+                size="small" 
+                type="primary" 
+                style={{ background: '#722ed1' }} 
+                icon={<FormatPainterOutlined />} 
+                onClick={() => navigate(`/admin/quotation-templates/${record.id}/builder`)}
+              >
+                Thiết kế
+              </Button>
+              <Popconfirm title="Xóa mẫu này?" onConfirm={() => handleDelete(record.id)} okText="Xóa" cancelText="Hủy">
+                <Button size="small" danger icon={<DeleteOutlined />} />
+              </Popconfirm>
+            </>
+          )}
         </Space>
       ),
     },

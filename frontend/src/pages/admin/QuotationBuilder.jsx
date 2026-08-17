@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { Layout, Button, message, Space, Typography, Divider, Tabs, Form, Input, Select, Row, Col } from 'antd';
+import { Layout, Button, message, Space, Typography, Divider, Tabs, Form, Input, Select, Row, Col, Splitter } from 'antd';
 import { SaveOutlined, ArrowLeftOutlined } from '@ant-design/icons';
 import { DndContext, closestCenter, DragOverlay, useSensor, useSensors, PointerSensor, KeyboardSensor, useDroppable } from '@dnd-kit/core';
 import { SortableContext, verticalListSortingStrategy, arrayMove, sortableKeyboardCoordinates } from '@dnd-kit/sortable';
@@ -20,6 +20,8 @@ function DroppableCanvas({ blocks, selectedBlockId, setSelectedBlockId, handleDe
     id: 'canvas',
   });
 
+  const rootBlocks = blocks.filter(b => !b.parentId || b.parentId === 'canvas');
+
   return (
     <div 
       ref={setNodeRef}
@@ -35,16 +37,17 @@ function DroppableCanvas({ blocks, selectedBlockId, setSelectedBlockId, handleDe
         margin: '0 auto'
       }}
     >
-      <SortableContext items={blocks.map(b => b.id)} strategy={verticalListSortingStrategy}>
-        {blocks.length === 0 ? (
+      <SortableContext items={rootBlocks.map(b => b.id)} strategy={verticalListSortingStrategy}>
+        {rootBlocks.length === 0 ? (
           <Text type="secondary" style={{ display: 'block', textAlign: 'center', marginTop: 100 }}>
             Kéo thả các thành phần từ cột trái vào đây
           </Text>
         ) : (
-          blocks.map((block) => (
+          rootBlocks.map((block) => (
             <BlockRenderer 
               key={block.id} 
               block={block} 
+              allBlocks={blocks}
               isActive={selectedBlockId === block.id} 
               onSelect={setSelectedBlockId} 
               onDelete={handleDeleteBlock}
@@ -91,6 +94,7 @@ export default function QuotationBuilder() {
           { id: 'title_1', type: BLOCK_TYPES.TITLE, props: { ...DEFAULT_BLOCK_PROPS[BLOCK_TYPES.TITLE], title: 'BẢNG BÁO GIÁ CHI TIẾT' } },
           { id: 'customer_1', type: BLOCK_TYPES.CUSTOMER_INFO, props: { ...DEFAULT_BLOCK_PROPS[BLOCK_TYPES.CUSTOMER_INFO], columns: 2 } },
           { id: 'table_1', type: BLOCK_TYPES.PRODUCT_TABLE, props: { ...DEFAULT_BLOCK_PROPS[BLOCK_TYPES.PRODUCT_TABLE] } },
+          { id: 'service_1', type: BLOCK_TYPES.SERVICE_TABLE, props: { ...DEFAULT_BLOCK_PROPS[BLOCK_TYPES.SERVICE_TABLE] } },
           { id: 'summary_1', type: BLOCK_TYPES.TOTALS, props: { ...DEFAULT_BLOCK_PROPS[BLOCK_TYPES.TOTALS] } },
           { id: 'terms_1', type: BLOCK_TYPES.TERMS, props: { ...DEFAULT_BLOCK_PROPS[BLOCK_TYPES.TERMS], content: '1. Báo giá có hiệu lực trong vòng 15 ngày.\n2. Thanh toán: Tạm ứng 50% ngay sau khi xác nhận.' } },
           { id: 'signature_1', type: BLOCK_TYPES.SIGNATURES, props: { ...DEFAULT_BLOCK_PROPS[BLOCK_TYPES.SIGNATURES], columns: 2 } },
@@ -157,22 +161,100 @@ export default function QuotationBuilder() {
     setActiveDragId(event.active.id);
   };
 
+  const handleDragOver = (event) => {
+    const { active, over } = event;
+    if (!over) return;
+
+    const activeId = active.id;
+    const overId = over.id;
+
+    if (activeId === overId) return;
+
+    // Is the item new from the palette? We don't have it in state yet, handled in dragEnd
+    if (active.data.current?.isNew) return;
+
+    const activeBlock = blocks.find(b => b.id === activeId);
+    if (!activeBlock) return;
+
+    // Find what we are dragging over
+    const overBlock = blocks.find(b => b.id === overId);
+    
+    // Determine the target container ID
+    // If overId is a string ending in _col_*, or 'canvas', it's a droppable container
+    let overContainerId = 'canvas';
+    if (String(overId).includes('_col_')) {
+      overContainerId = overId;
+    } else if (overId === 'canvas') {
+      overContainerId = 'canvas';
+    } else if (overBlock) {
+      overContainerId = overBlock.parentId || 'canvas';
+    }
+
+    const activeContainerId = activeBlock.parentId || 'canvas';
+
+    if (activeContainerId !== overContainerId) {
+      setBlocks((prev) => {
+        const activeIndex = prev.findIndex(b => b.id === activeId);
+        const overIndex = prev.findIndex(b => b.id === overId);
+        
+        let newIndex;
+        if (String(overId).includes('_col_') || overId === 'canvas') {
+          newIndex = prev.length + 1;
+        } else {
+          const isBelowOverItem =
+            over &&
+            active.rect.current.translated &&
+            active.rect.current.translated.top >
+              over.rect.top + over.rect.height;
+          const modifier = isBelowOverItem ? 1 : 0;
+          newIndex = overIndex >= 0 ? overIndex + modifier : prev.length + 1;
+        }
+
+        const newBlocks = [...prev];
+        newBlocks[activeIndex] = { 
+          ...newBlocks[activeIndex], 
+          parentId: overContainerId === 'canvas' ? undefined : overContainerId 
+        };
+        
+        return arrayMove(newBlocks, activeIndex, newIndex);
+      });
+    }
+  };
+
   const handleDragEnd = (event) => {
     const { active, over } = event;
     setActiveDragId(null);
     if (!over) return;
+    
     const activeId = active.id;
     const overId = over.id;
     
     // Handle DROPPING new block from palette
     if (active.data.current?.isNew) {
+      let overContainerId = 'canvas';
+      if (String(overId).includes('_col_')) {
+        overContainerId = overId;
+      } else if (overId === 'canvas') {
+        overContainerId = 'canvas';
+      } else {
+        const overBlock = blocks.find(b => b.id === overId);
+        overContainerId = overBlock ? (overBlock.parentId || 'canvas') : 'canvas';
+      }
+
+      // Prevent nesting layout blocks
+      if (active.data.current.type === BLOCK_TYPES.LAYOUT_ROW && overContainerId !== 'canvas') {
+        message.warning('Không thể đặt Khối Layout bên trong một Khối Layout khác');
+        return;
+      }
+
       const newBlock = {
         id: `block_${Date.now()}`,
         type: active.data.current.type,
-        props: active.data.current.props || DEFAULT_BLOCK_PROPS[active.data.current.type] || {}
+        props: active.data.current.savedProps || active.data.current.props || DEFAULT_BLOCK_PROPS[active.data.current.type] || {},
+        parentId: overContainerId === 'canvas' ? undefined : overContainerId
       };
       
-      if (overId === 'canvas') {
+      if (String(overId).includes('_col_') || overId === 'canvas') {
         setBlocks([...blocks, newBlock]);
       } else {
         const overIndex = blocks.findIndex((b) => b.id === overId);
@@ -295,10 +377,6 @@ export default function QuotationBuilder() {
             <Form.Item name="description" label="Mô tả mẫu">
               <Input.TextArea rows={2} placeholder="Nhập mô tả..." />
             </Form.Item>
-
-            <Form.Item name="footer_content" label="Điều khoản mặc định">
-              <Input.TextArea rows={3} placeholder="1. Báo giá có hiệu lực trong..." />
-            </Form.Item>
           </Form>
         </div>
       )
@@ -310,10 +388,11 @@ export default function QuotationBuilder() {
       sensors={sensors} 
       collisionDetection={closestCenter} 
       onDragStart={handleDragStart}
+      onDragOver={handleDragOver}
       onDragEnd={handleDragEnd}
     >
-      <Layout style={{ height: '100vh', overflow: 'hidden' }}>
-        <Header style={{ background: '#fff', borderBottom: '1px solid #f0f0f0', display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0 24px', height: 64 }}>
+      <Layout style={{ height: 'calc(100vh - 64px)', overflow: 'hidden' }}>
+        <Header style={{ background: '#fff', borderBottom: '1px solid #f0f0f0', display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0 24px', height: 64, flexShrink: 0 }}>
           <Space>
             <Button icon={<ArrowLeftOutlined />} onClick={() => navigate('/admin/quotation-templates')}>Quay lại</Button>
             <Title level={4} style={{ margin: 0 }}>Thiết kế mẫu: {template?.name}</Title>
@@ -321,46 +400,53 @@ export default function QuotationBuilder() {
           <Button type="primary" icon={<SaveOutlined />} onClick={handleSave}>Lưu thiết kế</Button>
         </Header>
         
-        <Layout style={{ height: 'calc(100vh - 64px)' }}>
+        <Splitter style={{ height: 'calc(100% - 64px)' }}>
           {/* Left Sidebar */}
-          <Sider width={320} theme="light" style={{ borderRight: '1px solid #f0f0f0', overflowY: 'auto' }}>
-            <Tabs defaultActiveKey="1" centered items={tabItems} style={{ height: '100%' }} />
-          </Sider>
+          <Splitter.Panel defaultSize={320} min={200} max="50%" collapsible>
+            <div style={{ height: '100%', background: '#fff', borderRight: '1px solid #f0f0f0', overflowY: 'auto' }}>
+              <Tabs defaultActiveKey="1" centered items={tabItems} style={{ height: '100%' }} />
+            </div>
+          </Splitter.Panel>
 
-          <Content style={{ background: '#f5f5f5', padding: '24px', overflow: 'auto' }} onClick={() => setSelectedBlockId(null)}>
-            <DroppableCanvas 
-              blocks={blocks} 
-              selectedBlockId={selectedBlockId} 
-              setSelectedBlockId={setSelectedBlockId} 
-              handleDeleteBlock={handleDeleteBlock} 
-              paperOrientation={paperOrientation} 
-              themeColor={themeColor}
-              tableStyle={tableStyle}
-              layoutStyle={layoutStyle}
-            />
-          </Content>
+          {/* Center Content */}
+          <Splitter.Panel>
+            <div style={{ height: '100%', background: '#f5f5f5', padding: '24px', overflow: 'auto' }} onClick={() => setSelectedBlockId(null)}>
+              <DroppableCanvas 
+                blocks={blocks} 
+                selectedBlockId={selectedBlockId} 
+                setSelectedBlockId={setSelectedBlockId} 
+                handleDeleteBlock={handleDeleteBlock} 
+                paperOrientation={paperOrientation} 
+                themeColor={themeColor}
+                tableStyle={tableStyle}
+                layoutStyle={layoutStyle}
+              />
+            </div>
+          </Splitter.Panel>
 
           {/* Right Sidebar */}
-          <Sider width={320} theme="light" style={{ borderLeft: '1px solid #f0f0f0', padding: 16, overflowY: 'auto' }}>
-            <Title level={5}>Tùy chỉnh (Settings)</Title>
-            {!selectedBlockId ? (
-              <Text type="secondary">Chọn một khối trên giấy để tùy chỉnh</Text>
-            ) : (
-              <div>
-                <Text strong>Khối: {blocks.find(b => b.id === selectedBlockId)?.type}</Text>
-                <Divider style={{ margin: '12px 0' }} />
-                <SettingsPanel 
-                  block={blocks.find(b => b.id === selectedBlockId)} 
-                  onChange={handleBlockChange} 
-                />
-                <Divider style={{ margin: '12px 0' }} />
-                <Button type="dashed" block onClick={handleSaveBlockTemplate}>
-                  ⭐ Lưu thành Block mẫu
-                </Button>
-              </div>
-            )}
-          </Sider>
-        </Layout>
+          <Splitter.Panel defaultSize={320} min={250} max="50%" collapsible>
+            <div style={{ height: '100%', background: '#fff', borderLeft: '1px solid #f0f0f0', padding: 16, overflowY: 'auto' }}>
+              <Title level={5}>Tùy chỉnh (Settings)</Title>
+              {!selectedBlockId ? (
+                <Text type="secondary">Chọn một khối trên giấy để tùy chỉnh</Text>
+              ) : (
+                <div>
+                  <Text strong>Khối: {blocks.find(b => b.id === selectedBlockId)?.type}</Text>
+                  <Divider style={{ margin: '12px 0' }} />
+                  <SettingsPanel 
+                    block={blocks.find(b => b.id === selectedBlockId)} 
+                    onChange={handleBlockChange} 
+                  />
+                  <Divider style={{ margin: '12px 0' }} />
+                  <Button type="dashed" block onClick={handleSaveBlockTemplate}>
+                    ⭐ Lưu thành Block mẫu
+                  </Button>
+                </div>
+              )}
+            </div>
+          </Splitter.Panel>
+        </Splitter>
       </Layout>
       <DragOverlay>
         {activeDragId ? (
