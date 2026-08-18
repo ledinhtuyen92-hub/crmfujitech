@@ -49,8 +49,12 @@ function docSo(so) {
 const { Text } = Typography;
 
 const computeLineTotal = (item) => {
-  const qty = Number(item.quantity || 1)
-  const price = Number(item.unit_price || 0)
+  if (item.quantity === null || item.quantity === '' || item.quantity === undefined ||
+      item.unit_price === null || item.unit_price === '' || item.unit_price === undefined) {
+    return null;
+  }
+  const qty = Number(item.quantity)
+  const price = Number(item.unit_price)
   const discount = Number(item.discount_percent || 0)
   
   const unit = (item.unit || item.custom_data?.unit || '').toLowerCase();
@@ -67,29 +71,50 @@ const computeLineTotal = (item) => {
 const computeRowSpan = (data, index, field = 'product') => {
   if (!data || !data[index]) return 1
   if (data[index].item_type === 'service') return 1
-  const currentVal = data[index]?.[field]
-  if (!currentVal) return 1
-  if (index > 0 && data[index - 1]?.[field] === currentVal && data[index - 1].item_type !== 'service') {
-    return 0
+  
+  const currentItem = data[index];
+  const matches = (item1, item2) => {
+    if (item1.item_type === 'service' || item2.item_type === 'service') return false;
+    if (field === 'product') {
+      if (item1.product && item2.product) return item1.product === item2.product;
+      if (!item1.product && !item2.product) return item1.product_name === item2.product_name && !!item1.product_name;
+      return false;
+    }
+    return item1[field] === item2[field];
+  };
+
+  if (index > 0 && matches(data[index - 1], currentItem)) {
+    return 0;
   }
-  let count = 1
+  let count = 1;
   for (let i = index + 1; i < data.length; i++) {
-    if (data[i]?.[field] === currentVal) {
-      count++
+    if (matches(data[i], currentItem)) {
+      count++;
     } else {
-      break
+      break;
     }
   }
-  return count
+  return count;
 };
 
 const computeProductSTT = (data, index, field = 'product') => {
   if (!data) return 0
   let count = 0
+  const matches = (item1, item2) => {
+    if (!item1 || !item2) return false;
+    if (item1.item_type === 'service' || item2.item_type === 'service') return false;
+    if (field === 'product') {
+      if (item1.product && item2.product) return item1.product === item2.product;
+      if (!item1.product && !item2.product) return item1.product_name === item2.product_name && !!item1.product_name;
+      return false;
+    }
+    return item1[field] === item2[field];
+  };
+
   for (let i = 0; i <= index; i++) {
     if (data[i].item_type === 'service') {
       count++
-    } else if (i === 0 || data[i]?.[field] !== data[i - 1]?.[field] || data[i - 1]?.item_type === 'service') {
+    } else if (i === 0 || !matches(data[i], data[i - 1])) {
       count++
     }
   }
@@ -261,6 +286,8 @@ export default function QuotationRenderer({ layoutConfig, layoutStyle, data }) {
         const isLandscape = layoutConfig?.paper_orientation === 'landscape';
         const tableTitle = block.props.tableTitle;
         const enableProductImage = block.props.enableProductImage !== false;
+        const enableProductName = block.props.enableProductName !== false;
+        const enableProductDescription = block.props.enableProductDescription !== false;
         const enableNoteImage = block.props.enableNoteImage !== false;
         const useComplexDimensions = block.props.useComplexDimensions !== false;
         const dimCol = block.props.columns?.find(c => (typeof c === 'object' ? c.id : c) === 'dimensions');
@@ -345,12 +372,12 @@ export default function QuotationRenderer({ layoutConfig, layoutStyle, data }) {
                             ? block.props.columns.some(c => c.id === 'specs')
                             : block.props.columns?.includes('specs');
                             
-                          if (colId === 'stt') return rowSpan > 0 ? <td key="stt" rowSpan={rowSpan} style={{ ...tdStyle, textAlign: 'center', fontWeight: 600, color: clr, verticalAlign: 'top' }}>{sttNum}</td> : null;
+                          if (colId === 'stt') return rowSpan > 0 ? <td key="stt" rowSpan={rowSpan} style={{ ...tdStyle, textAlign: 'center', fontWeight: 600, color: clr, verticalAlign: 'middle' }}>{sttNum}</td> : null;
                           if (colId === 'name') return rowSpan > 0 ? (
-                            <td key="name" rowSpan={rowSpan} style={{...tdStyle, verticalAlign: 'top'}}>
-                              <strong style={{ color: '#1e293b' }}>{item.product_name || item.name}</strong>
-                              {!showSpecs && (item.description || item.spec) && <div style={{ fontSize: 11, color: '#64748b', fontStyle: 'italic', whiteSpace: 'pre-wrap', marginTop: 2 }}>{item.description || item.spec}</div>}
-                              {enableProductImage && item.product_image && <div style={{marginTop: 4}}><img src={item.product_image} alt="" style={{ maxWidth: 80, maxHeight: 80, borderRadius: 4, objectFit: 'contain' }} /></div>}
+                            <td key="name" rowSpan={rowSpan} style={{...tdStyle, verticalAlign: 'middle', textAlign: 'left'}}>
+                              {enableProductImage && item.product_image && <div style={{marginBottom: 4, display: 'flex', justifyContent: 'center'}}><img src={item.product_image} alt="" style={{ maxWidth: '100%', maxHeight: 160, borderRadius: 4, objectFit: 'contain' }} /></div>}
+                              {enableProductName && <strong style={{ color: '#1e293b', display: 'block' }}>{item.product_name || item.name}</strong>}
+                              {enableProductDescription && !showSpecs && (item.description || item.spec) && <div style={{ fontSize: 11, color: '#64748b', fontStyle: 'italic', whiteSpace: 'pre-wrap', marginTop: 4, textAlign: 'left', display: 'inline-block', maxWidth: '100%' }}>{item.description || item.spec}</div>}
                             </td>
                           ) : null;
                           if (colId === 'symbol') return (
@@ -369,9 +396,9 @@ export default function QuotationRenderer({ layoutConfig, layoutStyle, data }) {
                                 <div style={{ height: '100%', padding: '4px 6px', display: 'flex', alignItems: 'center', whiteSpace: 'pre-wrap', textAlign: useComplexDimensions ? 'left' : 'center', justifyContent: useComplexDimensions ? 'flex-start' : 'center' }}>
                                   {item.custom_data?.custom_size_text || (() => {
                                       const parts = [];
-                                      if (item.height) parts.push(item.height);
-                                      if (item.width) parts.push(item.width);
-                                      if (item.thickness) parts.push(item.thickness);
+                                      if (Number(item.height) > 0) parts.push(item.height);
+                                      if (Number(item.width) > 0) parts.push(item.width);
+                                      if (Number(item.thickness) > 0) parts.push(item.thickness);
                                       return parts.join(' x ');
                                   })()}
                                 </div>
@@ -379,7 +406,7 @@ export default function QuotationRenderer({ layoutConfig, layoutStyle, data }) {
                                 <div style={{ display: 'flex', height: '100%' }}>
                                   {dimensionFields.map((field, idx) => (
                                     <div key={field.id} style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', borderRight: idx < dimensionFields.length - 1 ? '1px dashed #e2e8f0' : 'none', padding: '4px 6px', textAlign: 'center' }}>
-                                      {getDimVal(item, field) || ''}
+                                      {Number(getDimVal(item, field)) === 0 ? '' : getDimVal(item, field)}
                                     </div>
                                   ))}
                                 </div>
@@ -413,7 +440,9 @@ export default function QuotationRenderer({ layoutConfig, layoutStyle, data }) {
                           );
                           if (colId === 'total') return (
                             <td key="total" style={{ ...tdStyle, textAlign: 'right' }}>
-                              <strong style={{ color: item.item_type === 'accessory' ? '#64748b' : clr }}>{lineTotal.toLocaleString()} đ</strong>
+                              <strong style={{ color: item.item_type === 'accessory' ? '#64748b' : clr }}>
+                                {lineTotal !== null ? `${lineTotal.toLocaleString()} đ` : ''}
+                              </strong>
                             </td>
                           );
                           

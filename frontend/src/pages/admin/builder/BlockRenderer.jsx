@@ -164,6 +164,8 @@ export default function BlockRenderer({ block, allBlocks, isActive, onSelect, on
         const isService = block.type === BLOCK_TYPES.SERVICE_TABLE;
         const tableTitle = block.props.tableTitle;
         const enableProductImage = block.props.enableProductImage !== false;
+        const enableProductName = block.props.enableProductName !== false;
+        const enableProductDescription = block.props.enableProductDescription !== false;
         const enableNoteImage = block.props.enableNoteImage !== false;
         const useComplexDimensions = block.props.useComplexDimensions !== false;
         const dimCol = block.props.columns?.find(c => (typeof c === 'object' ? c.id : c) === 'dimensions');
@@ -243,9 +245,9 @@ export default function BlockRenderer({ block, allBlocks, isActive, onSelect, on
                             <div style={{ width: 40, height: 40, flexShrink: 0, background: '#e2e8f0', borderRadius: 4, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#94a3b8', fontSize: 10 }}>Ảnh</div>
                           )}
                           <div>
-                            <strong style={{ color: '#1e293b' }}>{isService ? 'Dịch vụ demo' : 'Sản phẩm demo A'}</strong>
-                            {!showSpecs && <br/>}
-                            {!showSpecs && <span style={{ color: '#64748b', fontSize: 11 }}>Mô tả sản phẩm demo</span>}
+                            {enableProductName && <strong style={{ color: '#1e293b' }}>{isService ? 'Dịch vụ demo' : 'Sản phẩm demo A'}</strong>}
+                            {enableProductName && enableProductDescription && !showSpecs && <br/>}
+                            {enableProductDescription && !showSpecs && <span style={{ color: '#64748b', fontSize: 11 }}>Mô tả sản phẩm demo</span>}
                           </div>
                         </div>
                       </td>

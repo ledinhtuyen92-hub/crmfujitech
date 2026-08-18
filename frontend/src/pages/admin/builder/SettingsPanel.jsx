@@ -320,9 +320,17 @@ export default function SettingsPanel({ block, onChange }) {
             
             <Divider style={{ margin: '12px 0' }} />
             <div style={{ fontWeight: 600, color: '#334155', marginBottom: 8, paddingBottom: 4, borderBottom: '1px solid #e2e8f0' }}>Cài đặt tính năng nâng cao</div>
-            <Form.Item name="enableProductImage" label="Cho phép tải & hiển thị ảnh Mẫu cửa/Sản phẩm" valuePropName="checked" initialValue={true} tooltip="Nếu bật, sẽ có nút chụp ảnh trong bảng và hiện ảnh thu nhỏ">
+            <Form.Item name="enableProductImage" label="Hiển thị ảnh Mẫu cửa/Sản phẩm" valuePropName="checked" initialValue={true}>
               <Switch />
             </Form.Item>
+            <Form.Item name="enableProductName" label="Hiển thị Tiêu đề sản phẩm" valuePropName="checked" initialValue={true}>
+              <Switch />
+            </Form.Item>
+            {block.type === BLOCK_TYPES.PRODUCT_TABLE && (
+              <Form.Item name="enableProductDescription" label="Hiển thị Mô tả sản phẩm" valuePropName="checked" initialValue={true}>
+                <Switch />
+              </Form.Item>
+            )}
             <Form.Item name="enableNoteImage" label="Cho phép tải & hiển thị ảnh Ghi chú" valuePropName="checked" initialValue={true}>
               <Switch />
             </Form.Item>

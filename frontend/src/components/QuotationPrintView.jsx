@@ -68,7 +68,7 @@ export default function QuotationPrintView({ quotation, type = 'quotation', effe
   const quotationData = {
     ...quotation,
     // Items (sản phẩm)
-    items: quotation.items || [],
+    items: (quotation.items || []).sort((a, b) => a.id - b.id),
     // Totals
     totals: {
       subtotal: Number(quotation.subtotal || quotation.sub_total || 0),

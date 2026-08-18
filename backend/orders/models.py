@@ -420,6 +420,7 @@ class OrderItem(models.Model):
     )
 
     class Meta:
+        ordering = ['id']
         verbose_name = "Dòng đơn hàng"
         verbose_name_plural = "Dòng đơn hàng"
         constraints = [
