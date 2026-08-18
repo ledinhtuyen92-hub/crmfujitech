@@ -1,6 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { Typography, Card, Space, Tabs, message, Button, Popconfirm } from 'antd';
-import { DeleteOutlined } from '@ant-design/icons';
+import { 
+  DeleteOutlined, IdcardOutlined, FormOutlined, UserOutlined, TableOutlined, 
+  ToolOutlined, CalculatorOutlined, LineChartOutlined, ProfileOutlined, 
+  HighlightOutlined, AlignLeftOutlined, PictureOutlined, MinusOutlined, 
+  AppstoreAddOutlined, StarOutlined
+} from '@ant-design/icons';
 import { useDraggable } from '@dnd-kit/core';
 import { BLOCK_TYPES } from './constants';
 import api from '../../../utils/api';
@@ -8,19 +13,19 @@ import api from '../../../utils/api';
 const { Title, Text } = Typography;
 
 const PALETTE_ITEMS = [
-  { type: BLOCK_TYPES.HEADER_LOGO, title: '🏷️ Khối Header & Logo' },
-  { type: BLOCK_TYPES.TITLE, title: '📜 Khối Tiêu đề & Lời chào' },
-  { type: BLOCK_TYPES.CUSTOMER_INFO, title: '👤 Khối Thông tin Khách hàng' },
-  { type: BLOCK_TYPES.PRODUCT_TABLE, title: '📊 Khối Bảng Sản phẩm' },
-  { type: BLOCK_TYPES.SERVICE_TABLE, title: '🛠️ Khối Dịch vụ & Phát sinh' },
-  { type: BLOCK_TYPES.TOTALS, title: '💰 Khối Tổng kết Thanh toán' },
-  { type: BLOCK_TYPES.PAYMENT_PROGRESS, title: '📈 Khối Tiến độ thanh toán' },
-  { type: BLOCK_TYPES.TERMS, title: '📝 Khối Ghi chú & Điều khoản' },
-  { type: BLOCK_TYPES.SIGNATURES, title: '✍️ Khối Chữ ký Xác nhận' },
-  { type: BLOCK_TYPES.TEXT, title: '📄 Khối Văn bản tự do' },
-  { type: BLOCK_TYPES.IMAGE, title: '🖼️ Khối Hình ảnh' },
-  { type: BLOCK_TYPES.DIVIDER, title: '〰️ Phân cách / Khoảng trống' },
-  { type: BLOCK_TYPES.LAYOUT_ROW, title: '⊞ Khối Layout (Cột)' }
+  { type: BLOCK_TYPES.HEADER_LOGO, title: 'Khối Header & Logo', icon: <IdcardOutlined style={{ color: '#1677ff' }} /> },
+  { type: BLOCK_TYPES.TITLE, title: 'Khối Tiêu đề & Lời chào', icon: <FormOutlined style={{ color: '#1677ff' }} /> },
+  { type: BLOCK_TYPES.CUSTOMER_INFO, title: 'Khối Thông tin Khách hàng', icon: <UserOutlined style={{ color: '#1677ff' }} /> },
+  { type: BLOCK_TYPES.PRODUCT_TABLE, title: 'Khối Bảng Sản phẩm', icon: <TableOutlined style={{ color: '#1677ff' }} /> },
+  { type: BLOCK_TYPES.SERVICE_TABLE, title: 'Khối Dịch vụ & Phát sinh', icon: <ToolOutlined style={{ color: '#1677ff' }} /> },
+  { type: BLOCK_TYPES.TOTALS, title: 'Khối Tổng kết Thanh toán', icon: <CalculatorOutlined style={{ color: '#1677ff' }} /> },
+  { type: BLOCK_TYPES.PAYMENT_PROGRESS, title: 'Khối Tiến độ thanh toán', icon: <LineChartOutlined style={{ color: '#1677ff' }} /> },
+  { type: BLOCK_TYPES.TERMS, title: 'Khối Ghi chú & Điều khoản', icon: <ProfileOutlined style={{ color: '#1677ff' }} /> },
+  { type: BLOCK_TYPES.SIGNATURES, title: 'Khối Chữ ký Xác nhận', icon: <HighlightOutlined style={{ color: '#1677ff' }} /> },
+  { type: BLOCK_TYPES.TEXT, title: 'Khối Văn bản tự do', icon: <AlignLeftOutlined style={{ color: '#1677ff' }} /> },
+  { type: BLOCK_TYPES.IMAGE, title: 'Khối Hình ảnh', icon: <PictureOutlined style={{ color: '#1677ff' }} /> },
+  { type: BLOCK_TYPES.DIVIDER, title: 'Phân cách / Khoảng trống', icon: <MinusOutlined style={{ color: '#1677ff' }} /> },
+  { type: BLOCK_TYPES.LAYOUT_ROW, title: 'Khối Layout (Cột)', icon: <AppstoreAddOutlined style={{ color: '#1677ff' }} /> }
 ];
 
 function DraggablePaletteItem({ item, isSaved = false }) {
@@ -47,7 +52,10 @@ function DraggablePaletteItem({ item, isSaved = false }) {
         position: 'relative'
       }}
     >
-      <Text ellipsis style={{ maxWidth: isSaved ? '80%' : '100%' }}>{item.title}</Text>
+      <Space>
+        {item.icon}
+        <Text ellipsis style={{ maxWidth: isSaved ? '80%' : '100%' }}>{item.title}</Text>
+      </Space>
     </Card>
   );
 }
@@ -94,7 +102,13 @@ export default function SidebarPalette() {
         savedBlocks.map((block) => (
           <div key={block.id} style={{ position: 'relative' }}>
             <DraggablePaletteItem 
-              item={{ id: block.id, type: block.block_type, title: `⭐ ${block.name}`, props: block.props }} 
+              item={{ 
+                id: block.id, 
+                type: block.block_type, 
+                title: block.name, 
+                icon: <StarOutlined style={{ color: '#faad14' }} />, 
+                props: block.props 
+              }} 
               isSaved={true} 
             />
             <Popconfirm title="Xóa block này?" onConfirm={() => deleteSavedBlock(block.id)}>

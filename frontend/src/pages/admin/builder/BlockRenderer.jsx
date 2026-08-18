@@ -70,7 +70,7 @@ export default function BlockRenderer({ block, allBlocks, isActive, onSelect, on
     transform: CSS.Transform.toString(transform),
     transition,
     opacity: isDragging ? 0.4 : 1,
-    marginBottom: 16,
+    marginBottom: 12,
     position: 'relative',
     border: isActive ? '2px solid #1677ff' : '2px solid transparent',
     fontFamily: globalLayoutStyle === 'classic_border' ? '"Times New Roman", Times, serif' : (globalLayoutStyle === 'modern_navy' ? 'Inter, sans-serif' : 'Arial, sans-serif'),
@@ -120,13 +120,17 @@ export default function BlockRenderer({ block, allBlocks, isActive, onSelect, on
         );
       case BLOCK_TYPES.TITLE:
         return (
-          <div style={{ textAlign: 'center', margin: '18px 0' }}>
+          <div style={{ textAlign: 'center', margin: '4px 0 8px 0' }}>
             <div style={{ fontSize: 20, fontWeight: 700, color: clr, textTransform: 'uppercase', letterSpacing: '0.5px' }}>
               {block.props.title}
             </div>
-            {block.props.showDate && (
+            {(block.props.metaText !== undefined ? block.props.metaText : (block.props.showDate ? 'Số: {{quotation_code}} | Ngày: {{current_date}}' : '')) && (
               <div style={{ display: 'inline-block', background: '#eff6ff', padding: '2px 12px', borderRadius: 12, border: '1px solid #bfdbfe', fontSize: 12, color: '#1d4ed8', margin: '6px 0' }}>
-                Số: <strong>BG-001</strong> | Ngày: <strong>{new Date().toLocaleDateString('vi-VN')}</strong>
+                {(() => {
+                  let text = block.props.metaText !== undefined ? block.props.metaText : 'Số: {{quotation_code}} | Ngày: {{current_date}}';
+                  if (!text) return null;
+                  return <strong>{text}</strong>;
+                })()}
               </div>
             )}
             <div style={{ fontSize: 12.5, fontStyle: 'italic', color: '#475569', marginTop: 4 }}>
@@ -136,21 +140,21 @@ export default function BlockRenderer({ block, allBlocks, isActive, onSelect, on
         );
       case BLOCK_TYPES.CUSTOMER_INFO:
         return (
-          <Row gutter={16} style={{ marginBottom: 16 }}>
-            <Col xs={24} md={block.props.columns === 1 ? 24 : 12} style={{ marginBottom: block.props.columns === 1 ? 16 : 0 }}>
+          <Row gutter={16} style={{ marginBottom: 0 }}>
+            <Col xs={24} md={block.props.columns === 1 ? 24 : 12} style={{ marginBottom: block.props.columns === 1 ? 12 : 0 }}>
               <div style={{ padding: '10px 14px', background: block.props.sellerBackgroundColor || '#f8fafc', border: (block.props.showBorder ?? true) ? `1px solid ${block.props.borderColor || clr + '40'}` : 'none', borderRadius: 6, height: '100%' }}>
-                <div style={{ fontWeight: 700, color: clr, fontSize: 13, marginBottom: 4 }}>BÊN BÁN (BÊN B): {block.props.companyName || 'CÔNG TY CỦA BẠN'}</div>
-                <div style={{ fontSize: 12, color: '#334155' }}><strong>Đại diện:</strong> {block.props.representative || 'Nguyễn Anh Tuấn'} • <strong>Chức vụ:</strong> {block.props.position || 'Giám đốc'}</div>
-                <div style={{ fontSize: 12, color: '#334155' }}><strong>Mã số thuế:</strong> {block.props.taxCode || '0111100289'} • <strong>Điện thoại:</strong> {block.props.phone || '0961442882'}</div>
-                <div style={{ fontSize: 12, color: '#334155' }}><strong>Địa chỉ:</strong> {block.props.address || 'KĐT Xa La, Hà Đông, TP Hà Nội'}</div>
+                <div style={{ fontWeight: 700, color: clr, fontSize: 13, marginBottom: 4 }}>{block.props.sellerTitle || 'BÊN BÁN (BÊN B)'}: {block.props.companyName || '{{company_name}}'}</div>
+                <div style={{ fontSize: 12, color: '#334155' }}><strong>Đại diện:</strong> {block.props.representative || '{{director_name}}'} • <strong>Chức vụ:</strong> {block.props.position || '{{director_title}}'}</div>
+                <div style={{ fontSize: 12, color: '#334155' }}><strong>Mã số thuế:</strong> {block.props.taxCode || '{{company_tax_code}}'} • <strong>Điện thoại:</strong> {block.props.phone || '{{company_phone}}'}</div>
+                <div style={{ fontSize: 12, color: '#334155' }}><strong>Địa chỉ:</strong> {block.props.address || '{{company_address}}'}</div>
               </div>
             </Col>
             <Col xs={24} md={block.props.columns === 1 ? 24 : 12}>
               <div style={{ padding: '10px 14px', background: block.props.buyerBackgroundColor || '#fff', border: (block.props.showBorder ?? true) ? `1px solid ${block.props.borderColor || '#e2e8f0'}` : 'none', borderRadius: 6, height: '100%' }}>
-                <div style={{ fontWeight: 700, color: '#0f172a', fontSize: 13, marginBottom: 4 }}>BÊN MUA (BÊN A): CÔNG TY KHÁCH HÀNG</div>
-                <div style={{ fontSize: 12, color: '#334155' }}><strong>Khách hàng:</strong> Công ty ABC</div>
-                <div style={{ fontSize: 12, color: '#334155' }}><strong>Mã số thuế:</strong> 0109999999 • <strong>Điện thoại:</strong> 0912345678</div>
-                <div style={{ fontSize: 12, color: '#334155' }}><strong>Địa chỉ:</strong> Tòa nhà văn phòng XYZ</div>
+                <div style={{ fontWeight: 700, color: '#0f172a', fontSize: 13, marginBottom: 4 }}>{block.props.buyerTitle || 'BÊN MUA (BÊN A)'}: {block.props.buyerCompany || '{{customer_company}}'}</div>
+                <div style={{ fontSize: 12, color: '#334155' }}><strong>Khách hàng:</strong> {block.props.buyerName || '{{customer_name}}'}</div>
+                <div style={{ fontSize: 12, color: '#334155' }}><strong>Mã số thuế:</strong> {block.props.buyerTaxCode || '{{customer_tax_code}}'} • <strong>Điện thoại:</strong> {block.props.buyerPhone || '{{customer_phone}}'}</div>
+                <div style={{ fontSize: 12, color: '#334155' }}><strong>Địa chỉ:</strong> {block.props.buyerAddress || '{{customer_address}}'}</div>
               </div>
             </Col>
           </Row>
@@ -159,8 +163,16 @@ export default function BlockRenderer({ block, allBlocks, isActive, onSelect, on
       case BLOCK_TYPES.PRODUCT_TABLE:
         const isService = block.type === BLOCK_TYPES.SERVICE_TABLE;
         const tableTitle = block.props.tableTitle;
+        const enableProductImage = block.props.enableProductImage !== false;
+        const enableNoteImage = block.props.enableNoteImage !== false;
+        const useComplexDimensions = block.props.useComplexDimensions !== false;
+        const dimCol = block.props.columns?.find(c => (typeof c === 'object' ? c.id : c) === 'dimensions');
+        const dimensionFieldsRaw = dimCol?.children || [];
+        const dimensionFields = dimensionFieldsRaw.length > 0
+          ? dimensionFieldsRaw.map(c => ({ id: c.id, label: c.title, width: 85 }))
+          : [{ id: 'height', label: 'Cao', width: 85 }, { id: 'width', label: 'Rộng', width: 85 }, { id: 'thickness', label: 'Dày', width: 85 }];
         return (
-          <div style={{ marginBottom: 16 }}>
+          <div style={{ marginBottom: 0 }}>
             {tableTitle && <div style={{ fontWeight: 600, color: '#0f172a', fontSize: 13, marginBottom: 8 }}>{tableTitle}</div>}
             <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
               {block.props.showHeader !== false && (
@@ -174,13 +186,15 @@ export default function BlockRenderer({ block, allBlocks, isActive, onSelect, on
                     if (colId === 'symbol') return <th key="symbol" style={{...thStyle, width: 80}}>Ký hiệu</th>;
                     if (colId === 'specs') return <th key="specs" style={{...thStyle, width: 150, textAlign: 'left'}}>{isService ? 'Ghi chú kỹ thuật' : 'Quy cách kỹ thuật'}</th>;
                     if (colId === 'dimensions') return (
-                      <th key="dimensions" style={{...thStyle, padding: 0, width: 180}}>
-                        <div style={{ borderBottom: '1px solid #e2e8f0', padding: '4px 6px' }}>Kích thước (mm)</div>
-                        <div style={{ display: 'flex' }}>
-                          <div style={{ flex: 1, borderRight: '1px solid #e2e8f0', padding: '2px 6px' }}>Cao</div>
-                          <div style={{ flex: 1, borderRight: '1px solid #e2e8f0', padding: '2px 6px' }}>Rộng</div>
-                          <div style={{ flex: 1, padding: '2px 6px' }}>Dày</div>
-                        </div>
+                      <th key="dimensions" style={{...thStyle, padding: 0, width: dimensionFields.reduce((s, f) => s + (f.width || 85), 0)}}>
+                        <div style={{ borderBottom: useComplexDimensions ? '1px solid #e2e8f0' : 'none', padding: '4px 6px' }}>Kích thước (mm)</div>
+                        {useComplexDimensions && (
+                          <div style={{ display: 'flex' }}>
+                            {dimensionFields.map((f, fi) => (
+                              <div key={f.id} style={{ flex: 1, borderRight: fi < dimensionFields.length - 1 ? '1px solid #e2e8f0' : 'none', padding: '2px 6px' }}>{f.label}</div>
+                            ))}
+                          </div>
+                        )}
                       </th>
                     );
                     if (colId === 'note') return <th key="note" style={{...thStyle, width: 120, textAlign: 'left'}}>Ghi chú</th>;
@@ -224,23 +238,43 @@ export default function BlockRenderer({ block, allBlocks, isActive, onSelect, on
                     if (colId === 'stt') return <td key="stt" style={{ ...tdStyle, textAlign: 'center', fontWeight: 600, color: clr }}>1</td>;
                     if (colId === 'name') return (
                       <td key="name" style={tdStyle}>
-                        <strong style={{ color: '#1e293b' }}>{isService ? 'Dịch vụ demo' : 'Sản phẩm demo A'}</strong>
-                        {!showSpecs && <br/>}
-                        {!showSpecs && <span style={{ color: '#64748b', fontSize: 11 }}>Mô tả sản phẩm demo</span>}
+                        <div style={{ display: 'flex', gap: 8, alignItems: 'flex-start' }}>
+                          {enableProductImage && (
+                            <div style={{ width: 40, height: 40, flexShrink: 0, background: '#e2e8f0', borderRadius: 4, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#94a3b8', fontSize: 10 }}>Ảnh</div>
+                          )}
+                          <div>
+                            <strong style={{ color: '#1e293b' }}>{isService ? 'Dịch vụ demo' : 'Sản phẩm demo A'}</strong>
+                            {!showSpecs && <br/>}
+                            {!showSpecs && <span style={{ color: '#64748b', fontSize: 11 }}>Mô tả sản phẩm demo</span>}
+                          </div>
+                        </div>
                       </td>
                     );
                     if (colId === 'symbol') return <td key="symbol" style={{ ...tdStyle, textAlign: 'center', fontWeight: 600, color: '#2563eb' }}>{isService ? 'SV1' : 'D1'}</td>;
                     if (colId === 'specs') return <td key="specs" style={{ ...tdStyle, color: '#475569', fontSize: 11 }}>{isService ? 'Ghi chú dịch vụ demo' : 'Mô tả sản phẩm demo'}</td>;
                     if (colId === 'dimensions') return (
                       <td key="dimensions" style={{ ...tdStyle, padding: 0 }}>
-                        <div style={{ display: 'flex', height: '100%' }}>
-                          <div style={{ flex: 1, borderRight: '1px dashed #e2e8f0', padding: '4px 6px', textAlign: 'center' }}>2200</div>
-                          <div style={{ flex: 1, borderRight: '1px dashed #e2e8f0', padding: '4px 6px', textAlign: 'center' }}>900</div>
-                          <div style={{ flex: 1, padding: '4px 6px', textAlign: 'center' }}>45</div>
-                        </div>
+                        {!useComplexDimensions ? (
+                          <div style={{ padding: '4px 6px', textAlign: 'center' }}>2200 x 900 x 45</div>
+                        ) : (
+                          <div style={{ display: 'flex', height: '100%' }}>
+                            {dimensionFields.map((f, fi) => (
+                              <div key={f.id} style={{ flex: 1, borderRight: fi < dimensionFields.length - 1 ? '1px dashed #e2e8f0' : 'none', padding: '4px 6px', textAlign: 'center' }}>
+                                {f.id === 'height' ? '2200' : f.id === 'width' ? '900' : f.id === 'thickness' ? '45' : '—'}
+                              </div>
+                            ))}
+                          </div>
+                        )}
                       </td>
                     );
-                    if (colId === 'note') return <td key="note" style={{ ...tdStyle, color: '#475569', fontSize: 11 }}>Khung ngoại 45x110</td>;
+                    if (colId === 'note') return (
+                      <td key="note" style={{ ...tdStyle, color: '#475569', fontSize: 11, textAlign: 'center' }}>
+                        {enableNoteImage && (
+                          <div style={{ width: 40, height: 40, background: '#e2e8f0', borderRadius: 4, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', color: '#94a3b8', fontSize: 10, marginBottom: 4 }}>Ảnh</div>
+                        )}
+                        <div>Khung ngoại 45x110</div>
+                      </td>
+                    );
                     if (colId === 'unit') return <td key="unit" style={{ ...tdStyle, textAlign: 'center' }}>{isService ? 'Lần' : 'Bộ'}</td>;
                     if (colId === 'qty') return <td key="qty" style={{ ...tdStyle, textAlign: 'center' }}>{isService ? '1' : '2'}</td>;
                     if (colId === 'price') return <td key="price" style={{ ...tdStyle, textAlign: 'right' }}>{isService ? '500,000 đ' : '1,250,000 đ'}</td>;
@@ -275,7 +309,7 @@ export default function BlockRenderer({ block, allBlocks, isActive, onSelect, on
       case BLOCK_TYPES.TOTALS:
         const isNested = !!block.parentId && block.parentId !== 'canvas';
         return (
-          <Row justify={isNested ? "center" : "end"} style={{ marginBottom: 16 }}>
+          <Row justify={isNested ? "center" : "end"} style={{ marginBottom: 0 }}>
             <Col xs={24} md={isNested ? 24 : 11} style={{ textAlign: 'right', padding: '10px 14px', background: block.props.backgroundColor ?? '#f8fafc', borderRadius: 6, border: (block.props.showBorder ?? true) ? `1px solid ${clr}40` : 'none' }}>
               {block.props.showSubtotal && <div style={{ fontSize: 12, color: '#64748b' }}>Cộng tiền hàng: 2,500,000 đ</div>}
               {block.props.showDiscount && <div style={{ fontSize: 12, color: '#64748b' }}>Chiết khấu chung: -50,000 đ</div>}
@@ -292,7 +326,7 @@ export default function BlockRenderer({ block, allBlocks, isActive, onSelect, on
       case BLOCK_TYPES.PAYMENT_PROGRESS:
         const progressTitle = block.props.title || 'Tiến độ thanh toán:';
         return (
-          <div style={{ marginBottom: 16 }}>
+          <div style={{ marginBottom: 0 }}>
             <div style={{ fontWeight: 600, color: '#0f172a', fontSize: 13, marginBottom: 8, textDecoration: 'underline' }}>{progressTitle}</div>
             <ul style={{ paddingLeft: 20, marginBottom: 12, fontSize: 12, color: '#334155' }}>
               <li>Thanh toán đợt 1 (100%): <strong style={{ color: clr }}>2,750,000 đ</strong></li>
@@ -323,7 +357,7 @@ export default function BlockRenderer({ block, allBlocks, isActive, onSelect, on
         );
       case BLOCK_TYPES.TERMS:
         return (
-          <div style={{ marginBottom: 16 }}>
+          <div style={{ marginBottom: 0 }}>
             <div style={{ fontWeight: 600, color: '#0f172a', fontSize: 13, marginBottom: 6 }}>📝 Ghi chú & Điều khoản thanh toán:</div>
             <div style={{ background: '#f8fafc', padding: '10px 14px', borderRadius: 6, borderLeft: `4px solid ${clr}`, whiteSpace: 'pre-wrap', fontSize: 12, color: '#334155' }}>
               {block.props.content}
@@ -332,13 +366,17 @@ export default function BlockRenderer({ block, allBlocks, isActive, onSelect, on
         );
       case BLOCK_TYPES.SIGNATURES:
         return (
-          <Row justify="space-around" style={{ marginTop: 24, textAlign: 'center', paddingBottom: 16 }}>
+          <Row justify="space-around" style={{ marginTop: 12, textAlign: 'center', paddingBottom: 0 }}>
             {Array.from({ length: block.props.columns || 2 }).map((_, idx) => (
               <Col xs={24} md={24 / (block.props.columns || 2)} key={idx}>
                 <div style={{ fontWeight: 700, color: clr, fontSize: 13 }}>{block.props.titles?.[idx] || 'CHỮ KÝ'}</div>
                 <div style={{ fontSize: 11, color: '#64748b', fontStyle: 'italic', marginBottom: 12 }}>(Ký, đóng dấu & ghi rõ họ tên)</div>
                 <div style={{ height: 115, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                  {idx === 0 && block.props.columns > 1 ? (
+                  {block.props.signatures?.[idx] ? (
+                    <div style={{ padding: 8, border: '1px dashed #cbd5e1', borderRadius: 4, background: '#f8fafc', color: '#64748b', fontSize: 11, whiteSpace: 'pre-wrap', textAlign: 'center' }}>
+                      {block.props.signatures[idx]}
+                    </div>
+                  ) : idx === 0 && block.props.columns > 1 ? (
                     <div style={{ width: 100, height: 60, border: '1px dashed #cbd5e1', borderRadius: 4, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#94a3b8', fontSize: 11 }}>Chữ ký khách hàng</div>
                   ) : (
                     <div style={{ position: 'relative', width: 140, height: 100 }}>

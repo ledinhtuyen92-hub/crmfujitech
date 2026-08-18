@@ -36,6 +36,13 @@ class Quotation(models.Model):
         related_name="quotations",
         verbose_name="Khách hàng",
     )
+    # --- Snapshot fields ---
+    customer_name_snapshot = models.CharField(max_length=255, blank=True, verbose_name="Tên khách hàng (snapshot)")
+    customer_company_snapshot = models.CharField(max_length=255, blank=True, verbose_name="Tên công ty KH (snapshot)")
+    customer_tax_code_snapshot = models.CharField(max_length=50, blank=True, verbose_name="Mã số thuế KH (snapshot)")
+    customer_phone_snapshot = models.CharField(max_length=50, blank=True, verbose_name="SĐT KH (snapshot)")
+    customer_address_snapshot = models.TextField(blank=True, verbose_name="Địa chỉ KH (snapshot)")
+    customer_city_snapshot = models.CharField(max_length=100, blank=True, verbose_name="Thành phố KH (snapshot)")
     created_by = models.ForeignKey(
         "users.User",
         on_delete=models.SET_NULL,
@@ -195,6 +202,20 @@ class Quotation(models.Model):
 
     def __str__(self):
         return self.quotation_number
+
+    def save(self, *args, **kwargs):
+        # Auto snapshot customer data on creation or if it's missing (and we have a customer)
+        if self.customer:
+            # We snapshot if this is a new record (not pk) or if the snapshot fields are suspiciously empty.
+            if not self.pk or not self.customer_name_snapshot:
+                self.customer_name_snapshot = self.customer.name or ''
+                self.customer_company_snapshot = getattr(self.customer, 'company_name', '') or ''
+                self.customer_tax_code_snapshot = getattr(self.customer, 'tax_code', '') or ''
+                self.customer_phone_snapshot = getattr(self.customer, 'phone', '') or ''
+                self.customer_address_snapshot = getattr(self.customer, 'address', '') or ''
+                self.customer_city_snapshot = getattr(self.customer, 'city', '') or ''
+                
+        super().save(*args, **kwargs)
 
     def clone(self):
         """Tạo một bản sao của báo giá hiện tại (thường dùng khi tạo version mới)."""

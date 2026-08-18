@@ -176,11 +176,16 @@ export default function QuotationList() {
     if (isLandscape) {
       return Number((qty * price * (1 - discount / 100)).toFixed(0))
     }
-    const area = Number(item.area || 0)
-    if ((item.unit === 'm²' || item.custom_data?.unit === 'm²' || (area > 0 && item.width > 0 && item.height > 0)) && area > 0) {
-      return Number((area * qty * price * (1 - discount / 100)).toFixed(0))
+    const unit = (item.unit || item.custom_data?.unit || '').toLowerCase();
+    const isAreaUnit = unit === 'm²' || unit === 'm2' || unit === 'mét vuông';
+    const area = Number(item.area || 0);
+
+    if (isAreaUnit && area > 0) {
+      return Number((area * qty * price * (1 - discount / 100)).toFixed(0));
     }
-    return Number((qty * price * (1 - discount / 100)).toFixed(0))
+    
+    // Default: calculate by quantity
+    return Number((qty * price * (1 - discount / 100)).toFixed(0));
   }
 
   const computeServiceLineTotal = (item) => {
@@ -267,7 +272,7 @@ export default function QuotationList() {
     ])
   }
 
-  const handleAddSameProduct = (index) => {
+  const handleAddSameProduct = (index, isCustomSize = false) => {
     setFormItems((prev) => {
       const currentItem = prev[index]
       if (!currentItem) return prev
@@ -286,7 +291,12 @@ export default function QuotationList() {
         spec: currentItem.spec || '',
         note: '',
         symbol: '',
-        custom_data: { ...(currentItem.custom_data || {}), symbol: '' },
+        custom_data: { 
+          ...(currentItem.custom_data || {}), 
+          symbol: '', 
+          is_custom_size: isCustomSize, 
+          custom_size_text: '' 
+        },
         quantity: 1,
         discount_percent: currentItem.discount_percent || 0,
       }
@@ -323,9 +333,9 @@ export default function QuotationList() {
         const h = Number(field === 'height' ? value : currentItem.height || 0)
         const l = Number(field === 'length' ? value : currentItem.length || 0)
         if (w > 0 && h > 0) {
-          currentItem.area = Number((w * h).toFixed(2))
+          currentItem.area = Number(((w * h) / 1000000).toFixed(4))
         } else if (l > 0 && w > 0) {
-          currentItem.area = Number((l * w).toFixed(2))
+          currentItem.area = Number(((l * w) / 1000000).toFixed(4))
         }
       }
       if (field === 'symbol') {
@@ -1157,6 +1167,9 @@ export default function QuotationList() {
     const tmplCode = effectiveTmpl?.code || 'STANDARD'
     const isLandscape = tmplCode === 'production_landscape_a4' || effectiveTmpl?.layout_config?.paper_orientation === 'landscape'
 
+    const serviceBlock = effectiveTmpl?.layout_config?.blocks?.find(b => b.type === 'service_table');
+    const enableServiceImage = serviceBlock?.props?.enableProductImage !== false;
+
     let baseCols = [
       {
         title: 'STT',
@@ -1172,7 +1185,7 @@ export default function QuotationList() {
         width: 250,
         render: (text, record, index) => (
           <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'nowrap' }}>
-            {record.product_image && (
+            {enableServiceImage && record.product_image && (
               <Image width={32} height={32} style={{ borderRadius: 4, objectFit: 'cover' }} src={record.product_image} />
             )}
             <AutoComplete
@@ -1180,29 +1193,33 @@ export default function QuotationList() {
               value={text}
               onChange={(val) => handleServiceLineChange(index, 'product_name', val)}
               options={products.filter((p) => p.product_type === 'service').map((p) => ({ value: p.name, label: p.name }))}
+              filterOption={(inputValue, option) => option.value.toUpperCase().indexOf(inputValue.toUpperCase()) !== -1}
               placeholder="Chọn hoặc nhập tên dịch vụ"
             />
-            <Upload
-              showUploadList={false}
-              customRequest={async ({ file, onSuccess, onError }) => {
-                try {
-                  const formData = new FormData();
-                  formData.append('image', file);
-                  const res = await api.post('/sales/quotations/upload-item-image/', formData, {
-                    headers: { 'Content-Type': 'multipart/form-data' },
-                  });
-                  handleServiceLineChange(index, 'product_image', res.data.url);
-                  messageApi.success("Đã tải ảnh thành công!");
-                  onSuccess("ok");
-                } catch (e) {
-                  const errDetail = e.response?.data?.error || "Vui lòng thử lại";
-                  messageApi.error(`Tải ảnh thất bại: ${errDetail}`);
-                  onError(e);
-                }
-              }}
-            >
-              <Button icon={<CameraOutlined />} size="small" type="dashed" title="Tải ảnh lên" />
-            </Upload>
+            {enableServiceImage && (
+              <Upload
+                fileList={[]}
+                showUploadList={false}
+                customRequest={async ({ file, onSuccess, onError }) => {
+                  try {
+                    const formData = new FormData();
+                    formData.append('image', file);
+                    const res = await api.post('/sales/quotations/upload-item-image/', formData, {
+                      headers: { 'Content-Type': 'multipart/form-data' },
+                    });
+                    handleServiceLineChange(index, 'product_image', res.data.url);
+                    messageApi.success("Đã tải ảnh thành công!");
+                    onSuccess("ok");
+                  } catch (e) {
+                    const errDetail = e.response?.data?.error || "Vui lòng thử lại";
+                    messageApi.error(`Tải ảnh thất bại: ${errDetail}`);
+                    onError(e);
+                  }
+                }}
+              >
+                <Button icon={<CameraOutlined />} size="small" type="dashed" title="Tải ảnh lên" />
+              </Upload>
+            )}
           </div>
         ),
       }
@@ -1315,6 +1332,88 @@ export default function QuotationList() {
     const tmplCode = effectiveTmpl?.code || 'STANDARD'
     const isLandscape = tmplCode === 'production_landscape_a4' || effectiveTmpl?.layout_config?.paper_orientation === 'landscape'
     
+    const productBlock = effectiveTmpl?.layout_config?.blocks?.find(b => b.type === 'product_table');
+    const enableProductImage = productBlock?.props?.enableProductImage !== false;
+    const enableNoteImage = productBlock?.props?.enableNoteImage !== false;
+    const useComplexDimensions = productBlock?.props?.useComplexDimensions !== false;
+    const dimCol = productBlock?.props?.columns?.find(c => (typeof c === 'object' ? c.id : c) === 'dimensions');
+    const dimensionFieldsRaw = dimCol?.children || [];
+    const dimensionFields = dimensionFieldsRaw.length > 0
+      ? dimensionFieldsRaw.map(c => ({ id: c.id, label: c.title, width: 85 }))
+      : [{ id: 'height', label: 'Cao', width: 85 }, { id: 'width', label: 'Rộng', width: 85 }, { id: 'thickness', label: 'Dày', width: 85 }];
+    const BUILTIN_DIM = ['height', 'width', 'thickness'];
+    const getDimVal = (record, field) => BUILTIN_DIM.includes(field.id) ? record[field.id] : record.custom_data?.[`dim_${field.id}`];
+    const setDimVal = (idx, record, field, v) => {
+      if (BUILTIN_DIM.includes(field.id)) {
+        handleLineChange(idx, field.id, v !== null && v !== undefined ? Math.round(Number(v)) : 0);
+      } else {
+        const cd = record.custom_data || {};
+        handleLineChange(idx, 'custom_data', { ...cd, [`dim_${field.id}`]: v });
+      }
+    };
+
+    const dimensionColumnGroup = useComplexDimensions ? [{
+      title: 'KÍCH THƯỚC Ô CHỜ (mm)',
+      key: 'dimensions',
+      children: dimensionFields.map((field, fi) => ({
+        title: field.label,
+        dataIndex: field.id,
+        key: field.id,
+        width: field.width || 85,
+        align: 'center',
+        render: (val, record, idx) => {
+          if (record.custom_data?.is_custom_size) {
+            if (fi === 0) {
+              return {
+                children: <Input placeholder="Nhập kích thước..." style={{ textAlign: 'left' }} value={record.custom_data?.custom_size_text || ''} onChange={(e) => {
+                  const currentData = record.custom_data || {};
+                  handleLineChange(idx, 'custom_data', { ...currentData, custom_size_text: e.target.value });
+                }} />,
+                props: { colSpan: dimensionFields.length }
+              };
+            }
+            return { children: null, props: { colSpan: 0 } };
+          }
+          const fieldVal = getDimVal(record, field);
+          return {
+            children: (
+              <InputNumber
+                min={0}
+                step={1}
+                precision={0}
+                style={{ width: '100%', textAlign: 'center' }}
+                value={fieldVal !== undefined && fieldVal !== null && fieldVal !== '' ? Math.round(Number(fieldVal)) : undefined}
+                onChange={(v) => setDimVal(idx, record, field, v)}
+                placeholder="0"
+              />
+            ),
+            props: { colSpan: 1 }
+          };
+        },
+      })),
+    }] : [{
+      title: 'KÍCH THƯỚC',
+      dataIndex: 'dimensions',
+      key: 'dimensions',
+      width: 150,
+      render: (val, record, idx) => {
+        const currentData = record.custom_data || {};
+        let initialText = currentData.custom_size_text || '';
+        if (!initialText && !currentData.is_custom_size) {
+          const parts = [];
+          if (record.height) parts.push(record.height);
+          if (record.width) parts.push(record.width);
+          if (record.thickness) parts.push(record.thickness);
+          initialText = parts.join(' x ');
+        }
+        return (
+          <Input placeholder="Nhập kích thước..." style={{ textAlign: 'center' }} value={initialText} onChange={(e) => {
+            handleLineChange(idx, 'custom_data', { ...currentData, custom_size_text: e.target.value, is_custom_size: true });
+          }} />
+        );
+      }
+    }];
+
     let baseCols = [];
 
     if (isLandscape) {
@@ -1338,106 +1437,72 @@ export default function QuotationList() {
             return {
               children: (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 8, padding: '4px 0' }}>
-                  <Select
-                    showSearch
-                    placeholder="Chọn mẫu cửa / sản phẩm..."
-                    optionFilterProp="children"
-                    style={{ width: '100%' }}
-                    value={val || undefined}
-                    onChange={(v) => handleLineChange(idx, 'product', v)}
-                  >
-                    {products.filter(p => p.product_type !== 'service').map((p) => (
-                      <Option key={p.id} value={p.id}>{p.name} ({p.unit || 'cái'})</Option>
-                    ))}
-                  </Select>
-                  {val && (
-                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', background: '#f8fafc', padding: 10, borderRadius: 8, border: '1px solid #e2e8f0', gap: 6 }}>
-                      {imgUrl ? (
-                        <img src={imgUrl} alt="product" style={{ width: 80, height: 80, objectFit: 'cover', borderRadius: 6, border: '1px solid #cbd5e1', boxShadow: '0 2px 4px rgba(0,0,0,0.05)' }} />
-                      ) : (
-                        <div style={{ width: 80, height: 80, background: '#e2e8f0', borderRadius: 6, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, color: '#64748b' }}>Không có ảnh</div>
-                      )}
-                      <Text strong style={{ fontSize: 13, textAlign: 'center', color: '#0f172a', lineHeight: 1.3 }}>
-                        {record.product_name || (prodObj ? prodObj.name : '')}
-                      </Text>
-                      {(record.spec || (prodObj && prodObj.description)) && (
-                        <div style={{ fontSize: 11.5, color: '#475569', textAlign: 'center', lineHeight: 1.4, fontStyle: 'italic', whiteSpace: 'pre-wrap' }}>
-                          {record.spec || (prodObj && prodObj.description)}
-                        </div>
-                      )}
-                      <Button
-                        type="dashed"
-                        size="small"
-                        icon={<PlusOutlined />}
-                        onClick={() => handleAddSameProduct(idx)}
-                        style={{ marginTop: 4, borderColor: '#2563eb', color: '#2563eb', width: '100%' }}
+                  <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'nowrap' }}>
+                    {enableProductImage && imgUrl && (
+                      <div style={{ position: 'relative', flexShrink: 0, width: 32, height: 32 }}>
+                        <Image src={imgUrl} style={{ width: 32, height: 32, borderRadius: 4, objectFit: 'cover', border: '1px solid #cbd5e1' }} />
+                        {record.product_image && (
+                          <CloseCircleOutlined 
+                            style={{ position: 'absolute', top: -6, right: -6, color: '#ef4444', cursor: 'pointer', background: '#fff', borderRadius: '50%', fontSize: 12 }} 
+                            onClick={(e) => {
+                               e.stopPropagation();
+                               handleLineChange(idx, 'product_image', null);
+                            }} 
+                          />
+                        )}
+                      </div>
+                    )}
+                    <AutoComplete
+                      style={{ flex: 1, minWidth: 150 }}
+                      value={record.product_name || (prodObj ? prodObj.name : undefined)}
+                      onChange={(v) => {
+                        const matched = products.find(p => p.name === v && p.product_type !== 'service');
+                        if (matched) {
+                          handleLineChange(idx, 'product', matched.id);
+                          handleLineChange(idx, 'product_name', matched.name);
+                        } else {
+                          handleLineChange(idx, 'product', null);
+                          handleLineChange(idx, 'product_name', v);
+                        }
+                      }}
+                      options={products.filter(p => p.product_type !== 'service').map(p => ({ value: p.name, label: `${p.name} (${p.unit || 'cái'})` }))}
+                      filterOption={(inputValue, option) => option.value.toUpperCase().indexOf(inputValue.toUpperCase()) !== -1}
+                      placeholder="Chọn hoặc nhập mẫu cửa..."
+                    />
+                    {enableProductImage && (
+                      <Upload
+                        fileList={[]}
+                        showUploadList={false}
+                        customRequest={async ({ file, onSuccess, onError }) => {
+                          const key = `upload-prod-${idx}`;
+                          messageApi.open({ key, type: 'loading', content: 'Đang tải ảnh lên...', duration: 0 });
+                          try {
+                            const formData = new FormData();
+                            formData.append('image', file);
+                            const res = await api.post('/sales/quotations/upload-item-image/', formData, {
+                              headers: { 'Content-Type': 'multipart/form-data' },
+                            });
+                            handleLineChange(idx, 'product_image', res.data.url);
+                            messageApi.open({ key, type: 'success', content: 'Đã tải ảnh thành công!', duration: 2 });
+                            onSuccess("ok");
+                          } catch (e) {
+                            const errDetail = e.response?.data?.error || "Vui lòng thử lại";
+                            messageApi.open({ key, type: 'error', content: `Tải ảnh thất bại: ${errDetail}`, duration: 3 });
+                            onError(e);
+                          }
+                        }}
                       >
-                        Thêm kích thước
-                      </Button>
-                    </div>
-                  )}
+                        <Button icon={<CameraOutlined />} size="small" type="dashed" title="Tải ảnh lên" />
+                      </Upload>
+                    )}
+                  </div>
                 </div>
               ),
               props: { rowSpan },
             }
           },
         },
-        {
-          title: 'KÍCH THƯỚC Ô CHỜ (mm)',
-          children: [
-            {
-              title: 'Cao',
-              dataIndex: 'height',
-              width: 85,
-              align: 'center',
-              render: (val, record, idx) => (
-                <InputNumber
-                  min={0}
-                  step={1}
-                  precision={0}
-                  style={{ width: '100%', textAlign: 'center' }}
-                  value={val !== undefined && val !== null && val !== '' ? Math.round(Number(val)) : undefined}
-                  onChange={(v) => handleLineChange(idx, 'height', v !== null && v !== undefined ? Math.round(Number(v)) : 0)}
-                  placeholder="0"
-                />
-              ),
-            },
-            {
-              title: 'Rộng',
-              dataIndex: 'width',
-              width: 85,
-              align: 'center',
-              render: (val, record, idx) => (
-                <InputNumber
-                  min={0}
-                  step={1}
-                  precision={0}
-                  style={{ width: '100%', textAlign: 'center' }}
-                  value={val !== undefined && val !== null && val !== '' ? Math.round(Number(val)) : undefined}
-                  onChange={(v) => handleLineChange(idx, 'width', v !== null && v !== undefined ? Math.round(Number(v)) : 0)}
-                  placeholder="0"
-                />
-              ),
-            },
-            {
-              title: 'Dày',
-              dataIndex: 'thickness',
-              width: 85,
-              align: 'center',
-              render: (val, record, idx) => (
-                <InputNumber
-                  min={0}
-                  step={1}
-                  precision={0}
-                  style={{ width: '100%', textAlign: 'center' }}
-                  value={val !== undefined && val !== null && val !== '' ? Math.round(Number(val)) : undefined}
-                  onChange={(v) => handleLineChange(idx, 'thickness', v !== null && v !== undefined ? Math.round(Number(v)) : 0)}
-                  placeholder="0"
-                />
-              ),
-            },
-          ],
-        },
+        ...dimensionColumnGroup,
         {
           title: 'KÝ HIỆU',
           dataIndex: 'symbol',
@@ -1449,7 +1514,52 @@ export default function QuotationList() {
           title: 'GHI CHÚ KỸ THUẬT',
           dataIndex: 'note',
           width: 170,
-          render: (val, record, idx) => <Input placeholder="Khóa, bản lề, kính..." value={val || ''} onChange={(e) => handleLineChange(idx, 'note', e.target.value)} />,
+          render: (val, record, idx) => (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 6, padding: '4px 0' }}>
+              <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                {enableNoteImage && record.custom_data?.note_image && (
+                  <div style={{ position: 'relative', flexShrink: 0, width: 32, height: 32 }}>
+                    <Image src={record.custom_data.note_image} alt="note" style={{ width: 32, height: 32, objectFit: 'cover', borderRadius: 4, border: '1px solid #cbd5e1' }} />
+                    <CloseCircleOutlined 
+                      style={{ position: 'absolute', top: -6, right: -6, color: '#ef4444', cursor: 'pointer', background: '#fff', borderRadius: '50%', fontSize: 12 }} 
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        const currentData = record.custom_data || {};
+                        handleLineChange(idx, 'custom_data', { ...currentData, note_image: null });
+                      }} 
+                    />
+                  </div>
+                )}
+                <Input style={{ textAlign: 'center' }} placeholder="Khóa, bản lề, kính..." value={val || ''} onChange={(e) => handleLineChange(idx, 'note', e.target.value)} />
+                {enableNoteImage && (
+                  <Upload
+                    fileList={[]}
+                    showUploadList={false}
+                    customRequest={async ({ file, onSuccess, onError }) => {
+                      const key = `upload-note-${idx}`;
+                      messageApi.open({ key, type: 'loading', content: 'Đang tải ảnh lên...', duration: 0 });
+                      try {
+                        const formData = new FormData();
+                        formData.append('image', file);
+                        const res = await api.post('/sales/quotations/upload-item-image/', formData, {
+                          headers: { 'Content-Type': 'multipart/form-data' },
+                        });
+                        const currentData = record.custom_data || {};
+                        handleLineChange(idx, 'custom_data', { ...currentData, note_image: res.data.url });
+                        messageApi.open({ key, type: 'success', content: 'Đã tải ảnh ghi chú!', duration: 2 });
+                        onSuccess("ok");
+                      } catch (e) {
+                        messageApi.open({ key, type: 'error', content: 'Tải ảnh thất bại', duration: 3 });
+                        onError(e);
+                      }
+                    }}
+                  >
+                    <Button icon={<CameraOutlined />} size="small" type={record.custom_data?.note_image ? "primary" : "dashed"} title="Tải ảnh lên" />
+                  </Upload>
+                )}
+              </div>
+            </div>
+          ),
         },
         {
           title: 'SL',
@@ -1499,18 +1609,52 @@ export default function QuotationList() {
         key: 'product',
         width: 220,
         render: (val, record, idx) => (
-          <Select
-            showSearch
-            placeholder="Chọn sản phẩm / dịch vụ..."
-            optionFilterProp="children"
-            style={{ width: '100%' }}
-            value={val || undefined}
-            onChange={(v) => handleLineChange(idx, 'product', v)}
-          >
-            {products.filter(p => p.product_type !== 'service').map((p) => (
-              <Option key={p.id} value={p.id}>{p.name} ({p.unit || 'cái'})</Option>
-            ))}
-          </Select>
+          <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'nowrap' }}>
+            {enableProductImage && record.product_image && (
+              <Image width={32} height={32} style={{ borderRadius: 4, objectFit: 'cover' }} src={record.product_image} />
+            )}
+            <AutoComplete
+              style={{ flex: 1, minWidth: 150 }}
+              value={record.product_name || (products.find(p => p.id === val)?.name || undefined)}
+              onChange={(v) => {
+                const matched = products.find(p => p.name === v && p.product_type !== 'service');
+                if (matched) {
+                  handleLineChange(idx, 'product', matched.id);
+                  handleLineChange(idx, 'product_name', matched.name);
+                } else {
+                  handleLineChange(idx, 'product', null);
+                  handleLineChange(idx, 'product_name', v);
+                }
+              }}
+              options={products.filter(p => p.product_type !== 'service').map(p => ({ value: p.name, label: p.name }))}
+              filterOption={(inputValue, option) => option.value.toUpperCase().indexOf(inputValue.toUpperCase()) !== -1}
+              placeholder="Chọn hoặc nhập sản phẩm..."
+            />
+            {enableProductImage && (
+              <Upload
+                fileList={[]}
+                showUploadList={false}
+                customRequest={async ({ file, onSuccess, onError }) => {
+                  try {
+                    const formData = new FormData();
+                    formData.append('image', file);
+                    const res = await api.post('/sales/quotations/upload-item-image/', formData, {
+                      headers: { 'Content-Type': 'multipart/form-data' },
+                    });
+                    handleLineChange(idx, 'product_image', res.data.url);
+                    messageApi.success("Đã tải ảnh thành công!");
+                    onSuccess("ok");
+                  } catch (e) {
+                    const errDetail = e.response?.data?.error || "Vui lòng thử lại";
+                    messageApi.error(`Tải ảnh thất bại: ${errDetail}`);
+                    onError(e);
+                  }
+                }}
+              >
+                <Button icon={<CameraOutlined />} size="small" type="dashed" title="Tải ảnh lên" />
+              </Upload>
+            )}
+          </div>
         ),
       },
     ]
@@ -1683,11 +1827,8 @@ export default function QuotationList() {
       });
     }
 
-    if (isLandscape) {
-       return baseCols;
-    }
-
-    baseCols.push(
+    if (!isLandscape) {
+      baseCols.push(
       {
         title: 'SL',
         dataIndex: 'quantity',
@@ -1724,7 +1865,42 @@ export default function QuotationList() {
           <Tooltip title="Xoá dòng"><Button type="text" danger shape="circle" icon={<DeleteOutlined />} onClick={() => handleRemoveLine(idx)} /></Tooltip>
         ) : null,
       }
-    )
+      )
+    }
+
+    // --- Sort columns based on Template config ---
+    const tmplCols = (productTableBlock?.props?.columns || []).map(c => typeof c === 'object' ? c.id : c);
+    
+    const getColId = (col) => {
+       if (col.key === 'stt') return 'stt';
+       if (col.key === 'product' || col.dataIndex === 'product') return 'name';
+       if (col.key === 'dimensions' || col.title === 'KÍCH THƯỚC Ô CHỜ (mm)') return 'dimensions';
+       if (col.dataIndex === 'symbol') return 'symbol';
+       if (col.dataIndex === 'note') return 'note';
+       if (col.dataIndex === 'quantity') return 'qty';
+       if (col.dataIndex === 'unit') return 'unit';
+       if (col.dataIndex === 'unit_price') return 'price';
+       if (col.key === 'total') return 'total';
+       if (col.key === 'action') return 'action';
+       return col.dataIndex || col.key || col.id;
+    };
+
+    baseCols.sort((a, b) => {
+       const idA = getColId(a);
+       const idB = getColId(b);
+       
+       if (idA === 'action') return 1;
+       if (idB === 'action') return -1;
+       
+       const idxA = tmplCols.indexOf(idA);
+       const idxB = tmplCols.indexOf(idB);
+       
+       if (idxA === -1 && idxB === -1) return 0;
+       if (idxA === -1) return 1;
+       if (idxB === -1) return -1;
+       
+       return idxA - idxB;
+    });
 
     return baseCols
   }

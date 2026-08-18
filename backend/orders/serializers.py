@@ -49,9 +49,9 @@ class OrderSerializer(serializers.ModelSerializer):
     items = OrderItemSerializer(many=True, read_only=True)
     quotation_detail = QuotationSerializer(source="quotation", read_only=True)
     status_display = serializers.CharField(source="get_status_display", read_only=True)
-    customer_name = serializers.CharField(source="customer.name", read_only=True)
-    customer_phone = serializers.CharField(source="customer.phone", read_only=True)
-    customer_address = serializers.CharField(source="customer.address", read_only=True)
+    customer_name = serializers.SerializerMethodField()
+    customer_phone = serializers.SerializerMethodField()
+    customer_address = serializers.SerializerMethodField()
     created_by_name = serializers.CharField(source="created_by.full_name", read_only=True)
     approved_by_name = serializers.CharField(source="approved_by.full_name", read_only=True)
     financial_status_display = serializers.CharField(source="get_financial_status_display", read_only=True)
@@ -59,6 +59,7 @@ class OrderSerializer(serializers.ModelSerializer):
     paid_amount = serializers.FloatField(read_only=True)
     remaining_debt = serializers.FloatField(read_only=True)
     company_info = serializers.SerializerMethodField()
+    customer_info = serializers.SerializerMethodField()
     has_pending_credit_request = serializers.SerializerMethodField()
     payment_milestones = OrderPaymentMilestoneSerializer(many=True, read_only=True)
     needs_export_request = serializers.SerializerMethodField()
@@ -109,6 +110,7 @@ class OrderSerializer(serializers.ModelSerializer):
             "created_at",
             "updated_at",
             "company_info",
+            "customer_info",
             "has_pending_credit_request",
             "needs_export_request",
             "payment_milestones",
@@ -120,7 +122,7 @@ class OrderSerializer(serializers.ModelSerializer):
             "paid_amount", "remaining_debt",
             "customer_name", "customer_phone", "customer_address",
             "created_by_name", "approved_by_name", "approved_at",
-            "items", "created_at", "updated_at", "company_info", "quotation_detail",
+            "items", "created_at", "updated_at", "company_info", "customer_info", "quotation_detail",
             "has_pending_credit_request",
             "payment_milestones",
             "needs_export_request",
@@ -131,8 +133,43 @@ class OrderSerializer(serializers.ModelSerializer):
     def get_company_info(self, obj):
         return get_company_info_dict(self, obj)
 
+    def get_customer_info(self, obj):
+        if obj.customer:
+            if getattr(obj, "customer_name_snapshot", ""):
+                return {
+                    "name": obj.customer_name_snapshot,
+                    "phone": obj.customer_phone_snapshot,
+                    "email": obj.customer.email, # we didn't snapshot email, fallback to live
+                    "address": obj.customer_address_snapshot,
+                    "city": obj.customer_city_snapshot,
+                    "company_name": obj.customer_company_snapshot,
+                    "tax_code": obj.customer_tax_code_snapshot,
+                }
+            return {
+                "name": obj.customer.name,
+                "phone": obj.customer.phone,
+                "email": obj.customer.email,
+                "address": obj.customer.address,
+                "city": obj.customer.city,
+                "company_name": getattr(obj.customer, "company_name", "") or "",
+                "tax_code": getattr(obj.customer, "tax_code", "") or "",
+            }
+        return None
+
     def get_has_production_order(self, obj):
         return obj.production_orders.exists()
+
+    def get_customer_name(self, obj):
+        if getattr(obj, "customer_name_snapshot", ""): return obj.customer_name_snapshot
+        return obj.customer.name if obj.customer else ""
+        
+    def get_customer_phone(self, obj):
+        if getattr(obj, "customer_name_snapshot", ""): return obj.customer_phone_snapshot
+        return obj.customer.phone if obj.customer else ""
+        
+    def get_customer_address(self, obj):
+        if getattr(obj, "customer_name_snapshot", ""): return obj.customer_address_snapshot
+        return obj.customer.address if obj.customer else ""
 
     def get_needs_export_request(self, obj):
         if obj.status != "approved":

@@ -86,13 +86,43 @@ export default function QuotationBuilder() {
       const res = await api.get(`/sales/quotation-templates/${id}/`);
       setTemplate(res.data);
       if (res.data.layout_config && Array.isArray(res.data.layout_config.blocks) && res.data.layout_config.blocks.length > 0) {
-        setBlocks(res.data.layout_config.blocks);
+        const loadedBlocks = res.data.layout_config.blocks.map(b => {
+          if (b.type === BLOCK_TYPES.SIGNATURES) {
+            if (!b.props) b.props = {};
+            if (!b.props.signatures || b.props.signatures.length === 0) {
+              // Smart detect order based on titles
+              if (b.props.titles && b.props.titles[0] && b.props.titles[0].toUpperCase().includes('CÔNG TY')) {
+                b.props.signatures = [
+                  '{{company_signature}}\n{{company_stamp}}\n\n<b>{{director_name}}</b>',
+                  '{{customer_signature}}\n\n\n<b>{{customer_name}}</b>'
+                ];
+              } else {
+                b.props.signatures = DEFAULT_BLOCK_PROPS[BLOCK_TYPES.SIGNATURES].signatures;
+              }
+            } else {
+              // Upgrade existing signatures that were auto-filled earlier but missing director_name or having too much space
+              if (b.props.signatures[0] === '{{company_signature}}<br>{{company_stamp}}' || b.props.signatures[0] === '{{company_signature}}\n{{company_stamp}}' || b.props.signatures[0] === '{{company_signature}}\n{{company_stamp}}\n\n\n<b>{{director_name}}</b>') {
+                b.props.signatures[0] = '{{company_signature}}\n{{company_stamp}}\n\n<b>{{director_name}}</b>';
+                if (b.props.signatures[1] === '{{customer_signature}}' || b.props.signatures[1] === '{{customer_signature}}\n\n\n\n<b>{{customer_name}}</b>') {
+                  b.props.signatures[1] = '{{customer_signature}}\n\n\n<b>{{customer_name}}</b>';
+                }
+              } else if (b.props.signatures[1] === '{{company_signature}}<br>{{company_stamp}}' || b.props.signatures[1] === '{{company_signature}}\n{{company_stamp}}' || b.props.signatures[1] === '{{company_signature}}\n{{company_stamp}}\n\n\n<b>{{director_name}}</b>') {
+                b.props.signatures[1] = '{{company_signature}}\n{{company_stamp}}\n\n<b>{{director_name}}</b>';
+                if (b.props.signatures[0] === '{{customer_signature}}' || b.props.signatures[0] === '{{customer_signature}}\n\n\n\n<b>{{customer_name}}</b>') {
+                  b.props.signatures[0] = '{{customer_signature}}\n\n\n<b>{{customer_name}}</b>';
+                }
+              }
+            }
+          }
+          return b;
+        });
+        setBlocks(loadedBlocks);
       } else {
         // Load default blocks if empty
         const defaultBlocks = [
-          { id: 'header_1', type: BLOCK_TYPES.HEADER_LOGO, props: { ...DEFAULT_BLOCK_PROPS[BLOCK_TYPES.HEADER_LOGO], companyName: 'CÔNG TY CỦA BẠN', phone: '0912345678', address: 'Hà Nội' } },
-          { id: 'title_1', type: BLOCK_TYPES.TITLE, props: { ...DEFAULT_BLOCK_PROPS[BLOCK_TYPES.TITLE], title: 'BẢNG BÁO GIÁ CHI TIẾT' } },
-          { id: 'customer_1', type: BLOCK_TYPES.CUSTOMER_INFO, props: { ...DEFAULT_BLOCK_PROPS[BLOCK_TYPES.CUSTOMER_INFO], columns: 2 } },
+          { id: 'header_1', type: BLOCK_TYPES.HEADER_LOGO, props: { ...DEFAULT_BLOCK_PROPS[BLOCK_TYPES.HEADER_LOGO] } },
+          { id: 'title_1', type: BLOCK_TYPES.TITLE, props: { ...DEFAULT_BLOCK_PROPS[BLOCK_TYPES.TITLE] } },
+          { id: 'customer_1', type: BLOCK_TYPES.CUSTOMER_INFO, props: { ...DEFAULT_BLOCK_PROPS[BLOCK_TYPES.CUSTOMER_INFO] } },
           { id: 'table_1', type: BLOCK_TYPES.PRODUCT_TABLE, props: { ...DEFAULT_BLOCK_PROPS[BLOCK_TYPES.PRODUCT_TABLE] } },
           { id: 'service_1', type: BLOCK_TYPES.SERVICE_TABLE, props: { ...DEFAULT_BLOCK_PROPS[BLOCK_TYPES.SERVICE_TABLE] } },
           { id: 'summary_1', type: BLOCK_TYPES.TOTALS, props: { ...DEFAULT_BLOCK_PROPS[BLOCK_TYPES.TOTALS] } },

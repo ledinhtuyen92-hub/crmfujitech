@@ -13,7 +13,7 @@ const PREDEFINED_COLUMNS = [
   { id: 'name', title: 'Tên hàng hóa / Dịch vụ' },
   { id: 'symbol', title: 'Ký hiệu' },
   { id: 'specs', title: 'Quy cách kỹ thuật' },
-  { id: 'dimensions', title: 'Kích thước (Cao/Rộng/Dày)' },
+  { id: 'dimensions', title: 'Kích thước', children: [{ id: 'height', title: 'Cao' }, { id: 'width', title: 'Rộng' }, { id: 'thickness', title: 'Dày' }] },
   { id: 'note', title: 'Ghi chú' },
   { id: 'unit', title: 'ĐVT' },
   { id: 'qty', title: 'Số lượng' },
@@ -39,7 +39,7 @@ function SortableItem({ id, title, childrenColumns, onRemove, onAddChild, onRemo
     position: 'relative'
   };
 
-  const isGroup = id.startsWith('group_');
+  const isGroup = id.startsWith('group_') || id === 'dimensions';
 
   return (
     <div ref={setNodeRef} style={style}>
@@ -94,7 +94,8 @@ export default function ColumnManager({ value = [], onChange }) {
   const [groupTitle, setGroupTitle] = useState('');
 
   // Normalize value to always be an array of objects
-  const normalizedValue = value.map(col => {
+  const safeValue = Array.isArray(value) ? value : [];
+  const normalizedValue = safeValue.map(col => {
     if (typeof col === 'string') {
       const predefined = PREDEFINED_COLUMNS.find(c => c.id === col);
       return predefined || { id: col, title: col };

@@ -52,11 +52,16 @@ const computeLineTotal = (item) => {
   const qty = Number(item.quantity || 1)
   const price = Number(item.unit_price || 0)
   const discount = Number(item.discount_percent || 0)
-  const area = Number(item.area || 0)
-  if ((item.unit === 'm²' || item.custom_data?.unit === 'm²' || (area > 0 && item.width > 0 && item.height > 0)) && area > 0) {
-    return Number((area * qty * price * (1 - discount / 100)).toFixed(0))
+  
+  const unit = (item.unit || item.custom_data?.unit || '').toLowerCase();
+  const isAreaUnit = unit === 'm²' || unit === 'm2' || unit === 'mét vuông';
+  const area = Number(item.area || 0);
+
+  if (isAreaUnit && area > 0) {
+    return Number((area * qty * price * (1 - discount / 100)).toFixed(0));
   }
-  return Number((qty * price * (1 - discount / 100)).toFixed(0))
+  
+  return Number((qty * price * (1 - discount / 100)).toFixed(0));
 };
 
 const computeRowSpan = (data, index, field = 'product') => {
@@ -121,9 +126,12 @@ export default function QuotationRenderer({ layoutConfig, layoutStyle, data }) {
     switch (block.type) {
       case BLOCK_TYPES.HEADER_LOGO:
         let finalLogoUrl = block.props.logoUrl;
-        if (finalLogoUrl === '{{company_logo}}') finalLogoUrl = company?.logo || data?.company_info?.logo;
-        else if (!finalLogoUrl) finalLogoUrl = company?.logo || data?.company_info?.logo;
+        if (finalLogoUrl === '{{company_logo}}' || !finalLogoUrl) finalLogoUrl = company?.logo || data?.company_info?.logo;
         
+        const headerCompanyName = company?.name || data?.company_info?.name || parseVariables(block.props.companyName || '[Tên công ty]', data, company);
+        const headerTaxCode = company?.tax_code || data?.company_info?.tax_code || parseVariables(block.props.taxCode || '', data, company);
+        const headerPhone = company?.phone || data?.company_info?.phone || parseVariables(block.props.phone || '', data, company);
+        const headerAddress = company?.address || data?.company_info?.address || parseVariables(block.props.address || '', data, company);
         return (
           <div style={{ padding: '14px 18px', background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: 8 }}>
             <Row justify="space-between" align="middle">
@@ -141,23 +149,29 @@ export default function QuotationRenderer({ layoutConfig, layoutStyle, data }) {
                 )}
               </Col>
               <Col xs={24} md={16} style={{ textAlign: 'right' }}>
-                <div style={{ fontWeight: 700, color: clr, fontSize: 16 }}>{parseVariables(block.props.companyName || 'TÊN CÔNG TY', data, company)}</div>
-                <div style={{ fontSize: 12, color: '#64748b', marginTop: 2 }}>MST: {parseVariables(block.props.taxCode || '', data, company)} • Hotline: {parseVariables(block.props.phone || '', data, company)}</div>
-                <div style={{ fontSize: 12, color: '#64748b' }}>Địa chỉ: {parseVariables(block.props.address || '', data, company)}</div>
+                <div style={{ fontWeight: 700, color: clr, fontSize: 16 }}>{headerCompanyName}</div>
+                <div style={{ fontSize: 12, color: '#64748b', marginTop: 2 }}>MST: {headerTaxCode} • Hotline: {headerPhone}</div>
+                <div style={{ fontSize: 12, color: '#64748b' }}>Địa chỉ: {headerAddress}</div>
               </Col>
             </Row>
           </div>
         );
 
       case BLOCK_TYPES.TITLE:
+        let parsedMeta = block.props.metaText !== undefined ? block.props.metaText : (block.props.showDate ? 'Số: {{quotation_code}} | Ngày: {{current_date}}' : '');
+        parsedMeta = parseVariables(parsedMeta, data, company);
         return (
-          <div style={{ textAlign: 'center', margin: '18px 0' }}>
+          <div style={{ textAlign: 'center', margin: '4px 0 8px 0' }}>
             <div style={{ fontSize: 20, fontWeight: 700, color: clr, textTransform: 'uppercase', letterSpacing: '0.5px' }}>
               {parseVariables(block.props.title || '', data, company)}
             </div>
-            {block.props.showDate && (
+            {(block.props.metaText !== undefined ? block.props.metaText : (block.props.showDate ? 'Số: {{quotation_code}} | Ngày: {{current_date}}' : '')) && (
               <div style={{ display: 'inline-block', background: '#eff6ff', padding: '2px 12px', borderRadius: 12, border: '1px solid #bfdbfe', fontSize: 12, color: '#1d4ed8', margin: '6px 0' }}>
-                Số: <strong>BG-001</strong> | Ngày: <strong>{new Date().toLocaleDateString('vi-VN')}</strong>
+                {(() => {
+                  let text = block.props.metaText !== undefined ? block.props.metaText : 'Số: {{quotation_code}} | Ngày: {{current_date}}';
+                  if (!text) return null;
+                  return <strong>{parseVariables(text, data, company)}</strong>;
+                })()}
               </div>
             )}
             <div style={{ fontSize: 12.5, fontStyle: 'italic', color: '#475569', marginTop: 4 }}>
@@ -184,26 +198,45 @@ export default function QuotationRenderer({ layoutConfig, layoutStyle, data }) {
         ) : null;
         
       case BLOCK_TYPES.CUSTOMER_INFO:
-        const custName = customer?.name || '[Tên khách hàng]';
-        const custPhone = customer?.phone || '[Số điện thoại]';
-        const custAddress = customer?.address || '[Địa chỉ]';
-        const custTax = customer?.tax_code || '[Mã số thuế]';
+        // Resolve seller info: luôn ưu tiên dữ liệu thực từ company
+        const sellerName = company?.name || parseVariables(block.props.companyName || '{{company_name}}', data, company);
+        const sellerRep = company?.director_name || parseVariables(block.props.representative || '{{director_name}}', data, company);
+        const sellerPos = company?.director_title || parseVariables(block.props.position || '{{director_title}}', data, company);
+        const sellerTax = company?.tax_code || parseVariables(block.props.taxCode || '{{company_tax_code}}', data, company);
+        const sellerPhone = company?.phone || parseVariables(block.props.phone || '{{company_phone}}', data, company);
+        const sellerAddr = company?.address || parseVariables(block.props.address || '{{company_address}}', data, company);
+        // Resolve buyer info: luôn ưu tiên dữ liệu thực từ customer
+        const rawBuyerCompanyName = data?.customer?.company_name || ''; // chỉ lấy nếu có công ty riêng
+        const rawBuyerName = data?.customer?.name || '';
+        const buyerName = rawBuyerName || parseVariables(block.props.buyerName || '{{customer_name}}', data, company);
+        // Chỉ hiện company trong tiêu đề nếu khách hàng có tên công ty riêng
+        const hasCompany = rawBuyerCompanyName && rawBuyerCompanyName !== rawBuyerName;
+        const buyerCompany = hasCompany ? rawBuyerCompanyName : (rawBuyerName || parseVariables(block.props.buyerName || '{{customer_name}}', data, company));
+        const buyerTax = data?.customer?.tax_code || '';
+        const rawBuyerPhone = data?.customer?.phone || '';
+        const buyerPhone = rawBuyerPhone || parseVariables(block.props.buyerPhone || '{{customer_phone}}', data, company);
+        const rawBuyerAddr = [data?.customer?.address, data?.customer?.city].filter(Boolean).join(' - ') || '';
+        const buyerAddr = rawBuyerAddr || parseVariables(block.props.buyerAddress || '{{customer_address}}', data, company);
         return (
-          <Row gutter={16} style={{ marginBottom: 16 }}>
-            <Col xs={24} md={block.props.columns === 1 ? 24 : 12} style={{ marginBottom: block.props.columns === 1 ? 16 : 0 }}>
+          <Row gutter={16} style={{ marginBottom: 0 }}>
+            <Col xs={24} md={block.props.columns === 1 ? 24 : 12} style={{ marginBottom: block.props.columns === 1 ? 12 : 0 }}>
               <div style={{ padding: '10px 14px', background: block.props.sellerBackgroundColor || '#f8fafc', border: (block.props.showBorder ?? true) ? `1px solid ${block.props.borderColor || clr + '40'}` : 'none', borderRadius: 6, height: '100%' }}>
-                <div style={{ fontWeight: 700, color: clr, fontSize: 13, marginBottom: 4 }}>BÊN BÁN (BÊN B): {parseVariables(block.props.companyName || 'CÔNG TY CỦA BẠN', data, company)}</div>
-                <div style={{ fontSize: 12, color: '#334155' }}><strong>Đại diện:</strong> {parseVariables(block.props.representative || 'Nguyễn Anh Tuấn', data, company)} • <strong>Chức vụ:</strong> {parseVariables(block.props.position || 'Giám đốc', data, company)}</div>
-                <div style={{ fontSize: 12, color: '#334155' }}><strong>Mã số thuế:</strong> {parseVariables(block.props.taxCode || '', data, company)} • <strong>Điện thoại:</strong> {parseVariables(block.props.phone || '', data, company)}</div>
-                <div style={{ fontSize: 12, color: '#334155' }}><strong>Địa chỉ:</strong> {parseVariables(block.props.address || '', data, company)}</div>
+                <div style={{ fontWeight: 700, color: clr, fontSize: 13, marginBottom: 4 }}>{parseVariables(block.props.sellerTitle || 'BÊN BÁN (BÊN B)', data, company)}: {sellerName}</div>
+                <div style={{ fontSize: 12, color: '#334155' }}><strong>Đại diện:</strong> {sellerRep} • <strong>Chức vụ:</strong> {sellerPos}</div>
+                <div style={{ fontSize: 12, color: '#334155' }}><strong>Mã số thuế:</strong> {sellerTax} • <strong>Điện thoại:</strong> {sellerPhone}</div>
+                <div style={{ fontSize: 12, color: '#334155' }}><strong>Địa chỉ:</strong> {sellerAddr}</div>
               </div>
             </Col>
             <Col xs={24} md={block.props.columns === 1 ? 24 : 12}>
               <div style={{ padding: '10px 14px', background: block.props.buyerBackgroundColor || '#fff', border: (block.props.showBorder ?? true) ? `1px solid ${block.props.borderColor || '#e2e8f0'}` : 'none', borderRadius: 6, height: '100%' }}>
-                <div style={{ fontWeight: 700, color: '#0f172a', fontSize: 13, marginBottom: 4 }}>BÊN MUA (BÊN A): CÔNG TY KHÁCH HÀNG</div>
-                <div style={{ fontSize: 12, color: '#334155' }}><strong>Khách hàng:</strong> {custName}</div>
-                <div style={{ fontSize: 12, color: '#334155' }}><strong>Mã số thuế:</strong> {custTax} • <strong>Điện thoại:</strong> {custPhone}</div>
-                <div style={{ fontSize: 12, color: '#334155' }}><strong>Địa chỉ:</strong> {custAddress}</div>
+                <div style={{ fontWeight: 700, color: '#0f172a', fontSize: 13, marginBottom: 4 }}>
+                  {parseVariables(block.props.buyerTitle || 'BÊN MUA (BÊN A)', data, company)}
+                  {hasCompany ? `: ${buyerCompany}` : ''}
+                </div>
+                <div style={{ fontSize: 12, color: '#334155' }}><strong>{hasCompany ? 'Đại diện' : 'Khách hàng'}:</strong> {buyerName}</div>
+                {buyerTax && <div style={{ fontSize: 12, color: '#334155' }}><strong>Mã số thuế:</strong> {buyerTax} • <strong>Điện thoại:</strong> {buyerPhone}</div>}
+                {!buyerTax && buyerPhone && <div style={{ fontSize: 12, color: '#334155' }}><strong>Điện thoại:</strong> {buyerPhone}</div>}
+                {buyerAddr && <div style={{ fontSize: 12, color: '#334155' }}><strong>Địa chỉ:</strong> {buyerAddr}</div>}
               </div>
             </Col>
           </Row>
@@ -221,10 +254,25 @@ export default function QuotationRenderer({ layoutConfig, layoutStyle, data }) {
           tableData = tableData.filter(it => it.item_type !== 'service');
         }
         
+        if (isService && tableData.length === 0) {
+          return null;
+        }
+        
         const isLandscape = layoutConfig?.paper_orientation === 'landscape';
         const tableTitle = block.props.tableTitle;
+        const enableProductImage = block.props.enableProductImage !== false;
+        const enableNoteImage = block.props.enableNoteImage !== false;
+        const useComplexDimensions = block.props.useComplexDimensions !== false;
+        const dimCol = block.props.columns?.find(c => (typeof c === 'object' ? c.id : c) === 'dimensions');
+        const dimensionFieldsRaw = dimCol?.children || [];
+        const dimensionFields = dimensionFieldsRaw.length > 0
+          ? dimensionFieldsRaw.map(c => ({ id: c.id, label: c.title, width: 85 }))
+          : [{ id: 'height', label: 'Cao', width: 85 }, { id: 'width', label: 'Rộng', width: 85 }, { id: 'thickness', label: 'Dày', width: 85 }];
+        const BUILTIN_DIM = ['height', 'width', 'thickness'];
+        const getDimVal = (record, field) => BUILTIN_DIM.includes(field.id) ? record[field.id] : record.custom_data?.[`dim_${field.id}`];
+
         return (
-          <div style={{ marginBottom: 16 }}>
+          <div style={{ marginBottom: 0 }}>
             {tableTitle && <div style={{ fontWeight: 600, color: '#0f172a', fontSize: 13, marginBottom: 8, textTransform: 'uppercase' }}>{tableTitle}</div>}
             <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
               {block.props.showHeader !== false && (
@@ -239,12 +287,14 @@ export default function QuotationRenderer({ layoutConfig, layoutStyle, data }) {
                     if (colId === 'specs') return <th key="specs" style={{...thStyle, width: 150, textAlign: 'left'}}>{isService ? 'Ghi chú kỹ thuật' : 'Quy cách kỹ thuật'}</th>;
                     if (colId === 'dimensions') return (
                       <th key="dimensions" style={{...thStyle, padding: 0, width: 180}}>
-                        <div style={{ borderBottom: '1px solid #e2e8f0', padding: '4px 6px' }}>Kích thước (mm)</div>
-                        <div style={{ display: 'flex' }}>
-                          <div style={{ flex: 1, borderRight: '1px solid #e2e8f0', padding: '2px 6px' }}>Cao</div>
-                          <div style={{ flex: 1, borderRight: '1px solid #e2e8f0', padding: '2px 6px' }}>Rộng</div>
-                          <div style={{ flex: 1, padding: '2px 6px' }}>Dày</div>
-                        </div>
+                        <div style={{ borderBottom: useComplexDimensions ? '1px solid #e2e8f0' : 'none', padding: '4px 6px' }}>Kích thước (mm)</div>
+                        {useComplexDimensions && (
+                          <div style={{ display: 'flex' }}>
+                            {dimensionFields.map((field, idx) => (
+                              <div key={field.id} style={{ flex: 1, borderRight: idx < dimensionFields.length - 1 ? '1px solid #e2e8f0' : 'none', padding: '2px 6px' }}>{field.label}</div>
+                            ))}
+                          </div>
+                        )}
                       </th>
                     );
                     if (colId === 'note') return <th key="note" style={{...thStyle, width: 120, textAlign: 'left'}}>Ghi chú</th>;
@@ -300,7 +350,7 @@ export default function QuotationRenderer({ layoutConfig, layoutStyle, data }) {
                             <td key="name" rowSpan={rowSpan} style={{...tdStyle, verticalAlign: 'top'}}>
                               <strong style={{ color: '#1e293b' }}>{item.product_name || item.name}</strong>
                               {!showSpecs && (item.description || item.spec) && <div style={{ fontSize: 11, color: '#64748b', fontStyle: 'italic', whiteSpace: 'pre-wrap', marginTop: 2 }}>{item.description || item.spec}</div>}
-                              {item.product_image && <div style={{marginTop: 4}}><img src={item.product_image} alt="" style={{ maxWidth: 80, maxHeight: 80, borderRadius: 4, objectFit: 'contain' }} /></div>}
+                              {enableProductImage && item.product_image && <div style={{marginTop: 4}}><img src={item.product_image} alt="" style={{ maxWidth: 80, maxHeight: 80, borderRadius: 4, objectFit: 'contain' }} /></div>}
                             </td>
                           ) : null;
                           if (colId === 'symbol') return (
@@ -314,16 +364,35 @@ export default function QuotationRenderer({ layoutConfig, layoutStyle, data }) {
                             </td>
                           );
                           if (colId === 'dimensions') return (
-                            <td key="dimensions" style={{ ...tdStyle, padding: 0, verticalAlign: 'top' }}>
-                              <div style={{ display: 'flex', height: '100%' }}>
-                                <div style={{ flex: 1, borderRight: '1px dashed #e2e8f0', padding: '4px 6px', textAlign: 'center' }}>{item.height || ''}</div>
-                                <div style={{ flex: 1, borderRight: '1px dashed #e2e8f0', padding: '4px 6px', textAlign: 'center' }}>{item.width || ''}</div>
-                                <div style={{ flex: 1, padding: '4px 6px', textAlign: 'center' }}>{item.custom_data?.thickness || item.thickness || ''}</div>
-                              </div>
+                            <td key="dimensions" style={{ ...tdStyle, padding: 0, verticalAlign: 'middle' }}>
+                              {!useComplexDimensions || item.custom_data?.is_custom_size ? (
+                                <div style={{ height: '100%', padding: '4px 6px', display: 'flex', alignItems: 'center', whiteSpace: 'pre-wrap', textAlign: useComplexDimensions ? 'left' : 'center', justifyContent: useComplexDimensions ? 'flex-start' : 'center' }}>
+                                  {item.custom_data?.custom_size_text || (() => {
+                                      const parts = [];
+                                      if (item.height) parts.push(item.height);
+                                      if (item.width) parts.push(item.width);
+                                      if (item.thickness) parts.push(item.thickness);
+                                      return parts.join(' x ');
+                                  })()}
+                                </div>
+                              ) : (
+                                <div style={{ display: 'flex', height: '100%' }}>
+                                  {dimensionFields.map((field, idx) => (
+                                    <div key={field.id} style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', borderRight: idx < dimensionFields.length - 1 ? '1px dashed #e2e8f0' : 'none', padding: '4px 6px', textAlign: 'center' }}>
+                                      {getDimVal(item, field) || ''}
+                                    </div>
+                                  ))}
+                                </div>
+                              )}
                             </td>
                           );
                           if (colId === 'note') return (
-                            <td key="note" style={{ ...tdStyle, textAlign: 'left', whiteSpace: 'pre-wrap' }}>
+                            <td key="note" style={{ ...tdStyle, textAlign: 'center', whiteSpace: 'pre-wrap' }}>
+                              {enableNoteImage && item.custom_data?.note_image && (
+                                <div style={{ marginBottom: 4, display: 'flex', justifyContent: 'center' }}>
+                                  <img src={item.custom_data.note_image} alt="note" style={{ maxWidth: '100%', maxHeight: 60, objectFit: 'contain', borderRadius: 4, border: '1px solid #cbd5e1' }} />
+                                </div>
+                              )}
                               <span style={{color: '#475569', fontSize: 11}}>{item.note || item.custom_data?.note}</span>
                             </td>
                           );
@@ -384,7 +453,7 @@ export default function QuotationRenderer({ layoutConfig, layoutStyle, data }) {
       case BLOCK_TYPES.TOTALS:
         const isNested = !!block.parentId && block.parentId !== 'canvas';
         return (
-          <Row justify={isNested ? "center" : "end"} style={{ marginBottom: 16 }}>
+          <Row justify={isNested ? "center" : "end"} style={{ marginBottom: 0 }}>
             <Col xs={24} md={isNested ? 24 : 11} style={{ textAlign: 'right', padding: '10px 14px', background: block.props.backgroundColor ?? '#f8fafc', borderRadius: 6, border: (block.props.showBorder ?? true) ? `1px solid ${clr}40` : 'none' }}>
               {block.props.showSubtotal && <div style={{ fontSize: 12, color: '#64748b' }}>Cộng tiền hàng: {Number(totals?.subtotal || 0).toLocaleString()} đ</div>}
               {block.props.showDiscount && Number(totals?.discount || 0) > 0 && <div style={{ fontSize: 12, color: '#64748b' }}>Chiết khấu chung: -{Number(totals?.discount || 0).toLocaleString()} đ</div>}
@@ -403,10 +472,10 @@ export default function QuotationRenderer({ layoutConfig, layoutStyle, data }) {
         const payments = data?.payment_terms_schedule || [];
         const paidAmount = Number(data?.paid_amount || 0);
         const totalAmount = Number(data?.total_amount || totals?.total || 0);
-        const debtAmount = totalAmount - paidAmount;
         const progressTitle = block.props.title || 'Tiến độ thanh toán:';
+        const debtAmount = Number(totals?.total || data?.total_amount || 0) - Number(data?.paid_amount || 0);
         return (
-          <div style={{ marginBottom: 16 }}>
+          <div style={{ marginBottom: 0 }}>
             <div style={{ fontWeight: 600, color: '#0f172a', fontSize: 13, marginBottom: 8, textDecoration: 'underline' }}>{progressTitle}</div>
             {payments.length > 0 ? (
               <ul style={{ paddingLeft: 20, marginBottom: 12, fontSize: 12, color: '#334155' }}>
@@ -436,6 +505,11 @@ export default function QuotationRenderer({ layoutConfig, layoutStyle, data }) {
                 Thời gian giao hàng / thi công: <strong>{data.delivery_time || '3-5 ngày làm việc'}</strong>
               </div>
             )}
+            {block.props.showInstallationDate && data?.installation_date && (
+              <div style={{ fontSize: 12, color: '#334155', marginBottom: 4 }}>
+                Ngày giao hàng / lắp đặt dự kiến: <strong>{new Date(data.installation_date).toLocaleDateString('vi-VN')}</strong>
+              </div>
+            )}
             {block.props.showValidity && (data?.validity_days || data?.validity_days === 0) && (
               <div style={{ fontSize: 12, color: '#334155' }}>
                 Báo giá có giá trị trong vòng: <strong>{data.validity_days || 30} ngày</strong>
@@ -448,7 +522,7 @@ export default function QuotationRenderer({ layoutConfig, layoutStyle, data }) {
         let termContent = block.props.content || '';
         termContent = parseVariables(termContent, data, company);
         return (
-          <div style={{ marginBottom: 16 }}>
+          <div style={{ marginBottom: 0 }}>
             <div style={{ fontWeight: 600, color: '#0f172a', fontSize: 13, marginBottom: 6 }}>📝 Ghi chú & Điều khoản thanh toán:</div>
             <div style={{ background: '#f8fafc', padding: '10px 14px', borderRadius: 6, borderLeft: `4px solid ${clr}`, whiteSpace: 'pre-wrap', fontSize: 12, color: '#334155' }}>
               {termContent}
@@ -457,41 +531,23 @@ export default function QuotationRenderer({ layoutConfig, layoutStyle, data }) {
         );
 
       case BLOCK_TYPES.SIGNATURES:
-        const stImg = data?.company_info?.stamp || data?.company_info?.stamp_image;
-        const sigImg = data?.company_info?.signature || data?.company_info?.director_signature;
-        const directorName = data?.company_info?.director_name || '';
-        const hasCustomerSignature = data?.status === 'accepted' && data?.signature_image;
-
         return (
-          <Row justify="space-around" style={{ marginTop: 24, textAlign: 'center', paddingBottom: 16 }}>
+          <Row justify="space-around" style={{ marginTop: 12, textAlign: 'center', paddingBottom: 0 }}>
             {Array.from({ length: block.props.columns || 2 }).map((_, idx) => (
               <Col xs={24} md={24 / (block.props.columns || 2)} key={idx}>
                 <div style={{ fontWeight: 700, color: clr, fontSize: 13 }}>{block.props.titles?.[idx] || 'CHỮ KÝ'}</div>
                 <div style={{ fontSize: 11, color: '#64748b', fontStyle: 'italic', marginBottom: 12 }}>(Ký, đóng dấu & ghi rõ họ tên)</div>
                 
-                {/* Customer Signature (Left column usually) */}
-                {idx === 0 && block.props.columns > 1 ? (
-                  hasCustomerSignature ? (
-                    <div style={{ height: 115, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
-                      <img src={data.signature_image} alt="Customer Signature" style={{ height: 90, objectFit: 'contain' }} />
-                    </div>
+                <div style={{ minHeight: 140, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'flex-start', paddingTop: 10, position: 'relative' }}>
+                  {block.props.signatures?.[idx] ? (
+                    <div 
+                      dangerouslySetInnerHTML={{ __html: parseVariables(block.props.signatures[idx], data, company) }} 
+                      style={{ display: 'block', textAlign: 'center', whiteSpace: 'pre-wrap', position: 'relative', width: '100%' }}
+                    />
                   ) : (
                     <div style={{ height: 115 }} />
-                  )
-                ) : (
-                  /* Company Signature (Right column usually, or single column) */
-                  <div style={{ height: 115, display: 'flex', alignItems: 'center', justifyContent: 'center', position: 'relative' }}>
-                    {stImg && <img src={stImg} alt="Stamp" style={{ height: 115, maxWidth: 165, position: 'absolute', opacity: 0.88, zIndex: 1, objectFit: 'contain' }} />}
-                    {sigImg && <img src={sigImg} alt="Signature" style={{ height: 95, maxWidth: 200, position: 'relative', zIndex: 2, objectFit: 'contain' }} />}
-                  </div>
-                )}
-                
-                {idx === 0 && block.props.columns > 1 && hasCustomerSignature && (
-                  <div style={{ fontWeight: 600, color: '#0f172a', fontSize: 14 }}>{data.customer_name_signed || customer?.name}</div>
-                )}
-                {(idx === 1 || block.props.columns === 1) && (
-                  <div style={{ fontWeight: 600, color: '#0f172a', fontSize: 14 }}>{directorName}</div>
-                )}
+                  )}
+                </div>
               </Col>
             ))}
           </Row>
@@ -509,7 +565,7 @@ export default function QuotationRenderer({ layoutConfig, layoutStyle, data }) {
               return (
                 <Col span={24 / (block.props.columns || 2)} key={idx}>
                   {colBlocks.map(childBlock => (
-                    <div key={childBlock.id} style={{ marginBottom: 16 }}>
+                    <div key={childBlock.id} style={{ marginBottom: 12 }}>
                       {renderBlock(childBlock)}
                     </div>
                   ))}
@@ -529,7 +585,7 @@ export default function QuotationRenderer({ layoutConfig, layoutStyle, data }) {
   return (
     <div style={{ fontFamily }}>
       {allBlocks.filter(b => !b.parentId || b.parentId === 'canvas').map((block) => (
-        <div key={block.id} style={{ marginBottom: 16 }}>
+        <div key={block.id} style={{ marginBottom: 12 }}>
           {renderBlock(block)}
         </div>
       ))}

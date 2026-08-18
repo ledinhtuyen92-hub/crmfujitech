@@ -62,24 +62,36 @@ export default function QuotationPrintView({ quotation, type = 'quotation', effe
   if (!quotation) return null;
 
   // Map backend quotation data to QuotationRenderer format
+  const companyInfo = quotation.company_info || effectiveTemplate?.company_info || null;
+  const customerInfo = quotation.customer_info || {};
+  
   const quotationData = {
     ...quotation,
+    // Items (sản phẩm)
+    items: quotation.items || [],
+    // Totals
     totals: {
-      subtotal: quotation.subtotal || quotation.sub_total || 0,
-      discount: quotation.discount_total || quotation.discount_amount || 0,
-      tax: quotation.vat_amount || quotation.tax_amount || 0,
-      tax_percent: quotation.vat_rate || quotation.tax_percent || 0,
-      shipping_fee: quotation.shipping_fee || 0,
-      installation_fee: quotation.installation_fee || 0,
-      total: quotation.total_amount || 0,
+      subtotal: Number(quotation.subtotal || quotation.sub_total || 0),
+      discount: Number(quotation.discount_total || quotation.discount_amount || 0),
+      tax: Number(quotation.vat_amount || quotation.tax_amount || 0),
+      tax_percent: Number(quotation.vat_rate || quotation.tax_percent || 0),
+      shipping_fee: Number(quotation.shipping_fee || 0),
+      installation_fee: Number(quotation.installation_fee || 0),
+      total: Number(quotation.total_amount || 0),
     },
+    // Customer — merge từ nhiều nguồn
     customer: {
-      name: quotation.customer_name,
-      phone: quotation.customer_phone,
-      address: quotation.customer_address,
-      ...quotation.customer_info
+      name: customerInfo.name || quotation.customer_name || '',
+      phone: customerInfo.phone || quotation.customer_phone || '',
+      email: customerInfo.email || quotation.customer_email || '',
+      address: customerInfo.address || quotation.customer_address || '',
+      city: customerInfo.city || quotation.customer_city || '',
+      company_name: customerInfo.company_name || quotation.customer_name || '',
+      tax_code: customerInfo.tax_code || '',
+      representative_name: customerInfo.representative_name || customerInfo.name || quotation.customer_name || '',
     },
-    company_info: quotation.company_info || effectiveTemplate?.company_info
+    // Company — từ company_info của API
+    company: companyInfo,
   };
 
   return (

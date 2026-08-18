@@ -1,5 +1,6 @@
 import React from 'react';
-import { Form, Input, Select, Switch, InputNumber, Divider, Typography, Tag, Tooltip, message } from 'antd';
+import { Form, Input, Select, Switch, InputNumber, Divider, Typography, Tag, Tooltip, message, Button } from 'antd';
+import { SwapOutlined, DeleteOutlined, PlusOutlined, HolderOutlined } from '@ant-design/icons';
 import { BLOCK_TYPES } from './constants';
 import ColumnManager from './ColumnManager';
 import { TEMPLATE_VARIABLES } from '../../../utils/templateVariables';
@@ -7,6 +8,88 @@ import { TEMPLATE_VARIABLES } from '../../../utils/templateVariables';
 const { Option } = Select;
 const { TextArea } = Input;
 const { Text } = Typography;
+
+// ── DimensionFieldsManager ─────────────────────────────────────────────────
+const DEFAULT_DIM_FIELDS = [
+  { id: 'height', label: 'Cao', width: 85 },
+  { id: 'width', label: 'Rộng', width: 85 },
+  { id: 'thickness', label: 'Dày', width: 85 },
+];
+
+const DimensionFieldsManager = ({ value, onChange }) => {
+  const fields = (value && value.length > 0) ? value : DEFAULT_DIM_FIELDS;
+  const BUILTIN = ['height', 'width', 'thickness'];
+
+  const handleLabelChange = (idx, newLabel) => {
+    const next = fields.map((f, i) => i === idx ? { ...f, label: newLabel } : f);
+    onChange(next);
+  };
+
+  const handleRemove = (idx) => {
+    if (fields.length <= 1) { message.warning('Phải giữ ít nhất 1 trường kích thước!'); return; }
+    onChange(fields.filter((_, i) => i !== idx));
+  };
+
+  const handleAdd = () => {
+    const newId = `dim_${Date.now()}`;
+    onChange([...fields, { id: newId, label: 'Trường mới', width: 85 }]);
+  };
+
+  const handleMoveUp = (idx) => {
+    if (idx === 0) return;
+    const next = [...fields];
+    [next[idx - 1], next[idx]] = [next[idx], next[idx - 1]];
+    onChange(next);
+  };
+
+  const handleMoveDown = (idx) => {
+    if (idx === fields.length - 1) return;
+    const next = [...fields];
+    [next[idx], next[idx + 1]] = [next[idx + 1], next[idx]];
+    onChange(next);
+  };
+
+  return (
+    <div style={{ border: '1px solid #e2e8f0', borderRadius: 6, padding: '10px 8px', background: '#f8fafc' }}>
+      {fields.map((field, idx) => (
+        <div key={field.id} style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 8 }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+            <Button type="text" size="small" icon={<HolderOutlined style={{ fontSize: 10 }} />}
+              onClick={() => handleMoveUp(idx)} disabled={idx === 0}
+              style={{ padding: '0 4px', height: 16, lineHeight: 1, color: '#94a3b8' }} />
+            <Button type="text" size="small" icon={<HolderOutlined style={{ fontSize: 10, transform: 'rotate(180deg)' }} />}
+              onClick={() => handleMoveDown(idx)} disabled={idx === fields.length - 1}
+              style={{ padding: '0 4px', height: 16, lineHeight: 1, color: '#94a3b8' }} />
+          </div>
+          <Input
+            size="small"
+            value={field.label}
+            onChange={(e) => handleLabelChange(idx, e.target.value)}
+            style={{ flex: 1 }}
+            placeholder="Tên hiển thị"
+          />
+          {!BUILTIN.includes(field.id) && (
+            <Tag color="blue" style={{ fontSize: 10, margin: 0 }}>tuỳ chỉnh</Tag>
+          )}
+          <Tooltip title={BUILTIN.includes(field.id) ? 'Không thể xoá trường gốc (chỉ đổi tên)' : 'Xoá trường này'}>
+            <Button
+              type="text" danger size="small" icon={<DeleteOutlined />}
+              disabled={BUILTIN.includes(field.id)}
+              onClick={() => handleRemove(idx)}
+            />
+          </Tooltip>
+        </div>
+      ))}
+      <Button type="dashed" icon={<PlusOutlined />} size="small" onClick={handleAdd}
+        style={{ width: '100%', marginTop: 4 }}>
+        Thêm trường kích thước
+      </Button>
+      <div style={{ fontSize: 11, color: '#94a3b8', marginTop: 6 }}>
+        💡 Trường gốc (Cao/Rộng/Dày) chỉ có thể đổi tên, không xoá được. Trường tuỳ chỉnh mới thêm có thể xoá.
+      </div>
+    </div>
+  );
+};
 
 const VariableHints = () => {
   const grouped = TEMPLATE_VARIABLES.reduce((acc, v) => {
@@ -137,8 +220,8 @@ export default function SettingsPanel({ block, onChange }) {
               <TextArea rows={3} />
             </Form.Item>
             <VariableHints />
-            <Form.Item name="showDate" label="Hiển thị Số & Ngày" valuePropName="checked">
-              <Switch />
+            <Form.Item name="metaText" label="Dòng thông tin phụ (Số / Ngày tháng)" extra="Mẹo: Dùng biến {{quotation_code}} và {{current_date}}">
+              <Input placeholder="Số: {{quotation_code}} | Ngày: {{current_date}}" />
             </Form.Item>
             <Form.Item name="themeColor" label="Màu Sắc Chủ Đạo">
               <Input type="color" />
@@ -149,6 +232,9 @@ export default function SettingsPanel({ block, onChange }) {
         return (
           <>
             <div style={{ fontWeight: 600, color: '#334155', marginBottom: 8, paddingBottom: 4, borderBottom: '1px solid #e2e8f0' }}>Thông tin Bên Bán (Bên B)</div>
+            <Form.Item name="sellerTitle" label="Tiêu đề khối">
+              <Input placeholder="VD: BÊN BÁN (BÊN B)" />
+            </Form.Item>
             <Form.Item name="companyName" label="Tên Công ty">
               <Input placeholder="Dùng biến {{company_name}} hoặc nhập tay..." />
             </Form.Item>
@@ -167,6 +253,29 @@ export default function SettingsPanel({ block, onChange }) {
             <Form.Item name="address" label="Địa chỉ">
               <TextArea rows={2} placeholder="Dùng biến {{company_address}} hoặc nhập tay..." />
             </Form.Item>
+
+            <Divider style={{ margin: '12px 0' }} />
+            <div style={{ fontWeight: 600, color: '#334155', marginBottom: 8, paddingBottom: 4, borderBottom: '1px solid #e2e8f0' }}>Thông tin Bên Mua (Bên A)</div>
+            <Form.Item name="buyerTitle" label="Tiêu đề khối">
+              <Input placeholder="VD: BÊN MUA (BÊN A)" />
+            </Form.Item>
+            <Form.Item name="buyerCompany" label="Tên công ty khách hàng">
+              <Input placeholder="Dùng biến {{customer_company}} hoặc nhập tay..." />
+            </Form.Item>
+            <Form.Item name="buyerName" label="Khách hàng / Người đại diện">
+              <Input placeholder="Dùng biến {{customer_name}} hoặc nhập tay..." />
+            </Form.Item>
+            <Form.Item name="buyerTaxCode" label="Mã số thuế">
+              <Input placeholder="Dùng biến {{customer_tax_code}} hoặc nhập tay..." />
+            </Form.Item>
+            <Form.Item name="buyerPhone" label="Số điện thoại">
+              <Input placeholder="Dùng biến {{customer_phone}} hoặc nhập tay..." />
+            </Form.Item>
+            <Form.Item name="buyerAddress" label="Địa chỉ">
+              <TextArea rows={2} placeholder="Dùng biến {{customer_address}} hoặc nhập tay..." />
+            </Form.Item>
+
+            <VariableHints />
 
             <Divider style={{ margin: '12px 0' }} />
             <div style={{ fontWeight: 600, color: '#334155', marginBottom: 8, paddingBottom: 4, borderBottom: '1px solid #e2e8f0' }}>Tùy chỉnh giao diện hiển thị</div>
@@ -208,7 +317,24 @@ export default function SettingsPanel({ block, onChange }) {
             <Form.Item name="showBorder" label="Hiển thị khung viền bảng" valuePropName="checked" initialValue={true}>
               <Switch />
             </Form.Item>
-            <Form.Item name="columns" label="Quản lý cột hiển thị">
+            
+            <Divider style={{ margin: '12px 0' }} />
+            <div style={{ fontWeight: 600, color: '#334155', marginBottom: 8, paddingBottom: 4, borderBottom: '1px solid #e2e8f0' }}>Cài đặt tính năng nâng cao</div>
+            <Form.Item name="enableProductImage" label="Cho phép tải & hiển thị ảnh Mẫu cửa/Sản phẩm" valuePropName="checked" initialValue={true} tooltip="Nếu bật, sẽ có nút chụp ảnh trong bảng và hiện ảnh thu nhỏ">
+              <Switch />
+            </Form.Item>
+            <Form.Item name="enableNoteImage" label="Cho phép tải & hiển thị ảnh Ghi chú" valuePropName="checked" initialValue={true}>
+              <Switch />
+            </Form.Item>
+            {block.type === BLOCK_TYPES.PRODUCT_TABLE && (
+              <Form.Item name="useComplexDimensions" label="Sử dụng cột Kích thước chia ngách" valuePropName="checked" initialValue={true} tooltip="Nếu tắt, cột Kích thước sẽ chỉ là 1 ô nhập chữ thông thường">
+                <Switch />
+              </Form.Item>
+            )}
+
+            <Divider style={{ margin: '12px 0' }} />
+            <div style={{ fontWeight: 600, color: '#334155', marginBottom: 8, paddingBottom: 4, borderBottom: '1px solid #e2e8f0' }}>Quản lý Cột & Giao diện</div>
+            <Form.Item name="columns" label="Danh sách cột hiển thị">
               <ColumnManager />
             </Form.Item>
             <Form.Item name="themeColor" label="Màu Sắc Chủ Đạo">
@@ -270,7 +396,7 @@ export default function SettingsPanel({ block, onChange }) {
             <Form.Item name="showPaidAndDebt" label="Hiển thị Đã thanh toán / Còn nợ" valuePropName="checked">
               <Switch />
             </Form.Item>
-            <Form.Item name="showDeliveryTime" label="Thời gian giao hàng / thi công" valuePropName="checked">
+            <Form.Item name="showInstallationDate" label="Ngày giao hàng / lắp đặt dự kiến" valuePropName="checked">
               <Switch />
             </Form.Item>
             <Form.Item name="showValidity" label="Hiệu lực báo giá" valuePropName="checked">
@@ -291,26 +417,73 @@ export default function SettingsPanel({ block, onChange }) {
           </>
         );
       case BLOCK_TYPES.SIGNATURES:
+        const sigCols = form.getFieldValue('columns') || 2;
         return (
           <>
             <Form.Item name="columns" label="Số lượng chữ ký (Cột)">
-              <Select>
+              <Select onChange={() => form.setFieldsValue({ columns: form.getFieldValue('columns') })}>
                 <Option value={1}>1 Người ký</Option>
                 <Option value={2}>2 Người ký</Option>
                 <Option value={3}>3 Người ký</Option>
                 <Option value={4}>4 Người ký</Option>
               </Select>
             </Form.Item>
-            <Form.Item label="Tiêu đề Người ký 1 (Bên trái)">
-              <Form.Item name={['titles', 0]} noStyle>
-                <Input placeholder="Vd: KHÁCH HÀNG" />
-              </Form.Item>
-            </Form.Item>
-            <Form.Item label="Tiêu đề Người ký 2 (Bên phải)">
-              <Form.Item name={['titles', 1]} noStyle>
-                <Input placeholder="Vd: ĐẠI DIỆN CÔNG TY" />
-              </Form.Item>
-            </Form.Item>
+            
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8, paddingBottom: 4, borderBottom: '1px solid #e2e8f0' }}>
+              <span style={{ fontWeight: 600, color: '#334155' }}>Tiêu đề và chữ ký</span>
+              {sigCols >= 2 && (
+                <Button 
+                  type="text" 
+                  size="small" 
+                  icon={<SwapOutlined />} 
+                  onClick={() => {
+                    const titles = form.getFieldValue('titles') || [];
+                    const signatures = form.getFieldValue('signatures') || [];
+                    
+                    const newTitles = [...titles];
+                    const newSignatures = [...signatures];
+                    
+                    if (newTitles.length >= 2) {
+                      const temp = newTitles[0];
+                      newTitles[0] = newTitles[1];
+                      newTitles[1] = temp;
+                    }
+                    if (newSignatures.length >= 2) {
+                      const temp = newSignatures[0];
+                      newSignatures[0] = newSignatures[1];
+                      newSignatures[1] = temp;
+                    }
+                    
+                    form.setFieldsValue({ titles: newTitles, signatures: newSignatures });
+                    
+                    // Trigger onChange
+                    const currentValues = form.getFieldsValue();
+                    onValuesChange(null, currentValues);
+                  }}
+                  style={{ fontSize: 12, color: '#1677ff' }}
+                >
+                  Đổi vị trí (1 ↔ 2)
+                </Button>
+              )}
+            </div>
+            
+            {Array.from({ length: sigCols }).map((_, index) => (
+              <div key={index} style={{ marginBottom: 12, border: '1px solid #e2e8f0', padding: '10px 8px', borderRadius: 6, background: '#f8fafc' }}>
+                <Form.Item label={`Tiêu đề Người ký ${index + 1}`} style={{ marginBottom: 10 }}>
+                  <Form.Item name={['titles', index]} noStyle>
+                    <Input placeholder={`Vd: ĐẠI DIỆN ${index + 1}`} />
+                  </Form.Item>
+                </Form.Item>
+                <Form.Item label={`Biến chữ ký / dấu ${index + 1}`} style={{ marginBottom: 0 }}>
+                  <Form.Item name={['signatures', index]} noStyle>
+                    <Input placeholder="Vd: {{company_signature}} {{company_stamp}}" />
+                  </Form.Item>
+                </Form.Item>
+              </div>
+            ))}
+
+            <VariableHints />
+
             <Form.Item name="themeColor" label="Màu Sắc Chủ Đạo">
               <Input type="color" />
             </Form.Item>
@@ -349,42 +522,7 @@ export default function SettingsPanel({ block, onChange }) {
             </Text>
           </>
         );
-      case BLOCK_TYPES.SIGNATURES:
-        return (
-          <>
-            <Form.Item name="columns" label="Số lượng chữ ký">
-              <Select>
-                <Option value={1}>1 Chữ ký</Option>
-                <Option value={2}>2 Chữ ký</Option>
-                <Option value={3}>3 Chữ ký</Option>
-                <Option value={4}>4 Chữ ký</Option>
-              </Select>
-            </Form.Item>
-            <Text type="secondary" style={{ display: 'block', marginBottom: 16 }}>
-              Tiêu đề các chữ ký:
-            </Text>
-            <Form.List name="titles">
-              {(fields, { add, remove }) => (
-                <>
-                  {fields.map((field, index) => (
-                    <Form.Item
-                      key={field.key}
-                      label={`Chữ ký ${index + 1}`}
-                      required={false}
-                    >
-                      <Form.Item
-                        {...field}
-                        noStyle
-                      >
-                        <Input placeholder="Người lập biểu / Giám đốc..." />
-                      </Form.Item>
-                    </Form.Item>
-                  ))}
-                </>
-              )}
-            </Form.List>
-          </>
-        );
+
       default:
         return <Text type="secondary">Chưa có cài đặt chi tiết cho loại khối này.</Text>;
     }

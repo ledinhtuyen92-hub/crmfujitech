@@ -94,6 +94,8 @@ class CustomerSerializer(serializers.ModelSerializer):
             "id",
             "company",
             "name",
+            "company_name",
+            "tax_code",
             "phone",
             "email",
             "address",
@@ -138,25 +140,30 @@ class CustomerSerializer(serializers.ModelSerializer):
 
     def validate_status(self, value):
         if self.instance and self.instance.pk:
+            # If status hasn't changed, no need to validate
+            if value == self.instance.status:
+                return value
+                
             from orders.models import Order
             valid_orders_count = self.instance.orders.exclude(
                 status__in=[Order.STATUS_CANCELLED, Order.STATUS_REJECTED]
             ).count()
             
             if valid_orders_count > 0:
-                if value not in [Customer.STATUS_HAS_ORDER, Customer.STATUS_REPEAT_ORDER]:
-                    raise serializers.ValidationError(
-                        "Khách hàng này đã có đơn hàng trên hệ thống. KHÔNG ĐƯỢC PHÉP lùi trạng thái về các bước trước đó để tránh sai lệch dữ liệu."
-                    )
-                if value != self.instance.status:
-                    raise serializers.ValidationError(
-                        "Trạng thái 'Đã có đơn hàng' và 'Mua thêm đơn hàng' là trạng thái được hệ thống TỰ ĐỘNG CẬP NHẬT. Bạn không được phép đổi thủ công."
-                    )
-                return value
+                raise serializers.ValidationError(
+                    "Khách hàng này đã có đơn hàng trên hệ thống. KHÔNG ĐƯỢC PHÉP thay đổi trạng thái thủ công để tránh sai lệch dữ liệu."
+                )
                 
+            if value in [Customer.STATUS_HAS_ORDER, Customer.STATUS_REPEAT_ORDER]:
+                raise serializers.ValidationError(
+                    "Trạng thái 'Đã có đơn hàng' và 'Mua thêm đơn hàng' là trạng thái được hệ thống TỰ ĐỘNG CẬP NHẬT. Bạn không được phép đổi thủ công."
+                )
+                
+            return value
+            
         if value in [Customer.STATUS_HAS_ORDER, Customer.STATUS_REPEAT_ORDER]:
             raise serializers.ValidationError(
-                "Trạng thái 'Đã có đơn hàng' và 'Mua thêm đơn hàng' là trạng thái được hệ thống TỰ ĐỘNG CẬP NHẬT khi có đơn hàng. Bạn không được phép chọn thủ công."
+                "Không thể tạo mới khách hàng với trạng thái này."
             )
         return value
     def validate_phone(self, value):

@@ -18,13 +18,18 @@ export const TEMPLATE_VARIABLES = [
   
   { tag: '{{customer_name}}', label: 'Tên KH/Đại diện', type: 'customer' },
   { tag: '{{customer_company}}', label: 'Tên công ty KH', type: 'customer' },
+  { tag: '{{customer_tax_code}}', label: 'Mã số thuế KH', type: 'customer' },
   { tag: '{{customer_address}}', label: 'Địa chỉ KH', type: 'customer' },
   { tag: '{{customer_phone}}', label: 'SĐT KH', type: 'customer' },
   { tag: '{{customer_email}}', label: 'Email KH', type: 'customer' },
+  { tag: '{{customer_signature}}', label: 'Chữ ký khách hàng', type: 'customer' },
   
   { tag: '{{quotation_code}}', label: 'Mã báo giá/Đơn hàng', type: 'quotation' },
   { tag: '{{quotation_date}}', label: 'Ngày báo giá', type: 'quotation' },
   { tag: '{{current_date}}', label: 'Ngày hiện tại', type: 'quotation' },
+  { tag: '{{quotation_notes}}', label: 'Ghi chú & Điều khoản chung', type: 'quotation' },
+  { tag: '{{delivery_date}}', label: 'Ngày giao hàng/lắp đặt', type: 'quotation' },
+  { tag: '{{delivery_time}}', label: 'Thời gian giao/thi công', type: 'quotation' },
   { tag: '{{total_amount}}', label: 'Tổng tiền', type: 'quotation' },
 ];
 
@@ -50,21 +55,26 @@ export const parseVariables = (text, quotationData = {}, companyData = {}, total
     '{{company_website}}': companyData?.website || '[Website công ty]',
     '{{director_name}}': companyData?.director_name || '[Tên giám đốc]',
     '{{director_title}}': companyData?.director_title || 'Giám đốc',
-    '{{company_logo}}': companyData?.logo ? `<img src="${companyData.logo}" alt="Logo" style="max-height: 60px; object-fit: contain;" />` : '[Logo công ty]',
-    '{{company_stamp}}': companyData?.stamp_image ? `<img src="${companyData.stamp_image}" alt="Stamp" style="max-height: 100px; object-fit: contain;" />` : '[Dấu công ty]',
-    '{{company_signature}}': companyData?.director_signature ? `<img src="${companyData.director_signature}" alt="Signature" style="max-height: 80px; object-fit: contain;" />` : '[Chữ ký]',
+    '{{company_logo}}': companyData?.logo ? `<img src="${companyData.logo}" alt="Logo" style="max-height: 60px; object-fit: contain;" />` : '',
+    '{{company_stamp}}': companyData?.stamp_image ? `<img src="${companyData.stamp_image}" alt="Stamp" style="position: absolute; top: -15px; left: 50%; transform: translateX(-50%); max-height: 125px; opacity: 0.85; z-index: 0; object-fit: contain;" />` : '',
+    '{{company_signature}}': companyData?.director_signature ? `<img src="${companyData.director_signature}" alt="Signature" style="position: relative; max-height: 70px; z-index: 10; object-fit: contain;" />` : '',
     
-    // Customer data
-    '{{customer_name}}': quotationData?.customer?.name || '[Tên khách hàng]',
-    '{{customer_company}}': quotationData?.customer?.company_name || quotationData?.customer?.name || '[Tên công ty KH]',
-    '{{customer_address}}': quotationData?.customer?.address || '[Địa chỉ khách hàng]',
-    '{{customer_phone}}': quotationData?.customer?.phone || '[SĐT khách hàng]',
-    '{{customer_email}}': quotationData?.customer?.email || '[Email khách hàng]',
+    // Customer data — đọc từ nhiều nguồn có thể được truyền vào
+    '{{customer_name}}': quotationData?.customer?.name || quotationData?.customer?.representative_name || '',
+    '{{customer_company}}': quotationData?.customer?.company_name || quotationData?.customer?.name || '',
+    '{{customer_tax_code}}': quotationData?.customer?.tax_code || '',
+    '{{customer_address}}': [quotationData?.customer?.address, quotationData?.customer?.city].filter(Boolean).join(' - ') || '',
+    '{{customer_phone}}': quotationData?.customer?.phone || '',
+    '{{customer_email}}': quotationData?.customer?.email || '',
+    '{{customer_signature}}': (quotationData?.status === 'accepted' && quotationData?.signature_image) ? `<img src="${quotationData.signature_image}" alt="Signature" style="max-height: 80px; object-fit: contain;" />` : '',
     
     // Quotation data
-    '{{quotation_code}}': quotationData?.code || quotationData?.order_code || '[Mã báo giá/đơn hàng]',
-    '{{quotation_date}}': quotationData?.date || '[Ngày báo giá]',
+    '{{quotation_code}}': quotationData?.code || quotationData?.order_code || quotationData?.order_number || quotationData?.quotation_number || '',
+    '{{quotation_date}}': quotationData?.date || (quotationData?.created_at ? new Date(quotationData.created_at).toLocaleDateString('vi-VN') : ''),
     '{{current_date}}': new Date().toLocaleDateString('vi-VN'),
+    '{{quotation_notes}}': quotationData?.notes || '',
+    '{{delivery_time}}': quotationData?.delivery_time || '',
+    '{{delivery_date}}': quotationData?.installation_date ? new Date(quotationData.installation_date).toLocaleDateString('vi-VN') : '',
     '{{total_amount}}': (() => {
       const total = quotationData?.total_amount || totals?.total || 0;
       return `${Number(total).toLocaleString()} đ`;
