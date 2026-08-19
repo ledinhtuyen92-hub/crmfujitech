@@ -56,7 +56,7 @@ export const parseVariables = (text, quotationData = {}, companyData = {}, total
     '{{director_name}}': companyData?.director_name || '[Tên giám đốc]',
     '{{director_title}}': companyData?.director_title || 'Giám đốc',
     '{{company_logo}}': companyData?.logo ? `<img src="${companyData.logo}" alt="Logo" style="max-height: 60px; object-fit: contain;" />` : '',
-    '{{company_stamp}}': companyData?.stamp_image ? `<img src="${companyData.stamp_image}" alt="Stamp" style="position: absolute; top: -15px; left: 50%; transform: translateX(-50%); max-height: 125px; opacity: 0.85; z-index: 0; object-fit: contain;" />` : '',
+    '{{company_stamp}}': companyData?.stamp_image ? `<img src="${companyData.stamp_image}" alt="Stamp" style="position: absolute; top: -20px; left: 50%; transform: translateX(-50%); max-height: 125px; opacity: 0.85; z-index: 0; object-fit: contain;" />` : '',
     '{{company_signature}}': companyData?.director_signature ? `<img src="${companyData.director_signature}" alt="Signature" style="position: relative; max-height: 70px; z-index: 10; object-fit: contain;" />` : '',
     
     // Customer data — đọc từ nhiều nguồn có thể được truyền vào

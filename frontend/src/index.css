@@ -116,7 +116,7 @@ h4.ant-typography,
 }
 
 
-/* ── Print Styles for Quotations & Multi-page Tables ────────────── */
+/* ── Print Styles ────────────── */
 @media print {
 
   /* Warranty: landscape by default */
@@ -124,7 +124,7 @@ h4.ant-typography,
     display: none;
   }
 
-  /* Hide Ant Design drawer headers, masks, toasts/messages, notifications, close buttons */
+  /* Hide Ant Design UI elements and no-print items */
   .ant-message,
   .ant-notification,
   .ant-tooltip,
@@ -136,7 +136,6 @@ h4.ant-typography,
     display: none !important;
   }
 
-  /* 3. Strip fixed heights, positioning, shadows, and scrollbars from Drawer wrappers */
   body,
   html {
     background: #ffffff !important;
@@ -169,7 +168,6 @@ h4.ant-typography,
     margin: 0 !important;
   }
 
-  /* 4. Ensure Content flows naturally across pages */
   .printable-quotation-content,
   .printable-transaction-content,
   .printable-receipt-content,
@@ -198,9 +196,17 @@ h4.ant-typography,
     display: table-footer-group !important;
   }
 
+  /* Force Ant Design Grid columns to keep their desktop widths when printing */
+  .ant-col-md-12 { flex: 0 0 50% !important; max-width: 50% !important; }
+  .ant-col-md-8  { flex: 0 0 33.33333333% !important; max-width: 33.33333333% !important; }
+  .ant-col-md-6  { flex: 0 0 25% !important; max-width: 25% !important; }
+  .ant-col-md-24 { flex: 0 0 100% !important; max-width: 100% !important; }
+
   .signature-block {
     page-break-inside: avoid !important;
     break-inside: avoid !important;
     margin-top: 36px !important;
   }
 }
+
+/* NOTE: @page { size, margin } is controlled per-component (QuotationPrintView) via inline <style> */

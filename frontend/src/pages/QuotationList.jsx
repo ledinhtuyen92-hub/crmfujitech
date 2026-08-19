@@ -783,15 +783,23 @@ export default function QuotationList() {
     }
 
     const effectiveTmpl = getEffectiveTemplate(selectedQuotation)
-    const isLand = effectiveTmpl?.layout_config?.paper_orientation === 'landscape' || effectiveTmpl?.code === 'production_landscape_a4'
+    const rawConfig = effectiveTmpl?.layout_config || {}
+    const isLand = rawConfig.paper_orientation === 'landscape'
+      || effectiveTmpl?.layout_style === 'A4_Landscape'
+      || effectiveTmpl?.code === 'production_landscape_a4'
+      || selectedQuotation?.layout_style === 'A4_Landscape'
+
+    // A4 kích thước thực (px at 96dpi): Portrait=794x1123, Landscape=1123x794
+    const winW = isLand ? 1170 : 840
+    const winH = isLand ? 860 : 1160
 
     // Collect all existing stylesheets from the current document
     const styleTags = Array.from(document.querySelectorAll('style, link[rel="stylesheet"]'))
       .map((el) => el.outerHTML)
       .join('\n')
 
-    // Open dedicated printable window without Ant Design Drawer wrappers
-    const printWin = window.open('', '_blank', 'width=1180,height=850')
+    // Open dedicated printable window sized to A4
+    const printWin = window.open('', '_blank', `width=${winW},height=${winH},toolbar=0,menubar=0,scrollbars=1`)
     if (!printWin) {
       const oldTitle = document.title
       document.title = qNum
@@ -800,100 +808,68 @@ export default function QuotationList() {
       return
     }
 
+    // Đọc giá trị zoom/scale hiện tại từ DOM (được set bởi QuotationPrintView)
+    const currentZoom = parseFloat(contentEl.style.zoom) || 1
+
     printWin.document.write(`
       <!DOCTYPE html>
       <html>
       <head>
         <meta charset="utf-8" />
         <title>${qNum}</title>
+        <!-- Preload Inter font để tránh lệch layout do fallback font -->
+        <link rel="preconnect" href="https://fonts.googleapis.com" />
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" />
         ${styleTags}
         <style>
-          @media print {
-            body, html, .printable-quotation-content {
-              display: block !important;
-              visibility: visible !important;
-              opacity: 1 !important;
-            }
-          }
-          @page {
-            size: A4 ${isLand ? 'landscape' : 'portrait'};
-            margin: 8mm;
-          }
-          * {
-            box-sizing: border-box;
-          }
+          /* ==== PRINT-WINDOW RESET ==== */
+          * { box-sizing: border-box; }
           html, body {
             margin: 0 !important;
             padding: 0 !important;
             background: #ffffff !important;
             color: #0f172a !important;
-            font-family: Inter, ui-sans-serif, system-ui, Arial, sans-serif !important;
+            font-family: 'Inter', ui-sans-serif, system-ui, Arial, sans-serif !important;
             width: 100% !important;
             height: auto !important;
             overflow: visible !important;
             -webkit-print-color-adjust: exact !important;
             print-color-adjust: exact !important;
           }
+          /* Áp dụng đúng zoom mà user đã chọn */
           .printable-quotation-content {
-            width: ${isLand ? '1060px' : '730px'} !important;
+            zoom: ${currentZoom} !important;
+            transform: none !important;
+            width: 100% !important;
             max-width: 100% !important;
             height: auto !important;
             overflow: visible !important;
-            margin: 0 auto !important;
+            margin: 0 !important;
             padding: 0 !important;
           }
-          @media print {
-            .printable-quotation-content > div:first-child {
-              margin-bottom: 6px !important;
-              padding: 8px 14px !important;
-            }
-            .printable-quotation-content h2 {
-              font-size: 18px !important;
-              margin: 4px 0 !important;
-            }
-            .ant-card {
-              margin-bottom: 8px !important;
-            }
-            .ant-card-body {
-              padding: 8px 12px !important;
-            }
-            .ant-table-wrapper {
-              margin-top: 4px !important;
-            }
-            tr {
-              page-break-inside: auto !important;
-              break-inside: auto !important;
-            }
-          }
-          .ant-table-wrapper,
-          .ant-spin-nested-loading,
-          .ant-spin-container,
-          .ant-table,
-          .ant-table-container,
-          .ant-table-content {
-            page-break-inside: auto !important;
-            break-inside: auto !important;
+          /* Ẩn các nút, thanh toolbar không cần thiết */
+          button, .ant-btn, .no-print, .ant-drawer-header,
+          .ant-drawer-close, .ant-drawer-mask { display: none !important; }
+          /* Bảng */
+          .ant-table-wrapper, .ant-spin-nested-loading,
+          .ant-spin-container, .ant-table,
+          .ant-table-container, .ant-table-content {
             overflow: visible !important;
             height: auto !important;
           }
           table {
             width: 100% !important;
             border-collapse: collapse !important;
-            page-break-inside: auto !important;
           }
-          tr {
-            page-break-inside: auto !important;
-            break-inside: auto !important;
-          }
-          thead {
-            display: table-header-group !important;
-          }
-          tfoot {
-            display: table-footer-group !important;
-          }
-          button, .ant-btn, .no-print {
-            display: none !important;
-          }
+          thead { display: table-header-group !important; }
+          tfoot { display: table-footer-group !important; }
+          /* Giữ layout lưới khi in */
+          .ant-col-md-16 { flex: 0 0 66.666666% !important; max-width: 66.666666% !important; }
+          .ant-col-md-12 { flex: 0 0 50% !important; max-width: 50% !important; }
+          .ant-col-md-8  { flex: 0 0 33.333333% !important; max-width: 33.333333% !important; }
+          .ant-col-md-6  { flex: 0 0 25% !important; max-width: 25% !important; }
+          .ant-col-md-24 { flex: 0 0 100% !important; max-width: 100% !important; }
+          /* Khối ký tên */
           .signature-block {
             display: flex !important;
             flex-direction: row !important;
@@ -902,13 +878,23 @@ export default function QuotationList() {
             width: 100% !important;
             page-break-inside: avoid !important;
             break-inside: avoid !important;
-            margin-top: 36px !important;
+            margin-top: 24px !important;
           }
           .signature-block > div,
           .signature-block > .ant-col {
             width: 45% !important;
             max-width: 45% !important;
             flex: 0 0 45% !important;
+          }
+          /* ==== @PAGE ==== 
+             Để có lề ở tất cả các trang, bắt buộc phải dùng @page margin.
+             Người dùng sẽ phải tắt "Header and footers" trong Print Dialog để ẩn ngày/URL. */
+          @page {
+            size: A4 ${isLand ? 'landscape' : 'portrait'};
+            margin: ${isLand ? '10mm 12mm' : '15mm 20mm'};
+          }
+          @media print {
+            tr { page-break-inside: avoid !important; break-inside: avoid !important; }
           }
         </style>
       </head>
@@ -917,13 +903,15 @@ export default function QuotationList() {
       </body>
       </html>
     `)
+
     printWin.document.close()
     printWin.focus()
 
+    // Đợi 1200ms để font Inter load xong → tránh lệch layout logo/thông tin
     setTimeout(() => {
       printWin.print()
       printWin.close()
-    }, 800)
+    }, 1200)
   }
 
   // ── Convert Quotation to Order ────────────────────────────────────────
@@ -2040,8 +2028,20 @@ export default function QuotationList() {
     };
 
     const getColConfig = (colId) => {
-      const col = (productTableBlock?.props?.columns || []).find(c => typeof c === 'object' ? c.id === colId : c === colId);
-      return typeof col === 'object' ? col : {};
+      let found = null;
+      for (const c of (productTableBlock?.props?.columns || [])) {
+        if (typeof c === 'object') {
+          if (c.id === colId) { found = c; break; }
+          if (c.children && Array.isArray(c.children)) {
+            const child = c.children.find(ch => ch.id === colId);
+            if (child) { found = child; break; }
+          }
+        } else if (c === colId) {
+          found = { id: c };
+          break;
+        }
+      }
+      return found || {};
     };
 
     const applyColFeatures = (cols) => {
@@ -2052,8 +2052,17 @@ export default function QuotationList() {
         const origRender = col.render;
         if (!origRender) return col;
         const colId = getColId(col);
+        const colCfg = getColConfig(colId);
+        const canUpload = colCfg.allowImageUpload === true;
+        
+        let finalWidth = col.width;
+        if (canUpload && colId !== 'action' && colId !== 'name') {
+          if (!finalWidth || finalWidth < 125) finalWidth = 125;
+        }
+
         return {
           ...col,
+          width: finalWidth,
           render: (val, record, idx) => {
             const { colSpan, isMergedRoot } = getMergeProps(colId, record);
             if (colSpan === 0) return { props: { colSpan: 0 } };
@@ -2086,7 +2095,7 @@ export default function QuotationList() {
               const imgUrl = record.custom_data?.[imgKey];
               
               innerChildren = (
-                <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'nowrap' }}>
                   {imgUrl && (
                     <div style={{ position: 'relative', flexShrink: 0, width: 32, height: 32 }}>
                       <Image src={imgUrl} alt="uploaded" style={{ width: 32, height: 32, objectFit: 'cover', borderRadius: 4, border: '1px solid #cbd5e1' }} />

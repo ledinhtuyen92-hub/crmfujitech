@@ -15,7 +15,7 @@ const DEFAULT_LAYOUT_BLOCKS = [
   { id: 'signature_1', type: BLOCK_TYPES.SIGNATURES, props: { ...DEFAULT_BLOCK_PROPS[BLOCK_TYPES.SIGNATURES], columns: 2 } },
 ];
 
-export default function QuotationPrintView({ quotation, type = 'quotation', effectiveTemplate, hidePricing = false, hideCustomerInfo = false }) {
+export default function QuotationPrintView({ quotation, type = 'quotation', effectiveTemplate, hidePricing = false, hideCustomerInfo = false, renderCustomerSignature }) {
   const [scale, setScale] = useState(1);
   const [showPageBreaks, setShowPageBreaks] = useState(true);
   const [zoomedHeight, setZoomedHeight] = useState(0);
@@ -31,9 +31,10 @@ export default function QuotationPrintView({ quotation, type = 'quotation', effe
     table_style: rawConfig.table_style || 'classic_border'
   };
 
-  const isLand = layoutConfig.paper_orientation === 'landscape';
+  const currentLayoutStyle = effectiveTemplate?.layout_style || quotation?.layout_style;
+  const isLand = layoutConfig.paper_orientation === 'landscape' || currentLayoutStyle === 'A4_Landscape';
   
-  // A4 Printable Dimensions in pixels (chừa thêm margin an toàn cho header/footer của Chrome)
+  /* @page margin được kiểm soát trực tiếp trong từng component (QuotationPrintView) */
   const A4_PRINTABLE_HEIGHT = isLand ? 650 : 970;
 
   useEffect(() => {
@@ -94,14 +95,29 @@ export default function QuotationPrintView({ quotation, type = 'quotation', effe
     company: companyInfo,
   };
 
+  // Lề chuẩn quốc tế: trên/dưới 15mm, trái/phải 20mm
+  const PAGE_MARGIN = isLand ? '10mm 15mm' : '15mm 20mm';
+
   return (
     <div>
       <style>{`
         @media print {
           @page {
             size: ${isLand ? 'A4 landscape' : 'A4 portrait'};
-            margin: 12mm;
+            margin: ${PAGE_MARGIN};
           }
+          /* Khi in: bỏ zoom, bỏ scale, để nội dung tự fill theo khổ giấy */
+          .printable-quotation-content {
+            zoom: 1 !important;
+            transform: none !important;
+            width: 100% !important;
+            padding: 0 !important;
+          }
+          /* Force 2-cột giữ nguyên khi in */
+          .ant-col-md-12 { flex: 0 0 50% !important; max-width: 50% !important; }
+          .ant-col-md-8  { flex: 0 0 33.33% !important; max-width: 33.33% !important; }
+          .ant-col-md-6  { flex: 0 0 25% !important; max-width: 25% !important; }
+          .ant-col-md-24 { flex: 0 0 100% !important; max-width: 100% !important; }
         }
       `}</style>
       {/* Zoom Controls (No Print) */}
@@ -146,6 +162,7 @@ export default function QuotationPrintView({ quotation, type = 'quotation', effe
           layoutConfig={layoutConfig} 
           layoutStyle={effectiveTemplate?.layout_style || quotation.layout_style} 
           data={quotationData} 
+          renderCustomerSignature={renderCustomerSignature}
         />
       </div>
     </div>

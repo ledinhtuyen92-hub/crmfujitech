@@ -1428,8 +1428,137 @@ export default function OrderList() {
        return idxA - idxB;
     });
 
-    return baseCols
-  }
+    const getMergeProps = (colId, record) => {
+      const merges = record?.custom_data?.merge_columns;
+      if (merges && Array.isArray(merges)) {
+        if (merges.length > 1) {
+          const idx = merges.indexOf(colId);
+          if (idx === 0) return { colSpan: merges.length, isMergedRoot: true };
+          if (idx > 0) return { colSpan: 0, isMergedRoot: false };
+        }
+        return { colSpan: 1, isMergedRoot: false };
+      }
+      if (record?.custom_data?.is_custom_size) {
+        const dimIds = dimensionFields.map(f => f.id);
+        const idx = dimIds.indexOf(colId);
+        if (idx === 0) return { colSpan: dimIds.length, isMergedRoot: true };
+        if (idx > 0) return { colSpan: 0, isMergedRoot: false };
+      }
+      return { colSpan: 1, isMergedRoot: false };
+    };
+
+    const getColConfig = (colId) => {
+      let found = null;
+      for (const c of (productBlock?.props?.columns || [])) {
+        if (typeof c === 'object') {
+          if (c.id === colId) { found = c; break; }
+          if (c.children && Array.isArray(c.children)) {
+            const child = c.children.find(ch => ch.id === colId);
+            if (child) { found = child; break; }
+          }
+        } else if (c === colId) {
+          found = { id: c };
+          break;
+        }
+      }
+      return found || {};
+    };
+
+    const applyColFeatures = (cols) => {
+      return cols.map(col => {
+        if (col.children) {
+          return { ...col, children: applyColFeatures(col.children) };
+        }
+        const origRender = col.render;
+        if (!origRender) return col;
+        const colId = getColId(col);
+        return {
+          ...col,
+          render: (val, record, idx) => {
+            const { colSpan, isMergedRoot } = getMergeProps(colId, record);
+            if (colSpan === 0) return { props: { colSpan: 0 } };
+            
+            if (isMergedRoot) {
+              return {
+                children: <Input placeholder="Thêm thông tin..." value={record.custom_data?.custom_size_text || ''} onChange={(e) => {
+                  const currentData = record.custom_data || {};
+                  handleLineChange(idx, 'custom_data', { ...currentData, custom_size_text: e.target.value });
+                }} />,
+                props: { colSpan }
+              };
+            }
+            
+            const origResult = origRender(val, record, idx);
+            let innerChildren = origResult;
+            let finalProps = { colSpan };
+            
+            if (origResult && typeof origResult === 'object' && origResult.children !== undefined) {
+              innerChildren = origResult.children;
+              finalProps = { ...origResult.props, colSpan: (origResult.props?.colSpan !== undefined && origResult.props?.colSpan !== 1) ? origResult.props.colSpan : colSpan };
+            }
+
+            const colCfg = getColConfig(colId);
+            const canUpload = colCfg.allowImageUpload === true;
+            
+            if (canUpload && colId !== 'action' && colId !== 'name' && colId !== 'note') {
+              const imgKey = `img_${colId}`;
+              const imgUrl = record.custom_data?.[imgKey];
+              
+              innerChildren = (
+                <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                  {imgUrl && (
+                    <div style={{ position: 'relative', flexShrink: 0, width: 32, height: 32 }}>
+                      <Image src={imgUrl} alt="uploaded" style={{ width: 32, height: 32, objectFit: 'cover', borderRadius: 4, border: '1px solid #cbd5e1' }} />
+                      <CloseCircleOutlined 
+                        style={{ position: 'absolute', top: -6, right: -6, color: '#ef4444', cursor: 'pointer', background: '#fff', borderRadius: '50%', fontSize: 12 }} 
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          const cd = record.custom_data || {};
+                          handleLineChange(idx, 'custom_data', { ...cd, [imgKey]: null });
+                        }} 
+                      />
+                    </div>
+                  )}
+                  <div style={{ flex: 1 }}>{innerChildren}</div>
+                  <Upload
+                    fileList={[]}
+                    showUploadList={false}
+                    customRequest={async ({ file, onSuccess, onError }) => {
+                      const key = `upload-img-${idx}-${colId}`;
+                      messageApi.open({ key, type: 'loading', content: 'Đang tải ảnh lên...', duration: 0 });
+                      try {
+                        const formData = new FormData();
+                        formData.append('image', file);
+                        const res = await api.post('/sales/quotations/upload-item-image/', formData, {
+                          headers: { 'Content-Type': 'multipart/form-data' },
+                        });
+                        const currentData = record.custom_data || {};
+                        handleLineChange(idx, 'custom_data', { ...currentData, [imgKey]: res.data.url });
+                        messageApi.open({ key, type: 'success', content: 'Đã tải ảnh thành công!', duration: 2 });
+                        onSuccess("ok");
+                      } catch (e) {
+                        messageApi.open({ key, type: 'error', content: 'Tải ảnh thất bại', duration: 3 });
+                        onError(e);
+                      }
+                    }}
+                  >
+                    <Button icon={<CameraOutlined />} size="small" type={imgUrl ? "primary" : "dashed"} title="Tải ảnh đính kèm" />
+                  </Upload>
+                </div>
+              );
+            }
+            
+            return {
+              children: innerChildren,
+              props: finalProps
+            };
+          }
+        };
+      });
+    };
+
+    return applyColFeatures(baseCols);
+  };
 
   const getServiceItemColumns = () => {
     const effectiveTmpl = getEffectiveTemplate(editingOrder)

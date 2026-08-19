@@ -125,13 +125,23 @@ const computeProductSTT = (data, index, field = 'product') => {
  * QuotationRenderer takes the layout_config JSON and actual data (customer, items, totals)
  * and renders the final read-only HTML view.
  */
-export default function QuotationRenderer({ layoutConfig, layoutStyle, data }) {
+export default function QuotationRenderer({ layoutConfig, layoutStyle, data, renderCustomerSignature }) {
   if (!layoutConfig || !Array.isArray(layoutConfig.blocks)) {
     return <div style={{ padding: 20, textAlign: 'center' }}>Mẫu báo giá chưa được thiết kế.</div>;
   }
 
   const allBlocks = layoutConfig.blocks;
   const { customer, items, totals, company } = data || {};
+
+  const isPlaceholder = (val) => {
+    if (!val) return true;
+    const str = String(val).trim();
+    const placeholders = [
+      '[Tên công ty]', '[Địa chỉ công ty]', '[SĐT công ty]', '[Email công ty]', 
+      '[Mã số thuế]', '[Website công ty]', '[Tên giám đốc]'
+    ];
+    return placeholders.includes(str) || (str.startsWith('{{') && str.endsWith('}}'));
+  };
 
   const renderBlock = (block) => {
     const clr = block.props.themeColor || layoutConfig.theme_color || '#1649c9';
@@ -174,9 +184,15 @@ export default function QuotationRenderer({ layoutConfig, layoutStyle, data }) {
                 )}
               </Col>
               <Col xs={24} md={16} style={{ textAlign: 'right' }}>
-                <div style={{ fontWeight: 700, color: clr, fontSize: 16 }}>{headerCompanyName}</div>
-                <div style={{ fontSize: 12, color: '#64748b', marginTop: 2 }}>MST: {headerTaxCode} • Hotline: {headerPhone}</div>
-                <div style={{ fontSize: 12, color: '#64748b' }}>Địa chỉ: {headerAddress}</div>
+                <div style={{ fontWeight: 700, color: clr, fontSize: 16 }}>{!isPlaceholder(headerCompanyName) ? headerCompanyName : ''}</div>
+                {(!isPlaceholder(headerTaxCode) || !isPlaceholder(headerPhone)) && (
+                  <div style={{ fontSize: 12, color: '#64748b', marginTop: 2 }}>
+                    {!isPlaceholder(headerTaxCode) ? `MST: ${headerTaxCode}` : ''}
+                    {!isPlaceholder(headerTaxCode) && !isPlaceholder(headerPhone) ? ' • ' : ''}
+                    {!isPlaceholder(headerPhone) ? `Hotline: ${headerPhone}` : ''}
+                  </div>
+                )}
+                {!isPlaceholder(headerAddress) && <div style={{ fontSize: 12, color: '#64748b' }}>Địa chỉ: {headerAddress}</div>}
               </Col>
             </Row>
           </div>
@@ -246,22 +262,40 @@ export default function QuotationRenderer({ layoutConfig, layoutStyle, data }) {
           <Row gutter={16} style={{ marginBottom: 0 }}>
             <Col xs={24} md={block.props.columns === 1 ? 24 : 12} style={{ marginBottom: block.props.columns === 1 ? 12 : 0 }}>
               <div style={{ padding: '10px 14px', background: block.props.sellerBackgroundColor || '#f8fafc', border: (block.props.showBorder ?? true) ? `1px solid ${block.props.borderColor || clr + '40'}` : 'none', borderRadius: 6, height: '100%' }}>
-                <div style={{ fontWeight: 700, color: clr, fontSize: 13, marginBottom: 4 }}>{parseVariables(block.props.sellerTitle || 'BÊN BÁN (BÊN B)', data, company)}: {sellerName}</div>
-                <div style={{ fontSize: 12, color: '#334155' }}><strong>Đại diện:</strong> {sellerRep} • <strong>Chức vụ:</strong> {sellerPos}</div>
-                <div style={{ fontSize: 12, color: '#334155' }}><strong>Mã số thuế:</strong> {sellerTax} • <strong>Điện thoại:</strong> {sellerPhone}</div>
-                <div style={{ fontSize: 12, color: '#334155' }}><strong>Địa chỉ:</strong> {sellerAddr}</div>
+                <div style={{ fontWeight: 700, color: clr, fontSize: 13, marginBottom: 4 }}>{parseVariables(block.props.sellerTitle || 'BÊN BÁN (BÊN B)', data, company)}: {!isPlaceholder(sellerName) ? sellerName : ''}</div>
+                {(!isPlaceholder(sellerRep) || !isPlaceholder(sellerPos)) && (
+                  <div style={{ fontSize: 12, color: '#334155' }}>
+                    {!isPlaceholder(sellerRep) ? <span><strong>Đại diện:</strong> {sellerRep}</span> : null}
+                    {!isPlaceholder(sellerRep) && !isPlaceholder(sellerPos) ? ' • ' : ''}
+                    {!isPlaceholder(sellerPos) ? <span><strong>Chức vụ:</strong> {sellerPos}</span> : null}
+                  </div>
+                )}
+                {(!isPlaceholder(sellerTax) || !isPlaceholder(sellerPhone)) && (
+                  <div style={{ fontSize: 12, color: '#334155' }}>
+                    {!isPlaceholder(sellerTax) ? <span><strong>Mã số thuế:</strong> {sellerTax}</span> : null}
+                    {!isPlaceholder(sellerTax) && !isPlaceholder(sellerPhone) ? ' • ' : ''}
+                    {!isPlaceholder(sellerPhone) ? <span><strong>Điện thoại:</strong> {sellerPhone}</span> : null}
+                  </div>
+                )}
+                {!isPlaceholder(sellerAddr) && <div style={{ fontSize: 12, color: '#334155' }}><strong>Địa chỉ:</strong> {sellerAddr}</div>}
               </div>
             </Col>
             <Col xs={24} md={block.props.columns === 1 ? 24 : 12}>
               <div style={{ padding: '10px 14px', background: block.props.buyerBackgroundColor || '#fff', border: (block.props.showBorder ?? true) ? `1px solid ${block.props.borderColor || '#e2e8f0'}` : 'none', borderRadius: 6, height: '100%' }}>
                 <div style={{ fontWeight: 700, color: '#0f172a', fontSize: 13, marginBottom: 4 }}>
                   {parseVariables(block.props.buyerTitle || 'BÊN MUA (BÊN A)', data, company)}
-                  {hasCompany ? `: ${buyerCompany}` : ''}
+                  {hasCompany && !isPlaceholder(buyerCompany) ? `: ${buyerCompany}` : ''}
                 </div>
-                <div style={{ fontSize: 12, color: '#334155' }}><strong>{hasCompany ? 'Đại diện' : 'Khách hàng'}:</strong> {buyerName}</div>
-                {buyerTax && <div style={{ fontSize: 12, color: '#334155' }}><strong>Mã số thuế:</strong> {buyerTax} • <strong>Điện thoại:</strong> {buyerPhone}</div>}
-                {!buyerTax && buyerPhone && <div style={{ fontSize: 12, color: '#334155' }}><strong>Điện thoại:</strong> {buyerPhone}</div>}
-                {buyerAddr && <div style={{ fontSize: 12, color: '#334155' }}><strong>Địa chỉ:</strong> {buyerAddr}</div>}
+                {!isPlaceholder(buyerName) && <div style={{ fontSize: 12, color: '#334155' }}><strong>{hasCompany ? 'Đại diện' : 'Khách hàng'}:</strong> {buyerName}</div>}
+                
+                {(!isPlaceholder(buyerTax) || !isPlaceholder(buyerPhone)) && (
+                  <div style={{ fontSize: 12, color: '#334155' }}>
+                    {!isPlaceholder(buyerTax) ? <span><strong>Mã số thuế:</strong> {buyerTax}</span> : null}
+                    {!isPlaceholder(buyerTax) && !isPlaceholder(buyerPhone) ? ' • ' : ''}
+                    {!isPlaceholder(buyerPhone) ? <span><strong>Điện thoại:</strong> {buyerPhone}</span> : null}
+                  </div>
+                )}
+                {!isPlaceholder(buyerAddr) && <div style={{ fontSize: 12, color: '#334155' }}><strong>Địa chỉ:</strong> {buyerAddr}</div>}
               </div>
             </Col>
           </Row>
@@ -301,7 +335,7 @@ export default function QuotationRenderer({ layoutConfig, layoutStyle, data }) {
         const dimCol = block.props.columns?.find(c => (typeof c === 'object' ? c.id : c) === 'dimensions');
         const dimensionFieldsRaw = dimCol?.children || [];
         const dimensionFields = dimensionFieldsRaw.length > 0
-          ? dimensionFieldsRaw.map(c => ({ id: c.id, label: c.title, width: 85 }))
+          ? dimensionFieldsRaw.map(c => ({ id: c.id, label: c.title, width: 85, allowImageUpload: c.allowImageUpload }))
           : [{ id: 'height', label: 'Cao', width: 85 }, { id: 'width', label: 'Rộng', width: 85 }, { id: 'thickness', label: 'Dày', width: 85 }];
         const BUILTIN_DIM = ['height', 'width', 'thickness'];
         const getDimVal = (record, field) => BUILTIN_DIM.includes(field.id) ? record[field.id] : record.custom_data?.[`dim_${field.id}`];
@@ -380,6 +414,19 @@ export default function QuotationRenderer({ layoutConfig, layoutStyle, data }) {
                             ? block.props.columns.some(c => c.id === 'specs')
                             : block.props.columns?.includes('specs');
                             
+                          const merges = item.custom_data?.merge_columns;
+                          if (merges && Array.isArray(merges) && merges.length > 1) {
+                            const idx = merges.indexOf(colId);
+                            if (idx > 0) return null;
+                            if (idx === 0) {
+                              return (
+                                <td key={colId} colSpan={merges.length} style={{ ...tdStyle, textAlign: 'left', whiteSpace: 'pre-wrap', verticalAlign: 'middle' }}>
+                                  <span style={{color: '#334155'}}>{item.custom_data?.custom_size_text || ''}</span>
+                                </td>
+                              );
+                            }
+                          }
+                          
                           if (colId === 'stt') return rowSpan > 0 ? <td key="stt" rowSpan={rowSpan} style={{ ...tdStyle, textAlign: 'center', fontWeight: 600, color: clr, verticalAlign: 'middle' }}>{sttNum}</td> : null;
                           if (colId === 'name') return rowSpan > 0 ? (
                             <td key="name" rowSpan={rowSpan} style={{...tdStyle, verticalAlign: 'middle', textAlign: 'left'}}>
@@ -398,11 +445,13 @@ export default function QuotationRenderer({ layoutConfig, layoutStyle, data }) {
                               <span style={{color: '#475569', fontSize: 11}}>{item.description || item.spec}</span>
                             </td>
                           );
-                          if (colId === 'dimensions') return (
-                            <td key="dimensions" style={{ ...tdStyle, padding: 0, verticalAlign: 'middle' }}>
-                              {!useComplexDimensions || item.custom_data?.is_custom_size ? (
-                                <div style={{ height: '100%', padding: '4px 6px', display: 'flex', alignItems: 'center', whiteSpace: 'pre-wrap', textAlign: useComplexDimensions ? 'left' : 'center', justifyContent: useComplexDimensions ? 'flex-start' : 'center' }}>
-                                  {item.custom_data?.custom_size_text || (() => {
+                          if (colId === 'dimensions') {
+                            const isLegacyCustomSize = item.custom_data?.is_custom_size && (!merges || !Array.isArray(merges) || merges.length === 0);
+                            return (
+                              <td key="dimensions" style={{ ...tdStyle, padding: 0, verticalAlign: 'middle' }}>
+                                {!useComplexDimensions || isLegacyCustomSize ? (
+                                  <div style={{ height: '100%', padding: '4px 6px', display: 'flex', alignItems: 'center', whiteSpace: 'pre-wrap', textAlign: useComplexDimensions ? 'left' : 'center', justifyContent: useComplexDimensions ? 'flex-start' : 'center' }}>
+                                    {isLegacyCustomSize ? (item.custom_data?.custom_size_text || '') : (() => {
                                       const parts = [];
                                       if (Number(item.height) > 0) parts.push(item.height);
                                       if (Number(item.width) > 0) parts.push(item.width);
@@ -412,15 +461,26 @@ export default function QuotationRenderer({ layoutConfig, layoutStyle, data }) {
                                 </div>
                               ) : (
                                 <div style={{ display: 'flex', height: '100%' }}>
-                                  {dimensionFields.map((field, idx) => (
-                                    <div key={field.id} style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', borderRight: idx < dimensionFields.length - 1 ? '1px dashed #e2e8f0' : 'none', padding: '4px 6px', textAlign: 'center' }}>
-                                      {Number(getDimVal(item, field)) === 0 ? '' : getDimVal(item, field)}
-                                    </div>
-                                  ))}
+                                  {dimensionFields.map((field, idx) => {
+                                    const canShowChildImg = field.allowImageUpload === true;
+                                    const childImgUrl = canShowChildImg ? item.custom_data?.[`img_${field.id}`] : null;
+                                    const val = Number(getDimVal(item, field)) === 0 ? '' : getDimVal(item, field);
+                                    return (
+                                      <div key={field.id} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', borderRight: idx < dimensionFields.length - 1 ? '1px dashed #e2e8f0' : 'none', padding: '4px 6px', textAlign: 'center' }}>
+                                        {childImgUrl && (
+                                          <div style={{ marginBottom: 4, display: 'flex', justifyContent: 'center' }}>
+                                            <img src={childImgUrl} alt="" style={{ maxWidth: '100%', maxHeight: 60, objectFit: 'contain', borderRadius: 4, border: '1px solid #cbd5e1' }} />
+                                          </div>
+                                        )}
+                                        <div>{val}</div>
+                                      </div>
+                                    );
+                                  })}
                                 </div>
                               )}
                             </td>
                           );
+                          }
                           if (colId === 'note') return (
                             <td key="note" style={{ ...tdStyle, textAlign: 'center', whiteSpace: 'pre-wrap' }}>
                               {enableNoteImage && item.custom_data?.note_image && (
@@ -586,10 +646,12 @@ export default function QuotationRenderer({ layoutConfig, layoutStyle, data }) {
                 <div style={{ fontSize: 11, color: '#64748b', fontStyle: 'italic', marginBottom: 12 }}>(Ký, đóng dấu & ghi rõ họ tên)</div>
                 
                 <div style={{ minHeight: 140, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'flex-start', paddingTop: 10, position: 'relative' }}>
-                  {block.props.signatures?.[idx] ? (
+                  {block.props.signatures?.[idx]?.includes('{{customer_signature}}') && renderCustomerSignature ? (
+                    renderCustomerSignature()
+                  ) : block.props.signatures?.[idx] ? (
                     <div 
-                      dangerouslySetInnerHTML={{ __html: parseVariables(block.props.signatures[idx], data, company) }} 
-                      style={{ display: 'block', textAlign: 'center', whiteSpace: 'pre-wrap', position: 'relative', width: '100%' }}
+                      dangerouslySetInnerHTML={{ __html: parseVariables(block.props.signatures[idx], data, company).replace(/\n{3,}/g, '\n\n').replace(/\n/g, '<br/>') }} 
+                      style={{ display: 'block', textAlign: 'center', whiteSpace: 'pre-wrap', position: 'relative', width: '100%', lineHeight: '1.2' }}
                     />
                   ) : (
                     <div style={{ height: 115 }} />
