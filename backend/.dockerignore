@@ -1,0 +1,14 @@
+*.pyc
+__pycache__/
+*.pyo
+*.egg-info/
+dist/
+build/
+.env
+.env.local
+.DS_Store
+.git
+.gitignore
+.vscode
+node_modules/
+npm-debug.log

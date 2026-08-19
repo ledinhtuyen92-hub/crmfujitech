@@ -4,67 +4,127 @@ services:
   db:
     image: pgvector/pgvector:pg15
     container_name: crm_db
-    restart: always
+    restart: unless-stopped
     environment:
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: 123
-      POSTGRES_DB: crm_db
+      POSTGRES_USER: ${DB_USER:-postgres}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-secure_password_change_me}
+      POSTGRES_DB: ${DB_NAME:-crm_db}
     volumes:
       - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - crm_network
 
   redis:
     image: redis:7-alpine
     container_name: crm_redis
-    restart: always
+    restart: unless-stopped
+    command: redis-server --appendonly yes
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - crm_network
 
   web:
     build:
       context: ./backend
       dockerfile: Dockerfile
     container_name: crm_web
-    restart: always
-    # Lệnh thông minh giải quyết bài toán con gà quả trứng
-    command: sh -c "if [ ! -f manage.py ]; then django-admin startproject core .; fi && python manage.py runserver 0.0.0.0:8000"
+    restart: unless-stopped
     environment:
+      - DEBUG=${DEBUG:-False}
+      - DATABASE_URL=postgresql://${DB_USER:-postgres}:${DB_PASSWORD:-secure_password_change_me}@db:5432/${DB_NAME:-crm_db}
+      - REDIS_URL=redis://redis:6379/0
       - SITE_URL=${SITE_URL:-http://localhost:8000}
+      - ALLOWED_HOSTS=${ALLOWED_HOSTS:-localhost,127.0.0.1}
     volumes:
-      # Đồng bộ code từ ngoài VS Code vào thư mục /app trong Docker
       - ./backend:/app
     ports:
       - "8000:8000"
     depends_on:
-      - db
-      - redis
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - crm_network
+    env_file:
+      - .env
 
   celery:
-    build: ./backend
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
     container_name: crm_celery
-    restart: always
+    restart: unless-stopped
     command: celery -A core worker -l info
     volumes:
       - ./backend:/app
     environment:
-      - DATABASE_URL=postgres://postgres:123@db:5432/crm_db
+      - DATABASE_URL=postgresql://${DB_USER:-postgres}:${DB_PASSWORD:-secure_password_change_me}@db:5432/${DB_NAME:-crm_db}
       - REDIS_URL=redis://redis:6379/0
       - SITE_URL=${SITE_URL:-http://localhost:8000}
     depends_on:
-      - db
-      - redis
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - crm_network
+    env_file:
+      - .env
 
   celery-beat:
-    build: ./backend
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
     container_name: crm_celery_beat
-    restart: always
+    restart: unless-stopped
     command: celery -A core beat -l info
     volumes:
       - ./backend:/app
     environment:
-      - DATABASE_URL=postgres://postgres:123@db:5432/crm_db
+      - DATABASE_URL=postgresql://${DB_USER:-postgres}:${DB_PASSWORD:-secure_password_change_me}@db:5432/${DB_NAME:-crm_db}
       - REDIS_URL=redis://redis:6379/1
       - SITE_URL=${SITE_URL:-http://localhost:8000}
     depends_on:
-      - db
-      - redis
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - crm_network
+    env_file:
+      - .env
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: crm_frontend
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    depends_on:
+      - web
+    networks:
+      - crm_network
+    environment:
+      - VITE_API_URL=${VITE_API_URL:-http://localhost:8000}
 
 volumes:
   postgres_data:
+  redis_data:
+
+networks:
+  crm_network:
+    driver: bridge

@@ -1,9 +1,9 @@
 import React, { useState } from 'react';
-import { Select, Button, Typography, Space, Input, Divider } from 'antd';
+import { Select, Button, Typography, Space, Input, Divider, Popover, Checkbox } from 'antd';
 import { DndContext, closestCenter, PointerSensor, useSensor, useSensors } from '@dnd-kit/core';
 import { arrayMove, SortableContext, verticalListSortingStrategy, useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
-import { HolderOutlined, CloseOutlined, PlusOutlined } from '@ant-design/icons';
+import { HolderOutlined, CloseOutlined, PlusOutlined, SettingOutlined } from '@ant-design/icons';
 
 const { Text } = Typography;
 const { Option } = Select;
@@ -21,7 +21,8 @@ const PREDEFINED_COLUMNS = [
   { id: 'total', title: 'Thành tiền' }
 ];
 
-function SortableItem({ id, title, childrenColumns, onRemove, onAddChild, onRemoveChild }) {
+function SortableItem({ col, onRemove, onAddChild, onRemoveChild, onUpdateCol, onUpdateChild }) {
+  const { id, title, children: childrenColumns } = col;
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id });
   const [childTitle, setChildTitle] = useState('');
 
@@ -51,7 +52,26 @@ function SortableItem({ id, title, childrenColumns, onRemove, onAddChild, onRemo
           <Text strong style={{ fontSize: 13, color: '#334155' }}>{title}</Text>
           {isGroup && <Text type="secondary" style={{ fontSize: 11, fontStyle: 'italic' }}>(Cột gộp)</Text>}
         </Space>
-        <CloseOutlined style={{ color: '#ef4444', cursor: 'pointer', fontSize: 12, padding: 4 }} onClick={() => onRemove(id)} />
+        <Space>
+          <Popover 
+            title="Cài đặt cột" 
+            trigger="click" 
+            content={
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8, width: 200 }}>
+                  <Checkbox 
+                    checked={col.allowImageUpload} 
+                    onChange={e => onUpdateCol(id, { allowImageUpload: e.target.checked })}
+                  >
+                    Cho phép tải ảnh đính kèm
+                  </Checkbox>
+                {/* Additional column settings can be added here */}
+              </div>
+            }
+          >
+            <SettingOutlined style={{ color: '#64748b', cursor: 'pointer', fontSize: 13, padding: 4 }} />
+          </Popover>
+          <CloseOutlined style={{ color: '#ef4444', cursor: 'pointer', fontSize: 12, padding: 4 }} onClick={() => onRemove(id)} />
+        </Space>
       </div>
 
       {isGroup && (
@@ -59,7 +79,25 @@ function SortableItem({ id, title, childrenColumns, onRemove, onAddChild, onRemo
           {childrenColumns && childrenColumns.map(child => (
             <div key={child.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#f8fafc', padding: '4px 8px', marginBottom: 4, borderRadius: 4, border: '1px dashed #e2e8f0' }}>
               <Text style={{ fontSize: 12, color: '#475569' }}>- {child.title}</Text>
-              <CloseOutlined style={{ color: '#ef4444', cursor: 'pointer', fontSize: 10 }} onClick={() => onRemoveChild(id, child.id)} />
+              <Space size={2}>
+                <Popover 
+                  title="Cài đặt cột con" 
+                  trigger="click" 
+                  content={
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 8, width: 200 }}>
+                      <Checkbox 
+                        checked={child.allowImageUpload} 
+                        onChange={e => onUpdateChild && onUpdateChild(id, child.id, { allowImageUpload: e.target.checked })}
+                      >
+                        Cho phép tải ảnh đính kèm
+                      </Checkbox>
+                    </div>
+                  }
+                >
+                  <SettingOutlined style={{ color: '#64748b', cursor: 'pointer', fontSize: 11, padding: 4 }} />
+                </Popover>
+                <CloseOutlined style={{ color: '#ef4444', cursor: 'pointer', fontSize: 10, padding: 4 }} onClick={() => onRemoveChild(id, child.id)} />
+              </Space>
             </div>
           ))}
           <div style={{ display: 'flex', gap: 4, marginTop: 6 }}>
@@ -172,6 +210,29 @@ export default function ColumnManager({ value = [], onChange }) {
     onChange(updated);
   };
 
+  const handleUpdateChild = (groupId, childId, updates) => {
+    const updated = normalizedValue.map(col => {
+      if (col.id === groupId) {
+        return {
+          ...col,
+          children: (col.children || []).map(c => c.id === childId ? { ...c, ...updates } : c)
+        };
+      }
+      return col;
+    });
+    onChange(updated);
+  };
+
+  const handleUpdateCol = (colId, updates) => {
+    const updated = normalizedValue.map(col => {
+      if (col.id === colId) {
+        return { ...col, ...updates };
+      }
+      return col;
+    });
+    onChange(updated);
+  };
+
   const availableColumns = PREDEFINED_COLUMNS.filter(col => !normalizedValue.find(c => c.id === col.id));
 
   return (
@@ -183,12 +244,12 @@ export default function ColumnManager({ value = [], onChange }) {
             return (
               <SortableItem 
                 key={col.id} 
-                id={col.id} 
-                title={col.title} 
-                childrenColumns={col.children}
+                col={col}
                 onRemove={handleRemove} 
                 onAddChild={handleAddChild}
                 onRemoveChild={handleRemoveChild}
+                onUpdateCol={handleUpdateCol}
+                onUpdateChild={handleUpdateChild}
               />
             );
           })}

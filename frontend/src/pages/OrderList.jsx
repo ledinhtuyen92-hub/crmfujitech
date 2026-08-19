@@ -695,7 +695,6 @@ export default function OrderList() {
           is_custom_size: isCustomSize, 
           custom_size_text: '' 
         },
-        quantity: 1,
         discount_percent: currentItem.discount_percent || 0,
       }
       let rowSpan = 1;
@@ -726,12 +725,23 @@ export default function OrderList() {
     const productBlock = et?.layout_config?.blocks?.find(b => b.type === 'product_table');
     const serviceBlock = et?.layout_config?.blocks?.find(b => b.type === 'service_table');
     
-    const enableProductImage = productBlock?.props?.enableProductImage !== false;
+    // Only enable image features if explicitly configured in template (default: off)
+    const hasTemplate = !!et?.layout_config;
+    const nameColCfg = hasTemplate
+      ? (productBlock?.props?.columns || []).find(c => (typeof c === 'object' ? c.id : c) === 'name')
+      : null;
+    const enableProductImage = hasTemplate
+      ? (nameColCfg && typeof nameColCfg === 'object' ? nameColCfg.allowImageUpload === true : productBlock?.props?.enableProductImage !== false)
+      : false;
     const enableProductName = productBlock?.props?.enableProductName !== false;
     const enableProductDescription = productBlock?.props?.enableProductDescription !== false;
-    const enableNoteImage = productBlock?.props?.enableNoteImage !== false;
+    const enableNoteImage = hasTemplate
+      ? (productBlock?.props?.columns?.find(c => (typeof c === 'object' ? c.id : c) === 'note')?.allowImageUpload === true)
+      : false;
     const useComplexDimensions = productBlock?.props?.useComplexDimensions !== false;
-    const enableServiceImage = serviceBlock?.props?.enableProductImage !== false;
+    const enableServiceImage = hasTemplate
+      ? serviceBlock?.props?.enableProductImage !== false
+      : false;
     const enableServiceName = serviceBlock?.props?.enableProductName !== false;
 
     const dimCol = productBlock?.props?.columns?.find(c => (typeof c === 'object' ? c.id : c) === 'dimensions');
@@ -927,15 +937,20 @@ export default function OrderList() {
                         )
                       )
                     )}
-                      <Button type="dashed" size="small" icon={<PlusOutlined />} onClick={() => handleAddSameProduct(idx)}
-                        style={{ marginTop: 4, borderColor: '#2563eb', color: '#2563eb', width: '100%' }}>
-                        Thêm kích thước
-                      </Button>
-                      <Button type="dashed" size="small" icon={<PlusOutlined />} onClick={() => handleAddSameProduct(idx, true)}
-                        style={{ marginTop: 4, borderColor: '#059669', color: '#059669', width: '100%' }}
-                        title="Tạo dòng nhập gộp (VD: 1000 x 2000)">
-                        Thêm gộp kích thước
-                      </Button>
+                      {(productBlock?.props?.actionButtons || [
+                        { id: 'btn_add_dim', label: 'Thêm kích thước', mergeColumns: [] },
+                        { id: 'btn_add_merged', label: 'Thêm gộp kích thước', mergeColumns: ['height', 'width', 'thickness'] }
+                      ]).map((btn, bidx) => (
+                        <Button
+                          key={btn.id || bidx}
+                          type="dashed" size="small" icon={<PlusOutlined />}
+                          onClick={() => handleAddSameProduct(idx, !!(btn.mergeColumns?.length))}
+                          style={{ marginTop: 4, borderColor: btn.mergeColumns?.length ? '#059669' : '#2563eb', color: btn.mergeColumns?.length ? '#059669' : '#2563eb', width: '100%' }}
+                          title={btn.mergeColumns?.length ? "Thêm dòng phụ và gộp ô" : "Thêm dòng phụ"}
+                        >
+                          {btn.label}
+                        </Button>
+                      ))}
                     </div>
                   )}
                 </div>
@@ -1146,15 +1161,20 @@ export default function OrderList() {
                         )
                       )
                     )}
-                    <Button type="dashed" size="small" icon={<PlusOutlined />} onClick={() => handleAddSameProduct(idx)}
-                      style={{ marginTop: 4, borderColor: '#2563eb', color: '#2563eb', width: '100%' }}>
-                      Thêm kích thước
-                    </Button>
-                    <Button type="dashed" size="small" icon={<PlusOutlined />} onClick={() => handleAddSameProduct(idx, true)}
-                      style={{ marginTop: 4, borderColor: '#059669', color: '#059669', width: '100%' }}
-                      title="Tạo dòng nhập gộp (VD: 1000 x 2000)">
-                      Thêm gộp ô chờ
-                    </Button>
+                    {(productBlock?.props?.actionButtons || [
+                      { id: 'btn_add_dim', label: 'Thêm kích thước', mergeColumns: [] },
+                      { id: 'btn_add_merged', label: 'Thêm gộp ô chờ', mergeColumns: ['height', 'width', 'thickness'] }
+                    ]).map((btn, bidx) => (
+                      <Button
+                        key={btn.id || bidx}
+                        type="dashed" size="small" icon={<PlusOutlined />}
+                        onClick={() => handleAddSameProduct(idx, !!(btn.mergeColumns?.length))}
+                        style={{ marginTop: 4, borderColor: btn.mergeColumns?.length ? '#059669' : '#2563eb', color: btn.mergeColumns?.length ? '#059669' : '#2563eb', width: '100%' }}
+                        title={btn.mergeColumns?.length ? "Thêm dòng phụ và gộp ô" : "Thêm dòng phụ"}
+                      >
+                        {btn.label}
+                      </Button>
+                    ))}
                   </div>
                 )}
               </div>

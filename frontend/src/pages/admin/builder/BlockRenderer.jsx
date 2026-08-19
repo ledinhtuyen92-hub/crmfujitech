@@ -163,15 +163,13 @@ export default function BlockRenderer({ block, allBlocks, isActive, onSelect, on
       case BLOCK_TYPES.PRODUCT_TABLE:
         const isService = block.type === BLOCK_TYPES.SERVICE_TABLE;
         const tableTitle = block.props.tableTitle;
-        const enableProductImage = block.props.enableProductImage !== false;
         const enableProductName = block.props.enableProductName !== false;
         const enableProductDescription = block.props.enableProductDescription !== false;
-        const enableNoteImage = block.props.enableNoteImage !== false;
         const useComplexDimensions = block.props.useComplexDimensions !== false;
         const dimCol = block.props.columns?.find(c => (typeof c === 'object' ? c.id : c) === 'dimensions');
         const dimensionFieldsRaw = dimCol?.children || [];
         const dimensionFields = dimensionFieldsRaw.length > 0
-          ? dimensionFieldsRaw.map(c => ({ id: c.id, label: c.title, width: 85 }))
+          ? dimensionFieldsRaw.map(c => ({ ...c, id: c.id, label: c.title, width: 85 }))
           : [{ id: 'height', label: 'Cao', width: 85 }, { id: 'width', label: 'Rộng', width: 85 }, { id: 'thickness', label: 'Dày', width: 85 }];
         return (
           <div style={{ marginBottom: 0 }}>
@@ -238,64 +236,162 @@ export default function BlockRenderer({ block, allBlocks, isActive, onSelect, on
                       : block.props.columns?.includes('specs');
 
                     if (colId === 'stt') return <td key="stt" style={{ ...tdStyle, textAlign: 'center', fontWeight: 600, color: clr }}>1</td>;
-                    if (colId === 'name') return (
-                      <td key="name" style={tdStyle}>
-                        <div style={{ display: 'flex', gap: 8, alignItems: 'flex-start' }}>
-                          {enableProductImage && (
-                            <div style={{ width: 40, height: 40, flexShrink: 0, background: '#e2e8f0', borderRadius: 4, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#94a3b8', fontSize: 10 }}>Ảnh</div>
+                    if (colId === 'name') {
+                      const showImg = typeof col === 'object' && col.allowImageUpload;
+                      return (
+                        <td key="name" style={{ ...tdStyle, textAlign: 'center' }}>
+                          {showImg && (
+                            <div style={{ width: 40, height: 40, background: '#e2e8f0', borderRadius: 4, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#94a3b8', fontSize: 10, marginBottom: 4, marginLeft: 'auto', marginRight: 'auto' }}>Ảnh</div>
                           )}
                           <div>
                             {enableProductName && <strong style={{ color: '#1e293b' }}>{isService ? 'Dịch vụ demo' : 'Sản phẩm demo A'}</strong>}
                             {enableProductName && enableProductDescription && !showSpecs && <br/>}
                             {enableProductDescription && !showSpecs && <span style={{ color: '#64748b', fontSize: 11 }}>Mô tả sản phẩm demo</span>}
                           </div>
-                        </div>
-                      </td>
-                    );
-                    if (colId === 'symbol') return <td key="symbol" style={{ ...tdStyle, textAlign: 'center', fontWeight: 600, color: '#2563eb' }}>{isService ? 'SV1' : 'D1'}</td>;
-                    if (colId === 'specs') return <td key="specs" style={{ ...tdStyle, color: '#475569', fontSize: 11 }}>{isService ? 'Ghi chú dịch vụ demo' : 'Mô tả sản phẩm demo'}</td>;
-                    if (colId === 'dimensions') return (
-                      <td key="dimensions" style={{ ...tdStyle, padding: 0 }}>
-                        {!useComplexDimensions ? (
-                          <div style={{ padding: '4px 6px', textAlign: 'center' }}>2200 x 900 x 45</div>
-                        ) : (
-                          <div style={{ display: 'flex', height: '100%' }}>
-                            {dimensionFields.map((f, fi) => (
-                              <div key={f.id} style={{ flex: 1, borderRight: fi < dimensionFields.length - 1 ? '1px dashed #e2e8f0' : 'none', padding: '4px 6px', textAlign: 'center' }}>
-                                {f.id === 'height' ? '2200' : f.id === 'width' ? '900' : f.id === 'thickness' ? '45' : '—'}
-                              </div>
-                            ))}
-                          </div>
-                        )}
-                      </td>
-                    );
-                    if (colId === 'note') return (
-                      <td key="note" style={{ ...tdStyle, color: '#475569', fontSize: 11, textAlign: 'center' }}>
-                        {enableNoteImage && (
-                          <div style={{ width: 40, height: 40, background: '#e2e8f0', borderRadius: 4, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', color: '#94a3b8', fontSize: 10, marginBottom: 4 }}>Ảnh</div>
-                        )}
-                        <div>Khung ngoại 45x110</div>
-                      </td>
-                    );
-                    if (colId === 'unit') return <td key="unit" style={{ ...tdStyle, textAlign: 'center' }}>{isService ? 'Lần' : 'Bộ'}</td>;
-                    if (colId === 'qty') return <td key="qty" style={{ ...tdStyle, textAlign: 'center' }}>{isService ? '1' : '2'}</td>;
-                    if (colId === 'price') return <td key="price" style={{ ...tdStyle, textAlign: 'right' }}>{isService ? '500,000 đ' : '1,250,000 đ'}</td>;
-                    if (colId === 'total') return <td key="total" style={{ ...tdStyle, textAlign: 'right' }}><strong style={{ color: clr }}>{isService ? '500,000 đ' : '2,500,000 đ'}</strong></td>;
+                        </td>
+                      );
+                    }
+                    if (colId === 'symbol') {
+                      const showImg = typeof col === 'object' && col.allowImageUpload;
+                      return (
+                        <td key="symbol" style={{ ...tdStyle, textAlign: 'center' }}>
+                          {showImg && (
+                            <div style={{ width: 40, height: 40, background: '#e2e8f0', borderRadius: 4, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#94a3b8', fontSize: 10, marginBottom: 4, marginLeft: 'auto', marginRight: 'auto' }}>Ảnh</div>
+                          )}
+                          <div><span style={{ fontWeight: 600, color: '#2563eb' }}>{isService ? 'SV1' : 'D1'}</span></div>
+                        </td>
+                      );
+                    }
+                    if (colId === 'specs') {
+                      const showImg = typeof col === 'object' && col.allowImageUpload;
+                      return (
+                        <td key="specs" style={{ ...tdStyle, textAlign: 'center' }}>
+                          {showImg && (
+                            <div style={{ width: 40, height: 40, background: '#e2e8f0', borderRadius: 4, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#94a3b8', fontSize: 10, marginBottom: 4, marginLeft: 'auto', marginRight: 'auto' }}>Ảnh</div>
+                          )}
+                          <div><span style={{ color: '#475569', fontSize: 11 }}>{isService ? 'Ghi chú dịch vụ demo' : 'Mô tả sản phẩm demo'}</span></div>
+                        </td>
+                      );
+                    }
+                    if (colId === 'dimensions') {
+                      const showImgParent = typeof col === 'object' && col.allowImageUpload;
+                      return (
+                        <td key="dimensions" style={{ ...tdStyle, padding: 0, verticalAlign: 'top' }}>
+                          {!useComplexDimensions ? (
+                            <div style={{ padding: '4px 6px', textAlign: 'center' }}>
+                              {showImgParent && (
+                                <div style={{ width: 40, height: 40, background: '#e2e8f0', borderRadius: 4, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#94a3b8', fontSize: 10, marginBottom: 4, marginLeft: 'auto', marginRight: 'auto' }}>Ảnh</div>
+                              )}
+                              <div>2200 x 900 x 45</div>
+                            </div>
+                          ) : (
+                            <div style={{ display: 'flex', height: '100%' }}>
+                              {dimensionFields.map((f, fi) => {
+                                const showImgChild = typeof f === 'object' && f.allowImageUpload;
+                                return (
+                                  <div key={f.id} style={{ flex: 1, borderRight: fi < dimensionFields.length - 1 ? '1px dashed #e2e8f0' : 'none', padding: '4px 6px', textAlign: 'center' }}>
+                                    {showImgChild && (
+                                      <div style={{ width: 40, height: 40, background: '#e2e8f0', borderRadius: 4, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#94a3b8', fontSize: 10, marginBottom: 4, marginLeft: 'auto', marginRight: 'auto' }}>Ảnh</div>
+                                    )}
+                                    <div>{f.id === 'height' ? '2200' : f.id === 'width' ? '900' : f.id === 'thickness' ? '45' : '—'}</div>
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          )}
+                        </td>
+                      );
+                    }
+                    if (colId === 'note') {
+                      const showImg = typeof col === 'object' && col.allowImageUpload;
+                      return (
+                        <td key="note" style={{ ...tdStyle, color: '#475569', fontSize: 11, textAlign: 'center' }}>
+                          {showImg && (
+                            <div style={{ width: 40, height: 40, background: '#e2e8f0', borderRadius: 4, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#94a3b8', fontSize: 10, marginBottom: 4, marginLeft: 'auto', marginRight: 'auto' }}>Ảnh</div>
+                          )}
+                          <div>Khung ngoại 45x110</div>
+                        </td>
+                      );
+                    }
+                    if (colId === 'unit') {
+                      const showImg = typeof col === 'object' && col.allowImageUpload;
+                      return (
+                        <td key="unit" style={{ ...tdStyle, textAlign: 'center' }}>
+                          {showImg && (
+                            <div style={{ width: 40, height: 40, background: '#e2e8f0', borderRadius: 4, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#94a3b8', fontSize: 10, marginBottom: 4, marginLeft: 'auto', marginRight: 'auto' }}>Ảnh</div>
+                          )}
+                          <div>{isService ? 'Lần' : 'Bộ'}</div>
+                        </td>
+                      );
+                    }
+                    if (colId === 'qty') {
+                      const showImg = typeof col === 'object' && col.allowImageUpload;
+                      return (
+                        <td key="qty" style={{ ...tdStyle, textAlign: 'center' }}>
+                          {showImg && (
+                            <div style={{ width: 40, height: 40, background: '#e2e8f0', borderRadius: 4, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#94a3b8', fontSize: 10, marginBottom: 4, marginLeft: 'auto', marginRight: 'auto' }}>Ảnh</div>
+                          )}
+                          <div>{isService ? '1' : '2'}</div>
+                        </td>
+                      );
+                    }
+                    if (colId === 'price') {
+                      const showImg = typeof col === 'object' && col.allowImageUpload;
+                      return (
+                        <td key="price" style={{ ...tdStyle, textAlign: 'center' }}>
+                          {showImg && (
+                            <div style={{ width: 40, height: 40, background: '#e2e8f0', borderRadius: 4, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#94a3b8', fontSize: 10, marginBottom: 4, marginLeft: 'auto', marginRight: 'auto' }}>Ảnh</div>
+                          )}
+                          <div>{isService ? '500,000 đ' : '1,250,000 đ'}</div>
+                        </td>
+                      );
+                    }
+                    if (colId === 'total') {
+                      const showImg = typeof col === 'object' && col.allowImageUpload;
+                      return (
+                        <td key="total" style={{ ...tdStyle, textAlign: 'center' }}>
+                          {showImg && (
+                            <div style={{ width: 40, height: 40, background: '#e2e8f0', borderRadius: 4, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#94a3b8', fontSize: 10, marginBottom: 4, marginLeft: 'auto', marginRight: 'auto' }}>Ảnh</div>
+                          )}
+                          <div><strong style={{ color: clr }}>{isService ? '500,000 đ' : '2,500,000 đ'}</strong></div>
+                        </td>
+                      );
+                    }
                     
-                    if (colId.startsWith('custom_')) return (
-                      <td key={colId} style={{ ...tdStyle, textAlign: 'center', color: '#64748b', fontSize: 11, fontStyle: 'italic' }}>Dữ liệu mẫu</td>
-                    );
+                    if (colId.startsWith('custom_')) {
+                      const showImg = typeof col === 'object' && col.allowImageUpload;
+                      return (
+                        <td key={colId} style={{ ...tdStyle, textAlign: 'center', color: '#64748b', fontSize: 11, fontStyle: 'italic' }}>
+                          {showImg && (
+                            <div style={{ width: 40, height: 40, background: '#e2e8f0', borderRadius: 4, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#94a3b8', fontSize: 10, marginBottom: 4, marginLeft: 'auto', marginRight: 'auto' }}>Ảnh</div>
+                          )}
+                          <div>Dữ liệu mẫu</div>
+                        </td>
+                      );
+                    }
                     
                     if (colId.startsWith('group_')) {
+                      const showImgParent = typeof col === 'object' && col.allowImageUpload;
                       const children = col.children || [];
                       return (
                         <td key={colId} style={{ ...tdStyle, padding: 0, verticalAlign: 'top' }}>
+                          {showImgParent && (
+                            <div style={{ padding: '4px 0', textAlign: 'center' }}>
+                              <div style={{ width: 40, height: 40, background: '#e2e8f0', borderRadius: 4, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', color: '#94a3b8', fontSize: 10 }}>Ảnh</div>
+                            </div>
+                          )}
                           <div style={{ display: 'flex', height: '100%' }}>
-                            {children.length > 0 ? children.map((child, idx) => (
-                              <div key={child.id} style={{ flex: 1, borderRight: idx < children.length - 1 ? '1px dashed #e2e8f0' : 'none', padding: '4px 6px', textAlign: 'center', color: '#64748b', fontSize: 11, fontStyle: 'italic' }}>
-                                Mẫu
-                              </div>
-                            )) : <div style={{ padding: '4px 6px', flex: 1 }} />}
+                            {children.length > 0 ? children.map((child, idx) => {
+                              const showImgChild = typeof child === 'object' && child.allowImageUpload;
+                              return (
+                                <div key={child.id} style={{ flex: 1, borderRight: idx < children.length - 1 ? '1px dashed #e2e8f0' : 'none', padding: '4px 6px', textAlign: 'center', color: '#64748b', fontSize: 11, fontStyle: 'italic' }}>
+                                  {showImgChild && (
+                                    <div style={{ width: 40, height: 40, background: '#e2e8f0', borderRadius: 4, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#94a3b8', fontSize: 10, marginBottom: 4, marginLeft: 'auto', marginRight: 'auto' }}>Ảnh</div>
+                                  )}
+                                  <div>Mẫu</div>
+                                </div>
+                              );
+                            }) : <div style={{ padding: '4px 6px', flex: 1 }} />}
                           </div>
                         </td>
                       );
@@ -304,6 +400,20 @@ export default function BlockRenderer({ block, allBlocks, isActive, onSelect, on
                     return null;
                   })}
                 </tr>
+                {block.props.actionButtons && block.props.actionButtons.length > 0 && (
+                  <tr style={{ background: '#f8fafc' }}>
+                    <td colSpan={100} style={{ padding: '8px 12px', borderBottom: '1px solid #e2e8f0', textAlign: 'left' }}>
+                      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
+                        <span style={{ fontSize: 11, color: '#64748b', fontStyle: 'italic', marginRight: 4 }}>Mô phỏng Nút hành động:</span>
+                        {block.props.actionButtons.map((btn, idx) => (
+                          <div key={idx} style={{ padding: '4px 10px', background: '#fff', border: '1px dashed #cbd5e1', borderRadius: 4, color: '#3b82f6', fontSize: 11, cursor: 'default', display: 'flex', alignItems: 'center', gap: 4 }}>
+                            <span style={{ fontSize: 14 }}>+</span> {btn.label || `Nút hành động ${idx + 1}`}
+                          </div>
+                        ))}
+                      </div>
+                    </td>
+                  </tr>
+                )}
               </tbody>
             </table>
           </div>

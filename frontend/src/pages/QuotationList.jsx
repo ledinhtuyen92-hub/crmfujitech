@@ -294,10 +294,14 @@ export default function QuotationList() {
     ])
   }
 
-  const handleAddSameProduct = (index, isCustomSize = false) => {
+  const handleAddSameProduct = (index, actionConfig = null) => {
     setFormItems((prev) => {
       const currentItem = prev[index]
       if (!currentItem) return prev
+      
+      const isCustomSize = actionConfig?.mergeColumns?.length > 0;
+      const mergeColumns = actionConfig?.mergeColumns || [];
+
       const newItem = {
         key: Date.now(),
         product: currentItem.product,
@@ -318,9 +322,9 @@ export default function QuotationList() {
           ...(currentItem.custom_data || {}), 
           symbol: '', 
           is_custom_size: isCustomSize, 
-          custom_size_text: '' 
+          custom_size_text: '',
+          merge_columns: mergeColumns
         },
-        quantity: 1,
         discount_percent: currentItem.discount_percent || 0,
       }
       let rowSpan = 1;
@@ -1368,10 +1372,16 @@ export default function QuotationList() {
     const isLandscape = tmplCode === 'production_landscape_a4' || effectiveTmpl?.layout_config?.paper_orientation === 'landscape'
     
     const productBlock = effectiveTmpl?.layout_config?.blocks?.find(b => b.type === 'product_table');
-    const enableProductImage = productBlock?.props?.enableProductImage !== false;
+    // Only enable image features if explicitly configured in template (default: off)
+    const hasTemplate = !!effectiveTmpl?.layout_config;
+    const nameColCfg = hasTemplate
+      ? (productBlock?.props?.columns || []).find(c => (typeof c === 'object' ? c.id : c) === 'name')
+      : null;
+    const enableProductImage = hasTemplate
+      ? (nameColCfg && typeof nameColCfg === 'object' ? nameColCfg.allowImageUpload === true : productBlock?.props?.enableProductImage !== false)
+      : false;
     const enableProductName = productBlock?.props?.enableProductName !== false;
     const enableProductDescription = productBlock?.props?.enableProductDescription !== false;
-    const enableNoteImage = productBlock?.props?.enableNoteImage !== false;
     const useComplexDimensions = productBlock?.props?.useComplexDimensions !== false;
     const dimCol = productBlock?.props?.columns?.find(c => (typeof c === 'object' ? c.id : c) === 'dimensions');
     const dimensionFieldsRaw = dimCol?.children || [];
@@ -1399,33 +1409,18 @@ export default function QuotationList() {
         width: field.width || 85,
         align: 'center',
         render: (val, record, idx) => {
-          if (record.custom_data?.is_custom_size) {
-            if (fi === 0) {
-              return {
-                children: <Input placeholder="Thêm thông tin..." style={{ textAlign: 'left' }} value={record.custom_data?.custom_size_text || ''} onChange={(e) => {
-                  const currentData = record.custom_data || {};
-                  handleLineChange(idx, 'custom_data', { ...currentData, custom_size_text: e.target.value });
-                }} />,
-                props: { colSpan: dimensionFields.length }
-              };
-            }
-            return { children: null, props: { colSpan: 0 } };
-          }
           const fieldVal = getDimVal(record, field);
-          return {
-            children: (
-              <InputNumber
-                min={0}
-                step={1}
-                precision={0}
-                style={{ width: '100%', textAlign: 'center' }}
-                value={fieldVal !== undefined && fieldVal !== null && fieldVal !== '' ? Math.round(Number(fieldVal)) : undefined}
-                onChange={(v) => setDimVal(idx, record, field, v)}
-                placeholder="0"
-              />
-            ),
-            props: { colSpan: 1 }
-          };
+          return (
+            <InputNumber
+              min={0}
+              step={1}
+              precision={0}
+              style={{ width: '100%', textAlign: 'center' }}
+              value={fieldVal !== undefined && fieldVal !== null && fieldVal !== '' ? Math.round(Number(fieldVal)) : undefined}
+              onChange={(v) => setDimVal(idx, record, field, v)}
+              placeholder="0"
+            />
+          );
         },
       })),
     }] : [{
@@ -1566,15 +1561,22 @@ export default function QuotationList() {
                           )
                         )
                       )}
-                      <Button type="dashed" size="small" icon={<PlusOutlined />} onClick={() => handleAddSameProduct(idx)}
-                        style={{ marginTop: 4, borderColor: '#2563eb', color: '#2563eb', width: '100%' }}>
-                        Thêm kích thước
-                      </Button>
-                      <Button type="dashed" size="small" icon={<PlusOutlined />} onClick={() => handleAddSameProduct(idx, true)}
-                        style={{ marginTop: 4, borderColor: '#059669', color: '#059669', width: '100%' }}
-                        title="Tạo dòng nhập gộp (VD: 1000 x 2000)">
-                        Thêm gộp ô chờ
-                      </Button>
+                      {(productBlock?.props?.actionButtons || [
+                        { id: 'btn_add_dim', label: 'Thêm kích thước', mergeColumns: [] },
+                        { id: 'btn_add_merged', label: 'Thêm gộp ô chờ', mergeColumns: ['height', 'width', 'thickness'] }
+                      ]).map((btn, bidx) => (
+                        <Button 
+                          key={btn.id || bidx}
+                          type="dashed" 
+                          size="small" 
+                          icon={<PlusOutlined />} 
+                          onClick={() => handleAddSameProduct(idx, btn)}
+                          style={{ marginTop: 4, borderColor: btn.mergeColumns?.length ? '#059669' : '#2563eb', color: btn.mergeColumns?.length ? '#059669' : '#2563eb', width: '100%' }}
+                          title={btn.mergeColumns?.length ? "Thêm dòng phụ và gộp ô" : "Thêm dòng phụ"}
+                        >
+                          {btn.label}
+                        </Button>
+                      ))}
                     </div>
                   )}
                 </div>
@@ -1595,52 +1597,7 @@ export default function QuotationList() {
           title: 'GHI CHÚ KỸ THUẬT',
           dataIndex: 'note',
           width: 170,
-          render: (val, record, idx) => (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 6, padding: '4px 0' }}>
-              <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
-                {enableNoteImage && record.custom_data?.note_image && (
-                  <div style={{ position: 'relative', flexShrink: 0, width: 32, height: 32 }}>
-                    <Image src={record.custom_data.note_image} alt="note" style={{ width: 32, height: 32, objectFit: 'cover', borderRadius: 4, border: '1px solid #cbd5e1' }} />
-                    <CloseCircleOutlined 
-                      style={{ position: 'absolute', top: -6, right: -6, color: '#ef4444', cursor: 'pointer', background: '#fff', borderRadius: '50%', fontSize: 12 }} 
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        const currentData = record.custom_data || {};
-                        handleLineChange(idx, 'custom_data', { ...currentData, note_image: null });
-                      }} 
-                    />
-                  </div>
-                )}
-                <Input style={{ textAlign: 'center' }} placeholder="Khóa, bản lề, kính..." value={val || ''} onChange={(e) => handleLineChange(idx, 'note', e.target.value)} />
-                {enableNoteImage && (
-                  <Upload
-                    fileList={[]}
-                    showUploadList={false}
-                    customRequest={async ({ file, onSuccess, onError }) => {
-                      const key = `upload-note-${idx}`;
-                      messageApi.open({ key, type: 'loading', content: 'Đang tải ảnh lên...', duration: 0 });
-                      try {
-                        const formData = new FormData();
-                        formData.append('image', file);
-                        const res = await api.post('/sales/quotations/upload-item-image/', formData, {
-                          headers: { 'Content-Type': 'multipart/form-data' },
-                        });
-                        const currentData = record.custom_data || {};
-                        handleLineChange(idx, 'custom_data', { ...currentData, note_image: res.data.url });
-                        messageApi.open({ key, type: 'success', content: 'Đã tải ảnh ghi chú!', duration: 2 });
-                        onSuccess("ok");
-                      } catch (e) {
-                        messageApi.open({ key, type: 'error', content: 'Tải ảnh thất bại', duration: 3 });
-                        onError(e);
-                      }
-                    }}
-                  >
-                    <Button icon={<CameraOutlined />} size="small" type={record.custom_data?.note_image ? "primary" : "dashed"} title="Tải ảnh lên" />
-                  </Upload>
-                )}
-              </div>
-            </div>
-          ),
+          render: (val, record, idx) => <Input style={{ textAlign: 'center' }} placeholder="Khóa, bản lề, kính..." value={val || ''} onChange={(e) => handleLineChange(idx, 'note', e.target.value)} />,
         },
         {
           title: 'SL',
@@ -1790,15 +1747,22 @@ export default function QuotationList() {
                         )
                       )
                     )}
-                    <Button type="dashed" size="small" icon={<PlusOutlined />} onClick={() => handleAddSameProduct(idx)}
-                      style={{ marginTop: 4, borderColor: '#2563eb', color: '#2563eb', width: '100%' }}>
-                      Thêm kích thước
-                    </Button>
-                    <Button type="dashed" size="small" icon={<PlusOutlined />} onClick={() => handleAddSameProduct(idx, true)}
-                      style={{ marginTop: 4, borderColor: '#059669', color: '#059669', width: '100%' }}
-                      title="Tạo dòng nhập gộp (VD: 1000 x 2000)">
-                      Thêm gộp ô chờ
-                    </Button>
+                    {(productBlock?.props?.actionButtons || [
+                      { id: 'btn_add_dim', label: 'Thêm kích thước', mergeColumns: [] },
+                      { id: 'btn_add_merged', label: 'Thêm gộp ô chờ', mergeColumns: ['height', 'width', 'thickness'] }
+                    ]).map((btn, bidx) => (
+                      <Button 
+                        key={btn.id || bidx}
+                        type="dashed" 
+                        size="small" 
+                        icon={<PlusOutlined />} 
+                        onClick={() => handleAddSameProduct(idx, btn)}
+                        style={{ marginTop: 4, borderColor: btn.mergeColumns?.length ? '#059669' : '#2563eb', color: btn.mergeColumns?.length ? '#059669' : '#2563eb', width: '100%' }}
+                        title={btn.mergeColumns?.length ? "Thêm dòng phụ và gộp ô" : "Thêm dòng phụ"}
+                      >
+                        {btn.label}
+                      </Button>
+                    ))}
                   </div>
                 )}
               </div>
@@ -1939,9 +1903,13 @@ export default function QuotationList() {
         if (col.id.startsWith('group_') && col.children && col.children.length > 0) {
           baseCols.push({
             title: col.title,
+            key: col.id,
+            id: col.id,
             children: col.children.map(child => ({
               title: child.title,
               dataIndex: child.id,
+              key: child.id,
+              id: child.id,
               width: 100,
               render: (val, record, idx) => (
                 <Input 
@@ -1960,6 +1928,8 @@ export default function QuotationList() {
           baseCols.push({
             title: col.title,
             dataIndex: col.id,
+            key: col.id,
+            id: col.id,
             width: 140,
             render: (val, record, idx) => (
               <Input 
@@ -2052,7 +2022,120 @@ export default function QuotationList() {
        return idxA - idxB;
     });
 
-    return baseCols
+    const getMergeProps = (colId, record) => {
+      const merges = record?.custom_data?.merge_columns;
+      if (merges && Array.isArray(merges) && merges.length > 1) {
+        const idx = merges.indexOf(colId);
+        if (idx === 0) return { colSpan: merges.length, isMergedRoot: true };
+        if (idx > 0) return { colSpan: 0, isMergedRoot: false };
+      }
+      // legacy support
+      if (record?.custom_data?.is_custom_size) {
+        const dimIds = dimensionFields.map(f => f.id);
+        const idx = dimIds.indexOf(colId);
+        if (idx === 0) return { colSpan: dimIds.length, isMergedRoot: true };
+        if (idx > 0) return { colSpan: 0, isMergedRoot: false };
+      }
+      return { colSpan: 1, isMergedRoot: false };
+    };
+
+    const getColConfig = (colId) => {
+      const col = (productTableBlock?.props?.columns || []).find(c => typeof c === 'object' ? c.id === colId : c === colId);
+      return typeof col === 'object' ? col : {};
+    };
+
+    const applyColFeatures = (cols) => {
+      return cols.map(col => {
+        if (col.children) {
+          return { ...col, children: applyColFeatures(col.children) };
+        }
+        const origRender = col.render;
+        if (!origRender) return col;
+        const colId = getColId(col);
+        return {
+          ...col,
+          render: (val, record, idx) => {
+            const { colSpan, isMergedRoot } = getMergeProps(colId, record);
+            if (colSpan === 0) return { props: { colSpan: 0 } };
+            
+            if (isMergedRoot) {
+              return {
+                children: <Input placeholder="Thêm thông tin..." value={record.custom_data?.custom_size_text || ''} onChange={(e) => {
+                  const currentData = record.custom_data || {};
+                  handleLineChange(idx, 'custom_data', { ...currentData, custom_size_text: e.target.value });
+                }} />,
+                props: { colSpan }
+              };
+            }
+            
+            const origResult = origRender(val, record, idx);
+            let innerChildren = origResult;
+            let finalProps = { colSpan };
+            
+            if (origResult && typeof origResult === 'object' && origResult.children !== undefined) {
+              innerChildren = origResult.children;
+              finalProps = { ...origResult.props, colSpan: (origResult.props?.colSpan !== undefined && origResult.props?.colSpan !== 1) ? origResult.props.colSpan : colSpan };
+            }
+
+            // Image Upload Feature - only enable if explicitly set in column config (no legacy fallback)
+            const colCfg = getColConfig(colId);
+            const canUpload = colCfg.allowImageUpload === true;
+            
+            if (canUpload && colId !== 'action' && colId !== 'name') { // Ensure not interfering with existing Product/Action logic
+              const imgKey = colId === 'note' ? 'note_image' : `img_${colId}`;
+              const imgUrl = record.custom_data?.[imgKey];
+              
+              innerChildren = (
+                <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                  {imgUrl && (
+                    <div style={{ position: 'relative', flexShrink: 0, width: 32, height: 32 }}>
+                      <Image src={imgUrl} alt="uploaded" style={{ width: 32, height: 32, objectFit: 'cover', borderRadius: 4, border: '1px solid #cbd5e1' }} />
+                      <CloseCircleOutlined 
+                        style={{ position: 'absolute', top: -6, right: -6, color: '#ef4444', cursor: 'pointer', background: '#fff', borderRadius: '50%', fontSize: 12 }} 
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          const cd = record.custom_data || {};
+                          handleLineChange(idx, 'custom_data', { ...cd, [imgKey]: null });
+                        }} 
+                      />
+                    </div>
+                  )}
+                  <div style={{ flex: 1 }}>{innerChildren}</div>
+                  <Upload
+                    fileList={[]}
+                    showUploadList={false}
+                    customRequest={async ({ file, onSuccess, onError }) => {
+                      const key = `upload-${colId}-${idx}`;
+                      messageApi.open({ key, type: 'loading', content: 'Đang tải ảnh lên...', duration: 0 });
+                      try {
+                        const formData = new FormData();
+                        formData.append('image', file);
+                        const res = await api.post('/sales/quotations/upload-item-image/', formData, {
+                          headers: { 'Content-Type': 'multipart/form-data' },
+                        });
+                        const cd = record.custom_data || {};
+                        handleLineChange(idx, 'custom_data', { ...cd, [imgKey]: res.data.url });
+                        messageApi.open({ key, type: 'success', content: 'Tải ảnh thành công!', duration: 2 });
+                        onSuccess("ok");
+                      } catch (e) {
+                        messageApi.open({ key, type: 'error', content: 'Tải ảnh thất bại', duration: 3 });
+                        onError(e);
+                      }
+                    }}
+                  >
+                    <Button icon={<CameraOutlined />} size="small" type={imgUrl ? "primary" : "dashed"} title="Tải ảnh lên" />
+                  </Upload>
+                </div>
+              );
+            }
+
+            return { children: innerChildren, props: finalProps };
+          }
+        };
+      });
+    };
+
+    return applyColFeatures(baseCols);
   }
 
   return (

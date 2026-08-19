@@ -133,6 +133,67 @@ const VariableHints = () => {
   );
 };
 
+const ActionButtonsManager = ({ value = [], onChange, blockColumns = [] }) => {
+  const handleAdd = () => {
+    onChange([...value, { id: `btn_${Date.now()}`, label: 'Nút mới', mergeColumns: [] }]);
+  };
+
+  const handleRemove = (id) => {
+    onChange(value.filter(b => b.id !== id));
+  };
+
+  const handleChange = (id, key, val) => {
+    onChange(value.map(b => b.id === id ? { ...b, [key]: val } : b));
+  };
+
+  const allCols = [];
+  (blockColumns || []).forEach(c => {
+    if (c.children) {
+      c.children.forEach(child => allCols.push(child));
+    } else {
+      allCols.push(c);
+    }
+  });
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+      {value.map((btn, idx) => (
+        <div key={btn.id} style={{ background: '#f1f5f9', padding: 12, borderRadius: 6, position: 'relative' }}>
+          <Button 
+            type="text" 
+            danger 
+            icon={<DeleteOutlined />} 
+            size="small" 
+            style={{ position: 'absolute', top: 4, right: 4 }} 
+            onClick={() => handleRemove(btn.id)} 
+          />
+          <div style={{ marginBottom: 8, fontWeight: 500, fontSize: 12 }}>Nút hành động {idx + 1}</div>
+          <Input 
+            size="small" 
+            placeholder="Tên nút hiển thị" 
+            value={btn.label} 
+            onChange={(e) => handleChange(btn.id, 'label', e.target.value)} 
+            style={{ marginBottom: 8 }}
+          />
+          <Select
+            mode="multiple"
+            size="small"
+            style={{ width: '100%' }}
+            placeholder="Chọn các cột sẽ gộp với nhau"
+            value={btn.mergeColumns || []}
+            onChange={(val) => handleChange(btn.id, 'mergeColumns', val)}
+          >
+            {allCols.map(c => (
+              <Option key={c.id} value={c.id}>{c.title || c.id}</Option>
+            ))}
+          </Select>
+        </div>
+      ))}
+      <Button type="dashed" icon={<PlusOutlined />} onClick={handleAdd} size="small">Thêm nút</Button>
+    </div>
+  );
+};
+
 export default function SettingsPanel({ block, onChange }) {
   const [form] = Form.useForm();
 
@@ -331,14 +392,18 @@ export default function SettingsPanel({ block, onChange }) {
                 <Switch />
               </Form.Item>
             )}
-            <Form.Item name="enableNoteImage" label="Cho phép tải & hiển thị ảnh Ghi chú" valuePropName="checked" initialValue={true}>
-              <Switch />
-            </Form.Item>
+
             {block.type === BLOCK_TYPES.PRODUCT_TABLE && (
               <Form.Item name="useComplexDimensions" label="Sử dụng cột Kích thước chia ngách" valuePropName="checked" initialValue={true} tooltip="Nếu tắt, cột Kích thước sẽ chỉ là 1 ô nhập chữ thông thường">
                 <Switch />
               </Form.Item>
             )}
+            
+            <Divider style={{ margin: '12px 0' }} />
+            <div style={{ fontWeight: 600, color: '#334155', marginBottom: 8, paddingBottom: 4, borderBottom: '1px solid #e2e8f0' }}>Quản lý Nút Hành động (Hàng con)</div>
+            <Form.Item name="actionButtons">
+              <ActionButtonsManager blockColumns={form.getFieldValue('columns')} />
+            </Form.Item>
 
             <Divider style={{ margin: '12px 0' }} />
             <div style={{ fontWeight: 600, color: '#334155', marginBottom: 8, paddingBottom: 4, borderBottom: '1px solid #e2e8f0' }}>Quản lý Cột & Giao diện</div>

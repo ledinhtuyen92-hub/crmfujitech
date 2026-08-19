@@ -285,10 +285,18 @@ export default function QuotationRenderer({ layoutConfig, layoutStyle, data }) {
         
         const isLandscape = layoutConfig?.paper_orientation === 'landscape';
         const tableTitle = block.props.tableTitle;
-        const enableProductImage = block.props.enableProductImage !== false;
+        const enableProductImage = (() => {
+          const nameCol = (block.props.columns || []).find(c => (typeof c === 'object' ? c.id : c) === 'name');
+          if (nameCol && typeof nameCol === 'object') return nameCol.allowImageUpload === true;
+          return block.props.enableProductImage !== false;
+        })();
         const enableProductName = block.props.enableProductName !== false;
         const enableProductDescription = block.props.enableProductDescription !== false;
-        const enableNoteImage = block.props.enableNoteImage !== false;
+        const enableNoteImage = (() => {
+          const noteCol = (block.props.columns || []).find(c => (typeof c === 'object' ? c.id : c) === 'note');
+          if (noteCol && typeof noteCol === 'object') return noteCol.allowImageUpload === true;
+          return block.props.enableNoteImage !== false;
+        })();
         const useComplexDimensions = block.props.useComplexDimensions !== false;
         const dimCol = block.props.columns?.find(c => (typeof c === 'object' ? c.id : c) === 'dimensions');
         const dimensionFieldsRaw = dimCol?.children || [];
@@ -447,22 +455,32 @@ export default function QuotationRenderer({ layoutConfig, layoutStyle, data }) {
                           );
                           
                           // Xử lý Custom Column
-                          if (colId.startsWith('custom_')) return (
-                            <td key={colId} style={{ ...tdStyle, textAlign: 'center' }}>
-                              <span style={{color: '#334155'}}>{item.custom_data?.[colId] || ''}</span>
-                            </td>
-                          );
+                          if (colId.startsWith('custom_')) {
+                            const canShowImg = typeof col === 'object' && col.allowImageUpload === true;
+                            const imgUrl = canShowImg ? item.custom_data?.[`img_${colId}`] : null;
+                            return (
+                              <td key={colId} style={{ ...tdStyle, textAlign: 'center' }}>
+                                {imgUrl && <div style={{ marginBottom: 4, display: 'flex', justifyContent: 'center' }}><img src={imgUrl} alt="" style={{ maxWidth: '100%', maxHeight: 60, objectFit: 'contain', borderRadius: 4, border: '1px solid #cbd5e1' }} /></div>}
+                                <span style={{color: '#334155'}}>{item.custom_data?.[colId] || ''}</span>
+                              </td>
+                            );
+                          }
                           
                           if (colId.startsWith('group_')) {
                             const children = col.children || [];
                             return (
                               <td key={colId} style={{ ...tdStyle, padding: 0, verticalAlign: 'top' }}>
                                 <div style={{ display: 'flex', height: '100%' }}>
-                                  {children.length > 0 ? children.map((child, idx) => (
-                                    <div key={child.id} style={{ flex: 1, borderRight: idx < children.length - 1 ? '1px dashed #e2e8f0' : 'none', padding: '4px 6px', textAlign: 'center' }}>
-                                      <span style={{color: '#334155'}}>{item.custom_data?.[child.id] || ''}</span>
-                                    </div>
-                                  )) : <div style={{ padding: '4px 6px', flex: 1 }} />}
+                                  {children.length > 0 ? children.map((child, idx) => {
+                                    const canShowChildImg = typeof child === 'object' && child.allowImageUpload === true;
+                                    const childImgUrl = canShowChildImg ? item.custom_data?.[`img_${child.id}`] : null;
+                                    return (
+                                      <div key={child.id} style={{ flex: 1, borderRight: idx < children.length - 1 ? '1px dashed #e2e8f0' : 'none', padding: '4px 6px', textAlign: 'center' }}>
+                                        {childImgUrl && <div style={{ marginBottom: 4, display: 'flex', justifyContent: 'center' }}><img src={childImgUrl} alt="" style={{ maxWidth: '100%', maxHeight: 60, objectFit: 'contain', borderRadius: 4, border: '1px solid #cbd5e1' }} /></div>}
+                                        <span style={{color: '#334155'}}>{item.custom_data?.[child.id] || ''}</span>
+                                      </div>
+                                    );
+                                  }) : <div style={{ padding: '4px 6px', flex: 1 }} />}
                                 </div>
                               </td>
                             );
