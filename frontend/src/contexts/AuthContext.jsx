@@ -141,6 +141,12 @@ export function AuthProvider({ children }) {
         const { data } = await api.get('users/me/')
         setUser(data)
       },
+      patchCompanySettings: async (payload) => {
+        const { data } = await api.patch('users/company-settings/', payload)
+        const { data: userData } = await api.get('users/me/')
+        setUser(userData)
+        return data
+      },
       refreshSettings: fetchPublicSettings,
       activeModules,
       isModuleActive,

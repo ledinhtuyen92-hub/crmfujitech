@@ -41,9 +41,10 @@ import {
   message,
   List,
   Collapse,
+  AutoComplete,
 } from 'antd'
 import dayjs from 'dayjs'
-import { useCallback, useEffect, useState, useMemo } from 'react'
+import { useCallback, useEffect, useState, useMemo, useRef } from 'react'
 import { useLocation } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
 import api from '../utils/api'
@@ -99,6 +100,28 @@ export default function Inventory() {
   const [productImageFile, setProductImageFile] = useState(null)
   const [productPreviewImage, setProductPreviewImage] = useState(null)
   const [productForm] = Form.useForm()
+
+  // Custom unit state
+  const [unitOptions, setUnitOptions] = useState(['Cái', 'm²', 'Mét', 'Bộ', 'Lần', 'Chuyến', 'Kg', 'Lít'])
+  const [newUnitName, setNewUnitName] = useState('')
+  const unitInputRef = useRef(null)
+
+  const onUnitNameChange = (e) => {
+    setNewUnitName(e.target.value)
+  }
+  const addUnitItem = (e) => {
+    e.preventDefault()
+    const trimmed = newUnitName.trim()
+    if (trimmed && !unitOptions.includes(trimmed)) {
+      setUnitOptions([...unitOptions, trimmed])
+      // Đồng thời cập nhật giá trị vào form để chọn luôn
+      productForm.setFieldsValue({ unit: trimmed })
+      setNewUnitName('')
+      setTimeout(() => {
+        unitInputRef.current?.focus()
+      }, 0)
+    }
+  }
 
   const [categoryModalVisible, setCategoryModalVisible] = useState(false)
   const [editingCategory, setEditingCategory] = useState(null)
@@ -1822,14 +1845,69 @@ export default function Inventory() {
             </Col>
             <Col xs={24} md={12}>
               <Form.Item name="unit" label="Đơn vị tính">
-                <Select>
-                  <Option value="cái">Cái</Option>
-                  <Option value="m²">m²</Option>
-                  <Option value="m">Mét</Option>
-                  <Option value="bộ">Bộ</Option>
-                  <Option value="kg">Kg</Option>
-                  <Option value="lít">Lít</Option>
-                </Select>
+                <Select
+                  placeholder="Chọn đơn vị..."
+                  showSearch
+                  dropdownRender={(menu) => (
+                    <>
+                      {menu}
+                      <div style={{ display: 'flex', flexWrap: 'nowrap', padding: 8, borderTop: '1px solid #f0f0f0' }}>
+                        <Input
+                          placeholder="Thêm đơn vị mới..."
+                          ref={unitInputRef}
+                          value={newUnitName}
+                          onChange={onUnitNameChange}
+                          onKeyDown={(e) => {
+                            e.stopPropagation()
+                            if (e.key === 'Enter') addUnitItem(e)
+                          }}
+                        />
+                        <Button
+                          type="primary"
+                          icon={<PlusOutlined />}
+                          onClick={addUnitItem}
+                          style={{ marginLeft: 4 }}
+                        >
+                          Thêm
+                        </Button>
+                      </div>
+                    </>
+                  )}
+                  options={unitOptions.map((item) => ({
+                    label: (
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <span>{item}</span>
+                        {!['Cái', 'm²', 'Mét', 'Bộ', 'Lần', 'Chuyến', 'Kg', 'Lít'].includes(item) && (
+                          <div style={{ display: 'flex', gap: 12 }}>
+                            <EditOutlined
+                              style={{ color: '#1677ff', fontSize: 13, cursor: 'pointer' }}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setNewUnitName(item);
+                                setUnitOptions((prev) => prev.filter((u) => u !== item));
+                                if (productForm.getFieldValue('unit') === item) {
+                                  productForm.setFieldsValue({ unit: null });
+                                }
+                                setTimeout(() => unitInputRef.current?.focus(), 0);
+                              }}
+                            />
+                            <DeleteOutlined
+                              style={{ color: '#ff4d4f', fontSize: 13, cursor: 'pointer' }}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setUnitOptions((prev) => prev.filter((u) => u !== item));
+                                if (productForm.getFieldValue('unit') === item) {
+                                  productForm.setFieldsValue({ unit: null });
+                                }
+                              }}
+                            />
+                          </div>
+                        )}
+                      </div>
+                    ),
+                    value: item,
+                  }))}
+                />
               </Form.Item>
             </Col>
             <Col xs={24} md={12}>

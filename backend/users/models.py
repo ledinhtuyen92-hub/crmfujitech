@@ -339,6 +339,12 @@ class CompanySettings(models.Model):
         blank=True,
         verbose_name="Tên tùy chỉnh các trạng thái Pipeline",
     )
+    custom_info_templates = models.JSONField(
+        default=list,
+        blank=True,
+        verbose_name="Mẫu thêm thông tin",
+        help_text="Danh sách các hạng mục thông tin tùy chỉnh được lưu lại",
+    )
     quotation_template = models.ForeignKey(
         "sales.QuotationTemplate",
         on_delete=models.SET_NULL,

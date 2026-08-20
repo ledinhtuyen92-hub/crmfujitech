@@ -1276,7 +1276,7 @@
   "pk": 2,
   "fields": {
     "password": "pbkdf2_sha256$1000000$vIIjZf8hXiPMKTZZF9XL9b$rAHNpABj+Y+kz3IwxL2p4jStPLsifJJ7y5kOArG3kCc=",
-    "last_login": "2026-08-19T15:15:30.609Z",
+    "last_login": "2026-08-20T15:34:56.897Z",
     "is_superuser": false,
     "username": "admin_fuji",
     "first_name": "",
@@ -1468,6 +1468,7 @@
       "potential": "Tìm hiểu nhu cầu",
       "repeat_order": "Mua thêm đơn hàng"
     },
+    "custom_info_templates": [],
     "quotation_template": 3,
     "default_quotation_terms": "1. Báo giá có hiệu lực trong vòng 15 ngày kể từ ngày xuất báo giá.\n2. Thanh toán: Tạm ứng 50% ngay sau khi xác nhận đơn hàng, 50% còn lại thanh toán sau khi bàn giao nghiệm thu.\n3. Đơn giá trên chưa bao gồm thuế VAT (nếu xuất hóa đơn).\n4. Bảo hành: Theo tiêu chuẩn từ nhà sản xuất kể từ ngày bàn giao.",
     "custom_quotation_title": "Báo giá sản xuất cửa",
@@ -1890,7 +1891,7 @@
     "company": 15,
     "prefix": "FUJI-BG",
     "date_str": "20082026",
-    "last_seq": 2
+    "last_seq": 3
   }
 },
 {
@@ -2233,10 +2234,10 @@
     "signature_image": "data:image/png;base64,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",
     "signed_at": "2026-08-19T17:14:42.904Z",
     "customer_name_signed": "Tuyền",
-    "subtotal": "3900000.00",
+    "subtotal": "7800000.00",
     "vat_rate": "0.00",
     "vat_amount": "0.00",
-    "total_amount": "3900000.00",
+    "total_amount": "7800000.00",
     "order": null,
     "template": null,
     "shipping_fee": "0.00",
@@ -2498,12 +2499,303 @@
       }
     },
     "created_at": "2026-08-19T17:06:14.686Z",
-    "updated_at": "2026-08-19T17:06:14.686Z"
+    "updated_at": "2026-08-20T16:10:22.979Z"
+  }
+},
+{
+  "model": "sales.quotation",
+  "pk": 12,
+  "fields": {
+    "company": 15,
+    "quotation_number": "FUJI-BG-20082026-003",
+    "customer": 37,
+    "customer_name_snapshot": "Lê Đình Tuyền",
+    "customer_company_snapshot": "",
+    "customer_tax_code_snapshot": "",
+    "customer_phone_snapshot": "0977565777",
+    "customer_address_snapshot": "",
+    "customer_city_snapshot": "",
+    "created_by": 2,
+    "status": "draft",
+    "installation_date": null,
+    "notes": "1. Báo giá có hiệu lực trong vòng 15 ngày kể từ ngày xuất báo giá.\n2. Thanh toán: Tạm ứng 50% ngay sau khi xác nhận đơn hàng, 50% còn lại thanh toán sau khi bàn giao nghiệm thu.\n3. Đơn giá trên chưa bao gồm thuế VAT (nếu xuất hóa đơn).\n4. Bảo hành: Theo tiêu chuẩn từ nhà sản xuất kể từ ngày bàn giao.",
+    "discount_total": "0.00",
+    "public_token": "0dc7c303-1aa1-4e41-81d6-d17f59cc09dd",
+    "public_link_expires_at": null,
+    "signature_image": null,
+    "signed_at": null,
+    "customer_name_signed": null,
+    "subtotal": "3900000.00",
+    "vat_rate": "0.00",
+    "vat_amount": "0.00",
+    "total_amount": "3900000.00",
+    "order": null,
+    "template": null,
+    "shipping_fee": "0.00",
+    "installation_fee": "0.00",
+    "delivery_time": "3-5 ngày làm việc",
+    "warranty_months": 12,
+    "payment_terms": "",
+    "payment_terms_schedule": [
+      {
+        "type": "deposit",
+        "title": "Thanh toán đợt 1",
+        "percentage": 100
+      }
+    ],
+    "validity_days": 15,
+    "custom_data": {
+      "template_snapshot": {
+        "id": 3,
+        "code": "default-b9adb0",
+        "name": "Báo giá FUJITECH (Bản sao)",
+        "layout_style": "modern_navy",
+        "layout_config": {
+          "blocks": [
+            {
+              "id": "header_1",
+              "type": "header_logo",
+              "props": {
+                "phone": "{{company_phone}}",
+                "address": "{{company_address}}",
+                "logoUrl": "{{company_logo}}",
+                "taxCode": "{{company_tax_code}}",
+                "companyName": "{{company_name}}"
+              }
+            },
+            {
+              "id": "title_1",
+              "type": "title",
+              "props": {
+                "title": "BẢNG BÁO GIÁ CHI TIẾT",
+                "metaText": "Số: {{quotation_code}} | Ngày: {{current_date}}",
+                "subtitle": "Kính gửi Quý khách hàng, chúng tôi xin trân trọng gửi bảng báo giá các hạng mục chi tiết dưới đây:"
+              }
+            },
+            {
+              "id": "customer_1",
+              "type": "customer_info",
+              "props": {
+                "phone": "{{company_phone}}",
+                "address": "{{company_address}}",
+                "columns": 2,
+                "taxCode": "{{company_tax_code}}",
+                "position": "{{director_title}}",
+                "buyerName": "{{customer_name}}",
+                "buyerPhone": "{{customer_phone}}",
+                "buyerTitle": "BÊN MUA (BÊN A)",
+                "companyName": "{{company_name}}",
+                "sellerTitle": "BÊN BÁN (BÊN B)",
+                "buyerAddress": "{{customer_address}}",
+                "buyerCompany": "{{customer_company}}",
+                "buyerTaxCode": "{{customer_tax_code}}",
+                "representative": "{{director_name}}"
+              }
+            },
+            {
+              "id": "table_1",
+              "type": "product_table",
+              "props": {
+                "columns": [
+                  {
+                    "id": "stt",
+                    "title": "STT"
+                  },
+                  {
+                    "id": "name",
+                    "title": "Tên hàng hóa / Dịch vụ",
+                    "allowImageUpload": true
+                  },
+                  {
+                    "id": "dimensions",
+                    "title": "Kích thước",
+                    "children": [
+                      {
+                        "id": "height",
+                        "title": "Cao",
+                        "allowImageUpload": false
+                      },
+                      {
+                        "id": "width",
+                        "title": "Rộng",
+                        "allowImageUpload": false
+                      },
+                      {
+                        "id": "thickness",
+                        "title": "Dày",
+                        "allowImageUpload": false
+                      }
+                    ]
+                  },
+                  {
+                    "id": "symbol",
+                    "title": "Ký hiệu"
+                  },
+                  {
+                    "id": "note",
+                    "title": "Ghi chú",
+                    "allowImageUpload": false
+                  },
+                  {
+                    "id": "unit",
+                    "title": "ĐVT"
+                  },
+                  {
+                    "id": "qty",
+                    "title": "Số lượng"
+                  },
+                  {
+                    "id": "price",
+                    "title": "Đơn giá"
+                  },
+                  {
+                    "id": "total",
+                    "title": "Thành tiền"
+                  }
+                ],
+                "showBorder": true,
+                "showHeader": true,
+                "tableTitle": "",
+                "actionButtons": [
+                  {
+                    "id": "btn_add_dim",
+                    "label": "Thêm kích thước",
+                    "mergeColumns": []
+                  },
+                  {
+                    "id": "btn_1787153022480",
+                    "label": "Thêm thông tin",
+                    "mergeColumns": [
+                      "height",
+                      "width",
+                      "thickness"
+                    ]
+                  }
+                ],
+                "enableProductName": false,
+                "enableProductImage": true,
+                "useComplexDimensions": true,
+                "enableProductDescription": false
+              }
+            },
+            {
+              "id": "service_1",
+              "type": "service_table",
+              "props": {
+                "columns": [
+                  "stt",
+                  "name",
+                  "symbol",
+                  "specs",
+                  "qty",
+                  "unit",
+                  "price",
+                  "total"
+                ],
+                "showBorder": true,
+                "showHeader": true,
+                "tableTitle": "DỊCH VỤ & CHI PHÍ PHÁT SINH:",
+                "enableProductName": true,
+                "enableProductImage": true
+              }
+            },
+            {
+              "id": "summary_1",
+              "type": "totals",
+              "props": {
+                "showVAT": true,
+                "showWords": true,
+                "showBorder": true,
+                "showDiscount": true,
+                "showSubtotal": true,
+                "backgroundColor": "#f8fafc",
+                "showShippingFee": true,
+                "showInstallationFee": true
+              }
+            },
+            {
+              "id": "terms_1",
+              "type": "terms",
+              "props": {
+                "content": "1. Báo giá có hiệu lực trong vòng 15 ngày.\n2. Thanh toán: Tạm ứng 50% ngay sau khi xác nhận."
+              }
+            },
+            {
+              "id": "signature_1",
+              "type": "signatures",
+              "props": {
+                "titles": [
+                  "ĐẠI DIỆN KHÁCH HÀNG",
+                  "ĐẠI DIỆN CÔNG TY"
+                ],
+                "columns": 2,
+                "signatures": [
+                  "{{customer_signature}}\n\n\n\n\n<b>{{customer_name}}</b>",
+                  "{{company_signature}}\n{{company_stamp}}\n\n<b>{{director_name}}</b>"
+                ]
+              }
+            }
+          ],
+          "sections": [
+            {
+              "id": "header",
+              "name": "🏢 Khối Header & Logo Công ty",
+              "order": 1,
+              "visible": true
+            },
+            {
+              "id": "title",
+              "name": "📌 Khối Tiêu đề & Lời chào",
+              "order": 2,
+              "visible": true
+            },
+            {
+              "id": "customer_info",
+              "name": "👤 Khối Thông tin Khách hàng / Đối tác",
+              "order": 3,
+              "visible": true
+            },
+            {
+              "id": "items_table",
+              "name": "📦 Khối Bảng Hạng mục Sản phẩm & Dịch vụ",
+              "order": 4,
+              "visible": true
+            },
+            {
+              "id": "summary",
+              "name": "💰 Khối Tổng kết Thanh toán & Chiết khấu",
+              "order": 5,
+              "visible": true
+            },
+            {
+              "id": "terms",
+              "name": "📜 Khối Ghi chú & Điều khoản (Từ Admin Công ty)",
+              "order": 6,
+              "visible": true
+            },
+            {
+              "id": "signatures",
+              "name": "✍️ Khối Chữ ký Xác nhận",
+              "order": 7,
+              "columns": 2,
+              "visible": true
+            }
+          ],
+          "table_style": "classic_border",
+          "theme_color": "#d97706",
+          "custom_title": "BÁO GIÁ SẢN XUẤT CỬA COMPOSITE",
+          "paper_orientation": "landscape"
+        },
+        "footer_content": "1. Báo giá có hiệu lực trong vòng 15 ngày kể từ ngày xuất báo giá.\n2. Thanh toán: Tạm ứng 50% ngay sau khi xác nhận đơn hàng, 50% còn lại thanh toán sau khi bàn giao nghiệm thu.\n3. Đơn giá trên chưa bao gồm thuế VAT (nếu xuất hóa đơn).\n4. Bảo hành: Theo tiêu chuẩn từ nhà sản xuất kể từ ngày bàn giao."
+      }
+    },
+    "created_at": "2026-08-20T16:37:50.384Z",
+    "updated_at": "2026-08-20T16:37:50.385Z"
   }
 },
 {
   "model": "sales.quotationitem",
-  "pk": 30,
+  "pk": 49,
   "fields": {
     "quotation": 11,
     "product": 7,
@@ -2531,9 +2823,68 @@
 },
 {
   "model": "sales.quotationitem",
-  "pk": 31,
+  "pk": 50,
   "fields": {
     "quotation": 11,
+    "product": 7,
+    "item_type": "product",
+    "product_name": "Cửa composite CCP01 - Mẫu mới",
+    "unit_price": "3900000.00",
+    "width": "0.00",
+    "height": "0.00",
+    "quantity": 1,
+    "discount_percent": "0.00",
+    "line_total": "0.00",
+    "note": "",
+    "length": "0.00",
+    "area": "0.00",
+    "spec": "1. Độ dày cửa cao\r\n2. Tương đối đẹp\r\n3. Nhiều màu sắc để lựa chọn",
+    "warranty": "12 tháng",
+    "thickness": "0.00",
+    "product_image": "http://localhost:8000/media/products/anh_cua.jpg",
+    "custom_data": {
+      "unit": "m2",
+      "symbol": "",
+      "thickness": 0,
+      "merge_columns": [],
+      "is_custom_size": false,
+      "custom_size_text": ""
+    }
+  }
+},
+{
+  "model": "sales.quotationitem",
+  "pk": 51,
+  "fields": {
+    "quotation": 12,
+    "product": 7,
+    "item_type": "product",
+    "product_name": "Cửa composite CCP01 - Mẫu mới",
+    "unit_price": "3900000.00",
+    "width": "0.00",
+    "height": "0.00",
+    "quantity": 1,
+    "discount_percent": "0.00",
+    "line_total": "0.00",
+    "note": "",
+    "length": "0.00",
+    "area": "0.00",
+    "spec": "1. Độ dày cửa cao\r\n2. Tương đối đẹp\r\n3. Nhiều màu sắc để lựa chọn",
+    "warranty": "12 tháng",
+    "thickness": "0.00",
+    "product_image": "http://localhost:8000/media/products/anh_cua.jpg",
+    "custom_data": {
+      "unit": "bộ",
+      "symbol": "",
+      "thickness": 0
+    }
+  }
+},
+{
+  "model": "sales.quotationitem",
+  "pk": 52,
+  "fields": {
+    "quotation": 12,
     "product": 7,
     "item_type": "product",
     "product_name": "Cửa composite CCP01 - Mẫu mới",
@@ -2560,7 +2911,7 @@
         "thickness"
       ],
       "is_custom_size": true,
-      "custom_size_text": "1. Màu sắc"
+      "custom_size_text": "Bản lề"
     }
   }
 },
@@ -4016,7 +4367,8 @@
   "fields": {
     "company": 15,
     "name": "Cửa Fujitech Door",
-    "description": "Dòng tiêu chuẩn"
+    "description": "Dòng tiêu chuẩn",
+    "category_type": "product"
   }
 },
 {
@@ -4025,7 +4377,18 @@
   "fields": {
     "company": 15,
     "name": "Cửa Fujitech Grand Door",
-    "description": "Dòng cao cấp"
+    "description": "Dòng cao cấp",
+    "category_type": "product"
+  }
+},
+{
+  "model": "inventory.productcategory",
+  "pk": 9,
+  "fields": {
+    "company": 15,
+    "name": "Phụ kiện",
+    "description": "",
+    "category_type": "service"
   }
 },
 {
@@ -9523,6 +9886,32 @@
     "old_expires_at": "2026-07-30T15:11:34.107Z",
     "new_expires_at": null,
     "created_at": "2026-08-19T18:00:01.236Z"
+  }
+},
+{
+  "model": "zalo_integration.zalotokenrefreshlog",
+  "pk": 10,
+  "fields": {
+    "oa_config": 1,
+    "status": "failed",
+    "trigger": "auto",
+    "error_message": "Zalo error=-14014: Invalid refresh token.",
+    "old_expires_at": "2026-07-30T15:11:34.107Z",
+    "new_expires_at": null,
+    "created_at": "2026-08-20T16:00:00.872Z"
+  }
+},
+{
+  "model": "zalo_integration.zalotokenrefreshlog",
+  "pk": 11,
+  "fields": {
+    "oa_config": 1,
+    "status": "failed",
+    "trigger": "auto",
+    "error_message": "Zalo error=-14014: Invalid refresh token.",
+    "old_expires_at": "2026-07-30T15:11:34.107Z",
+    "new_expires_at": null,
+    "created_at": "2026-08-20T17:00:01.460Z"
   }
 },
 {

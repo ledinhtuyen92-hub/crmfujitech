@@ -8,6 +8,9 @@ import { useLocation } from 'react-router-dom'
 import QuotationPrintView from '../components/QuotationPrintView'
 import api from '../utils/api'
 import { useResponsive } from '../hooks/useResponsive'
+import CustomInfoInput from '../components/CustomInfoInput'
+
+const getProductDisplayName = (p) => p.sku ? `[${p.sku}] ${p.name}` : p.name;
 
 const { Title, Text, Paragraph } = Typography
 const { Option } = Select
@@ -1471,8 +1474,8 @@ export default function QuotationList() {
           initialText = parts.join(' x ');
         }
         return (
-          <Input placeholder="Thêm thông tin..." style={{ textAlign: 'center' }} value={initialText} onChange={(e) => {
-            handleLineChange(idx, 'custom_data', { ...currentData, custom_size_text: e.target.value, is_custom_size: true });
+          <CustomInfoInput placeholder="Thêm thông tin..." style={{ textAlign: 'center' }} value={initialText} onChange={(val) => {
+            handleLineChange(idx, 'custom_data', { ...currentData, custom_size_text: val, is_custom_size: true });
           }} />
         );
       }
@@ -1627,13 +1630,13 @@ export default function QuotationList() {
           dataIndex: 'symbol',
           width: 100,
           align: 'center',
-          render: (val, record, idx) => <Input style={{ textAlign: 'center', fontWeight: 600, color: '#2563eb' }} placeholder="VD: D1.1" value={record.custom_data?.symbol || record.symbol || ''} onChange={(e) => handleLineChange(idx, 'symbol', e.target.value)} />,
+          render: (val, record, idx) => <CustomInfoInput style={{ textAlign: 'center', fontWeight: 600, color: '#2563eb' }} placeholder="VD: D1.1" value={record.custom_data?.symbol || record.symbol || ''} onChange={(v) => handleLineChange(idx, 'symbol', v)} />,
         },
         {
           title: 'GHI CHÚ KỸ THUẬT',
           dataIndex: 'note',
           width: 170,
-          render: (val, record, idx) => <Input style={{ textAlign: 'center' }} placeholder="Khóa, bản lề, kính..." value={val || ''} onChange={(e) => handleLineChange(idx, 'note', e.target.value)} />,
+          render: (val, record, idx) => <CustomInfoInput style={{ textAlign: 'center' }} placeholder="Khóa, bản lề, kính..." value={val || ''} onChange={(v) => handleLineChange(idx, 'note', v)} />,
         },
         {
           title: 'SL',
@@ -1852,13 +1855,13 @@ export default function QuotationList() {
           title: 'Quy cách / Hệ nhôm',
           dataIndex: 'spec',
           width: 160,
-          render: (val, record, idx) => <Input placeholder="Hệ 55, kính 10mm..." value={val} onChange={(e) => handleLineChange(idx, 'spec', e.target.value)} />,
+          render: (val, record, idx) => <CustomInfoInput placeholder="Hệ 55, kính 10mm..." value={val || ''} onChange={(v) => handleLineChange(idx, 'spec', v)} />,
         },
         {
           title: 'Bảo hành',
           dataIndex: 'warranty',
           width: 100,
-          render: (val, record, idx) => <Input placeholder="5 năm..." value={val} onChange={(e) => handleLineChange(idx, 'warranty', e.target.value)} />,
+          render: (val, record, idx) => <CustomInfoInput placeholder="5 năm..." value={val || ''} onChange={(v) => handleLineChange(idx, 'warranty', v)} />,
         }
       )
     } else if (tmplCode === 'SERVICES') {
@@ -1867,13 +1870,13 @@ export default function QuotationList() {
           title: 'Phạm vi / Mô tả chi tiết',
           dataIndex: 'spec',
           width: 200,
-          render: (val, record, idx) => <Input placeholder="Chi tiết phạm vi công việc..." value={val} onChange={(e) => handleLineChange(idx, 'spec', e.target.value)} />,
+          render: (val, record, idx) => <CustomInfoInput placeholder="Chi tiết phạm vi công việc..." value={val || ''} onChange={(v) => handleLineChange(idx, 'spec', v)} />,
         },
         {
           title: 'Thời gian bảo hành / duy trì',
           dataIndex: 'warranty',
           width: 140,
-          render: (val, record, idx) => <Input placeholder="12 tháng / 1 năm..." value={val} onChange={(e) => handleLineChange(idx, 'warranty', e.target.value)} />,
+          render: (val, record, idx) => <CustomInfoInput placeholder="12 tháng / 1 năm..." value={val || ''} onChange={(v) => handleLineChange(idx, 'warranty', v)} />,
         }
       )
     } else if (tmplCode === 'PRINTING') {
@@ -1900,7 +1903,7 @@ export default function QuotationList() {
           title: 'Chất liệu / Quy cách',
           dataIndex: 'spec',
           width: 150,
-          render: (val, record, idx) => <Input placeholder="Giấy C250, cán mờ..." value={val} onChange={(e) => handleLineChange(idx, 'spec', e.target.value)} />,
+          render: (val, record, idx) => <CustomInfoInput placeholder="Giấy C250, cán mờ..." value={val || ''} onChange={(v) => handleLineChange(idx, 'spec', v)} />,
         }
       )
     } else {
@@ -1910,10 +1913,10 @@ export default function QuotationList() {
           dataIndex: 'note',
           width: 200,
           render: (val, record, idx) => (
-            <Input
+            <CustomInfoInput
               placeholder="VD: 800×2000mm, màu vân gỗ, lắp đặt kèm..."
               value={val || ''}
-              onChange={(e) => handleLineChange(idx, 'note', e.target.value)}
+              onChange={(v) => handleLineChange(idx, 'note', v)}
             />
           ),
         },
@@ -2130,9 +2133,9 @@ export default function QuotationList() {
             
             if (isMergedRoot) {
               return {
-                children: <Input placeholder="Thêm thông tin..." value={record.custom_data?.custom_size_text || ''} onChange={(e) => {
+                children: <CustomInfoInput placeholder="Thêm thông tin..." value={record.custom_data?.custom_size_text || ''} onChange={(val) => {
                   const currentData = record.custom_data || {};
-                  handleLineChange(idx, 'custom_data', { ...currentData, custom_size_text: e.target.value });
+                  handleLineChange(idx, 'custom_data', { ...currentData, custom_size_text: val });
                 }} />,
                 props: { colSpan }
               };
