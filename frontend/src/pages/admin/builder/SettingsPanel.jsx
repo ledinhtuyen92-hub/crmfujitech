@@ -482,9 +482,6 @@ export default function SettingsPanel({ block, onChange }) {
             <Form.Item name="showInstallationDate" label="Ngày giao hàng / lắp đặt dự kiến" valuePropName="checked">
               <Switch />
             </Form.Item>
-            <Form.Item name="showValidity" label="Hiệu lực báo giá" valuePropName="checked">
-              <Switch />
-            </Form.Item>
           </>
         );
       case BLOCK_TYPES.TERMS:
