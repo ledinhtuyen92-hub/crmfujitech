@@ -69,6 +69,25 @@ class DeliveryOrder(models.Model):
         code = self.delivery_code or f"GH-{self.pk:04d}"
         return f"{code} — {self.order.order_number}"
 
+    def save(self, *args, **kwargs):
+        is_new = self.pk is None
+        old_status = None
+        if not is_new:
+            try:
+                old_status = DeliveryOrder.objects.get(pk=self.pk).status
+            except DeliveryOrder.DoesNotExist:
+                pass
+                
+        super().save(*args, **kwargs)
+        
+        if old_status != self.status and self.status == self.STATUS_DELIVERED:
+            try:
+                from orders.workflow import OrderWorkflowEngine
+                OrderWorkflowEngine.trigger_next_step(self.order, current_step="delivery")
+            except Exception as exc:
+                import logging
+                logging.getLogger(__name__).error("Workflow trigger failed after delivery completion: %s", exc)
+
 
 class WarrantyCard(models.Model):
     """Phiếu bảo hành sinh ra khi giao hàng thành công."""

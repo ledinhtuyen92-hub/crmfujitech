@@ -29,6 +29,29 @@ git fetch origin main
 git reset --hard origin/main
 echo "✅ Code da duoc cap nhat thanh cong!"
 
+# 2.1 Tu dong cau hinh file .env theo VPS
+echo ""
+echo "⚙  [2/5] Tu dong cap nhat file .env theo cau hinh VPS..."
+if [ -f /etc/nginx/sites-available/crm ]; then
+    DOMAIN=$(grep server_name /etc/nginx/sites-available/crm | head -n 1 | awk '{print $2}' | tr -d ';')
+else
+    # Fallback lay IP public neu khong co nginx config
+    DOMAIN=$(curl -s ifconfig.me)
+fi
+
+if [[ "$DOMAIN" =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+    PROTOCOL="http"
+else
+    PROTOCOL="https"
+fi
+
+sed -i "s|^SITE_URL=.*|SITE_URL=$PROTOCOL://$DOMAIN|g" .env
+sed -i "s|^VITE_API_URL=.*|VITE_API_URL=$PROTOCOL://$DOMAIN|g" .env
+sed -i "s|^ALLOWED_HOSTS=.*|ALLOWED_HOSTS=$DOMAIN,localhost,127.0.0.1|g" .env
+sed -i "s|^DEBUG=.*|DEBUG=False|g" .env
+echo "✅ File .env da duoc cau hinh tu dong cho: $DOMAIN"
+
+
 # 2.5 Khoi dong cac dich vu moi (neu co)
 echo ""
 echo "🐳 Dang khoi dong / cap nhat Docker containers..."

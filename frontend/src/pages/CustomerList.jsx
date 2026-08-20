@@ -335,6 +335,8 @@ function CustomerList() {
     setEditingCustomer(record)
     form.setFieldsValue({
       name: record.name,
+      company_name: record.company_name || '',
+      tax_code: record.tax_code || '',
       phone: record.phone,
       email: record.email,
       address: record.address,
@@ -1165,10 +1167,10 @@ function CustomerList() {
             <Col xs={24} md={12}>
               <Form.Item
                 name="name"
-                label="Tên khách hàng / Công ty"
+                label="Tên khách hàng / Người liên hệ"
                 rules={[{ required: true, message: 'Vui lòng nhập tên!' }]}
               >
-                <Input placeholder="VD: Công ty ABC hoặc Nguyễn Văn A" />
+                <Input placeholder="VD: Nguyễn Văn A" />
               </Form.Item>
             </Col>
             <Col xs={24} md={12}>
@@ -1178,6 +1180,26 @@ function CustomerList() {
                 rules={[{ required: true, message: 'Vui lòng nhập SĐT!' }]}
               >
                 <Input placeholder="VD: 0901234567" />
+              </Form.Item>
+            </Col>
+          </Row>
+
+          <Row gutter={16}>
+            <Col xs={24} md={16}>
+              <Form.Item
+                name="company_name"
+                label="Tên công ty (Dành cho khách B2B)"
+                extra="Để trống nếu khách hàng cá nhân, không thuộc công ty"
+              >
+                <Input placeholder="VD: Công ty TNHH ABC" allowClear />
+              </Form.Item>
+            </Col>
+            <Col xs={24} md={8}>
+              <Form.Item
+                name="tax_code"
+                label="Mã số thuế"
+              >
+                <Input placeholder="VD: 0123456789" allowClear />
               </Form.Item>
             </Col>
           </Row>
@@ -1569,6 +1591,18 @@ function CustomerList() {
                       <Col xs={24} md={12}>
                         <Form.Item label="Email">
                           <Input value={currentCustomer.email || '—'} readOnly />
+                        </Form.Item>
+                      </Col>
+                    </Row>
+                    <Row gutter={16}>
+                      <Col xs={24} md={16}>
+                        <Form.Item label="Tên công ty (nếu có)">
+                          <Input value={currentCustomer.company_name || '—'} readOnly />
+                        </Form.Item>
+                      </Col>
+                      <Col xs={24} md={8}>
+                        <Form.Item label="Mã số thuế">
+                          <Input value={currentCustomer.tax_code || '—'} readOnly />
                         </Form.Item>
                       </Col>
                     </Row>

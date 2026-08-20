@@ -36,6 +36,13 @@ class Quotation(models.Model):
         related_name="quotations",
         verbose_name="Khách hàng",
     )
+    # --- Snapshot fields ---
+    customer_name_snapshot = models.CharField(max_length=255, blank=True, verbose_name="Tên khách hàng (snapshot)")
+    customer_company_snapshot = models.CharField(max_length=255, blank=True, verbose_name="Tên công ty KH (snapshot)")
+    customer_tax_code_snapshot = models.CharField(max_length=50, blank=True, verbose_name="Mã số thuế KH (snapshot)")
+    customer_phone_snapshot = models.CharField(max_length=50, blank=True, verbose_name="SĐT KH (snapshot)")
+    customer_address_snapshot = models.TextField(blank=True, verbose_name="Địa chỉ KH (snapshot)")
+    customer_city_snapshot = models.CharField(max_length=100, blank=True, verbose_name="Thành phố KH (snapshot)")
     created_by = models.ForeignKey(
         "users.User",
         on_delete=models.SET_NULL,
@@ -195,6 +202,20 @@ class Quotation(models.Model):
 
     def __str__(self):
         return self.quotation_number
+
+    def save(self, *args, **kwargs):
+        # Auto snapshot customer data on creation or if it's missing (and we have a customer)
+        if self.customer:
+            # We snapshot if this is a new record (not pk) or if the snapshot fields are suspiciously empty.
+            if not self.pk or not self.customer_name_snapshot:
+                self.customer_name_snapshot = self.customer.name or ''
+                self.customer_company_snapshot = getattr(self.customer, 'company_name', '') or ''
+                self.customer_tax_code_snapshot = getattr(self.customer, 'tax_code', '') or ''
+                self.customer_phone_snapshot = getattr(self.customer, 'phone', '') or ''
+                self.customer_address_snapshot = getattr(self.customer, 'address', '') or ''
+                self.customer_city_snapshot = getattr(self.customer, 'city', '') or ''
+                
+        super().save(*args, **kwargs)
 
     def clone(self):
         """Tạo một bản sao của báo giá hiện tại (thường dùng khi tạo version mới)."""
@@ -368,6 +389,15 @@ class QuotationTemplate(models.Model):
     )
     is_default = models.BooleanField(default=False, verbose_name="Mẫu mặc định hệ thống")
     is_active = models.BooleanField(default=True, verbose_name="Hoạt động")
+    is_system_template = models.BooleanField(default=True, verbose_name="Mẫu hệ thống")
+    company = models.ForeignKey(
+        'users.Company',
+        on_delete=models.CASCADE,
+        null=True,
+        blank=True,
+        related_name='quotation_templates',
+        verbose_name="Công ty sở hữu"
+    )
     created_at = models.DateTimeField(auto_now_add=True, verbose_name="Ngày tạo")
     updated_at = models.DateTimeField(auto_now=True, verbose_name="Ngày cập nhật")
 
@@ -384,3 +414,27 @@ class QuotationTemplate(models.Model):
             # Đảm bảo chỉ có 1 mẫu mặc định trong toàn hệ thống
             QuotationTemplate.objects.filter(is_default=True).exclude(pk=self.pk).update(is_default=False)
         super().save(*args, **kwargs)
+
+
+class SavedTemplateBlock(models.Model):
+    """Lưu trữ các Block đã cấu hình sẵn của người dùng để kéo thả nhanh."""
+
+    company = models.ForeignKey(
+        "users.Company",
+        on_delete=models.CASCADE,
+        related_name="saved_blocks",
+        verbose_name="Công ty",
+    )
+    name = models.CharField(max_length=100, verbose_name="Tên Block")
+    block_type = models.CharField(max_length=50, verbose_name="Loại Block")
+    props = models.JSONField(default=dict, verbose_name="Cấu hình Block")
+    created_at = models.DateTimeField(auto_now_add=True, verbose_name="Ngày tạo")
+    updated_at = models.DateTimeField(auto_now=True, verbose_name="Ngày cập nhật")
+
+    class Meta:
+        verbose_name = "Block mẫu đã lưu"
+        verbose_name_plural = "Block mẫu đã lưu"
+        ordering = ["-created_at"]
+
+    def __str__(self):
+        return f"{self.name} ({self.block_type})"

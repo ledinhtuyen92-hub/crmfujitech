@@ -683,14 +683,14 @@ class InventoryTransactionViewSet(TenantQuerySetMixin, viewsets.ModelViewSet):
         txn.factory = factory_obj
         txn.save(update_fields=["warehouse", "status", "factory"])
         
-        # Kích hoạt Lệnh Sản Xuất cho Đơn hàng
-        if txn.reference_order and factory_obj:
+        # Kích hoạt bước tiếp theo (Lệnh Sản Xuất / Giao Hàng)
+        if txn.reference_order:
             try:
-                from orders.signals import _create_production_order
-                _create_production_order(txn.reference_order, factory_id=factory_id)
+                from orders.workflow import OrderWorkflowEngine
+                OrderWorkflowEngine.trigger_next_step(txn.reference_order, current_step="inventory", factory_id=factory_id)
             except Exception as e:
                 import logging
-                logging.getLogger(__name__).error(f"Lỗi khi auto-create MO từ kho: {e}")
+                logging.getLogger(__name__).error(f"Lỗi khi auto-create bước tiếp theo từ kho: {e}")
         
         return Response({"detail": "Đã duyệt và xuất kho thành công."})
 
@@ -765,10 +765,10 @@ class InventoryTransactionViewSet(TenantQuerySetMixin, viewsets.ModelViewSet):
             return Response({"detail": "Lệnh sản xuất đã tồn tại cho đơn hàng này."}, status=status.HTTP_400_BAD_REQUEST)
 
         try:
-            from orders.signals import _create_production_order
+            from orders.workflow import OrderWorkflowEngine
             factory_id = txn.factory_id  # Lấy từ phiếu xuất (nếu có gắn nhà máy)
-            _create_production_order(order, factory_id=factory_id)
-            # Lấy mã lệnh SX vừa tạo để trả về
+            OrderWorkflowEngine.trigger_next_step(order, current_step="inventory", factory_id=factory_id)
+            # Lấy mã lệnh SX vừa tạo để trả về (nếu có)
             po = order.production_orders.first()
             return Response({
                 "detail": f"Đã tạo lại Lệnh Sản Xuất thành công.",

@@ -32,6 +32,7 @@ import AdminSettings from './pages/admin/AdminSettings'
 import CompanyManagement from './pages/admin/CompanyManagement'
 import SystemUserManagement from './pages/admin/SystemUserManagement'
 import QuotationTemplateManagement from './pages/admin/QuotationTemplateManagement'
+import QuotationBuilder from './pages/admin/QuotationBuilder'
 import RoleManagement from './pages/settings/RoleManagement'
 import UserManagement from './pages/settings/UserManagement'
 import DepartmentManagement from './pages/settings/DepartmentManagement'
@@ -302,6 +303,14 @@ function App() {
                   <PermissionRoute permissionCode="production.manage_factory">
                     <FactoryManagement />
                   </PermissionRoute>
+                }
+              />
+              <Route
+                path="/admin/quotation-templates/:id/builder"
+                element={
+                  <CompanyAdminRoute>
+                    <QuotationBuilder />
+                  </CompanyAdminRoute>
                 }
               />
 

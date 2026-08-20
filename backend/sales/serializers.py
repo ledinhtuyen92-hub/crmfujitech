@@ -1,6 +1,6 @@
 from rest_framework import serializers
 
-from .models import Quotation, QuotationItem, QuotationTemplate
+from .models import Quotation, QuotationItem, QuotationTemplate, SavedTemplateBlock
 
 
 def get_company_info_dict(serializer_instance, obj):
@@ -75,6 +75,8 @@ class QuotationTemplateSerializer(serializers.ModelSerializer):
             "layout_config",
             "is_default",
             "is_active",
+            "is_system_template",
+            "company",
             "created_at",
             "updated_at",
             "company_info",
@@ -136,13 +138,14 @@ class QuotationItemSerializer(serializers.ModelSerializer):
 class QuotationSerializer(serializers.ModelSerializer):
     items = QuotationItemSerializer(many=True, read_only=True)
     status_display = serializers.CharField(source="get_status_display", read_only=True)
-    customer_name = serializers.CharField(source="customer.name", read_only=True)
-    customer_phone = serializers.CharField(source="customer.phone", read_only=True)
-    customer_address = serializers.CharField(source="customer.address", read_only=True)
-    customer_email = serializers.CharField(source="customer.email", read_only=True)
-    customer_city = serializers.CharField(source="customer.city", read_only=True)
+    customer_name = serializers.SerializerMethodField()
+    customer_phone = serializers.SerializerMethodField()
+    customer_address = serializers.SerializerMethodField()
+    customer_email = serializers.SerializerMethodField()
+    customer_city = serializers.SerializerMethodField()
     created_by_name = serializers.CharField(source="created_by.full_name", read_only=True)
     company_info = serializers.SerializerMethodField()
+    customer_info = serializers.SerializerMethodField()
     order_status = serializers.SerializerMethodField()
 
     class Meta:
@@ -181,6 +184,7 @@ class QuotationSerializer(serializers.ModelSerializer):
             "created_at",
             "updated_at",
             "company_info",
+            "customer_info",
             "public_token",
             "public_link_expires_at",
             "signature_image",
@@ -191,12 +195,35 @@ class QuotationSerializer(serializers.ModelSerializer):
         read_only_fields = [
             "id", "company", "quotation_number", "items", "status_display",
             "customer_name", "customer_phone", "customer_address", "customer_email", "customer_city",
-            "created_by_name", "created_at", "updated_at", "company_info",
+            "created_by_name", "created_at", "updated_at", "company_info", "customer_info",
             "public_token", "public_link_expires_at", "signature_image", "signed_at", "customer_name_signed", "order_status",
         ]
 
     def get_company_info(self, obj):
         return get_company_info_dict(self, obj)
+
+    def get_customer_info(self, obj):
+        if obj.customer:
+            if getattr(obj, "customer_name_snapshot", ""):
+                return {
+                    "name": obj.customer_name_snapshot,
+                    "phone": obj.customer_phone_snapshot,
+                    "email": obj.customer.email, # we didn't snapshot email, fallback to live
+                    "address": obj.customer_address_snapshot,
+                    "city": obj.customer_city_snapshot,
+                    "company_name": obj.customer_company_snapshot,
+                    "tax_code": obj.customer_tax_code_snapshot,
+                }
+            return {
+                "name": obj.customer.name,
+                "phone": obj.customer.phone,
+                "email": obj.customer.email,
+                "address": obj.customer.address,
+                "city": obj.customer.city,
+                "company_name": getattr(obj.customer, "company_name", "") or "",
+                "tax_code": getattr(obj.customer, "tax_code", "") or "",
+            }
+        return None
 
     def get_order_status(self, obj):
         from orders.models import Order
@@ -204,3 +231,36 @@ class QuotationSerializer(serializers.ModelSerializer):
         if latest_order:
             return latest_order.status
         return None
+
+    def get_customer_name(self, obj):
+        if getattr(obj, "customer_name_snapshot", ""): return obj.customer_name_snapshot
+        return obj.customer.name if obj.customer else ""
+        
+    def get_customer_phone(self, obj):
+        if getattr(obj, "customer_name_snapshot", ""): return obj.customer_phone_snapshot
+        return obj.customer.phone if obj.customer else ""
+        
+    def get_customer_address(self, obj):
+        if getattr(obj, "customer_name_snapshot", ""): return obj.customer_address_snapshot
+        return obj.customer.address if obj.customer else ""
+        
+    def get_customer_email(self, obj):
+        return obj.customer.email if obj.customer else ""
+        
+    def get_customer_city(self, obj):
+        if getattr(obj, "customer_name_snapshot", ""): return obj.customer_city_snapshot
+        return obj.customer.city if obj.customer else ""
+
+class SavedTemplateBlockSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = SavedTemplateBlock
+        fields = [
+            "id",
+            "company",
+            "name",
+            "block_type",
+            "props",
+            "created_at",
+            "updated_at",
+        ]
+        read_only_fields = ["id", "company", "created_at", "updated_at"]

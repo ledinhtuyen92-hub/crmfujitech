@@ -83,6 +83,8 @@ class Customer(models.Model):
         verbose_name="Công ty",
     )
     name = models.CharField(max_length=255, verbose_name="Họ và tên")
+    company_name = models.CharField(max_length=255, blank=True, verbose_name="Tên công ty (KH)")
+    tax_code = models.CharField(max_length=50, blank=True, verbose_name="Mã số thuế (KH)")
     phone = models.CharField(max_length=20, verbose_name="Số điện thoại")
     email = models.EmailField(blank=True, verbose_name="Email")
     address = models.TextField(blank=True, verbose_name="Địa chỉ")

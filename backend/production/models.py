@@ -202,3 +202,11 @@ class ProductionStep(models.Model):
             if po.status != new_status:
                 po.status = new_status
                 po.save(update_fields=["status", "updated_at"])
+                
+                if new_status == po.STATUS_COMPLETED:
+                    try:
+                        from orders.workflow import OrderWorkflowEngine
+                        OrderWorkflowEngine.trigger_next_step(po.order, current_step="production")
+                    except Exception as exc:
+                        import logging
+                        logging.getLogger(__name__).error("Workflow trigger failed after production completion: %s", exc)
