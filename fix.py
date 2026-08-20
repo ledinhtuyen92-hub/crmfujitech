@@ -1,41 +1,16 @@
-import codecs
-with open(r'd:\L?P TRÌNH\fujitech\backend\orders\signals.py', 'rb') as f:
-    content = f.read()
+import os
 
-text = content.decode('utf-8', errors='ignore')
-idx = text.find('def _handle_order_pending')
-if idx != -1:
-    clean_text = text[:idx]
+def fix_file(path):
+    with open(path, 'r', encoding='utf-8') as f:
+        content = f.read()
+
+    # Fix the broken function definition
+    content = content.replace('const getProductDisplayName = (p) => p.sku ?  -  : p.name;', 'const getProductDisplayName = (p) => p.sku ? []  : p.name;')
+    content = content.replace('const getProductDisplayName = (p) => p.sku ?  -  : p.name;', 'const getProductDisplayName = (p) => p.sku ? []  : p.name;')
     
-    correct_code = '''
-def _handle_order_pending(order):
-    \"\"\"
-    Xu ly khi don hang chuyen ve lai trang thai Cho duyet (VD: do nguoi dung chinh sua don hang):
-    1. Huy Lenh san xuat (neu chua hoan thanh)
-    2. Huy Lenh xuat kho (neu chua hoan thanh)
-    \"\"\"
-    try:
-        from production.models import ProductionOrder
-        from inventory.models import InventoryTransaction
+    with open(path, 'w', encoding='utf-8') as f:
+        f.write(content)
 
-        # 1. Huy lenh san xuat chua hoan thanh
-        ProductionOrder.objects.filter(
-            order=order
-        ).exclude(
-            status=ProductionOrder.STATUS_COMPLETED
-        ).update(status=ProductionOrder.STATUS_CANCELLED)
-        
-        # 2. Huy cac lenh xuat kho cho duyet
-        InventoryTransaction.objects.filter(
-            reference_order=order,
-            status=InventoryTransaction.STATUS_PENDING,
-            type=InventoryTransaction.TYPE_EXPORT
-        ).update(status=InventoryTransaction.STATUS_REJECTED)
-        
-        logger.info("Successfully cancelled related MO and Export transactions for pending order %s", order.order_number)
-    except Exception as exc:
-        logger.error("Failed to cancel related transactions for order %s: %s", order.order_number, exc)
-'''
-    final_text = clean_text + correct_code
-    with codecs.open(r'd:\L?P TRÌNH\fujitech\backend\orders\signals.py', 'w', 'utf-8') as f2:
-        f2.write(final_text)
+fix_file('frontend/src/pages/QuotationList.jsx')
+fix_file('frontend/src/pages/OrderList.jsx')
+print('Fixed!')

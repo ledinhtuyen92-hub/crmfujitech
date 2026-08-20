@@ -161,6 +161,7 @@ class UserSerializer(serializers.ModelSerializer):
     permissions = serializers.SerializerMethodField()
     active_modules = serializers.SerializerMethodField()
     pipeline_status_labels = serializers.SerializerMethodField()
+    custom_info_templates = serializers.SerializerMethodField()
     managed_department_ids = serializers.SerializerMethodField()
 
     company_id = serializers.IntegerField(write_only=True, required=False)
@@ -179,6 +180,7 @@ class UserSerializer(serializers.ModelSerializer):
             "company_name",
             "active_modules",
             "pipeline_status_labels",
+            "custom_info_templates",
             "role",
             "role_name",
             "permissions",
@@ -191,7 +193,7 @@ class UserSerializer(serializers.ModelSerializer):
             "company_id",
             "managed_department_ids",
         ]
-        read_only_fields = ["created_at", "permissions", "is_superuser", "company", "active_modules", "pipeline_status_labels"]
+        read_only_fields = ["created_at", "permissions", "is_superuser", "company", "active_modules", "pipeline_status_labels", "custom_info_templates"]
 
     def get_permissions(self, obj):
         """Trả về danh sách permission code của user."""
@@ -207,6 +209,11 @@ class UserSerializer(serializers.ModelSerializer):
             return obj.company.settings.pipeline_status_labels
         from users.models import get_default_pipeline_labels
         return get_default_pipeline_labels()
+
+    def get_custom_info_templates(self, obj):
+        if obj.company and hasattr(obj.company, 'settings') and obj.company.settings.custom_info_templates:
+            return obj.company.settings.custom_info_templates
+        return []
 
     def get_managed_department_ids(self, obj):
         return list(obj.managed_departments.values_list("id", flat=True))
@@ -561,7 +568,7 @@ class CompanySettingsSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = CompanySettings
-        fields = ["id", "order_prefix", "lead_routing", "timezone", "active_modules", "pipeline_status_labels", "quotation_template", "default_quotation_terms", "quotation_template_detail", "custom_quotation_title", "custom_order_title", "default_warranty_content", "default_warranty_rules", "inactive_days_threshold", "website_api_key", "is_website_integration_active", "continuous_sequence_numbering"]
+        fields = ["id", "order_prefix", "lead_routing", "timezone", "active_modules", "pipeline_status_labels", "quotation_template", "default_quotation_terms", "quotation_template_detail", "custom_quotation_title", "custom_order_title", "default_warranty_content", "default_warranty_rules", "inactive_days_threshold", "website_api_key", "is_website_integration_active", "continuous_sequence_numbering", "custom_info_templates"]
 
     def get_quotation_template_detail(self, obj):
         if obj.quotation_template:

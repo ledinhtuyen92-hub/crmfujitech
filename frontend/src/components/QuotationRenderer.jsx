@@ -435,10 +435,18 @@ export default function QuotationRenderer({ layoutConfig, layoutStyle, data, ren
                           
                           if (colId === 'stt') return rowSpan > 0 ? <td key="stt" rowSpan={rowSpan} style={{ ...tdStyle, textAlign: 'center', fontWeight: 600, color: clr, verticalAlign: 'middle' }}>{sttNum}</td> : null;
                           if (colId === 'name') return rowSpan > 0 ? (
-                            <td key="name" rowSpan={rowSpan} style={{...tdStyle, verticalAlign: 'middle', textAlign: 'left'}}>
-                              {enableProductImage && item.product_image && <div style={{marginBottom: 4, display: 'flex', justifyContent: 'center'}}><img src={item.product_image} alt="" style={{ maxWidth: '100%', maxHeight: 160, borderRadius: 4, objectFit: 'contain' }} /></div>}
-                              {enableProductName && <strong style={{ color: '#1e293b', display: 'block' }}>{item.product_name || item.name}</strong>}
-                              {enableProductDescription && !showSpecs && (item.description || item.spec) && <div style={{ fontSize: 11, color: '#64748b', fontStyle: 'italic', whiteSpace: 'pre-wrap', marginTop: 4, textAlign: 'left', display: 'inline-block', maxWidth: '100%' }}>{item.description || item.spec}</div>}
+                            <td key="name" rowSpan={rowSpan} style={{...tdStyle, verticalAlign: 'middle', textAlign: 'left', height: '1px'}}>
+                              <div style={{ height: '100%', display: 'flex', flexDirection: 'column', minHeight: 80 }}>
+                                {enableProductImage && item.product_image && (
+                                  <div style={{ flex: 1, position: 'relative', width: '100%', minHeight: 0, marginBottom: 4 }}>
+                                    <img src={item.product_image} alt="" style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', borderRadius: 4, objectFit: 'contain' }} />
+                                  </div>
+                                )}
+                                <div style={{ flexShrink: 0 }}>
+                                  {enableProductName && <strong style={{ color: '#1e293b', display: 'block' }}>{item.product_name || item.name}</strong>}
+                                  {enableProductDescription && !showSpecs && (item.description || item.spec) && <div style={{ fontSize: 11, color: '#64748b', fontStyle: 'italic', whiteSpace: 'pre-wrap', marginTop: 4, textAlign: 'left', display: 'inline-block', maxWidth: '100%' }}>{item.description || item.spec}</div>}
+                                </div>
+                              </div>
                             </td>
                           ) : null;
                           if (colId === 'symbol') return (
