@@ -147,13 +147,15 @@ const ActionButtonsManager = ({ value = [], onChange, blockColumns = [] }) => {
   };
 
   const allCols = [];
-  (blockColumns || []).forEach(c => {
-    if (c.children) {
-      c.children.forEach(child => allCols.push(child));
-    } else {
-      allCols.push(c);
-    }
-  });
+  if (Array.isArray(blockColumns)) {
+    blockColumns.forEach(c => {
+      if (c && Array.isArray(c.children)) {
+        c.children.forEach(child => allCols.push(child));
+      } else if (c) {
+        allCols.push(c);
+      }
+    });
+  }
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>

@@ -454,6 +454,11 @@ export default function BlockRenderer({ block, allBlocks, isActive, onSelect, on
                 </div>
               </div>
             )}
+            {block.props.showDate && (
+              <div style={{ fontSize: 12, color: '#334155', marginBottom: 4 }}>
+                Ngày báo giá: <strong>{new Date().toLocaleDateString('vi-VN')}</strong>
+              </div>
+            )}
             {block.props.showDeliveryTime && (
               <div style={{ fontSize: 12, color: '#334155', marginBottom: 4 }}>
                 Thời gian giao hàng / thi công: <strong>3-5 ngày làm việc</strong>
