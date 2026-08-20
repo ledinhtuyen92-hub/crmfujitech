@@ -356,13 +356,13 @@ export default function QuotationRenderer({ layoutConfig, layoutStyle, data, ren
                   {(block.props.columns || []).map(col => {
                     const colId = typeof col === 'object' ? col.id : col;
                     const colTitle = typeof col === 'object' ? col.title : null;
-                    if (colId === 'stt') return <th key="stt" style={{ ...thStyle, color: clr, width: 40 }}>STT</th>;
-                    if (colId === 'name') return <th key="name" style={{...thStyle, width: 200, textAlign: 'left'}}>{isService ? 'Tên dịch vụ / chi phí' : 'Tên hàng hóa / Dịch vụ'}</th>;
-                    if (colId === 'symbol') return <th key="symbol" style={{...thStyle, width: 80}}>Ký hiệu</th>;
-                    if (colId === 'specs') return <th key="specs" style={{...thStyle, width: 150, textAlign: 'left'}}>{isService ? 'Ghi chú kỹ thuật' : 'Quy cách kỹ thuật'}</th>;
+                    if (colId === 'stt') return <th key="stt" style={{ ...thStyle, color: clr, width: 40 }}>{colTitle || 'STT'}</th>;
+                    if (colId === 'name') return <th key="name" style={{...thStyle, width: 200, textAlign: 'left'}}>{colTitle || (isService ? 'Tên dịch vụ / chi phí' : 'Tên hàng hóa / Dịch vụ')}</th>;
+                    if (colId === 'symbol') return <th key="symbol" style={{...thStyle, width: 80}}>{colTitle || 'Ký hiệu'}</th>;
+                    if (colId === 'specs') return <th key="specs" style={{...thStyle, width: 150, textAlign: 'left'}}>{colTitle || (isService ? 'Ghi chú kỹ thuật' : 'Quy cách kỹ thuật')}</th>;
                     if (colId === 'dimensions') return (
                       <th key="dimensions" style={{...thStyle, padding: 0, width: 180}}>
-                        <div style={{ borderBottom: useComplexDimensions ? '1px solid #e2e8f0' : 'none', padding: '4px 6px' }}>Kích thước (mm)</div>
+                        <div style={{ borderBottom: useComplexDimensions ? '1px solid #e2e8f0' : 'none', padding: '4px 6px' }}>{colTitle || 'Kích thước (mm)'}</div>
                         {useComplexDimensions && (
                           <div style={{ display: 'flex' }}>
                             {dimensionFields.map((field, idx) => (
@@ -372,11 +372,11 @@ export default function QuotationRenderer({ layoutConfig, layoutStyle, data, ren
                         )}
                       </th>
                     );
-                    if (colId === 'note') return <th key="note" style={{...thStyle, width: 120, textAlign: 'left'}}>Ghi chú</th>;
-                    if (colId === 'unit') return <th key="unit" style={{...thStyle, width: 50}}>ĐVT</th>;
-                    if (colId === 'qty') return <th key="qty" style={{...thStyle, width: 50}}>SL</th>;
-                    if (colId === 'price') return <th key="price" style={{...thStyle, width: 90, textAlign: 'right'}}>Đơn giá</th>;
-                    if (colId === 'total') return <th key="total" style={{...thStyle, width: 100, textAlign: 'right'}}>Thành tiền</th>;
+                    if (colId === 'note') return <th key="note" style={{...thStyle, width: 120, textAlign: 'left'}}>{colTitle || 'Ghi chú'}</th>;
+                    if (colId === 'unit') return <th key="unit" style={{...thStyle, width: 50}}>{colTitle || 'ĐVT'}</th>;
+                    if (colId === 'qty') return <th key="qty" style={{...thStyle, width: 50}}>{colTitle || 'SL'}</th>;
+                    if (colId === 'price') return <th key="price" style={{...thStyle, width: 90, textAlign: 'right'}}>{colTitle || 'Đơn giá'}</th>;
+                    if (colId === 'total') return <th key="total" style={{...thStyle, width: 100, textAlign: 'right'}}>{colTitle || 'Thành tiền'}</th>;
                     
                     // Xử lý Custom Column
                     if (colId.startsWith('custom_')) {
@@ -452,12 +452,25 @@ export default function QuotationRenderer({ layoutConfig, layoutStyle, data, ren
                             </td>
                           );
                           if (colId === 'dimensions') {
-                            const isLegacyCustomSize = item.custom_data?.is_custom_size && (!merges || !Array.isArray(merges) || merges.length === 0);
+                            const itemMerges = item.custom_data?.merge_columns;
+                            const dimFieldIds = dimensionFields.map(f => f.id);
+                            const hasMerges = itemMerges && Array.isArray(itemMerges) && itemMerges.length > 0;
+                            const isDimensionMerge = hasMerges && itemMerges.some(m => dimFieldIds.includes(m));
+                            const isCustomSize = hasMerges ? isDimensionMerge : item.custom_data?.is_custom_size === true;
+
+                            if (isCustomSize) {
+                              return (
+                                <td key="dimensions" style={{ ...tdStyle, verticalAlign: 'middle', whiteSpace: 'pre-wrap' }}>
+                                  <span style={{color: '#334155'}}>{item.custom_data?.custom_size_text || ''}</span>
+                                </td>
+                              );
+                            }
+
                             return (
                               <td key="dimensions" style={{ ...tdStyle, padding: 0, verticalAlign: 'middle' }}>
-                                {!useComplexDimensions || isLegacyCustomSize ? (
-                                  <div style={{ height: '100%', padding: '4px 6px', display: 'flex', alignItems: 'center', whiteSpace: 'pre-wrap', textAlign: useComplexDimensions ? 'left' : 'center', justifyContent: useComplexDimensions ? 'flex-start' : 'center' }}>
-                                    {isLegacyCustomSize ? (item.custom_data?.custom_size_text || '') : (() => {
+                                {!useComplexDimensions ? (
+                                  <div style={{ height: '100%', padding: '4px 6px', display: 'flex', alignItems: 'center', whiteSpace: 'pre-wrap', textAlign: 'center', justifyContent: 'center' }}>
+                                    {(() => {
                                       const parts = [];
                                       if (Number(item.height) > 0) parts.push(item.height);
                                       if (Number(item.width) > 0) parts.push(item.width);

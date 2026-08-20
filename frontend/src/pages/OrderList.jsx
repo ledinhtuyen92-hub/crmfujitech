@@ -1430,15 +1430,15 @@ export default function OrderList() {
 
     const getMergeProps = (colId, record) => {
       const merges = record?.custom_data?.merge_columns;
-      if (merges && Array.isArray(merges)) {
-        if (merges.length > 1) {
-          const idx = merges.indexOf(colId);
-          if (idx === 0) return { colSpan: merges.length, isMergedRoot: true };
-          if (idx > 0) return { colSpan: 0, isMergedRoot: false };
-        }
-        return { colSpan: 1, isMergedRoot: false };
+      const hasMerges = merges && Array.isArray(merges) && merges.length > 1;
+      
+      if (hasMerges) {
+        const idx = merges.indexOf(colId);
+        if (idx === 0) return { colSpan: merges.length, isMergedRoot: true };
+        if (idx > 0) return { colSpan: 0, isMergedRoot: false };
       }
-      if (record?.custom_data?.is_custom_size) {
+      
+      if (record?.custom_data?.is_custom_size && !hasMerges) {
         const dimIds = dimensionFields.map(f => f.id);
         const idx = dimIds.indexOf(colId);
         if (idx === 0) return { colSpan: dimIds.length, isMergedRoot: true };

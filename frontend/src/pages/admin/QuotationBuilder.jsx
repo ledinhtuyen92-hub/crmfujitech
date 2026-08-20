@@ -69,6 +69,7 @@ export default function QuotationBuilder() {
   const [blocks, setBlocks] = useState([]);
   const [selectedBlockId, setSelectedBlockId] = useState(null);
   const [activeDragId, setActiveDragId] = useState(null);
+  const [categories, setCategories] = useState([]);
   
   // Global form settings
   const [form] = Form.useForm();
@@ -79,6 +80,10 @@ export default function QuotationBuilder() {
 
   useEffect(() => {
     fetchTemplate();
+    api.get('/inventory/product-categories/').then(res => {
+      const data = Array.isArray(res.data) ? res.data : res.data?.results ?? [];
+      setCategories(data);
+    }).catch(() => {});
   }, [id]);
 
   const fetchTemplate = async () => {
@@ -467,6 +472,7 @@ export default function QuotationBuilder() {
                   <SettingsPanel 
                     block={blocks.find(b => b.id === selectedBlockId)} 
                     onChange={handleBlockChange} 
+                    categories={categories}
                   />
                   <Divider style={{ margin: '12px 0' }} />
                   <Button type="dashed" block onClick={handleSaveBlockTemplate}>

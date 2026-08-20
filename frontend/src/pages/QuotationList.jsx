@@ -11,6 +11,40 @@ import { useResponsive } from '../hooks/useResponsive'
 
 const { Title, Text, Paragraph } = Typography
 const { Option } = Select
+
+const groupProducts = (items, withUnit = false) => {
+  const grouped = {};
+  const ungrouped = [];
+  items.forEach(p => {
+    const label = withUnit ? `${p.name} (${p.unit || 'cái'})` : p.name;
+    const option = { label, value: p.name };
+    if (p.category_name) {
+      if (!grouped[p.category_name]) grouped[p.category_name] = [];
+      grouped[p.category_name].push(option);
+    } else {
+      ungrouped.push(option);
+    }
+  });
+  const res = Object.keys(grouped).map(cat => ({
+    label: (
+      <span style={{ fontWeight: 'bold', color: '#1677ff' }}>
+        {cat}
+      </span>
+    ),
+    options: grouped[cat]
+  }));
+  if (ungrouped.length > 0) {
+    res.push({
+      label: (
+        <span style={{ fontWeight: 'bold', color: '#1677ff' }}>
+          Khác
+        </span>
+      ),
+      options: ungrouped
+    });
+  }
+  return res;
+};
 const { TextArea } = Input
 
 // Trạng thái báo giá
@@ -1191,6 +1225,9 @@ export default function QuotationList() {
   // ── Dynamic Editable Table Columns based on Template ──────────────────
   const getServiceItemColumns = () => {
     const effectiveTmpl = getEffectiveTemplate(editingQuotation)
+    const serviceTableBlock = effectiveTmpl?.layout_config?.blocks?.find(b => b.type === 'service_table')
+    const allowedCategories = serviceTableBlock?.props?.allowedCategories || []
+    
     const tmplCode = effectiveTmpl?.code || 'STANDARD'
     const isLandscape = tmplCode === 'production_landscape_a4' || effectiveTmpl?.layout_config?.paper_orientation === 'landscape'
 
@@ -1219,8 +1256,12 @@ export default function QuotationList() {
               style={{ flex: 1, minWidth: 150 }}
               value={text}
               onChange={(val) => handleServiceLineChange(index, 'product_name', val)}
-              options={products.filter((p) => p.product_type === 'service').map((p) => ({ value: p.name, label: p.name }))}
-              filterOption={(inputValue, option) => option.value.toUpperCase().indexOf(inputValue.toUpperCase()) !== -1}
+              options={groupProducts(products.filter((p) => {
+                if (p.product_type !== 'service') return false;
+                if (allowedCategories.length === 0) return true;
+                return allowedCategories.includes(p.category_name);
+              }))}
+              filterOption={(inputValue, option) => (option?.value || '').toUpperCase().includes(inputValue.toUpperCase())}
               placeholder="Chọn hoặc nhập tên dịch vụ"
             />
             {enableServiceImage && (
@@ -1356,6 +1397,9 @@ export default function QuotationList() {
 
   const getItemColumns = () => {
     const effectiveTmpl = getEffectiveTemplate(editingQuotation)
+    const productTableBlock = effectiveTmpl?.layout_config?.blocks?.find(b => b.type === 'product_table')
+    const allowedCategories = productTableBlock?.props?.allowedCategories || []
+    
     const tmplCode = effectiveTmpl?.code || 'STANDARD'
     const isLandscape = tmplCode === 'production_landscape_a4' || effectiveTmpl?.layout_config?.paper_orientation === 'landscape'
     
@@ -1486,8 +1530,12 @@ export default function QuotationList() {
                           handleLineChange(idx, 'product_name', v);
                         }
                       }}
-                      options={products.filter(p => p.product_type !== 'service').map(p => ({ value: p.name, label: `${p.name} (${p.unit || 'cái'})` }))}
-                      filterOption={(inputValue, option) => option.value.toUpperCase().indexOf(inputValue.toUpperCase()) !== -1}
+                      options={groupProducts(products.filter(p => {
+                        if (p.product_type === 'service') return false;
+                        if (allowedCategories.length === 0) return true;
+                        return allowedCategories.includes(p.category_name);
+                      }), true)}
+                      filterOption={(inputValue, option) => (option?.value || '').toUpperCase().includes(inputValue.toUpperCase())}
                       placeholder="Chọn hoặc nhập mẫu cửa..."
                     />
                     {enableProductImage && (
@@ -1672,8 +1720,12 @@ export default function QuotationList() {
                         handleLineChange(idx, 'product_name', v);
                       }
                     }}
-                    options={products.filter(p => p.product_type !== 'service').map(p => ({ value: p.name, label: p.name }))}
-                    filterOption={(inputValue, option) => option.value.toUpperCase().indexOf(inputValue.toUpperCase()) !== -1}
+                    options={groupProducts(products.filter(p => {
+                      if (p.product_type === 'service') return false;
+                      if (allowedCategories.length === 0) return true;
+                      return allowedCategories.includes(p.category_name);
+                    }))}
+                    filterOption={(inputValue, option) => (option?.value || '').toUpperCase().includes(inputValue.toUpperCase())}
                     placeholder="Chọn hoặc nhập sản phẩm..."
                   />
                   {enableProductImage && (
@@ -1883,7 +1935,6 @@ export default function QuotationList() {
     } // End of else block for non-landscape
 
     // --- Inject Custom Columns from Template ---
-    const productTableBlock = effectiveTmpl?.layout_config?.blocks?.find(b => b.type === 'product_table');
     const customColumns = (productTableBlock?.props?.columns || []).filter(col => typeof col === 'object' && (col.id.startsWith('custom_') || col.id.startsWith('group_')));
 
     if (customColumns.length > 0) {
@@ -2012,13 +2063,16 @@ export default function QuotationList() {
 
     const getMergeProps = (colId, record) => {
       const merges = record?.custom_data?.merge_columns;
-      if (merges && Array.isArray(merges) && merges.length > 1) {
+      const hasMerges = merges && Array.isArray(merges) && merges.length > 1;
+      
+      if (hasMerges) {
         const idx = merges.indexOf(colId);
         if (idx === 0) return { colSpan: merges.length, isMergedRoot: true };
         if (idx > 0) return { colSpan: 0, isMergedRoot: false };
       }
+      
       // legacy support
-      if (record?.custom_data?.is_custom_size) {
+      if (record?.custom_data?.is_custom_size && !hasMerges) {
         const dimIds = dimensionFields.map(f => f.id);
         const idx = dimIds.indexOf(colId);
         if (idx === 0) return { colSpan: dimIds.length, isMergedRoot: true };
@@ -2046,13 +2100,19 @@ export default function QuotationList() {
 
     const applyColFeatures = (cols) => {
       return cols.map(col => {
-        if (col.children) {
-          return { ...col, children: applyColFeatures(col.children) };
-        }
-        const origRender = col.render;
-        if (!origRender) return col;
         const colId = getColId(col);
         const colCfg = getColConfig(colId);
+        let finalTitle = col.title;
+        if (colCfg && colCfg.title) {
+          finalTitle = colCfg.title;
+        }
+
+        if (col.children) {
+          return { ...col, title: finalTitle, children: applyColFeatures(col.children) };
+        }
+        const origRender = col.render;
+        if (!origRender) return { ...col, title: finalTitle };
+        
         const canUpload = colCfg.allowImageUpload === true;
         
         let finalWidth = col.width;
@@ -2062,6 +2122,7 @@ export default function QuotationList() {
 
         return {
           ...col,
+          title: finalTitle,
           width: finalWidth,
           render: (val, record, idx) => {
             const { colSpan, isMergedRoot } = getMergeProps(colId, record);
