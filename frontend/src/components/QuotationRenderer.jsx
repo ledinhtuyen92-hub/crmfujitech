@@ -613,6 +613,11 @@ export default function QuotationRenderer({ layoutConfig, layoutStyle, data, ren
                 </div>
               </div>
             )}
+            {block.props.showDate && (
+              <div style={{ fontSize: 12, color: '#334155', marginBottom: 4 }}>
+                Ngày báo giá: <strong>{data?.quotation_date ? new Date(data.quotation_date).toLocaleDateString('vi-VN') : new Date().toLocaleDateString('vi-VN')}</strong>
+              </div>
+            )}
             {block.props.showDeliveryTime && (data?.delivery_time || data?.delivery_time === '') && (
               <div style={{ fontSize: 12, color: '#334155', marginBottom: 4 }}>
                 Thời gian giao hàng / thi công: <strong>{data.delivery_time || '3-5 ngày làm việc'}</strong>
