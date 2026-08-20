@@ -159,11 +159,16 @@ def check_and_trigger_mo_gate(order):
         order.FIN_STATUS_FULLY_PAID,
         order.FIN_STATUS_CREDIT_APPROVED,
     ]
+    logger.info(
+        "MO Gate: Order %s | status=%s | financial_status=%s | company_id=%s",
+        order.order_number, order.status, order.financial_status, order.company_id
+    )
     if order.financial_status in allowed_statuses:
-        # Lệnh sản xuất (MO) chỉ được tạo sau khi Kho đã cấp vật tư thành công.
-        _create_pending_inventory_export(order)
+        # Nhạc trưởng Workflow sẽ tự động kiểm tra xem module nào được bật tiếp theo
+        from orders.workflow import OrderWorkflowEngine
+        OrderWorkflowEngine.trigger_next_step(order, current_step=None)
     else:
-        logger.info("Order %s approved but waiting for deposit payment to open MO & Export Gate.", order.order_number)
+        logger.info("Order %s approved but waiting for deposit payment to open Workflow Gate.", order.order_number)
 
 
 def _create_production_order(order, factory_id=None):

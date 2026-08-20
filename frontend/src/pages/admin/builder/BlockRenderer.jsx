@@ -95,34 +95,33 @@ export default function BlockRenderer({ block, allBlocks, isActive, onSelect, on
       case BLOCK_TYPES.HEADER_LOGO:
         const hasLogoUrl = block.props.logoUrl && !block.props.logoUrl.includes('{{');
         return (
-          <div style={{ padding: '14px 18px', background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: 8 }}>
-            <Row justify="space-between" align="middle">
-              <Col xs={24} md={8} style={{ textAlign: 'left' }}>
-                {hasLogoUrl ? (
-                  <img
-                    src={block.props.logoUrl}
-                    alt="Logo"
-                    style={{ maxHeight: 75, maxWidth: '100%', objectFit: 'contain', borderRadius: 4 }}
-                  />
-                ) : (
-                  <div style={{ width: 56, height: 56, borderRadius: 6, background: '#e0e7ff', color: clr, display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700, fontSize: 16 }}>
-                    LOGO
-                  </div>
-                )}
-              </Col>
-              <Col xs={24} md={16} style={{ textAlign: 'right' }}>
-                <div style={{ fontWeight: 700, color: clr, fontSize: 16 }}>{block.props.companyName || 'TÊN CÔNG TY'}</div>
-                <div style={{ fontSize: 12, color: '#64748b', marginTop: 2 }}>MST: {block.props.taxCode || '0101234567'} • Hotline: {block.props.phone || '0912345678'}</div>
-                <div style={{ fontSize: 12, color: '#64748b' }}>Địa chỉ: {block.props.address || 'Hà Nội'}</div>
-              </Col>
-            </Row>
+          <div style={{ padding: '14px 18px', background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: 8, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16 }}>
+            <div style={{ textAlign: 'left', flexShrink: 0, maxWidth: '40%' }}>
+              {hasLogoUrl ? (
+                <img
+                  src={block.props.logoUrl}
+                  alt="Logo"
+                  style={{ maxHeight: 75, maxWidth: '100%', objectFit: 'contain', borderRadius: 4 }}
+                />
+              ) : (
+                <div style={{ width: 56, height: 56, borderRadius: 6, background: '#e0e7ff', color: clr, display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700, fontSize: 16 }}>
+                  LOGO
+                </div>
+              )}
+            </div>
+            <div style={{ textAlign: 'right', flex: 1, minWidth: 0 }}>
+              <div style={{ fontWeight: 700, color: clr, fontSize: 16, wordWrap: 'break-word' }}>{block.props.companyName || 'TÊN CÔNG TY'}</div>
+              <div style={{ fontSize: 12, color: '#64748b', marginTop: 2, wordWrap: 'break-word' }}>MST: {block.props.taxCode || '0101234567'} • Hotline: {block.props.phone || '0912345678'}</div>
+              <div style={{ fontSize: 12, color: '#64748b', wordWrap: 'break-word' }}>Địa chỉ: {block.props.address || 'Hà Nội'}</div>
+            </div>
           </div>
         );
       case BLOCK_TYPES.TITLE:
         return (
           <div style={{ textAlign: 'center', margin: '4px 0 8px 0' }}>
             <div style={{ fontSize: 20, fontWeight: 700, color: clr, textTransform: 'uppercase', letterSpacing: '0.5px' }}>
-              {block.props.title}
+              {block.props.title || 'BẢNG BÁO GIÁ CHI TIẾT'} 
+              {block.props.orderTitle ? <span style={{ color: '#94a3b8', fontSize: 16 }}> / {block.props.orderTitle}</span> : null}
             </div>
             {(block.props.metaText !== undefined ? block.props.metaText : (block.props.showDate ? 'Số: {{quotation_code}} | Ngày: {{current_date}}' : '')) && (
               <div style={{ display: 'inline-block', background: '#eff6ff', padding: '2px 12px', borderRadius: 12, border: '1px solid #bfdbfe', fontSize: 12, color: '#1d4ed8', margin: '6px 0' }}>
@@ -134,7 +133,7 @@ export default function BlockRenderer({ block, allBlocks, isActive, onSelect, on
               </div>
             )}
             <div style={{ fontSize: 12.5, fontStyle: 'italic', color: '#475569', marginTop: 4 }}>
-              {block.props.subtitle}
+              {block.props.subtitle || 'Kính gửi Quý khách hàng...'}
             </div>
           </div>
         );

@@ -60,7 +60,12 @@ else
 fi
 
 echo "VITE_API_URL=$PROTOCOL://$DOMAIN/api/" > frontend/.env.production
-echo "SITE_URL=$PROTOCOL://$DOMAIN" > .env
+
+# Tu dong cau hinh .env cho VPS (khong xoa cac bien khac)
+sed -i "s|^SITE_URL=.*|SITE_URL=$PROTOCOL://$DOMAIN|g" .env
+sed -i "s|^VITE_API_URL=.*|VITE_API_URL=$PROTOCOL://$DOMAIN|g" .env
+sed -i "s|^ALLOWED_HOSTS=.*|ALLOWED_HOSTS=$DOMAIN,localhost,127.0.0.1|g" .env
+sed -i "s|^DEBUG=.*|DEBUG=False|g" .env
 
 # Cap quyen cho Nginx doc thu muc root
 chmod 711 /root

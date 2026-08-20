@@ -274,12 +274,22 @@ export default function SettingsPanel({ block, onChange }) {
       case BLOCK_TYPES.TITLE:
         return (
           <>
-            <Form.Item name="title" label="Tiêu đề chính">
-              <Input />
+            <div style={{ fontWeight: 600, color: '#334155', marginBottom: 8, paddingBottom: 4, borderBottom: '1px solid #e2e8f0' }}>Cấu hình cho Báo giá</div>
+            <Form.Item name="title" label="Tiêu đề Báo giá">
+              <Input placeholder="VD: BẢNG BÁO GIÁ CHI TIẾT" />
             </Form.Item>
-            <Form.Item name="subtitle" label="Lời chào / Mô tả">
-              <TextArea rows={3} />
+            <Form.Item name="subtitle" label="Lời chào (Báo giá)">
+              <TextArea rows={3} placeholder="VD: Kính gửi Quý khách, chúng tôi xin gửi báo giá..." />
             </Form.Item>
+            
+            <div style={{ fontWeight: 600, color: '#334155', marginTop: 16, marginBottom: 8, paddingBottom: 4, borderBottom: '1px solid #e2e8f0' }}>Cấu hình cho Đơn hàng</div>
+            <Form.Item name="orderTitle" label="Tiêu đề Đơn hàng">
+              <Input placeholder="VD: ĐƠN ĐẶT HÀNG" />
+            </Form.Item>
+            <Form.Item name="orderSubtitle" label="Lời chào (Đơn hàng)">
+              <TextArea rows={3} placeholder="VD: Kính gửi Quý khách, chúng tôi xin gửi thông tin đơn hàng..." />
+            </Form.Item>
+
             <VariableHints />
             <Form.Item name="metaText" label="Dòng thông tin phụ (Số / Ngày tháng)" extra="Mẹo: Dùng biến {{quotation_code}} và {{current_date}}">
               <Input placeholder="Số: {{quotation_code}} | Ngày: {{current_date}}" />

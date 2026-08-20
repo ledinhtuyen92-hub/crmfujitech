@@ -15,7 +15,7 @@ const DEFAULT_LAYOUT_BLOCKS = [
   { id: 'signature_1', type: BLOCK_TYPES.SIGNATURES, props: { ...DEFAULT_BLOCK_PROPS[BLOCK_TYPES.SIGNATURES], columns: 2 } },
 ];
 
-export default function QuotationPrintView({ quotation, type = 'quotation', effectiveTemplate, hidePricing = false, hideCustomerInfo = false, renderCustomerSignature }) {
+export default function QuotationPrintView({ quotation, type = 'quotation', documentType = 'quotation', effectiveTemplate, hidePricing = false, hideCustomerInfo = false, renderCustomerSignature }) {
   const [scale, setScale] = useState(1);
   const [showPageBreaks, setShowPageBreaks] = useState(true);
   const [zoomedHeight, setZoomedHeight] = useState(0);
@@ -106,11 +106,8 @@ export default function QuotationPrintView({ quotation, type = 'quotation', effe
             size: ${isLand ? 'A4 landscape' : 'A4 portrait'};
             margin: ${PAGE_MARGIN};
           }
-          /* Khi in: bỏ zoom, bỏ scale, để nội dung tự fill theo khổ giấy */
+          /* Khi in: giữ nguyên zoom của người dùng để thu nhỏ vào 1 trang, nhưng bù lại width để fill màn hình */
           .printable-quotation-content {
-            zoom: 1 !important;
-            transform: none !important;
-            width: 100% !important;
             padding: 0 !important;
           }
           /* Force 2-cột giữ nguyên khi in */
@@ -143,7 +140,7 @@ export default function QuotationPrintView({ quotation, type = 'quotation', effe
       <div 
         ref={contentRef}
         className="printable-quotation-content" 
-        style={{ zoom: scale, position: 'relative', background: '#fff' }}
+        style={{ zoom: scale, width: `${100 / scale}%`, position: 'relative', background: '#fff' }}
       >
         {/* Draw simulated page breaks */}
         {showPageBreaks && zoomedHeight > 0 && Array.from({ length: estimatedPages - 1 }).map((_, i) => (
@@ -163,6 +160,7 @@ export default function QuotationPrintView({ quotation, type = 'quotation', effe
           layoutStyle={effectiveTemplate?.layout_style || quotation.layout_style} 
           data={quotationData} 
           renderCustomerSignature={renderCustomerSignature}
+          documentType={documentType !== 'quotation' ? documentType : type}
         />
       </div>
     </div>

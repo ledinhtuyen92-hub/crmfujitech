@@ -125,7 +125,7 @@ const computeProductSTT = (data, index, field = 'product') => {
  * QuotationRenderer takes the layout_config JSON and actual data (customer, items, totals)
  * and renders the final read-only HTML view.
  */
-export default function QuotationRenderer({ layoutConfig, layoutStyle, data, renderCustomerSignature }) {
+export default function QuotationRenderer({ layoutConfig, layoutStyle, data, renderCustomerSignature, documentType = 'quotation' }) {
   if (!layoutConfig || !Array.isArray(layoutConfig.blocks)) {
     return <div style={{ padding: 20, textAlign: 'center' }}>Mẫu báo giá chưa được thiết kế.</div>;
   }
@@ -168,43 +168,49 @@ export default function QuotationRenderer({ layoutConfig, layoutStyle, data, ren
         const headerPhone = company?.phone || data?.company_info?.phone || parseVariables(block.props.phone || '', data, company);
         const headerAddress = company?.address || data?.company_info?.address || parseVariables(block.props.address || '', data, company);
         return (
-          <div style={{ padding: '14px 18px', background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: 8 }}>
-            <Row justify="space-between" align="middle">
-              <Col xs={24} md={8} style={{ textAlign: 'left' }}>
-                {finalLogoUrl ? (
-                  <img
-                    src={finalLogoUrl}
-                    alt="Logo"
-                    style={{ maxHeight: 75, maxWidth: '100%', objectFit: 'contain', borderRadius: 4 }}
-                  />
-                ) : (
-                  <div style={{ width: 56, height: 56, borderRadius: 6, background: '#e0e7ff', color: clr, display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700, fontSize: 16 }}>
-                    LOGO
-                  </div>
-                )}
-              </Col>
-              <Col xs={24} md={16} style={{ textAlign: 'right' }}>
-                <div style={{ fontWeight: 700, color: clr, fontSize: 16 }}>{!isPlaceholder(headerCompanyName) ? headerCompanyName : ''}</div>
-                {(!isPlaceholder(headerTaxCode) || !isPlaceholder(headerPhone)) && (
-                  <div style={{ fontSize: 12, color: '#64748b', marginTop: 2 }}>
-                    {!isPlaceholder(headerTaxCode) ? `MST: ${headerTaxCode}` : ''}
-                    {!isPlaceholder(headerTaxCode) && !isPlaceholder(headerPhone) ? ' • ' : ''}
-                    {!isPlaceholder(headerPhone) ? `Hotline: ${headerPhone}` : ''}
-                  </div>
-                )}
-                {!isPlaceholder(headerAddress) && <div style={{ fontSize: 12, color: '#64748b' }}>Địa chỉ: {headerAddress}</div>}
-              </Col>
-            </Row>
+          <div style={{ padding: '14px 18px', background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: 8, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16 }}>
+            <div style={{ textAlign: 'left', flexShrink: 0, maxWidth: '40%' }}>
+              {finalLogoUrl ? (
+                <img
+                  src={finalLogoUrl}
+                  alt="Logo"
+                  style={{ maxHeight: 75, maxWidth: '100%', objectFit: 'contain', borderRadius: 4 }}
+                />
+              ) : (
+                <div style={{ width: 56, height: 56, borderRadius: 6, background: '#e0e7ff', color: clr, display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700, fontSize: 16 }}>
+                  LOGO
+                </div>
+              )}
+            </div>
+            <div style={{ textAlign: 'right', flex: 1, minWidth: 0 }}>
+              <div style={{ fontWeight: 700, color: clr, fontSize: 16, wordWrap: 'break-word' }}>{!isPlaceholder(headerCompanyName) ? headerCompanyName : ''}</div>
+              {(!isPlaceholder(headerTaxCode) || !isPlaceholder(headerPhone)) && (
+                <div style={{ fontSize: 12, color: '#64748b', marginTop: 2, wordWrap: 'break-word' }}>
+                  {!isPlaceholder(headerTaxCode) ? `MST: ${headerTaxCode}` : ''}
+                  {!isPlaceholder(headerTaxCode) && !isPlaceholder(headerPhone) ? ' • ' : ''}
+                  {!isPlaceholder(headerPhone) ? `Hotline: ${headerPhone}` : ''}
+                </div>
+              )}
+              {!isPlaceholder(headerAddress) && <div style={{ fontSize: 12, color: '#64748b', wordWrap: 'break-word' }}>Địa chỉ: {headerAddress}</div>}
+            </div>
           </div>
         );
 
       case BLOCK_TYPES.TITLE:
+        const isOrder = documentType === 'order';
+        const displayTitle = isOrder 
+          ? (block.props.orderTitle !== undefined ? block.props.orderTitle : 'ĐƠN ĐẶT HÀNG')
+          : (block.props.title || '');
+        const displaySubtitle = isOrder 
+          ? (block.props.orderSubtitle !== undefined ? block.props.orderSubtitle : 'Kính gửi Quý khách hàng, chúng tôi xin gửi thông tin đơn hàng chi tiết dưới đây:')
+          : (block.props.subtitle || '');
+        
         let parsedMeta = block.props.metaText !== undefined ? block.props.metaText : (block.props.showDate ? 'Số: {{quotation_code}} | Ngày: {{current_date}}' : '');
         parsedMeta = parseVariables(parsedMeta, data, company);
         return (
           <div style={{ textAlign: 'center', margin: '4px 0 8px 0' }}>
             <div style={{ fontSize: 20, fontWeight: 700, color: clr, textTransform: 'uppercase', letterSpacing: '0.5px' }}>
-              {parseVariables(block.props.title || '', data, company)}
+              {parseVariables(displayTitle, data, company)}
             </div>
             {(block.props.metaText !== undefined ? block.props.metaText : (block.props.showDate ? 'Số: {{quotation_code}} | Ngày: {{current_date}}' : '')) && (
               <div style={{ display: 'inline-block', background: '#eff6ff', padding: '2px 12px', borderRadius: 12, border: '1px solid #bfdbfe', fontSize: 12, color: '#1d4ed8', margin: '6px 0' }}>
@@ -216,7 +222,7 @@ export default function QuotationRenderer({ layoutConfig, layoutStyle, data, ren
               </div>
             )}
             <div style={{ fontSize: 12.5, fontStyle: 'italic', color: '#475569', marginTop: 4 }}>
-              {parseVariables(block.props.subtitle || '', data, company)}
+              {parseVariables(displaySubtitle, data, company)}
             </div>
           </div>
         );
@@ -639,7 +645,7 @@ export default function QuotationRenderer({ layoutConfig, layoutStyle, data, ren
 
       case BLOCK_TYPES.SIGNATURES:
         return (
-          <Row justify="space-around" style={{ marginTop: 12, textAlign: 'center', paddingBottom: 0 }}>
+          <Row justify="space-around" style={{ marginTop: 12, textAlign: 'center', paddingBottom: 0, pageBreakInside: 'avoid', breakInside: 'avoid' }}>
             {Array.from({ length: block.props.columns || 2 }).map((_, idx) => (
               <Col xs={24} md={24 / (block.props.columns || 2)} key={idx}>
                 <div style={{ fontWeight: 700, color: clr, fontSize: 13 }}>{block.props.titles?.[idx] || 'CHỮ KÝ'}</div>

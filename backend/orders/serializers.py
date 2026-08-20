@@ -171,8 +171,27 @@ class OrderSerializer(serializers.ModelSerializer):
         if getattr(obj, "customer_name_snapshot", ""): return obj.customer_address_snapshot
         return obj.customer.address if obj.customer else ""
 
+    def _is_inventory_active(self, obj):
+        """Check nếu module Kho vận đang được bật — đọc FRESH từ DB để tránh ORM cache."""
+        try:
+            from users.models import CompanySettings
+            settings_obj = CompanySettings.objects.get(company_id=obj.company_id)
+            modules = settings_obj.active_modules
+            if isinstance(modules, str):
+                import ast
+                try:
+                    modules = ast.literal_eval(modules)
+                except Exception:
+                    modules = [m.strip() for m in modules.split(',') if m.strip()]
+            return isinstance(modules, list) and 'inventory' in modules
+        except Exception:
+            return False
+
     def get_needs_export_request(self, obj):
         if obj.status != "approved":
+            return False
+        # Nếu module kho vận không bật, không cần xuất kho
+        if not self._is_inventory_active(obj):
             return False
         try:
             from inventory.models import InventoryTransaction
@@ -184,6 +203,9 @@ class OrderSerializer(serializers.ModelSerializer):
             return False
 
     def get_has_pending_export(self, obj):
+        # Nếu module kho vận không bật, không hiển thị trạng thái chờ xuất kho
+        if not self._is_inventory_active(obj):
+            return False
         try:
             from inventory.models import InventoryTransaction
             return InventoryTransaction.objects.filter(

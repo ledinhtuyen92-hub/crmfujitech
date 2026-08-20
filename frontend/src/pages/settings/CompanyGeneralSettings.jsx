@@ -510,26 +510,7 @@ export default function CompanyGeneralSettings() {
             </Col>
           </Row>
 
-          <Row gutter={16}>
-            <Col xs={24} md={12}>
-              <Form.Item
-                name="custom_quotation_title"
-                label="Tiêu đề mẫu in Báo Giá (Tùy chỉnh)"
-                help="Nếu để trống sẽ dùng mặc định (VD: BÁO GIÁ SẢN XUẤT)"
-              >
-                <Input placeholder="VD: BÁO GIÁ DỊCH VỤ, HỢP ĐỒNG NGUYÊN TẮC..." style={{ textTransform: 'uppercase' }} />
-              </Form.Item>
-            </Col>
-            <Col xs={24} md={12}>
-              <Form.Item
-                name="custom_order_title"
-                label="Tiêu đề mẫu in Đơn Hàng (Tùy chỉnh)"
-                help="Nếu để trống sẽ dùng mặc định (VD: ĐƠN HÀNG SẢN XUẤT)"
-              >
-                <Input placeholder="VD: HỢP ĐỒNG THI CÔNG, ĐƠN ĐẶT HÀNG..." style={{ textTransform: 'uppercase' }} />
-              </Form.Item>
-            </Col>
-          </Row>
+
 
           <Divider dashed />
 

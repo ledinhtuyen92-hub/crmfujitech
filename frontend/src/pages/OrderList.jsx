@@ -2987,41 +2987,43 @@ export default function OrderList() {
             </div>
 
             {/* CỔNG XUẤT KHO (DO GATE) */}
-            <div style={{ padding: '16px', background: selectedOrder.financial_status === 'fully_paid' || selectedOrder.financial_status === 'credit_approved' ? 'linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%)' : 'linear-gradient(135deg, #fff1f2 0%, #ffe4e6 100%)', borderRadius: '12px', border: selectedOrder.financial_status === 'fully_paid' || selectedOrder.financial_status === 'credit_approved' ? '1px solid #bbf7d0' : '1px solid #fecdd3', marginBottom: '16px', boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.05)' }}>
-              <Row align="middle" justify="space-between">
-                <Col xs={24} md={16}>
-                  <Space align="center" size={12}>
-                    <div style={{ width: 40, height: 40, borderRadius: '50%', background: selectedOrder.financial_status === 'fully_paid' || selectedOrder.financial_status === 'credit_approved' ? '#22c55e' : '#f43f5e', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 4px 10px rgba(0,0,0,0.1)' }}>
-                      {selectedOrder.financial_status === 'fully_paid' || selectedOrder.financial_status === 'credit_approved' ? <CheckCircleOutlined style={{color: '#fff', fontSize: 20}} /> : <CloseCircleOutlined style={{color: '#fff', fontSize: 20}} />}
-                    </div>
-                    <Space direction="vertical" size={0}>
-                      <Text strong style={{ fontSize: 15, color: selectedOrder.financial_status === 'fully_paid' || selectedOrder.financial_status === 'credit_approved' ? '#15803d' : '#be123c' }}>
-                        CỔNG XUẤT KHO (DO GATE): {selectedOrder.financial_status === 'fully_paid' || selectedOrder.financial_status === 'credit_approved' ? 'ĐÃ MỞ' : 'ĐÃ KHÓA'}
-                      </Text>
-                      <Text type="secondary" style={{ fontSize: 13, color: selectedOrder.financial_status === 'fully_paid' || selectedOrder.financial_status === 'credit_approved' ? '#16a34a' : '#e11d48' }}>
-                        {selectedOrder.financial_status === 'fully_paid' || selectedOrder.financial_status === 'credit_approved' ? 'Đơn hàng đủ điều kiện xuất kho an toàn.' : 'Chờ thanh toán đủ hoặc cần Giám đốc phê duyệt nợ.'}
-                      </Text>
+            {isModuleActive('inventory') && (
+              <div style={{ padding: '16px', background: selectedOrder.financial_status === 'fully_paid' || selectedOrder.financial_status === 'credit_approved' ? 'linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%)' : 'linear-gradient(135deg, #fff1f2 0%, #ffe4e6 100%)', borderRadius: '12px', border: selectedOrder.financial_status === 'fully_paid' || selectedOrder.financial_status === 'credit_approved' ? '1px solid #bbf7d0' : '1px solid #fecdd3', marginBottom: '16px', boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.05)' }}>
+                <Row align="middle" justify="space-between">
+                  <Col xs={24} md={16}>
+                    <Space align="center" size={12}>
+                      <div style={{ width: 40, height: 40, borderRadius: '50%', background: selectedOrder.financial_status === 'fully_paid' || selectedOrder.financial_status === 'credit_approved' ? '#22c55e' : '#f43f5e', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 4px 10px rgba(0,0,0,0.1)' }}>
+                        {selectedOrder.financial_status === 'fully_paid' || selectedOrder.financial_status === 'credit_approved' ? <CheckCircleOutlined style={{color: '#fff', fontSize: 20}} /> : <CloseCircleOutlined style={{color: '#fff', fontSize: 20}} />}
+                      </div>
+                      <Space direction="vertical" size={0}>
+                        <Text strong style={{ fontSize: 15, color: selectedOrder.financial_status === 'fully_paid' || selectedOrder.financial_status === 'credit_approved' ? '#15803d' : '#be123c' }}>
+                          CỔNG WORKFLOW: {selectedOrder.financial_status === 'fully_paid' || selectedOrder.financial_status === 'credit_approved' ? 'ĐÃ MỞ' : 'ĐÃ KHÓA'}
+                        </Text>
+                        <Text type="secondary" style={{ fontSize: 13, color: selectedOrder.financial_status === 'fully_paid' || selectedOrder.financial_status === 'credit_approved' ? '#16a34a' : '#e11d48' }}>
+                          {selectedOrder.financial_status === 'fully_paid' || selectedOrder.financial_status === 'credit_approved' ? 'Đơn hàng đủ điều kiện chuyển qua các bộ phận tiếp theo.' : 'Chờ thanh toán đủ hoặc cần Giám đốc phê duyệt nợ.'}
+                        </Text>
+                      </Space>
                     </Space>
-                  </Space>
-                </Col>
-                <Col xs={24} md={8} style={{ textAlign: 'right' }}>
-                  {selectedOrder.financial_status !== 'fully_paid' && selectedOrder.financial_status !== 'credit_approved' && canRequestCredit && (
-                    <Button
-                      danger={!selectedOrder.has_pending_credit_request}
-                      type={selectedOrder.has_pending_credit_request ? 'default' : 'primary'}
-                      size="middle"
-                      disabled={selectedOrder.has_pending_credit_request}
-                      onClick={openApproverModal}
-                      style={{ borderRadius: '8px', fontWeight: 600, boxShadow: selectedOrder.has_pending_credit_request ? 'none' : '0 4px 12px rgba(225, 29, 72, 0.3)' }}
-                    >
-                      {selectedOrder.has_pending_credit_request ? '⏳ Đang chờ duyệt nợ' : '🛡️ Trình Duyệt Nợ'}
-                    </Button>
-                  )}
-                </Col>
-              </Row>
-            </div>
+                  </Col>
+                  <Col xs={24} md={8} style={{ textAlign: 'right' }}>
+                    {selectedOrder.financial_status !== 'fully_paid' && selectedOrder.financial_status !== 'credit_approved' && canRequestCredit && (
+                      <Button
+                        danger={!selectedOrder.has_pending_credit_request}
+                        type={selectedOrder.has_pending_credit_request ? 'default' : 'primary'}
+                        size="middle"
+                        disabled={selectedOrder.has_pending_credit_request}
+                        onClick={openApproverModal}
+                        style={{ borderRadius: '8px', fontWeight: 600, boxShadow: selectedOrder.has_pending_credit_request ? 'none' : '0 4px 12px rgba(225, 29, 72, 0.3)' }}
+                      >
+                        {selectedOrder.has_pending_credit_request ? '⏳ Đang chờ duyệt nợ' : '🛡️ Trình Duyệt Nợ'}
+                      </Button>
+                    )}
+                  </Col>
+                </Row>
+              </div>
+            )}
 
-            {(isCompanyAdmin || selectedOrder.created_by === user?.id) && selectedOrder.needs_export_request && ['fully_paid', 'deposit_paid', 'credit_approved'].includes(selectedOrder.financial_status) && (
+            {(isCompanyAdmin || selectedOrder.created_by === user?.id) && isModuleActive('inventory') && selectedOrder.needs_export_request && ['fully_paid', 'deposit_paid', 'credit_approved'].includes(selectedOrder.financial_status) && (
               <div style={{ padding: '16px', background: '#fef2f2', borderRadius: '12px', border: '1px solid #fca5a5', marginBottom: '16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <Space size={12}>
                   <AlertOutlined style={{ color: '#ef4444', fontSize: 20 }} />

@@ -2790,6 +2790,7 @@ export default function QuotationList() {
             effectiveTemplate={effectiveTemplate} 
             isCompanyAdmin={isCompanyAdmin} 
             products={products} 
+            documentType="quotation"
           />
           )
         })()}
