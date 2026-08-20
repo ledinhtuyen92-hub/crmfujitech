@@ -49,7 +49,21 @@ function SortableItem({ col, onRemove, onAddChild, onRemoveChild, onUpdateCol, o
           <span {...attributes} {...listeners} style={{ cursor: 'grab', color: '#94a3b8', marginRight: 4, display: 'inline-flex', padding: 4 }}>
             <HolderOutlined />
           </span>
-          <Text strong style={{ fontSize: 13, color: '#334155' }}>{title}</Text>
+          <Text 
+            strong 
+            style={{ fontSize: 13, color: '#334155', margin: 0 }}
+            editable={{
+              text: title,
+              onChange: (val) => {
+                if (val && val.trim() !== '') {
+                  onUpdateCol(id, { title: val.trim() });
+                }
+              },
+              tooltip: 'Sửa tên cột'
+            }}
+          >
+            {title}
+          </Text>
           {isGroup && <Text type="secondary" style={{ fontSize: 11, fontStyle: 'italic' }}>(Cột gộp)</Text>}
         </Space>
         <Space>
@@ -78,7 +92,23 @@ function SortableItem({ col, onRemove, onAddChild, onRemoveChild, onUpdateCol, o
         <div style={{ marginTop: 12, paddingLeft: 28 }}>
           {childrenColumns && childrenColumns.map(child => (
             <div key={child.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#f8fafc', padding: '4px 8px', marginBottom: 4, borderRadius: 4, border: '1px dashed #e2e8f0' }}>
-              <Text style={{ fontSize: 12, color: '#475569' }}>- {child.title}</Text>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                <span style={{ fontSize: 12, color: '#475569' }}>-</span>
+                <Text 
+                  style={{ fontSize: 12, color: '#475569', margin: 0 }}
+                  editable={{
+                    text: child.title,
+                    onChange: (val) => {
+                      if (val && val.trim() !== '') {
+                        onUpdateChild && onUpdateChild(id, child.id, { title: val.trim() });
+                      }
+                    },
+                    tooltip: 'Sửa tên cột con'
+                  }}
+                >
+                  {child.title}
+                </Text>
+              </div>
               <Space size={2}>
                 <Popover 
                   title="Cài đặt cột con" 

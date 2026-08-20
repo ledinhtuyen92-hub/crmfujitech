@@ -7,6 +7,8 @@ import {
   DeleteOutlined,
   DownloadOutlined,
   EditOutlined,
+  FolderOutlined,
+  FolderOpenOutlined,
   HistoryOutlined,
   InboxOutlined,
   PictureOutlined,
@@ -40,6 +42,7 @@ import {
   Dropdown,
   List,
   Collapse,
+  Menu,
 } from 'antd'
 import dayjs from 'dayjs'
 import { useCallback, useEffect, useState, useRef } from 'react'
@@ -75,6 +78,9 @@ export default function Products() {
   const [productImageFile, setProductImageFile] = useState(null)
   const [productPreviewImage, setProductPreviewImage] = useState(null)
   const [productForm] = Form.useForm()
+  const productCategories = categories.filter(c => c.category_type === 'product' || !c.category_type);
+  const serviceCategories = categories.filter(c => c.category_type === 'service');
+  const selectedProductType = Form.useWatch('product_type', productForm);
 
   const [categoryModalVisible, setCategoryModalVisible] = useState(false)
   const [editingCategory, setEditingCategory] = useState(null)
@@ -152,6 +158,7 @@ export default function Products() {
       productForm.resetFields()
       productForm.setFieldsValue({ 
         product_type: activeTab === 'services' ? 'service' : 'product',
+        category: categoryFilter ? parseInt(categoryFilter) : undefined,
         unit: 'cái', 
         price: 0, 
         cost_price: 0, 
@@ -234,7 +241,7 @@ export default function Products() {
         await api.patch(`/inventory/product-categories/${editingCategory.id}/`, values)
         messageApi.success('Cập nhật danh mục thành công!')
       } else {
-        await api.post('/inventory/product-categories/', values)
+        await api.post('/inventory/product-categories/', { ...values, category_type: activeTab === 'services' ? 'service' : 'product' })
         messageApi.success('Thêm danh mục thành công!')
       }
       setCategoryModalVisible(false)
@@ -518,6 +525,7 @@ export default function Products() {
     />
   )
 
+
   const tabItems = [
     {
       key: 'products',
@@ -528,42 +536,131 @@ export default function Products() {
         </Space>
       ),
       children: (
-        <div>
-          <Row gutter={16} align="middle" style={{ marginBottom: 16 }}>
-            <Col xs={24} sm={10} style={{ marginBottom: isMobile ? 8 : 0 }}>
-              <Input
-                placeholder="Tìm theo tên, mã SKU..."
-                prefix={<SearchOutlined style={{ color: '#94a3b8' }} />}
-                value={searchText}
-                onChange={(e) => setSearchText(e.target.value)}
-                allowClear
-                style={{ borderRadius: 8 }}
+        <div style={{ display: 'flex', gap: 24, alignItems: 'flex-start', flexWrap: isMobile ? 'wrap' : 'nowrap' }}>
+          {/* Sidebar Thư mục */}
+          {!isMobile && (
+            <div style={{ width: 260, flexShrink: 0, background: '#fff', borderRadius: 8, border: '1px solid #e2e8f0', padding: 16 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+                <Text strong style={{ fontSize: 14, color: '#334155' }}>Danh mục (Thư mục)</Text>
+                <Button type="text" size="small" icon={<PlusOutlined />} onClick={() => openCategoryModal()} style={{ color: '#2563eb' }} />
+              </div>
+              <Menu
+                mode="inline"
+                selectedKeys={[categoryFilter ? categoryFilter.toString() : 'all']}
+                onClick={(e) => setCategoryFilter(e.key === 'all' ? '' : e.key)}
+                style={{ borderRight: 'none', background: 'transparent' }}
+                items={[
+                  { key: 'all', icon: <InboxOutlined style={{ color: !categoryFilter ? '#2563eb' : '#94a3b8' }} />, label: 'Tất cả sản phẩm' },
+                  ...productCategories.map(c => ({
+                    key: c.id.toString(),
+                    icon: categoryFilter && categoryFilter.toString() === c.id.toString() ? <FolderOpenOutlined style={{ color: '#f59e0b' }} /> : <FolderOutlined style={{ color: '#f59e0b' }} />,
+                    label: (
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%' }}>
+                        <span style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>{c.name}</span>
+                        {categoryFilter === c.id.toString() && (
+                          <Space size={0} onClick={(e) => e.stopPropagation()}>
+                            <Button type="text" size="small" icon={<EditOutlined style={{ fontSize: 12, color: '#d97706' }} />} onClick={(e) => { e.stopPropagation(); openCategoryModal(c); }} />
+                            <Popconfirm title="Xóa thư mục?" onConfirm={(e) => { e.stopPropagation(); handleCategoryDelete(c.id); }} okText="Xóa" cancelText="Hủy">
+                              <Button type="text" danger size="small" icon={<DeleteOutlined style={{ fontSize: 12 }} />} onClick={(e) => e.stopPropagation()} />
+                            </Popconfirm>
+                          </Space>
+                        )}
+                      </div>
+                    )
+                  }))
+                ]}
               />
-            </Col>
-            <Col xs={24} sm={8}>
-              <Select
-                placeholder="Lọc theo danh mục"
-                value={categoryFilter || undefined}
-                onChange={(val) => setCategoryFilter(val || '')}
-                allowClear
-                style={{ width: '100%' }}
-              >
-                {categories.map((c) => (
-                  <Option key={c.id} value={c.id}>{c.name}</Option>
-                ))}
-              </Select>
-            </Col>
-          </Row>
-          {isMobile ? renderProductMobileList(products.filter(p => p.product_type !== 'service' && (p.name?.toLowerCase().includes(searchText.toLowerCase()) || p.sku?.toLowerCase().includes(searchText.toLowerCase())))) : (
-            <Table
-              columns={productColumns}
-              dataSource={products.filter(p => p.product_type !== 'service' && (p.name?.toLowerCase().includes(searchText.toLowerCase()) || p.sku?.toLowerCase().includes(searchText.toLowerCase())))}
-              rowKey="id"
-              loading={loading}
-              scroll={{ x: 1200 }}
-              pagination={{ pageSize: 15 }}
-            />
+            </div>
           )}
+
+          {/* Main content */}
+          <div style={{ flex: 1, minWidth: 0 }}>
+            {isMobile && (
+              <div style={{ 
+                display: 'flex', 
+                overflowX: 'auto', 
+                gap: 8, 
+                padding: '0 0 12px 0',
+                scrollbarWidth: 'none',
+                WebkitOverflowScrolling: 'touch',
+                borderBottom: '1px solid #f1f5f9',
+                marginBottom: 12
+              }}>
+                <style dangerouslySetInnerHTML={{__html: `::-webkit-scrollbar { display: none; }`}} />
+                <div 
+                  onClick={() => setCategoryFilter('')}
+                  style={{
+                    display: 'flex', alignItems: 'center', gap: 6,
+                    padding: '6px 12px', borderRadius: 20, whiteSpace: 'nowrap',
+                    background: !categoryFilter ? '#eff6ff' : '#f8fafc',
+                    border: `1px solid ${!categoryFilter ? '#bfdbfe' : '#e2e8f0'}`,
+                    color: !categoryFilter ? '#2563eb' : '#475569',
+                    fontWeight: !categoryFilter ? 600 : 400
+                  }}
+                >
+                  <InboxOutlined /> Tất cả
+                </div>
+                {productCategories.map(c => (
+                  <div 
+                    key={c.id}
+                    onClick={() => setCategoryFilter(c.id.toString())}
+                    style={{
+                      display: 'flex', alignItems: 'center', gap: 6,
+                      padding: '6px 12px', borderRadius: 20, whiteSpace: 'nowrap',
+                      background: categoryFilter === c.id.toString() ? '#fffbeb' : '#f8fafc',
+                      border: `1px solid ${categoryFilter === c.id.toString() ? '#fde68a' : '#e2e8f0'}`,
+                      color: categoryFilter === c.id.toString() ? '#d97706' : '#475569',
+                      fontWeight: categoryFilter === c.id.toString() ? 600 : 400
+                    }}
+                  >
+                    {categoryFilter === c.id.toString() ? <FolderOpenOutlined style={{ color: '#f59e0b' }} /> : <FolderOutlined style={{ color: '#94a3b8' }} />} 
+                    {c.name}
+                  </div>
+                ))}
+                <div 
+                  onClick={() => openCategoryModal()}
+                  style={{
+                    display: 'flex', alignItems: 'center', gap: 6,
+                    padding: '6px 12px', borderRadius: 20, whiteSpace: 'nowrap',
+                    background: '#f8fafc',
+                    border: '1px dashed #cbd5e1',
+                    color: '#64748b',
+                  }}
+                >
+                  <PlusOutlined /> Thêm
+                </div>
+              </div>
+            )}
+            <Row gutter={16} align="middle" style={{ marginBottom: 16 }}>
+              <Col xs={24} sm={isMobile ? 24 : 14} style={{ marginBottom: isMobile ? 8 : 0 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                  {!isMobile && (
+                    <Text strong style={{ fontSize: 16, color: '#0f172a', whiteSpace: 'nowrap' }}>
+                      {categoryFilter ? productCategories.find(c => c.id.toString() === categoryFilter.toString())?.name : 'Tất cả sản phẩm'}
+                    </Text>
+                  )}
+                  <Input
+                    placeholder="Tìm theo tên, mã SKU..."
+                    prefix={<SearchOutlined style={{ color: '#94a3b8' }} />}
+                    value={searchText}
+                    onChange={(e) => setSearchText(e.target.value)}
+                    allowClear
+                    style={{ borderRadius: 8 }}
+                  />
+                </div>
+              </Col>
+            </Row>
+            {isMobile ? renderProductMobileList(products.filter(p => p.product_type !== 'service' && (p.name?.toLowerCase().includes(searchText.toLowerCase()) || p.sku?.toLowerCase().includes(searchText.toLowerCase())))) : (
+              <Table
+                columns={productColumns}
+                dataSource={products.filter(p => p.product_type !== 'service' && (p.name?.toLowerCase().includes(searchText.toLowerCase()) || p.sku?.toLowerCase().includes(searchText.toLowerCase())))}
+                rowKey="id"
+                loading={loading}
+                scroll={{ x: 1200 }}
+                pagination={{ pageSize: 15 }}
+              />
+            )}
+          </div>
         </div>
       ),
     },
@@ -576,32 +673,120 @@ export default function Products() {
         </Space>
       ),
       children: (
-        <div>
-          <Row gutter={16} align="middle" style={{ marginBottom: 16 }}>
-            <Col xs={24} sm={10} style={{ marginBottom: isMobile ? 8 : 0 }}>
-              <Input
-                placeholder="Tìm theo tên dịch vụ, mã SKU..."
-                prefix={<SearchOutlined style={{ color: '#94a3b8' }} />}
-                value={searchText}
-                onChange={(e) => setSearchText(e.target.value)}
-                allowClear
-                style={{ borderRadius: 8 }}
+        <div style={{ display: 'flex', gap: 24, alignItems: 'flex-start', flexWrap: isMobile ? 'wrap' : 'nowrap' }}>
+          {/* Sidebar Thư mục */}
+          {!isMobile && (
+            <div style={{ width: 260, flexShrink: 0, background: '#fff', borderRadius: 8, border: '1px solid #e2e8f0', padding: 16 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+                <Text strong style={{ fontSize: 14, color: '#334155' }}>Danh mục (Thư mục)</Text>
+                <Button type="text" size="small" icon={<PlusOutlined />} onClick={() => openCategoryModal()} style={{ color: '#2563eb' }} />
+              </div>
+              <Menu
+                mode="inline"
+                selectedKeys={[categoryFilter ? categoryFilter.toString() : 'all']}
+                onClick={(e) => setCategoryFilter(e.key === 'all' ? '' : e.key)}
+                style={{ borderRight: 'none', background: 'transparent' }}
+                items={[
+                  { key: 'all', icon: <InboxOutlined style={{ color: !categoryFilter ? '#2563eb' : '#94a3b8' }} />, label: 'Tất cả dịch vụ' },
+                  ...serviceCategories.map(c => ({
+                    key: c.id.toString(),
+                    icon: categoryFilter && categoryFilter.toString() === c.id.toString() ? <FolderOpenOutlined style={{ color: '#f59e0b' }} /> : <FolderOutlined style={{ color: '#f59e0b' }} />,
+                    label: (
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%' }}>
+                        <span style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>{c.name}</span>
+                        {categoryFilter === c.id.toString() && (
+                          <Space size={0} onClick={(e) => e.stopPropagation()}>
+                            <Button type="text" size="small" icon={<EditOutlined style={{ fontSize: 12, color: '#d97706' }} />} onClick={(e) => { e.stopPropagation(); openCategoryModal(c); }} />
+                            <Popconfirm title="Xóa thư mục?" onConfirm={(e) => { e.stopPropagation(); handleCategoryDelete(c.id); }} okText="Xóa" cancelText="Hủy">
+                              <Button type="text" danger size="small" icon={<DeleteOutlined style={{ fontSize: 12 }} />} onClick={(e) => e.stopPropagation()} />
+                            </Popconfirm>
+                          </Space>
+                        )}
+                      </div>
+                    )
+                  }))
+                ]}
               />
-            </Col>
-            <Col xs={24} sm={8}>
-              <Select
-                placeholder="Lọc theo danh mục"
-                value={categoryFilter || undefined}
-                onChange={(val) => setCategoryFilter(val || '')}
-                allowClear
-                style={{ width: '100%' }}
-              >
-                {categories.map((c) => (
-                  <Option key={c.id} value={c.id}>{c.name}</Option>
+            </div>
+          )}
+
+          {/* Main content */}
+          <div style={{ flex: 1, minWidth: 0 }}>
+            {isMobile && (
+              <div style={{ 
+                display: 'flex', 
+                overflowX: 'auto', 
+                gap: 8, 
+                padding: '0 0 12px 0',
+                scrollbarWidth: 'none',
+                WebkitOverflowScrolling: 'touch',
+                borderBottom: '1px solid #f1f5f9',
+                marginBottom: 12
+              }}>
+                <style dangerouslySetInnerHTML={{__html: `::-webkit-scrollbar { display: none; }`}} />
+                <div 
+                  onClick={() => setCategoryFilter('')}
+                  style={{
+                    display: 'flex', alignItems: 'center', gap: 6,
+                    padding: '6px 12px', borderRadius: 20, whiteSpace: 'nowrap',
+                    background: !categoryFilter ? '#eff6ff' : '#f8fafc',
+                    border: `1px solid ${!categoryFilter ? '#bfdbfe' : '#e2e8f0'}`,
+                    color: !categoryFilter ? '#2563eb' : '#475569',
+                    fontWeight: !categoryFilter ? 600 : 400
+                  }}
+                >
+                  <InboxOutlined /> Tất cả
+                </div>
+                {serviceCategories.map(c => (
+                  <div 
+                    key={c.id}
+                    onClick={() => setCategoryFilter(c.id.toString())}
+                    style={{
+                      display: 'flex', alignItems: 'center', gap: 6,
+                      padding: '6px 12px', borderRadius: 20, whiteSpace: 'nowrap',
+                      background: categoryFilter === c.id.toString() ? '#fffbeb' : '#f8fafc',
+                      border: `1px solid ${categoryFilter === c.id.toString() ? '#fde68a' : '#e2e8f0'}`,
+                      color: categoryFilter === c.id.toString() ? '#d97706' : '#475569',
+                      fontWeight: categoryFilter === c.id.toString() ? 600 : 400
+                    }}
+                  >
+                    {categoryFilter === c.id.toString() ? <FolderOpenOutlined style={{ color: '#f59e0b' }} /> : <FolderOutlined style={{ color: '#94a3b8' }} />} 
+                    {c.name}
+                  </div>
                 ))}
-              </Select>
-            </Col>
-          </Row>
+                <div 
+                  onClick={() => openCategoryModal()}
+                  style={{
+                    display: 'flex', alignItems: 'center', gap: 6,
+                    padding: '6px 12px', borderRadius: 20, whiteSpace: 'nowrap',
+                    background: '#f8fafc',
+                    border: '1px dashed #cbd5e1',
+                    color: '#64748b',
+                  }}
+                >
+                  <PlusOutlined /> Thêm
+                </div>
+              </div>
+            )}
+            <Row gutter={16} align="middle" style={{ marginBottom: 16 }}>
+              <Col xs={24} sm={isMobile ? 24 : 14} style={{ marginBottom: isMobile ? 8 : 0 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                  {!isMobile && (
+                    <Text strong style={{ fontSize: 16, color: '#0f172a', whiteSpace: 'nowrap' }}>
+                      {categoryFilter ? serviceCategories.find(c => c.id.toString() === categoryFilter.toString())?.name : 'Tất cả dịch vụ'}
+                    </Text>
+                  )}
+                  <Input
+                    placeholder="Tìm theo tên dịch vụ, mã SKU..."
+                    prefix={<SearchOutlined style={{ color: '#94a3b8' }} />}
+                    value={searchText}
+                    onChange={(e) => setSearchText(e.target.value)}
+                    allowClear
+                    style={{ borderRadius: 8 }}
+                  />
+                </div>
+              </Col>
+            </Row>
           {isMobile ? renderProductMobileList(products.filter(p => p.product_type === 'service' && (p.name?.toLowerCase().includes(searchText.toLowerCase()) || p.sku?.toLowerCase().includes(searchText.toLowerCase())))) : (
             <Table
               columns={productColumns}
@@ -612,68 +797,10 @@ export default function Products() {
               pagination={{ pageSize: 15 }}
             />
           )}
+          </div>
         </div>
       ),
-    },
-    {
-      key: 'categories',
-      label: isMobile ? <Text strong>Danh mục Sản Phẩm/Dịch vụ</Text> : (
-        <Space>
-          <TagOutlined />
-          <span>Loại Sản Phẩm/Dịch vụ</span>
-        </Space>
-      ),
-      children: isMobile ? (
-        <List
-          dataSource={categories}
-          pagination={{ pageSize: 10, size: "small" }}
-          renderItem={(c) => (
-            <List.Item style={{ background: '#fff', borderRadius: 8, padding: 12, marginBottom: 8, border: '1px solid #f0f0f0' }}>
-              <List.Item.Meta
-                title={
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                    <Text strong style={{ fontSize: 14 }}>{c.name}</Text>
-                    <Space size={0}>
-                      {canEdit && <Button type="text" size="small" icon={<EditOutlined style={{ color: '#d97706' }} />} onClick={() => openCategoryModal(c)} />}
-                      {canDelete && (
-                        <Popconfirm title="Xoá danh mục?" onConfirm={() => handleCategoryDelete(c.id)} okText="Xoá" cancelText="Hủy" okButtonProps={{ danger: true }}>
-                          <Button type="text" danger size="small" icon={<DeleteOutlined />} />
-                        </Popconfirm>
-                      )}
-                    </Space>
-                  </div>
-                }
-                description={<Text type="secondary" style={{ display: 'block', marginTop: 4 }}>{c.description || 'Không có mô tả'}</Text>}
-              />
-            </List.Item>
-          )}
-        />
-      ) : (
-        <Table scroll={{ x: 'max-content' }}
-          dataSource={categories}
-          rowKey="id"
-          columns={[
-            { title: 'Tên loại SP/Dịch vụ', dataIndex: 'name', key: 'name', render: (v) => <Text strong>{v}</Text> },
-            { title: 'Mô tả', dataIndex: 'description', key: 'description', render: (v) => <Text type="secondary">{v || '—'}</Text> },
-            {
-              title: 'Hành động',
-              key: 'action',
-              align: 'right',
-              render: (_, r) => (
-                <Space>
-                  {canEdit && <Button type="text" icon={<EditOutlined style={{ color: '#d97706' }} />} onClick={() => openCategoryModal(r)} />}
-                  {canDelete && (
-                    <Popconfirm title="Xoá danh mục?" onConfirm={() => handleCategoryDelete(r.id)} okText="Xoá" cancelText="Hủy" okButtonProps={{ danger: true }}>
-                      <Button type="text" danger icon={<DeleteOutlined />} />
-                    </Popconfirm>
-                  )}
-                </Space>
-              ),
-            },
-          ]}
-          pagination={{ pageSize: 10 }}
-        />
-      ),
+
     },
     {
       key: 'templates',
@@ -795,7 +922,7 @@ export default function Products() {
             <Col xs={24} md={12}>
               <Form.Item name="category" label="Danh mục SP/Dịch vụ" rules={[{ required: true, message: 'Vui lòng chọn danh mục' }]}>
                 <Select placeholder="Chọn danh mục...">
-                  {categories.map((c) => (
+                  {(selectedProductType === 'service' ? serviceCategories : productCategories).map((c) => (
                     <Option key={c.id} value={c.id}>{c.name}</Option>
                   ))}
                 </Select>

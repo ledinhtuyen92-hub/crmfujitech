@@ -38,6 +38,13 @@ class ProductCategoryViewSet(TenantQuerySetMixin, viewsets.ModelViewSet):
         "partial_update": "products.manage_categories",
         "destroy": "products.manage_categories",
     }
+    
+    def get_queryset(self):
+        qs = super().get_queryset()
+        category_type = self.request.query_params.get("category_type")
+        if category_type:
+            qs = qs.filter(category_type=category_type)
+        return qs
 
 
 class ProductTemplateViewSet(TenantQuerySetMixin, viewsets.ModelViewSet):

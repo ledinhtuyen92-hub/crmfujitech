@@ -247,10 +247,49 @@ export default function AiKnowledgeBase() {
 
   const handleEdit = (record) => {
     setCurrentDoc(record)
+    
+    let qa_list = [];
+    if (record.doc_type === 'qa') {
+      const blocks = (record.content || '').split('\n\nHỏi: ').filter(Boolean);
+      qa_list = blocks.map((block, index) => {
+        let raw = block;
+        if (index === 0 && raw.startsWith('Hỏi: ')) {
+          raw = raw.substring(5);
+        }
+        const parts = raw.split('\nĐáp: ');
+        if (parts.length >= 2) {
+          let answerRaw = parts.slice(1).join('\nĐáp: ');
+          
+          const imgRegex = /!\[.*?\]\((.*?)\)/g;
+          const images = [];
+          let match;
+          while ((match = imgRegex.exec(answerRaw)) !== null) {
+            images.push({
+              uid: Math.random().toString(36).substring(7),
+              name: 'image.jpg',
+              status: 'done',
+              url: match[1],
+              isExisting: true
+            });
+          }
+          
+          const cleanAnswer = answerRaw.replace(/!\[.*?\]\((.*?)\)/g, '').trim();
+
+          return {
+            question: parts[0],
+            answer: cleanAnswer,
+            images: images
+          }
+        }
+        return { question: '', answer: raw, images: [] }
+      });
+    }
+
     editForm.setFieldsValue({
       title: record.title,
       agent: record.agent,
-      content: record.content
+      content: record.content,
+      qa_list: qa_list.length > 0 ? qa_list : [{ question: '', answer: '' }]
     })
     setIsEditModalVisible(true)
   }
@@ -258,6 +297,41 @@ export default function AiKnowledgeBase() {
   const handleSaveEdit = async (values) => {
     setEditSubmitting(true)
     try {
+      if (currentDoc.doc_type === 'qa' && values.qa_list) {
+        let uploadedQaList = [];
+        for (const qa of (values.qa_list || [])) {
+          let answerText = qa.answer || '';
+          
+          if (qa.images && qa.images.length > 0) {
+            for (const fileItem of qa.images) {
+              if (fileItem.isExisting && fileItem.url) {
+                answerText += `\n\n![${fileItem.name || 'image'}](${fileItem.url})`;
+              } else {
+                const file = fileItem.originFileObj;
+                if (file) {
+                  const uploadFormData = new FormData();
+                  uploadFormData.append('file', file);
+                  try {
+                    const uploadRes = await api.post('core/upload/', uploadFormData, {
+                      headers: { 'Content-Type': 'multipart/form-data' }
+                    });
+                    if (uploadRes.data?.url) {
+                      answerText += `\n\n![${file.name}](${uploadRes.data.url})`;
+                    }
+                  } catch (err) {
+                    console.error("Lỗi khi tải ảnh Hỏi-Đáp:", err);
+                    message.error(`Không thể tải lên ảnh: ${file.name}`);
+                  }
+                }
+              }
+            }
+          }
+          uploadedQaList.push({ question: qa.question, answer: answerText });
+        }
+        values.content = uploadedQaList.map(qa => `Hỏi: ${qa.question}\nĐáp: ${qa.answer}`).join('\n\n') || '';
+        delete values.qa_list;
+      }
+
       if (currentDoc.isGroup) {
         await Promise.all(currentDoc.children.map(c => api.patch(`/ai_agents/knowledge/${c.id}/`, values)))
       } else {
@@ -309,11 +383,39 @@ export default function AiKnowledgeBase() {
         })
         await Promise.all(promises)
       } else if (values.doc_type === 'qa') {
+        let uploadedQaList = [];
+        
+        for (const qa of (values.qa_list || [])) {
+          let answerText = qa.answer || '';
+          
+          if (qa.images && qa.images.length > 0) {
+            for (const fileItem of qa.images) {
+              const file = fileItem.originFileObj;
+              if (file) {
+                const uploadFormData = new FormData();
+                uploadFormData.append('file', file);
+                try {
+                  const uploadRes = await api.post('core/upload/', uploadFormData, {
+                    headers: { 'Content-Type': 'multipart/form-data' }
+                  });
+                  if (uploadRes.data?.url) {
+                    answerText += `\n\n![${file.name}](${uploadRes.data.url})`;
+                  }
+                } catch (err) {
+                  console.error("Lỗi khi tải ảnh Hỏi-Đáp:", err);
+                  message.error(`Không thể tải lên ảnh: ${file.name}`);
+                }
+              }
+            }
+          }
+          uploadedQaList.push({ question: qa.question, answer: answerText });
+        }
+
         const formData = new FormData()
         formData.append('title', values.title)
         formData.append('agent', values.agent)
         formData.append('doc_type', values.doc_type)
-        const qaContent = values.qa_list?.map(qa => `Hỏi: ${qa.question}\nĐáp: ${qa.answer}`).join('\n\n') || ''
+        const qaContent = uploadedQaList.map(qa => `Hỏi: ${qa.question}\nĐáp: ${qa.answer}`).join('\n\n') || ''
         formData.append('content', qaContent)
         await api.post('/ai_agents/knowledge/', formData, {
           headers: { 'Content-Type': 'multipart/form-data' }
@@ -1037,6 +1139,25 @@ export default function AiKnowledgeBase() {
                           >
                             <Input.TextArea autoSize={{ minRows: 2, maxRows: 6 }} placeholder="Câu trả lời (Ví dụ: Dạ bên em có giao hàng chủ nhật ạ)" />
                           </Form.Item>
+                          <Form.Item
+                            {...restField}
+                            name={[name, 'images']}
+                            valuePropName="fileList"
+                            getValueFromEvent={(e) => Array.isArray(e) ? e : e?.fileList}
+                            style={{ marginBottom: 0, marginTop: 12 }}
+                          >
+                            <Upload
+                              listType="picture-card"
+                              multiple
+                              beforeUpload={() => false}
+                              accept="image/*"
+                            >
+                              <div>
+                                <PlusOutlined />
+                                <div style={{ marginTop: 8 }}>Thêm ảnh</div>
+                              </div>
+                            </Upload>
+                          </Form.Item>
                         </Col>
                         <Col span={2} style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                           <Button type="text" danger icon={<MinusCircleOutlined />} onClick={() => remove(name)} />
@@ -1164,16 +1285,76 @@ export default function AiKnowledgeBase() {
             </Radio.Group>
           </Form.Item>
 
-          {(currentDoc?.doc_type === 'qa' || currentDoc?.doc_type === 'image') && (
+          {(currentDoc?.doc_type === 'qa') ? (
+            <Form.List name="qa_list">
+              {(fields, { add, remove }) => (
+                <>
+                  <div style={{ marginBottom: 8 }}>
+                    <Text strong>Nội dung Kiến thức (Hỏi & Đáp)</Text>
+                  </div>
+                  {fields.map(({ key, name, ...restField }) => (
+                    <Card size="small" key={key} style={{ marginBottom: 12, background: '#fafafa', borderRadius: 8 }}>
+                      <Row gutter={12}>
+                        <Col span={22}>
+                          <Form.Item
+                            {...restField}
+                            name={[name, 'question']}
+                            rules={[{ required: true, message: 'Nhập câu hỏi' }]}
+                            style={{ marginBottom: 12 }}
+                          >
+                            <Input placeholder="Câu hỏi (Ví dụ: Shop có giao hàng chủ nhật không?)" prefix={<QuestionCircleOutlined style={{ color: '#1677ff', marginRight: 4 }} />} />
+                          </Form.Item>
+                          <Form.Item
+                            {...restField}
+                            name={[name, 'answer']}
+                            rules={[{ required: true, message: 'Nhập câu trả lời' }]}
+                            style={{ marginBottom: 0 }}
+                          >
+                            <Input.TextArea autoSize={{ minRows: 2, maxRows: 6 }} placeholder="Câu trả lời (có thể chứa link ảnh cũ)" />
+                          </Form.Item>
+                          <Form.Item
+                            {...restField}
+                            name={[name, 'images']}
+                            valuePropName="fileList"
+                            getValueFromEvent={(e) => Array.isArray(e) ? e : e?.fileList}
+                            style={{ marginBottom: 0, marginTop: 12 }}
+                          >
+                            <Upload
+                              listType="picture-card"
+                              multiple
+                              beforeUpload={() => false}
+                              accept="image/*"
+                            >
+                              <div>
+                                <PlusOutlined />
+                                <div style={{ marginTop: 8 }}>Thêm ảnh mới</div>
+                              </div>
+                            </Upload>
+                          </Form.Item>
+                        </Col>
+                        <Col span={2} style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                          <Button type="text" danger icon={<MinusCircleOutlined />} onClick={() => remove(name)} />
+                        </Col>
+                      </Row>
+                    </Card>
+                  ))}
+                  <Form.Item>
+                    <Button type="dashed" onClick={() => add()} block icon={<PlusOutlined />}>
+                      Thêm bộ Hỏi - Đáp mới
+                    </Button>
+                  </Form.Item>
+                </>
+              )}
+            </Form.List>
+          ) : (currentDoc?.doc_type === 'image') ? (
             <Form.Item
               name="content"
               label="Nội dung / Mô tả Kiến thức"
-              rules={[{ required: currentDoc?.doc_type === 'qa', message: 'Vui lòng nhập nội dung' }]}
               extra="Lưu ý: Thay đổi nội dung sẽ yêu cầu AI phải học lại từ đầu."
             >
               <Input.TextArea rows={6} />
             </Form.Item>
-          )}
+          ) : null}
 
           <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 24 }}>
             <Space>

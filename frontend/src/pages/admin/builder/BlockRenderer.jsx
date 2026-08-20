@@ -180,13 +180,13 @@ export default function BlockRenderer({ block, allBlocks, isActive, onSelect, on
                   {(block.props.columns || []).map(col => {
                     const colId = typeof col === 'object' ? col.id : col;
                     const colTitle = typeof col === 'object' ? col.title : null;
-                    if (colId === 'stt') return <th key="stt" style={{ ...thStyle, color: clr, width: 40 }}>STT</th>;
-                    if (colId === 'name') return <th key="name" style={{...thStyle, width: 200, textAlign: 'left'}}>{isService ? 'Tên dịch vụ / chi phí' : 'Tên hàng hóa / Dịch vụ'}</th>;
-                    if (colId === 'symbol') return <th key="symbol" style={{...thStyle, width: 80}}>Ký hiệu</th>;
-                    if (colId === 'specs') return <th key="specs" style={{...thStyle, width: 150, textAlign: 'left'}}>{isService ? 'Ghi chú kỹ thuật' : 'Quy cách kỹ thuật'}</th>;
+                    if (colId === 'stt') return <th key="stt" style={{ ...thStyle, color: clr, width: 40 }}>{colTitle || 'STT'}</th>;
+                    if (colId === 'name') return <th key="name" style={{...thStyle, width: 200, textAlign: 'left'}}>{colTitle || (isService ? 'Tên dịch vụ / chi phí' : 'Tên hàng hóa / Dịch vụ')}</th>;
+                    if (colId === 'symbol') return <th key="symbol" style={{...thStyle, width: 80}}>{colTitle || 'Ký hiệu'}</th>;
+                    if (colId === 'specs') return <th key="specs" style={{...thStyle, width: 150, textAlign: 'left'}}>{colTitle || (isService ? 'Ghi chú kỹ thuật' : 'Quy cách kỹ thuật')}</th>;
                     if (colId === 'dimensions') return (
                       <th key="dimensions" style={{...thStyle, padding: 0, width: dimensionFields.reduce((s, f) => s + (f.width || 85), 0)}}>
-                        <div style={{ borderBottom: useComplexDimensions ? '1px solid #e2e8f0' : 'none', padding: '4px 6px' }}>Kích thước (mm)</div>
+                        <div style={{ borderBottom: useComplexDimensions ? '1px solid #e2e8f0' : 'none', padding: '4px 6px' }}>{colTitle || 'Kích thước (mm)'}</div>
                         {useComplexDimensions && (
                           <div style={{ display: 'flex' }}>
                             {dimensionFields.map((f, fi) => (
@@ -196,11 +196,11 @@ export default function BlockRenderer({ block, allBlocks, isActive, onSelect, on
                         )}
                       </th>
                     );
-                    if (colId === 'note') return <th key="note" style={{...thStyle, width: 120, textAlign: 'left'}}>Ghi chú</th>;
-                    if (colId === 'unit') return <th key="unit" style={{...thStyle, width: 50}}>ĐVT</th>;
-                    if (colId === 'qty') return <th key="qty" style={{...thStyle, width: 50}}>SL</th>;
-                    if (colId === 'price') return <th key="price" style={{...thStyle, width: 90, textAlign: 'right'}}>Đơn giá</th>;
-                    if (colId === 'total') return <th key="total" style={{...thStyle, width: 100, textAlign: 'right'}}>Thành tiền</th>;
+                    if (colId === 'note') return <th key="note" style={{...thStyle, width: 120, textAlign: 'left'}}>{colTitle || 'Ghi chú'}</th>;
+                    if (colId === 'unit') return <th key="unit" style={{...thStyle, width: 50}}>{colTitle || 'ĐVT'}</th>;
+                    if (colId === 'qty') return <th key="qty" style={{...thStyle, width: 50}}>{colTitle || 'SL'}</th>;
+                    if (colId === 'price') return <th key="price" style={{...thStyle, width: 90, textAlign: 'right'}}>{colTitle || 'Đơn giá'}</th>;
+                    if (colId === 'total') return <th key="total" style={{...thStyle, width: 100, textAlign: 'right'}}>{colTitle || 'Thành tiền'}</th>;
                     
                     if (colId.startsWith('custom_')) {
                       return <th key={colId} style={{...thStyle, width: 100}}>{colTitle || 'Cột tuỳ chỉnh'}</th>;

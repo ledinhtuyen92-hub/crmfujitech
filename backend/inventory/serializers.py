@@ -10,7 +10,7 @@ from sales.serializers import get_company_info_dict
 class ProductCategorySerializer(serializers.ModelSerializer):
     class Meta:
         model = ProductCategory
-        fields = ["id", "company", "name", "description"]
+        fields = ["id", "company", "name", "description", "category_type"]
         read_only_fields = ["id", "company"]
 
 

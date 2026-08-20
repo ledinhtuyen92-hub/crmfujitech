@@ -15,6 +15,19 @@ class ProductCategory(models.Model):
         blank=True,
         verbose_name="Mô tả",
     )
+    
+    TYPE_PRODUCT = "product"
+    TYPE_SERVICE = "service"
+    TYPE_CHOICES = [
+        (TYPE_PRODUCT, "Hàng hóa"),
+        (TYPE_SERVICE, "Dịch vụ"),
+    ]
+    category_type = models.CharField(
+        max_length=20,
+        choices=TYPE_CHOICES,
+        default=TYPE_PRODUCT,
+        verbose_name="Phân loại",
+    )
 
     class Meta:
         verbose_name = "Loại sản phẩm"
