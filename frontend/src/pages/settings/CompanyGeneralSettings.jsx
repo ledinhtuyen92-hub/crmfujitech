@@ -813,9 +813,9 @@ export default function CompanyGeneralSettings() {
                     director_title: companyInfo?.director_title || 'Giám đốc'
                   },
                   items: [
-                    { id: 1, product: 'Sản phẩm 1', unit: 'Cái', quantity: 10, unit_price: 150000, discount_percent: 0, line_total: 1500000 },
-                    { id: 2, product: 'Sản phẩm 2', unit: 'Bộ', quantity: 5, unit_price: 300000, discount_percent: 10, line_total: 1350000 },
-                    { id: 3, product: 'Sản phẩm 3', unit: 'Chiếc', quantity: 2, unit_price: 500000, discount_percent: 0, line_total: 1000000 },
+                    { id: 1, product: 'Sản phẩm Demo 1', unit: 'Bộ', quantity: 2, unit_price: 1500000, discount_percent: 0, line_total: 3000000, item_type: 'product', height: 2200, width: 900, thickness: 45, symbol: 'D1', note: 'Kính trắng 8mm cường lực', custom_data: { custom_1786962666909: 'Màu vân gỗ' } },
+                    { id: 2, product: 'Sản phẩm Demo 2', unit: 'Bộ', quantity: 1, unit_price: 3500000, discount_percent: 10, line_total: 3150000, item_type: 'product', height: 2400, width: 1200, thickness: 50, symbol: 'D2', note: 'Phụ kiện đồng bộ', custom_data: { custom_1786962666909: 'Màu trắng sứ' } },
+                    { id: 3, product: 'Dịch vụ thi công lắp đặt', unit: 'Gói', quantity: 1, unit_price: 500000, discount_percent: 0, line_total: 500000, item_type: 'service', symbol: 'SV1', specs: 'Bao gồm vật tư phụ', note: 'Thi công trong ngày' },
                   ],
                   totals: {
                     subtotal: 3850000,

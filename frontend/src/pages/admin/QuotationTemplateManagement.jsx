@@ -136,7 +136,11 @@ export default function QuotationTemplateManagement() {
             {record.is_system_template ? (
               <Tag color="volcano" style={{ margin: 0 }}>Mẫu Hệ Thống</Tag>
             ) : (
-              <Tag color="cyan" style={{ margin: 0 }}>Mẫu Của Bạn</Tag>
+              <Tag color="cyan" style={{ margin: 0 }}>
+                {isSystemPlatformAdmin && record.company_info?.name 
+                  ? record.company_info.name 
+                  : 'Mẫu Của Bạn'}
+              </Tag>
             )}
             {record.is_default && <Tag color="blue" style={{ margin: 0 }}>Mặc định</Tag>}
             {!record.is_active && <Tag color="default" style={{ margin: 0 }}>Đã ẩn</Tag>}
@@ -258,12 +262,14 @@ export default function QuotationTemplateManagement() {
                   customer: { name: 'CÔNG TY KHÁCH HÀNG', phone: '0912345678', address: 'Tòa nhà văn phòng XYZ', tax_code: '0109999999' },
                   company: { name: 'CÔNG TY CỦA BẠN', phone: '0912345678', address: 'Hà Nội', tax_code: '0101234567' },
                   items: [
-                    { product_name: 'Sản phẩm demo A', spec: 'Mô tả sản phẩm demo', width: 900, height: 2200, thickness: 45, symbol: 'D1', note: 'Khung ngoại 45x110', unit: 'Bộ', quantity: 2, unit_price: 1250000, total_price: 2500000, custom_data: { custom_1: 'Dữ liệu mẫu' } }
+                    { id: 1, product: 'Sản phẩm Demo 1', unit: 'Bộ', quantity: 2, unit_price: 1500000, discount_percent: 0, line_total: 3000000, item_type: 'product', height: 2200, width: 900, thickness: 45, symbol: 'D1', note: 'Kính trắng 8mm cường lực', custom_data: { custom_1786962666909: 'Màu vân gỗ' } },
+                    { id: 2, product: 'Sản phẩm Demo 2', unit: 'Bộ', quantity: 1, unit_price: 3500000, discount_percent: 10, line_total: 3150000, item_type: 'product', height: 2400, width: 1200, thickness: 50, symbol: 'D2', note: 'Phụ kiện đồng bộ', custom_data: { custom_1786962666909: 'Màu trắng sứ' } },
+                    { id: 3, product: 'Dịch vụ thi công lắp đặt', unit: 'Gói', quantity: 1, unit_price: 500000, discount_percent: 0, line_total: 500000, item_type: 'service', symbol: 'SV1', specs: 'Bao gồm vật tư phụ', note: 'Thi công trong ngày' },
                   ],
-                  totals: { subtotal: 2500000, discount: 50000, tax_percent: 10, tax: 250000, shipping_fee: 50000, installation_fee: 100000, total: 2850000 },
+                  totals: { subtotal: 6650000, discount: 50000, tax_percent: 10, tax: 665000, shipping_fee: 50000, installation_fee: 100000, total: 7415000 },
                   payment_terms_schedule: [ { title: 'Tạm ứng', percentage: 50 }, { title: 'Thanh toán', percentage: 50 } ],
                   paid_amount: 0,
-                  total_amount: 2850000
+                  total_amount: 7415000
                 }}
               />
             </div>
