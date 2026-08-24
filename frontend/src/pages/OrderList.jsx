@@ -47,6 +47,41 @@ import CustomInfoInput from '../components/CustomInfoInput'
 
 const getProductDisplayName = (p) => p.sku ? `[${p.sku}] ${p.name}` : p.name;
 
+const groupProducts = (items, withUnit = false) => {
+  const grouped = {};
+  const ungrouped = [];
+  items.forEach(p => {
+    const displayName = getProductDisplayName(p);
+    const label = withUnit ? `${displayName} (${p.unit || 'cái'})` : displayName;
+    const option = { label, value: displayName };
+    if (p.category_name) {
+      if (!grouped[p.category_name]) grouped[p.category_name] = [];
+      grouped[p.category_name].push(option);
+    } else {
+      ungrouped.push(option);
+    }
+  });
+  const res = Object.keys(grouped).map(cat => ({
+    label: (
+      <span style={{ fontWeight: 'bold', color: '#1677ff' }}>
+        {cat}
+      </span>
+    ),
+    options: grouped[cat]
+  }));
+  if (ungrouped.length > 0) {
+    res.push({
+      label: (
+        <span style={{ fontWeight: 'bold', color: '#1677ff' }}>
+          Khác
+        </span>
+      ),
+      options: ungrouped
+    });
+  }
+  return res;
+};
+
 const { Title, Text, Paragraph } = Typography
 const { Option } = Select
 const { TextArea } = Input
@@ -877,11 +912,8 @@ export default function OrderList() {
                           handleLineChange(idx, 'product_name', v);
                         }
                       }}
-                      options={products.filter(p => p.product_type !== 'service').map(p => {
-                          const displayName = getProductDisplayName(p);
-                          return { value: displayName, label: `${displayName} (${p.unit || 'cái'})` };
-                        })}
-                      filterOption={(inputValue, option) => option.value.toUpperCase().indexOf(inputValue.toUpperCase()) !== -1}
+                      options={groupProducts(products.filter(p => p.product_type !== 'service'), true)}
+                      filterOption={(inputValue, option) => (option?.value || '').toUpperCase().includes(inputValue.toUpperCase())}
                       placeholder="Chọn hoặc nhập mẫu cửa..."
                     />
                     {enableProductImage && (
@@ -1104,11 +1136,8 @@ export default function OrderList() {
                         handleLineChange(idx, 'product_name', v);
                       }
                     }}
-                    options={products.filter(p => p.product_type !== 'service').map(p => {
-                          const displayName = getProductDisplayName(p);
-                          return { value: displayName, label: `${displayName} (${p.unit || 'cái'})` };
-                        })}
-                    filterOption={(inputValue, option) => option.value.toUpperCase().indexOf(inputValue.toUpperCase()) !== -1}
+                    options={groupProducts(products.filter(p => p.product_type !== 'service'), true)}
+                    filterOption={(inputValue, option) => (option?.value || '').toUpperCase().includes(inputValue.toUpperCase())}
                     placeholder="Chọn hoặc nhập sản phẩm..."
                   />
                   {enableProductImage && (
@@ -1329,12 +1358,12 @@ export default function OrderList() {
               dataIndex: child.id,
               width: 100,
               render: (val, record, idx) => (
-                <Input 
+                <CustomInfoInput 
                   placeholder={`Nhập ${child.title.toLowerCase()}...`}
                   value={record.custom_data?.[child.id] || ''} 
-                  onChange={(e) => {
+                  onChange={(v) => {
                     const newData = { ...(record.custom_data || {}) };
-                    newData[child.id] = e.target.value;
+                    newData[child.id] = v;
                     handleLineChange(idx, 'custom_data', newData);
                   }} 
                 />
@@ -1347,12 +1376,12 @@ export default function OrderList() {
             dataIndex: col.id,
             width: 140,
             render: (val, record, idx) => (
-              <Input 
+              <CustomInfoInput 
                 placeholder={`Nhập ${col.title.toLowerCase()}...`}
                 value={record.custom_data?.[col.id] || ''} 
-                onChange={(e) => {
+                onChange={(v) => {
                   const newData = { ...(record.custom_data || {}) };
-                  newData[col.id] = e.target.value;
+                  newData[col.id] = v;
                   handleLineChange(idx, 'custom_data', newData);
                 }} 
               />
@@ -1475,14 +1504,22 @@ export default function OrderList() {
 
     const applyColFeatures = (cols) => {
       return cols.map(col => {
+        const colId = getColId(col);
+        const colCfg = getColConfig(colId);
+        let finalTitle = col.title;
+        if (colCfg && colCfg.title) {
+          finalTitle = colCfg.title;
+        }
+
         if (col.children) {
-          return { ...col, children: applyColFeatures(col.children) };
+          return { ...col, title: finalTitle, children: applyColFeatures(col.children) };
         }
         const origRender = col.render;
-        if (!origRender) return col;
-        const colId = getColId(col);
+        if (!origRender) return { ...col, title: finalTitle };
+        
         return {
           ...col,
+          title: finalTitle,
           render: (val, record, idx) => {
             const { colSpan, isMergedRoot } = getMergeProps(colId, record);
             if (colSpan === 0) return { props: { colSpan: 0 } };
@@ -1599,11 +1636,8 @@ export default function OrderList() {
               style={{ flex: 1, minWidth: 150 }}
               value={text}
               onChange={(val) => handleServiceLineChange(index, 'product_name', val)}
-              options={products.filter(p => p.product_type === 'service').map(p => {
-                          const displayName = getProductDisplayName(p);
-                          return { value: displayName, label: displayName };
-                        })}
-              filterOption={(inputValue, option) => option.value.toUpperCase().indexOf(inputValue.toUpperCase()) !== -1}
+              options={groupProducts(products.filter(p => p.product_type === 'service'))}
+              filterOption={(inputValue, option) => (option?.value || '').toUpperCase().includes(inputValue.toUpperCase())}
               placeholder="Chọn hoặc nhập tên dịch vụ"
             />
             {enableServiceImage && (
@@ -1734,7 +1768,32 @@ export default function OrderList() {
       }
     )
 
-    return baseCols
+    const getColId = (col) => col.key || col.dataIndex;
+    const getColConfig = (colId) => {
+      let found = null;
+      for (const c of (serviceBlock?.props?.columns || [])) {
+        if (typeof c === 'object') {
+          if (c.id === colId) { found = c; break; }
+        } else if (c === colId) {
+          found = { id: c }; break;
+        }
+      }
+      return found || {};
+    };
+
+    const applyServiceColFeatures = (cols) => {
+      return cols.map(col => {
+        const colId = getColId(col);
+        const colCfg = getColConfig(colId);
+        let finalTitle = col.title;
+        if (colCfg && colCfg.title) {
+          finalTitle = colCfg.title;
+        }
+        return { ...col, title: finalTitle };
+      });
+    };
+
+    return applyServiceColFeatures(baseCols)
   }
 
   const handleAddServiceLine = () => {

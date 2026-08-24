@@ -57,9 +57,11 @@ export default function CustomInfoInput({ value, onChange, placeholder, style })
       onChange={onChange}
       options={options}
       placeholder={placeholder || "Thêm thông tin..."}
-      filterOption={(inputValue, option) =>
-        option.value.toUpperCase().indexOf(inputValue.toUpperCase()) !== -1
-      }
+      filterOption={(inputValue, option) => {
+        if (!inputValue) return true;
+        return (option?.value || '').toUpperCase().includes((inputValue || '').toUpperCase());
+      }}
+      defaultActiveFirstOption={false}
       notFoundContent={
         <div style={{ padding: 8, textAlign: 'center', color: '#999' }}>
           Không có mẫu nào khớp
@@ -79,11 +81,11 @@ export default function CustomInfoInput({ value, onChange, placeholder, style })
                 if (value) {
                   addTemplate(value);
                 } else {
-                  message.warning('Vui lòng gõ nội dung vào ô trước khi lưu mẫu!');
+                  message.warning('Vui lòng nhập nội dung trước khi lưu');
                 }
               }}
             >
-              Lưu mẫu
+              + Lưu mẫu
             </Button>
           </div>
         </>

@@ -84,9 +84,22 @@ def call_openai(api_key, agent, system_prompt, conversation_history):
             content = []
             if msg.get('content'):
                 content.append({"type": "text", "text": msg['content']})
+                
+            import requests
+            import base64
+            img_url_payload = {"url": msg['image_url']}
+            try:
+                resp = requests.get(msg['image_url'], timeout=10)
+                if resp.status_code == 200:
+                    mime_type = resp.headers.get('content-type', 'image/jpeg')
+                    b64 = base64.b64encode(resp.content).decode('utf-8')
+                    img_url_payload = {"url": f"data:{mime_type};base64,{b64}"}
+            except Exception as e:
+                logger.error(f"OpenAI image download error: {e}")
+                
             content.append({
                 "type": "image_url",
-                "image_url": {"url": msg['image_url']}
+                "image_url": img_url_payload
             })
             messages.append({'role': msg['role'], 'content': content})
         else:
@@ -232,12 +245,24 @@ def generate_image_description(image_url: str, api_keys, provider: str = 'gemini
                 return ""
             elif provider == 'openai':
                 client = OpenAI(api_key=api_key)
+                
+                img_url_payload = {"url": image_url}
+                try:
+                    resp = requests.get(image_url, timeout=10)
+                    if resp.status_code == 200:
+                        mime_type = resp.headers.get('content-type', 'image/jpeg')
+                        import base64
+                        b64 = base64.b64encode(resp.content).decode('utf-8')
+                        img_url_payload = {"url": f"data:{mime_type};base64,{b64}"}
+                except Exception as e:
+                    logger.error(f"OpenAI image download error: {e}")
+
                 response = client.chat.completions.create(
                     model=model_name,
                     messages=[
                         {'role': 'system', 'content': system_prompt},
                         {'role': 'user', 'content': [
-                            {"type": "image_url", "image_url": {"url": image_url}}
+                            {"type": "image_url", "image_url": img_url_payload}
                         ]}
                     ],
                     max_tokens=200

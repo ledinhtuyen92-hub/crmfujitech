@@ -211,8 +211,13 @@ class UserSerializer(serializers.ModelSerializer):
         return get_default_pipeline_labels()
 
     def get_custom_info_templates(self, obj):
-        if obj.company and hasattr(obj.company, 'settings') and obj.company.settings.custom_info_templates:
-            return obj.company.settings.custom_info_templates
+        if obj.company_id:
+            from users.models import CompanySettings
+            try:
+                settings = CompanySettings.objects.only('custom_info_templates').get(company_id=obj.company_id)
+                return settings.custom_info_templates or []
+            except CompanySettings.DoesNotExist:
+                return []
         return []
 
     def get_managed_department_ids(self, obj):

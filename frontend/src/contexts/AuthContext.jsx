@@ -143,8 +143,13 @@ export function AuthProvider({ children }) {
       },
       patchCompanySettings: async (payload) => {
         const { data } = await api.patch('users/company-settings/', payload)
-        const { data: userData } = await api.get('users/me/')
-        setUser(userData)
+        // Immediately update user state with fresh data from PATCH response
+        // (Django may cache company.settings so GET /me/ can return stale data)
+        if (data.custom_info_templates !== undefined) {
+          setUser(prev => ({ ...prev, custom_info_templates: data.custom_info_templates }))
+        }
+        // Also refresh full user in background for consistency
+        api.get('users/me/').then(({ data: userData }) => setUser(userData)).catch(() => {})
         return data
       },
       refreshSettings: fetchPublicSettings,

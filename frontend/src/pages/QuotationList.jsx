@@ -1954,12 +1954,12 @@ export default function QuotationList() {
               id: child.id,
               width: 100,
               render: (val, record, idx) => (
-                <Input 
+                <CustomInfoInput 
                   placeholder={`Nhập ${child.title.toLowerCase()}...`}
                   value={record.custom_data?.[child.id] || ''} 
-                  onChange={(e) => {
+                  onChange={(v) => {
                     const newData = { ...(record.custom_data || {}) };
-                    newData[child.id] = e.target.value;
+                    newData[child.id] = v;
                     handleLineChange(idx, 'custom_data', newData);
                   }} 
                 />
@@ -1974,12 +1974,12 @@ export default function QuotationList() {
             id: col.id,
             width: 140,
             render: (val, record, idx) => (
-              <Input 
+              <CustomInfoInput 
                 placeholder={`Nhập ${col.title.toLowerCase()}...`}
                 value={record.custom_data?.[col.id] || ''} 
-                onChange={(e) => {
+                onChange={(v) => {
                   const newData = { ...(record.custom_data || {}) };
-                  newData[col.id] = e.target.value;
+                  newData[col.id] = v;
                   handleLineChange(idx, 'custom_data', newData);
                 }} 
               />
