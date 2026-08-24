@@ -538,8 +538,9 @@ def process_fb_webhook_message(entry: dict):
             att_type = att.get("type", "")
             att_url = att.get("payload", {}).get("url", "")
 
+        msg_created = False
         if msg_id:
-            FacebookMessage.objects.get_or_create(
+            _, msg_created = FacebookMessage.objects.get_or_create(
                 fb_message_id=msg_id,
                 defaults={
                     "lead": lead,
@@ -549,6 +550,15 @@ def process_fb_webhook_message(entry: dict):
                     "attachment_type": att_type,
                 }
             )
+        else:
+            FacebookMessage.objects.create(
+                lead=lead,
+                sender_type=sender_type,
+                text=msg_text,
+                attachment_url=att_url,
+                attachment_type=att_type,
+            )
+            msg_created = True
 
         # Phát hiện SĐT trong tin nhắn của khách (luồng Hybrid 2 bước)
         if msg_text and sender_type == "customer":
@@ -583,9 +593,8 @@ def process_fb_webhook_message(entry: dict):
                 extract_and_process_phone_fb_regex(lead, msg_text)
 
         # Trigger AI chỉ khi page_config bật AI VÀ hội thoại này chưa bị Sale tiếp quản.
-        # is_ai_active đã được refresh từ DB ở bước phát hiện SĐT bên trên (nếu có msg_text).
-        # Nếu không có msg_text, cần refresh riêng để tránh đọc giá trị cũ từ memory.
-        if sender_type == "customer" and lead.page_config and lead.page_config.is_ai_active and lead.page_config.ai_agent_id:
+        # Đồng thời chỉ trigger khi msg_created = True để tránh gửi 2 lần khi webhook retry.
+        if msg_created and sender_type == "customer" and lead.page_config and lead.page_config.is_ai_active and lead.page_config.ai_agent_id:
             if msg_text is None:
                 lead.refresh_from_db(fields=['is_ai_active'])
             if lead.is_ai_active:

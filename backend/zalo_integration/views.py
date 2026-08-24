@@ -200,11 +200,10 @@ class ZaloWebhookView(APIView):
                 # để đảm bảo tự động tạo KH CRM ngay lập tức
                 extract_and_process_phone_regex(social_lead, message_text)
 
-        # Lưu vào ZaloMessage
+        # Lưu vào ZaloMessage — dùng get_or_create để chống duplicate khi Zalo retry webhook
         from .models import ZaloMessage
         
         message_id = data.get("message", {}).get("msg_id", "")
-        # Zalo webhook gửi text ở 'text', và attachments ở 'attachments'
         attachments = data.get("message", {}).get("attachments", [])
         attachment_url = ""
         attachment_type = ""
@@ -212,32 +211,40 @@ class ZaloWebhookView(APIView):
         if attachments and len(attachments) > 0:
             att = attachments[0]
             attachment_type = att.get("type", "")
-            if attachment_type == "image":
-                attachment_url = att.get("payload", {}).get("url", "")
-            elif attachment_type == "file":
-                attachment_url = att.get("payload", {}).get("url", "")
-            elif attachment_type == "audio":
+            if attachment_type in ("image", "file", "audio"):
                 attachment_url = att.get("payload", {}).get("url", "")
 
-        ZaloMessage.objects.create(
-            company=company,
-            social_lead=social_lead,
-            direction=ZaloMessage.DIRECTION_INBOUND,
-            content=message_text,
-            attachment_url=attachment_url,
-            attachment_type=attachment_type,
-            zalo_msg_id=message_id,
-        )
+        msg_created = False
+        if message_id:
+            _, msg_created = ZaloMessage.objects.get_or_create(
+                zalo_msg_id=message_id,
+                defaults={
+                    "company": company,
+                    "social_lead": social_lead,
+                    "direction": ZaloMessage.DIRECTION_INBOUND,
+                    "content": message_text,
+                    "attachment_url": attachment_url,
+                    "attachment_type": attachment_type,
+                }
+            )
+        else:
+            # Không có msg_id (hiếm) → tạo mới luôn
+            ZaloMessage.objects.create(
+                company=company,
+                social_lead=social_lead,
+                direction=ZaloMessage.DIRECTION_INBOUND,
+                content=message_text,
+                attachment_url=attachment_url,
+                attachment_type=attachment_type,
+            )
+            msg_created = True
 
         # Push realtime notification cho nhân viên phụ trách
         if social_lead.assigned_to:
             self._push_notification(social_lead, message_text)
 
-        # Trigger AI
-        # BUG FIX: Dùng conversation_ai_active đã được refresh từ DB ở bước phát hiện SĐT.
-        # Nếu không có message_text (tin nhắn ảnh/file thuần), cần refresh riêng để
-        # tránh đọc giá trị cũ từ memory khi Sale đã tắt AI cho hội thoại này.
-        if social_lead.oa_config and social_lead.oa_config.is_ai_active and social_lead.oa_config.ai_agent_id:
+        # Trigger AI — chỉ khi tin nhắn mới (msg_created=True), tránh trigger lại khi Zalo retry
+        if msg_created and social_lead.oa_config and social_lead.oa_config.is_ai_active and social_lead.oa_config.ai_agent_id:
             if not message_text:
                 social_lead.refresh_from_db(fields=['is_ai_active'])
             if social_lead.is_ai_active:

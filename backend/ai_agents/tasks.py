@@ -560,34 +560,48 @@ def ai_drip_followup():
     
     for agent in agents:
         hours = agent.drip_followup_hours or 24
-        cutoff_start = now - timedelta(hours=hours + 1)
-        cutoff_end = now - timedelta(hours=hours)
+        cutoff_end   = now - timedelta(hours=hours)        # Quá giờ cài đặt
+        cutoff_start = now - timedelta(hours=hours, minutes=15)  # Tránh gửi lại nếu task chạy trễ
         
-        # 1. Quét Zalo
+        # 1. Quét Zalo — khách chưa phản hồi (có thể Sale đang tiếp quản)
         zalo_leads = ZaloLead.objects.filter(
             is_customer_converted=False,
             has_ai_followed_up=False,
             has_unread_message=False,
             oa_config__ai_agent=agent,
-            last_interaction_date__gte=cutoff_start,
-            last_interaction_date__lte=cutoff_end
+            last_interaction_date__lte=cutoff_end,    # Quá giờ cài đặt
+            last_interaction_date__gte=cutoff_start,  # Trong cửa sổ 15 phút gần nhất
         )
         
         for lead in zalo_leads:
+            # FIX: Kiểm tra tin nhắn cuối cùng phải là của OA/AI/Sale, tức là khách KHÔNG trả lời lại
+            last_msg = ZaloMessage.objects.filter(
+                social_lead=lead
+            ).order_by('-created_at').first()
+            if not last_msg or last_msg.direction != ZaloMessage.DIRECTION_OUTBOUND:
+                logger.info(f"[AI FollowUp] Bỏ qua Zalo {lead.social_id}: tin cuối là của khách, không phải OA")
+                continue
             logger.info(f"[AI FollowUp] Trigger Zalo Follow-up cho {lead.social_id} sau {hours}h")
             trigger_zalo_ai(lead.id, is_followup=True)
 
-        # 2. Quét Facebook
+        # 2. Quét Facebook — khách chưa phản hồi (có thể Sale đang tiếp quản)
         fb_leads = FacebookLead.objects.filter(
             is_customer_converted=False,
             has_ai_followed_up=False,
             has_unread_message=False,
             page_config__ai_agent=agent,
-            last_message_at__gte=cutoff_start,
-            last_message_at__lte=cutoff_end
+            last_message_at__lte=cutoff_end,    # Quá giờ cài đặt
+            last_message_at__gte=cutoff_start,  # Trong cửa sổ 15 phút gần nhất
         )
 
         for lead in fb_leads:
+            # FIX: Kiểm tra tin nhắn cuối cùng phải là của Page/AI/Sale, tức là khách KHÔNG trả lời lại
+            last_msg = FacebookMessage.objects.filter(
+                lead=lead
+            ).order_by('-created_at').first()
+            if not last_msg or last_msg.sender_type == 'customer':
+                logger.info(f"[AI FollowUp] Bỏ qua Facebook {lead.fb_user_id}: tin cuối là của khách, không phải Page")
+                continue
             logger.info(f"[AI FollowUp] Trigger Facebook Follow-up cho {lead.fb_user_id} sau {hours}h")
             trigger_facebook_ai(lead.id, is_followup=True)
             
