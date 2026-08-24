@@ -1,7 +1,7 @@
 import { AlertOutlined, CheckCircleOutlined, ClockCircleOutlined, CloseCircleOutlined, DeleteOutlined, EditOutlined, FileDoneOutlined, FilePdfOutlined, FileTextOutlined, PlusOutlined, PrinterOutlined, SearchOutlined, SendOutlined, SettingOutlined, UserOutlined, CameraOutlined } from '@ant-design/icons'
 import { AutoComplete, Badge, Button, Card, Col, DatePicker, Divider, Drawer, Form, Input, InputNumber, Modal, Popconfirm, Row, Select, Space, Table, Tag, Tooltip, Typography, message, theme, Upload, Avatar, Image, List } from 'antd' 
 import dayjs from 'dayjs'
-import { useCallback, useEffect, useState } from 'react'
+import React, { useCallback, useEffect, useState } from 'react'
 import { useAuth } from '../contexts/AuthContext'
 import { useLocation } from 'react-router-dom'
 
@@ -2133,7 +2133,7 @@ export default function QuotationList() {
             
             if (isMergedRoot) {
               return {
-                children: <CustomInfoInput placeholder="Thêm thông tin..." value={record.custom_data?.custom_size_text || ''} onChange={(val) => {
+                children: <CustomInfoInput enableTemplate={colCfg?.enableTemplate !== false} placeholder="Thêm thông tin..." value={record.custom_data?.custom_size_text || ''} onChange={(val) => {
                   const currentData = record.custom_data || {};
                   handleLineChange(idx, 'custom_data', { ...currentData, custom_size_text: val });
                 }} />,
@@ -2150,10 +2150,12 @@ export default function QuotationList() {
               finalProps = { ...origResult.props, colSpan: (origResult.props?.colSpan !== undefined && origResult.props?.colSpan !== 1) ? origResult.props.colSpan : colSpan };
             }
 
+            if (React.isValidElement(innerChildren) && innerChildren.type === CustomInfoInput) {
+              innerChildren = React.cloneElement(innerChildren, { enableTemplate: colCfg?.enableTemplate !== false });
+            }
+
             // Image Upload Feature - only enable if explicitly set in column config (no legacy fallback)
-            const colCfg = getColConfig(colId);
-            const canUpload = colCfg.allowImageUpload === true;
-            
+            // colCfg và canUpload đã được khai báo ở outer scope (dòng 2107-2119), dùng trực tiếp
             if (canUpload && colId !== 'action' && colId !== 'name') { // Ensure not interfering with existing Product/Action logic
               const imgKey = colId === 'note' ? 'note_image' : `img_${colId}`;
               const imgUrl = record.custom_data?.[imgKey];

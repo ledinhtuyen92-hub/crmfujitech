@@ -78,6 +78,14 @@ function SortableItem({ col, onRemove, onAddChild, onRemoveChild, onUpdateCol, o
                   >
                     Cho phép tải ảnh đính kèm
                   </Checkbox>
+                  {(id.startsWith('custom_') || id.startsWith('group_') || id === 'note' || id === 'spec' || id === 'warranty' || id === 'symbol') && (
+                    <Checkbox 
+                      checked={col.enableTemplate !== false} 
+                      onChange={e => onUpdateCol(id, { enableTemplate: e.target.checked })}
+                    >
+                      Bật tính năng Gợi ý / Lưu mẫu chữ
+                    </Checkbox>
+                  )}
                 {/* Additional column settings can be added here */}
               </div>
             }
@@ -121,6 +129,14 @@ function SortableItem({ col, onRemove, onAddChild, onRemoveChild, onUpdateCol, o
                       >
                         Cho phép tải ảnh đính kèm
                       </Checkbox>
+                      {(child.id.startsWith('custom_') || child.id === 'note' || child.id === 'spec' || child.id === 'warranty' || child.id === 'symbol' || child.id === 'height' || child.id === 'width' || child.id === 'thickness') && (
+                        <Checkbox 
+                          checked={child.enableTemplate !== false} 
+                          onChange={e => onUpdateChild && onUpdateChild(id, child.id, { enableTemplate: e.target.checked })}
+                        >
+                          Bật tính năng Gợi ý / Lưu mẫu chữ
+                        </Checkbox>
+                      )}
                     </div>
                   }
                 >

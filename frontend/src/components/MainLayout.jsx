@@ -526,7 +526,7 @@ function MainLayout({ children, isDarkMode, toggleTheme }) {
   )
 
   return (
-    <Layout style={{ minHeight: '100vh', background: token.colorBgLayout }}>
+    <Layout style={{ minHeight: '100dvh', background: token.colorBgLayout }}>
       {isMobile ? (
         <Drawer
           placement="left"
@@ -550,7 +550,7 @@ function MainLayout({ children, isDarkMode, toggleTheme }) {
             style={{
               background: 'radial-gradient(circle at 50% 0%, rgba(14, 165, 233, 0.15) 0%, transparent 60%), linear-gradient(180deg, #0f172a 0%, #020617 100%)',
               boxShadow: '8px 0 24px rgba(15, 23, 42, 0.16)',
-              minHeight: '100vh',
+              minHeight: '100dvh',
               position: 'fixed',
               left: 0,
               top: 0,
@@ -866,7 +866,7 @@ function MainLayout({ children, isDarkMode, toggleTheme }) {
           style={{
             margin: '0',
             padding: location.pathname.includes('/inbox') ? 0 : '24px',
-            height: headerCollapsed ? '100vh' : 'calc(100vh - 80px)',
+            height: headerCollapsed ? '100dvh' : 'calc(100dvh - 80px)',
             display: 'flex',
             flexDirection: 'column',
             width: '100%',

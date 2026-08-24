@@ -1291,7 +1291,7 @@ export default function FacebookInboxPage() {
   }
 
   return (
-    <div style={{ height: '100%', display: 'flex', flexDirection: 'column', minWidth: 0, minHeight: 0 }}>
+    <div style={{ height: '100%', display: 'flex', flexDirection: 'column', minWidth: 0, minHeight: 0, flex: 1 }}>
       {/* Header */}
       {(!isMobile || !selectedLead) && (
       <div style={{ padding: '10px 16px', background: token.colorBgContainer, borderBottom: `1px solid ${token.colorBorderSecondary}`, display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', flexShrink: 0 }}>
@@ -1707,7 +1707,7 @@ export default function FacebookInboxPage() {
         {/* Left: Conversation List */}
         {/* Drag handle between filter sidebar and left column — unused, left col already flex */}
         {(!isMobile || !selectedLead) && (
-        <div style={{ width: isMobile ? '100%' : leftColWidth, flex: isMobile ? 1 : 'none', height: isMobile ? 'auto' : '100%', flexShrink: 0, display: 'flex', flexDirection: 'column', background: '#fff', minWidth: 0, borderRight: 'none' }}>
+        <div style={{ width: isMobile ? '100%' : leftColWidth, flex: isMobile ? 1 : 'none', height: isMobile ? 'auto' : '100%', flexShrink: isMobile ? 1 : 0, minHeight: 0, display: 'flex', flexDirection: 'column', background: '#fff', minWidth: 0, borderRight: 'none' }}>
           {/* Active Filter Banner */}
           {(replyFilter || sortBy || hasUnreadOnly || (phoneFilterMode !== 'all' && phoneFilterMode !== '') || hasPhoneOnly || statusFilter || isArchivedOnly || isStarredOnly || tagFilter !== 'all' || assignedToFilter !== 'all') && (
             <div style={{ padding: '6px 10px', background: '#f8fafc', borderBottom: '1px solid #e2e8f0', display: 'flex', alignItems: 'center', gap: 4, flexWrap: 'wrap' }}>

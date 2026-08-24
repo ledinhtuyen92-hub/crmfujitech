@@ -917,7 +917,7 @@ export default function ZaloInboxPage() {
   }
 
   return (
-    <div style={{ height: '100%', display: 'flex', flexDirection: 'column', minWidth: 0 }}>
+    <div style={{ height: '100%', display: 'flex', flexDirection: 'column', minWidth: 0, flex: 1, minHeight: 0 }}>
       {/* Header */}
       <div style={{ padding: '10px 16px', background: token.colorBgContainer, borderBottom: `1px solid ${token.colorBorderSecondary}`, display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
         <WechatOutlined style={{ fontSize: 22, color: '#0068ff' }} />
@@ -1231,7 +1231,7 @@ export default function ZaloInboxPage() {
 
         {/* Cột 2: Danh sách hội thoại */}
         {(!isMobile || !selectedLead) && (
-        <div style={{ width: isMobile ? '100%' : leftColWidth, flex: isMobile ? 1 : 'none', height: isMobile ? 'auto' : '100%', borderRight: isMobile ? 'none' : '1px solid #e5e7eb', display: 'flex', flexDirection: 'column', background: '#fff', flexShrink: 0 }}>
+        <div style={{ width: isMobile ? '100%' : leftColWidth, flex: isMobile ? 1 : 'none', height: isMobile ? 'auto' : '100%', borderRight: isMobile ? 'none' : '1px solid #e5e7eb', display: 'flex', flexDirection: 'column', background: '#fff', flexShrink: isMobile ? 1 : 0, minHeight: 0 }}>
           <div style={{ padding: '8px 12px', borderBottom: '1px solid #e5e7eb' }}>
             <Search
               placeholder="Tìm tên, tin nhắn..."

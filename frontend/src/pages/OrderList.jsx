@@ -35,7 +35,7 @@ import {
   Popover,
 } from 'antd' 
 import dayjs from 'dayjs'
-import { useCallback, useEffect, useState, useRef } from 'react'
+import React, { useCallback, useEffect, useState, useRef } from 'react'
 import { useLocation } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
 import api from '../utils/api'
@@ -1526,7 +1526,7 @@ export default function OrderList() {
             
             if (isMergedRoot) {
               return {
-                children: <CustomInfoInput placeholder="Thêm thông tin..." value={record.custom_data?.custom_size_text || ''} onChange={(val) => {
+                children: <CustomInfoInput enableTemplate={colCfg?.enableTemplate !== false} placeholder="Thêm thông tin..." value={record.custom_data?.custom_size_text || ''} onChange={(val) => {
                   const currentData = record.custom_data || {};
                   handleLineChange(idx, 'custom_data', { ...currentData, custom_size_text: val });
                 }} />,
@@ -1543,7 +1543,10 @@ export default function OrderList() {
               finalProps = { ...origResult.props, colSpan: (origResult.props?.colSpan !== undefined && origResult.props?.colSpan !== 1) ? origResult.props.colSpan : colSpan };
             }
 
-            const colCfg = getColConfig(colId);
+            if (React.isValidElement(innerChildren) && innerChildren.type === CustomInfoInput) {
+              innerChildren = React.cloneElement(innerChildren, { enableTemplate: colCfg?.enableTemplate !== false });
+            }
+
             const canUpload = colCfg.allowImageUpload === true;
             
             if (canUpload && colId !== 'action' && colId !== 'name' && colId !== 'note') {
@@ -1789,7 +1792,19 @@ export default function OrderList() {
         if (colCfg && colCfg.title) {
           finalTitle = colCfg.title;
         }
-        return { ...col, title: finalTitle };
+
+        const origRender = col.render;
+        return { 
+          ...col, 
+          title: finalTitle,
+          render: origRender ? (val, record, idx) => {
+            const origResult = origRender(val, record, idx);
+            if (React.isValidElement(origResult) && origResult.type === CustomInfoInput) {
+              return React.cloneElement(origResult, { enableTemplate: colCfg?.enableTemplate !== false });
+            }
+            return origResult;
+          } : undefined
+        };
       });
     };
 

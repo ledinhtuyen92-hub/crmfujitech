@@ -3,9 +3,20 @@ import { AutoComplete, Input, Button, message } from 'antd';
 import { PlusOutlined, DeleteOutlined } from '@ant-design/icons';
 import { useAuth } from '../contexts/AuthContext';
 
-export default function CustomInfoInput({ value, onChange, placeholder, style }) {
+export default function CustomInfoInput({ value, onChange, placeholder, style, enableTemplate = true }) {
   const { user, patchCompanySettings } = useAuth();
   const [adding, setAdding] = useState(false);
+
+  if (enableTemplate === false) {
+    return (
+      <Input
+        placeholder={placeholder}
+        style={style}
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+      />
+    );
+  }
   
   // Lấy danh sách mẫu từ settings
   const customInfoOptions = user?.custom_info_templates || [];
@@ -85,7 +96,7 @@ export default function CustomInfoInput({ value, onChange, placeholder, style })
                 }
               }}
             >
-              + Lưu mẫu
+              Lưu mẫu
             </Button>
           </div>
         </>
