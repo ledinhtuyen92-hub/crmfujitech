@@ -78,9 +78,15 @@ npm run build
 cd ..
 echo "✅ Frontend da duoc build xong!"
 
-# 6. Reload Nginx de phuc vu file moi nhat
+# 6. Restart Backend
 echo ""
-echo "🌐 [5/5] Dang reload Nginx de ap dung giao dien moi..."
+echo "🐍 [5/6] Dang khoi dong lai Backend de nhan code Python moi..."
+docker restart crm_web
+echo "✅ Backend da duoc khoi dong lai!"
+
+# 7. Reload Nginx de phuc vu file moi nhat
+echo ""
+echo "🌐 [6/6] Dang reload Nginx de ap dung giao dien moi..."
 systemctl reload nginx
 echo "✅ Nginx da duoc reload!"
 
@@ -88,6 +94,6 @@ echo ""
 echo "=========================================================="
 echo "🎉 CAP NHAT HOAN TAT! He thong da chay phien ban moi."
 echo ""
-echo "   📝 Luu y: Backend Django tu dong nhan code moi"
-echo "      do volume mount ./backend:/app trong docker-compose."
+echo "   📝 Luu y: Backend Django da duoc khoi dong lai"
+echo "      de nhan code Python moi nhat."
 echo "=========================================================="
