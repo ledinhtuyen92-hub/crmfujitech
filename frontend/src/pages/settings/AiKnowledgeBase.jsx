@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from 'react'
-import { Card, Table, Button, Space, Typography, Tag, Modal, Form, Input, Upload, message, Radio, Divider, Spin, Collapse, Alert, Checkbox, Segmented, Row, Col, List } from 'antd'
+import { Card, Table, Button, Space, Typography, Tag, Modal, Form, Input, Upload, message, Radio, Divider, Spin, Collapse, Alert, Checkbox, Segmented, Row, Col, List, Select } from 'antd'
 import { PlusOutlined, UploadOutlined, RobotOutlined, BookOutlined, EyeOutlined, EditOutlined, SyncOutlined, DeleteOutlined, BulbOutlined, MinusCircleOutlined, QuestionCircleOutlined, DownloadOutlined } from '@ant-design/icons'
 import api from '../../utils/api'
 import { useAuth } from '../../contexts/AuthContext'
@@ -32,6 +32,10 @@ export default function AiKnowledgeBase() {
   const [editForm] = Form.useForm()
   const [editSubmitting, setEditSubmitting] = useState(false)
   
+  const [isImportModalVisible, setIsImportModalVisible] = useState(false)
+  const [importForm] = Form.useForm()
+  const [importSubmitting, setImportSubmitting] = useState(false)
+  
   const docType = Form.useWatch('doc_type', form)
 
   const fetchData = async (showLoading = true) => {
@@ -50,6 +54,51 @@ export default function AiKnowledgeBase() {
       if (showLoading) message.error('Lỗi khi tải dữ liệu Tri thức')
     } finally {
       if (showLoading) setLoading(false)
+    }
+  }
+
+  const handleExportData = async () => {
+    try {
+      const res = await api.get('/ai_agents/knowledge/export_data/')
+      const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(res.data, null, 2))
+      const downloadAnchorNode = document.createElement('a')
+      downloadAnchorNode.setAttribute("href", dataStr)
+      downloadAnchorNode.setAttribute("download", "ai_knowledge_export.json")
+      document.body.appendChild(downloadAnchorNode) // required for firefox
+      downloadAnchorNode.click()
+      downloadAnchorNode.remove()
+      message.success('Đã xuất dữ liệu thành công')
+    } catch (err) {
+      message.error('Lỗi khi xuất dữ liệu')
+    }
+  }
+
+  const handleImportSubmit = async (values) => {
+    setImportSubmitting(true)
+    try {
+      const file = values.file[0].originFileObj
+      const reader = new FileReader()
+      reader.onload = async (e) => {
+        try {
+          const documents = JSON.parse(e.target.result)
+          const payload = {
+            agent_id: values.agent_id,
+            documents: documents
+          }
+          await api.post('/ai_agents/knowledge/import_data/', payload)
+          message.success('Đã nhập dữ liệu thành công')
+          setIsImportModalVisible(false)
+          importForm.resetFields()
+          fetchData()
+        } catch (err) {
+          message.error('File không đúng định dạng JSON hoặc có lỗi xảy ra')
+        }
+      }
+      reader.readAsText(file)
+    } catch (err) {
+      message.error('Lỗi khi đọc file')
+    } finally {
+      setImportSubmitting(false)
     }
   }
 
@@ -250,7 +299,14 @@ export default function AiKnowledgeBase() {
     
     let qa_list = [];
     if (record.doc_type === 'qa') {
-      const blocks = (record.content || '').split('\n\nHỏi: ').filter(Boolean);
+      let text = record.content || '';
+      text = text.replace(/\n\nKhách hàng:\s*/g, '\n\nHỏi: ')
+                 .replace(/^Khách hàng:\s*/, 'Hỏi: ')
+                 .replace(/\nNhân viên:\s*/g, '\nĐáp: ')
+                 .replace(/\n\nKhách:\s*/g, '\n\nHỏi: ')
+                 .replace(/^Khách:\s*/, 'Hỏi: ')
+                 .replace(/\nSale:\s*/g, '\nĐáp: ');
+      const blocks = text.split('\n\nHỏi: ').filter(Boolean);
       qa_list = blocks.map((block, index) => {
         let raw = block;
         if (index === 0 && raw.startsWith('Hỏi: ')) {
@@ -746,7 +802,13 @@ export default function AiKnowledgeBase() {
           </Collapse>
 
         <Card bordered={false} style={{ borderRadius: 12 }} styles={{ body: { padding: isMobile ? '16px 12px' : 24 } }}>
-          <Title level={5} style={{ marginBottom: 16 }}>Kho tài liệu đã huấn luyện</Title>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+            <Title level={5} style={{ margin: 0 }}>Kho tài liệu đã huấn luyện</Title>
+            <Space>
+              <Button icon={<DownloadOutlined />} onClick={handleExportData}>Xuất dữ liệu</Button>
+              <Button icon={<UploadOutlined />} onClick={() => setIsImportModalVisible(true)}>Nhập dữ liệu</Button>
+            </Space>
+          </div>
           {isMobile ? (
             <List
               dataSource={groupedDocuments}
@@ -901,6 +963,51 @@ export default function AiKnowledgeBase() {
             />
           )}
         </Card>
+
+      <Modal
+        title="Nhập Kho tri thức từ File JSON"
+        open={isImportModalVisible}
+        onCancel={() => {
+          setIsImportModalVisible(false)
+          importForm.resetFields()
+        }}
+        footer={null}
+      >
+        <Form form={importForm} layout="vertical" onFinish={handleImportSubmit}>
+          <Form.Item
+            name="agent_id"
+            label="Chọn Trợ lý AI đích"
+            rules={[{ required: true, message: 'Vui lòng chọn Trợ lý AI' }]}
+          >
+            <Select placeholder="Chọn một Trợ lý AI để nạp tài liệu vào">
+              {agents.map(a => (
+                <Select.Option key={a.id} value={a.id}>{a.name}</Select.Option>
+              ))}
+            </Select>
+          </Form.Item>
+          
+          <Form.Item
+            name="file"
+            label="File JSON"
+            valuePropName="fileList"
+            getValueFromEvent={e => {
+              if (Array.isArray(e)) return e;
+              return e?.fileList;
+            }}
+            rules={[{ required: true, message: 'Vui lòng chọn file JSON để nhập' }]}
+          >
+            <Upload beforeUpload={() => false} maxCount={1} accept=".json">
+              <Button icon={<UploadOutlined />}>Chọn File</Button>
+            </Upload>
+          </Form.Item>
+          
+          <Form.Item>
+            <Button type="primary" htmlType="submit" loading={importSubmitting} block>
+              Bắt đầu Nhập
+            </Button>
+          </Form.Item>
+        </Form>
+      </Modal>
 
       <Modal
         title="Dạy thêm kiến thức cho AI"

@@ -332,7 +332,7 @@ class AiKnowledgeDocumentViewSet(viewsets.ModelViewSet):
             
             # Use agent.model_name to extract
             from ai_agents.services import generate_raw_text
-            prompt = f"Bạn là chuyên gia huấn luyện AI. Hãy đọc đoạn hội thoại sau và bóc tách ra các thắc mắc khó của khách và cách Sale trả lời. Trình bày dưới dạng các cặp Hỏi - Đáp (Q&A) cực kỳ ngắn gọn, chuẩn mực. Không chứa tên riêng, số điện thoại hay khuyến mãi cá biệt. CHỈ xuất ra danh sách các cặp Q&A, tuyệt đối KHÔNG viết thêm các câu dẫn dắt, giải thích hay mào đầu (ví dụ: 'Dưới đây là...').\nHội thoại:\n{transcript}"
+            prompt = f"Bạn là chuyên gia huấn luyện AI. Hãy đọc đoạn hội thoại sau và bóc tách ra các thắc mắc khó của khách và cách Sale trả lời. Trình bày dưới dạng các cặp Hỏi - Đáp (Q&A) cực kỳ ngắn gọn, chuẩn mực.\n\nBẮT BUỘC phải định dạng chính xác từng cặp theo mẫu sau (KHÔNG thay đổi chữ 'Hỏi:' và 'Đáp:'):\n\nHỏi: [Nội dung câu hỏi của khách]\nĐáp: [Nội dung trả lời của Sale]\n\nKhông chứa tên riêng, số điện thoại hay khuyến mãi cá biệt. CHỈ xuất ra danh sách các cặp theo đúng mẫu trên, mỗi cặp cách nhau 1 dòng trắng. Tuyệt đối KHÔNG viết thêm các câu dẫn dắt, giải thích hay mào đầu.\n\nHội thoại:\n{transcript}"
             
             try:
                 extracted_text = generate_raw_text(agent, prompt)
@@ -383,6 +383,60 @@ class AiKnowledgeDocumentViewSet(viewsets.ModelViewSet):
             return Response({'status': 'Đã lưu thành công vào Cẩm nang'})
         except Exception as e:
             return Response({'error': str(e)}, status=500)
+
+    @action(detail=False, methods=['GET'])
+    def export_data(self, request):
+        """Xuất toàn bộ kho tri thức của công ty ra JSON"""
+        docs = AiKnowledgeDocument.objects.filter(agent__company=request.user.company)
+        data = []
+        for doc in docs:
+            data.append({
+                'agent_name': doc.agent.name,
+                'title': doc.title,
+                'content': doc.content,
+                'doc_type': doc.doc_type,
+                'image_description': doc.image_description,
+            })
+        return Response(data)
+
+    @action(detail=False, methods=['POST'])
+    def import_data(self, request):
+        """Nhập kho tri thức từ JSON"""
+        target_agent_id = request.data.get('agent_id')
+        docs_data = request.data.get('documents', [])
+        
+        if not target_agent_id:
+            return Response({'error': 'Vui lòng chọn Trợ lý AI đích'}, status=400)
+            
+        if not isinstance(docs_data, list):
+            return Response({'error': 'Dữ liệu không hợp lệ'}, status=400)
+            
+        try:
+            target_agent = AiAgent.objects.get(id=target_agent_id, company=request.user.company)
+        except AiAgent.DoesNotExist:
+            return Response({'error': 'Không tìm thấy Trợ lý AI đích'}, status=404)
+            
+        provider = getattr(request.user.company.ai_settings, 'default_embedding_provider', 'openai')
+        
+        imported_count = 0
+        for doc_data in docs_data:
+            # Bỏ qua các doc rỗng
+            if not doc_data.get('title') and not doc_data.get('content'):
+                continue
+                
+            doc = AiKnowledgeDocument.objects.create(
+                agent=target_agent,
+                title=doc_data.get('title', 'Tài liệu nhập (Không tên)'),
+                content=doc_data.get('content', ''),
+                doc_type=doc_data.get('doc_type', 'file'),
+                image_description=doc_data.get('image_description', ''),
+                status='pending',
+                embedding_provider=provider
+            )
+            transaction.on_commit(lambda d_id=doc.id: process_document_rag.delay(d_id))
+            imported_count += 1
+            
+        return Response({'status': f'Đã nhập thành công {imported_count} tài liệu'})
 
 
 class CompanyAiSettingsViewSet(viewsets.ModelViewSet):
