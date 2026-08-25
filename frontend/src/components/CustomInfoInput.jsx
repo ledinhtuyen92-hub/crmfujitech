@@ -3,7 +3,7 @@ import { AutoComplete, Input, Button, message } from 'antd';
 import { PlusOutlined, DeleteOutlined } from '@ant-design/icons';
 import { useAuth } from '../contexts/AuthContext';
 
-export default function CustomInfoInput({ value, onChange, placeholder, style, enableTemplate = true }) {
+export default function CustomInfoInput({ value, onChange, placeholder, style, enableTemplate = true, templateKey = 'default' }) {
   const { user, patchCompanySettings } = useAuth();
   const [adding, setAdding] = useState(false);
 
@@ -18,16 +18,27 @@ export default function CustomInfoInput({ value, onChange, placeholder, style, e
     );
   }
   
-  // Lấy danh sách mẫu từ settings
-  const customInfoOptions = user?.custom_info_templates || [];
+  // Xử lý cả dạng mảng (cũ) và dạng object (mới)
+  const rawTemplates = user?.custom_info_templates;
+  const isArray = Array.isArray(rawTemplates);
+  let currentKeyOptions = [];
+  if (isArray) {
+    // Nếu vẫn là array cũ, gán tạm cho key 'default'
+    currentKeyOptions = templateKey === 'default' ? rawTemplates : [];
+  } else if (rawTemplates && typeof rawTemplates === 'object') {
+    currentKeyOptions = rawTemplates[templateKey] || [];
+  }
 
   const addTemplate = async (text) => {
     if (!text) return;
     const trimmed = text.trim();
-    if (!customInfoOptions.includes(trimmed)) {
+    if (!currentKeyOptions.includes(trimmed)) {
       setAdding(true);
       try {
-        await patchCompanySettings({ custom_info_templates: [...customInfoOptions, trimmed] });
+        let newTemplates = isArray ? { default: rawTemplates } : { ...(rawTemplates || {}) };
+        newTemplates[templateKey] = [...(newTemplates[templateKey] || []), trimmed];
+        
+        await patchCompanySettings({ custom_info_templates: newTemplates });
         message.success('Đã lưu mẫu thành công!');
       } catch (err) {
         message.error('Lỗi khi lưu mẫu');
@@ -42,14 +53,17 @@ export default function CustomInfoInput({ value, onChange, placeholder, style, e
   const removeTemplate = async (e, text) => {
     e.stopPropagation();
     try {
-      await patchCompanySettings({ custom_info_templates: customInfoOptions.filter(t => t !== text) });
+      let newTemplates = isArray ? { default: rawTemplates } : { ...(rawTemplates || {}) };
+      newTemplates[templateKey] = (newTemplates[templateKey] || []).filter(t => t !== text);
+      await patchCompanySettings({ custom_info_templates: newTemplates });
     } catch (err) {
       message.error('Lỗi khi xóa mẫu');
     }
   };
 
-  const options = customInfoOptions.map(item => ({
+  const options = currentKeyOptions.map(item => ({
     value: item,
+    title: '', // Ẩn tooltip mặc định của Ant Design
     label: (
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <span>{item}</span>
