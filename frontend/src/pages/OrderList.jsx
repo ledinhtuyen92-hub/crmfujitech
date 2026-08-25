@@ -53,8 +53,9 @@ const groupProducts = (items, withUnit = false) => {
   const grouped = {};
   const ungrouped = [];
   items.forEach(p => {
-    const label = withUnit ? `${p.name} (${p.unit || 'cái'})` : p.name;
-    const option = { label, value: p.name };
+    const text = withUnit ? `${p.name} (${p.unit || 'cái'})` : p.name;
+    // Dùng JSX label với title="" để chặn tooltip đen tự động của browser/Ant Design
+    const option = { label: <span title="">{text}</span>, value: p.name, title: '' };
     if (p.category_name) {
       if (!grouped[p.category_name]) grouped[p.category_name] = [];
       grouped[p.category_name].push(option);
@@ -1188,7 +1189,7 @@ export default function OrderList() {
           dataIndex: 'symbol',
           width: 100,
           align: 'center',
-          render: (val, record, idx) => <CustomInfoInput style={{ textAlign: 'center', fontWeight: 600, color: '#2563eb' }} placeholder="VD: D1.1" value={record.custom_data?.symbol || record.symbol || ''} onChange={(v) => handleLineChange(idx, 'symbol', v)} />,
+          render: (val, record, idx) => <CustomInfoInput templateKey="symbol" style={{ textAlign: 'center', fontWeight: 600, color: '#2563eb' }} placeholder="VD: D1.1" value={record.custom_data?.symbol || record.symbol || ''} onChange={(v) => handleLineChange(idx, 'symbol', v)} />,
         },
         {
           title: 'GHI CHÚ KỸ THUẬT',
@@ -1229,7 +1230,7 @@ export default function OrderList() {
                       filterOption={(inputValue, option) => (option?.value || '').toUpperCase().includes(inputValue.toUpperCase())}
                     />
                   ) : (
-                    <CustomInfoInput style={{ textAlign: 'center' }} placeholder="Khóa, bản lề, kính..." value={val || ''} onChange={(v) => handleLineChange(idx, 'note', v)} enableTemplate={noteColCfg?.enableTemplate !== false} />
+                    <CustomInfoInput templateKey="note" style={{ textAlign: 'center' }} placeholder="Khóa, bản lề, kính..." value={val || ''} onChange={(v) => handleLineChange(idx, 'note', v)} enableTemplate={noteColCfg?.enableTemplate !== false} />
                   )
                 }
                 {enableNoteImage && (
@@ -1506,13 +1507,13 @@ export default function OrderList() {
           title: 'Quy cách / Hệ nhôm',
           dataIndex: 'spec',
           width: 160,
-          render: (val, record, idx) => <CustomInfoInput placeholder="Hệ 55, kính 10mm..." value={val || ''} onChange={(v) => handleLineChange(idx, 'spec', v)} />,
+          render: (val, record, idx) => <CustomInfoInput templateKey="spec" placeholder="Hệ 55, kính 10mm..." value={val || ''} onChange={(v) => handleLineChange(idx, 'spec', v)} />,
         },
         {
           title: 'Bảo hành',
           dataIndex: 'warranty',
           width: 100,
-          render: (val, record, idx) => <CustomInfoInput placeholder="5 năm..." value={val || ''} onChange={(v) => handleLineChange(idx, 'warranty', v)} />,
+          render: (val, record, idx) => <CustomInfoInput templateKey="warranty" placeholder="5 năm..." value={val || ''} onChange={(v) => handleLineChange(idx, 'warranty', v)} />,
         }
       )
     } else if (tmplCode === 'SERVICES') {
@@ -1521,13 +1522,13 @@ export default function OrderList() {
           title: 'Phạm vi / Mô tả chi tiết',
           dataIndex: 'spec',
           width: 200,
-          render: (val, record, idx) => <CustomInfoInput placeholder="Chi tiết phạm vi công việc..." value={val || ''} onChange={(v) => handleLineChange(idx, 'spec', v)} />,
+          render: (val, record, idx) => <CustomInfoInput templateKey="spec" placeholder="Chi tiết phạm vi công việc..." value={val || ''} onChange={(v) => handleLineChange(idx, 'spec', v)} />,
         },
         {
           title: 'Thời gian bảo hành / duy trì',
           dataIndex: 'warranty',
           width: 140,
-          render: (val, record, idx) => <CustomInfoInput placeholder="12 tháng / 1 năm..." value={val || ''} onChange={(v) => handleLineChange(idx, 'warranty', v)} />,
+          render: (val, record, idx) => <CustomInfoInput templateKey="warranty" placeholder="12 tháng / 1 năm..." value={val || ''} onChange={(v) => handleLineChange(idx, 'warranty', v)} />,
         }
       )
     } else if (tmplCode === 'PRINTING') {
@@ -1554,7 +1555,7 @@ export default function OrderList() {
           title: 'Chất liệu / Quy cách',
           dataIndex: 'spec',
           width: 150,
-          render: (val, record, idx) => <CustomInfoInput placeholder="Giấy C250, cán mờ..." value={val || ''} onChange={(v) => handleLineChange(idx, 'spec', v)} />,
+          render: (val, record, idx) => <CustomInfoInput templateKey="spec" placeholder="Giấy C250, cán mờ..." value={val || ''} onChange={(v) => handleLineChange(idx, 'spec', v)} />,
         }
       )
     } else {
@@ -1585,7 +1586,7 @@ export default function OrderList() {
               );
             }
             return (
-              <CustomInfoInput
+              <CustomInfoInput templateKey="note"
                 placeholder="VD: 800×2000mm, màu vân gỗ, lắp đặt kèm..."
                 value={val || ''}
                 onChange={(v) => handleLineChange(idx, 'note', v)}
@@ -1846,7 +1847,7 @@ export default function OrderList() {
                   />
                 );
               } else {
-                innerChildren = <CustomInfoInput enableTemplate={colCfg?.enableTemplate !== false} placeholder="Thêm thông tin..." value={record.custom_data?.custom_size_text || ''} onChange={(val) => {
+                innerChildren = <CustomInfoInput templateKey="custom_size" enableTemplate={colCfg?.enableTemplate !== false} placeholder="Thêm thông tin..." value={record.custom_data?.custom_size_text || ''} onChange={(val) => {
                   const currentData = record.custom_data || {};
                   const matched = products.find(p => p.name === val);
                   
@@ -2019,13 +2020,13 @@ export default function OrderList() {
           dataIndex: 'symbol',
           width: 100,
           align: 'center',
-          render: (val, record, idx) => <CustomInfoInput style={{ textAlign: 'center', fontWeight: 600, color: '#2563eb' }} placeholder="VD: D1.1" value={record.symbol || ''} onChange={(v) => handleServiceLineChange(idx, 'symbol', v)} />,
+          render: (val, record, idx) => <CustomInfoInput templateKey="symbol" style={{ textAlign: 'center', fontWeight: 600, color: '#2563eb' }} placeholder="VD: D1.1" value={record.symbol || ''} onChange={(v) => handleServiceLineChange(idx, 'symbol', v)} />,
         },
         {
           title: 'GHI CHÚ KỸ THUẬT',
           dataIndex: 'note',
           width: 170,
-          render: (val, record, idx) => <CustomInfoInput placeholder="Chi tiết..." value={val || ''} onChange={(v) => handleServiceLineChange(idx, 'note', v)} />,
+          render: (val, record, idx) => <CustomInfoInput templateKey="note" placeholder="Chi tiết..." value={val || ''} onChange={(v) => handleServiceLineChange(idx, 'note', v)} />,
         },
         {
           title: 'SL',
@@ -2048,7 +2049,7 @@ export default function OrderList() {
           title: 'GHI CHÚ',
           dataIndex: 'note',
           width: 170,
-          render: (val, record, idx) => <CustomInfoInput placeholder="Chi tiết..." value={val || ''} onChange={(v) => handleServiceLineChange(idx, 'note', v)} />,
+          render: (val, record, idx) => <CustomInfoInput templateKey="note" placeholder="Chi tiết..." value={val || ''} onChange={(v) => handleServiceLineChange(idx, 'note', v)} />,
         },
         {
           title: 'ĐVT',
@@ -3706,3 +3707,4 @@ export default function OrderList() {
     </section>
   )
 }
+

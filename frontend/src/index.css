@@ -210,3 +210,12 @@ h4.ant-typography,
 }
 
 /* NOTE: @page { size, margin } is controlled per-component (QuotationPrintView) via inline <style> */
+
+/* Ẩn tooltip đen tự động khi hover vào option trong Select / AutoComplete */
+/* Ant Design dùng value làm title attribute → browser/Ant Design hiện tooltip đen */
+/* Fix: ẩn các .ant-tooltip xuất hiện khi có dropdown đang mở */
+body:has(.ant-select-dropdown:not(.ant-select-dropdown-hidden)) > .ant-tooltip {
+  visibility: hidden !important;
+  opacity: 0 !important;
+  pointer-events: none !important;
+}
