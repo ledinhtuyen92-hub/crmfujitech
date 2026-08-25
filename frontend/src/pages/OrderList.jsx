@@ -49,15 +49,12 @@ import { DndContext, PointerSensor, useSensor, useSensors, KeyboardSensor } from
 import { restrictToVerticalAxis } from '@dnd-kit/modifiers';
 import { SortableContext, useSortable, verticalListSortingStrategy, arrayMove, sortableKeyboardCoordinates } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
-const getProductDisplayName = (p) => p.sku ? `[${p.sku}] ${p.name}` : p.name;
-
 const groupProducts = (items, withUnit = false) => {
   const grouped = {};
   const ungrouped = [];
   items.forEach(p => {
-    const displayName = getProductDisplayName(p);
-    const label = withUnit ? `${displayName} (${p.unit || 'cái'})` : displayName;
-    const option = { label, value: displayName };
+    const label = withUnit ? `${p.name} (${p.unit || 'cái'})` : p.name;
+    const option = { label, value: p.name };
     if (p.category_name) {
       if (!grouped[p.category_name]) grouped[p.category_name] = [];
       grouped[p.category_name].push(option);
@@ -687,7 +684,7 @@ export default function OrderList() {
       
       const matches = (item1, item2) => {
         if (item1.product && item2.product) return item1.product === item2.product;
-        if (!item1.product && !item2.product) return item1.product_name === item2.product_name && !!item1.product_name;
+        if (!item1.product && !item2.product) return item1.product_name === item2.product_name && (!!item1.product_name || item1.custom_data?.is_custom_size !== undefined || item1.custom_data?.is_child || item2.custom_data?.is_custom_size !== undefined || item2.custom_data?.is_child);
         return false;
       };
 
@@ -772,7 +769,7 @@ export default function OrderList() {
     const matches = (item1, item2) => {
       if (field === 'product') {
         if (item1.product && item2.product) return item1.product === item2.product;
-        if (!item1.product && !item2.product) return item1.product_name === item2.product_name && !!item1.product_name;
+        if (!item1.product && !item2.product) return item1.product_name === item2.product_name && (!!item1.product_name || item1.custom_data?.is_custom_size !== undefined || item1.custom_data?.is_child || item2.custom_data?.is_custom_size !== undefined || item2.custom_data?.is_child);
         return false;
       }
       return item1[field] === item2[field];
@@ -792,10 +789,14 @@ export default function OrderList() {
     return count;
   }
 
-  const handleAddSameProduct = (index, isCustomSize = false) => {
+  const handleAddSameProduct = (index, actionConfig = null) => {
     setFormItems((prev) => {
       const currentItem = prev[index]
       if (!currentItem) return prev
+      
+      const isCustomSize = actionConfig?.mergeColumns?.length > 0;
+      const mergeColumns = actionConfig?.mergeColumns || [];
+
       const newItem = {
         key: Date.now(),
         product: currentItem.product,
@@ -816,14 +817,15 @@ export default function OrderList() {
           ...(currentItem.custom_data || {}), 
           symbol: '', 
           is_custom_size: isCustomSize, 
-          custom_size_text: '' 
+          custom_size_text: '',
+          merge_columns: mergeColumns
         },
         discount_percent: currentItem.discount_percent || 0,
       }
       let rowSpan = 1;
       const matches = (item1, item2) => {
         if (item1.product && item2.product) return item1.product === item2.product;
-        if (!item1.product && !item2.product) return item1.product_name === item2.product_name && !!item1.product_name;
+        if (!item1.product && !item2.product) return item1.product_name === item2.product_name && (!!item1.product_name || item1.custom_data?.is_custom_size !== undefined || item1.custom_data?.is_child || item2.custom_data?.is_custom_size !== undefined || item2.custom_data?.is_child);
         return false;
       };
       for (let i = index + 1; i < prev.length; i++) {
@@ -896,6 +898,9 @@ export default function OrderList() {
       : null;
     const nameAllowedCategories = (nameColCfg && typeof nameColCfg === 'object') ? nameColCfg.allowedCategories : null;
     const hasCategoryFilter = nameAllowedCategories && nameAllowedCategories.length > 0;
+    
+    const noteAllowedCategories = (noteColCfg && typeof noteColCfg === 'object') ? (noteColCfg.allowedCategories || []) : [];
+    const hasNoteCategoryFilter = noteAllowedCategories && noteAllowedCategories.length > 0;
     
     // enableProductSuggest: "Bật tính năng Ghi nhớ / Lưu mẫu chữ" - independent of category filter
     // If nameColCfg not found (old template), default to true
@@ -1073,7 +1078,7 @@ export default function OrderList() {
                             for (let i = idx + 1; i < prev.length; i++) {
                               const ni = prev[i];
                               const sameGroup = (ni.product && ni.product === prev[idx].product) ||
-                                (!ni.product && !prev[idx].product && ni.product_name === prev[idx].product_name && !!ni.product_name);
+                                (!ni.product && !prev[idx].product && ni.product_name === prev[idx].product_name && (!!ni.product_name || ni.custom_data?.is_custom_size !== undefined || ni.custom_data?.is_child));
                               if (!sameGroup) break;
                               updated[i] = { ...updated[i], product: item.product, product_name: item.product_name, product_image: item.product_image };
                             }
@@ -1162,7 +1167,7 @@ export default function OrderList() {
                         <Button
                           key={btn.id || bidx}
                           type="dashed" size="small" icon={<PlusOutlined />}
-                          onClick={() => handleAddSameProduct(idx, !!(btn.mergeColumns?.length))}
+                          onClick={() => handleAddSameProduct(idx, btn)}
                           style={{ marginTop: 4, borderColor: btn.mergeColumns?.length ? '#059669' : '#2563eb', color: btn.mergeColumns?.length ? '#059669' : '#2563eb', width: '100%' }}
                           title={btn.mergeColumns?.length ? "Thêm dòng phụ và gộp ô" : "Thêm dòng phụ"}
                         >
@@ -1356,7 +1361,7 @@ export default function OrderList() {
                           for (let i = idx + 1; i < prev.length; i++) {
                             const ni = prev[i];
                             const sameGroup = (ni.product && ni.product === prev[idx].product) ||
-                              (!ni.product && !prev[idx].product && ni.product_name === prev[idx].product_name && !!ni.product_name);
+                              (!ni.product && !prev[idx].product && ni.product_name === prev[idx].product_name && (!!ni.product_name || ni.custom_data?.is_custom_size !== undefined || ni.custom_data?.is_child));
                             if (!sameGroup) break;
                             updated[i] = { ...updated[i], product: item.product, product_name: item.product_name, product_image: item.product_image };
                           }
@@ -1445,7 +1450,7 @@ export default function OrderList() {
                       <Button
                         key={btn.id || bidx}
                         type="dashed" size="small" icon={<PlusOutlined />}
-                        onClick={() => handleAddSameProduct(idx, !!(btn.mergeColumns?.length))}
+                        onClick={() => handleAddSameProduct(idx, btn)}
                         style={{ marginTop: 4, borderColor: btn.mergeColumns?.length ? '#059669' : '#2563eb', color: btn.mergeColumns?.length ? '#059669' : '#2563eb', width: '100%' }}
                         title={btn.mergeColumns?.length ? "Thêm dòng phụ và gộp ô" : "Thêm dòng phụ"}
                       >

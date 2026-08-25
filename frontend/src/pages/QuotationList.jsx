@@ -296,7 +296,7 @@ export default function QuotationList() {
     const matches = (item1, item2) => {
       if (field === 'product') {
         if (item1.product && item2.product) return item1.product === item2.product;
-        if (!item1.product && !item2.product) return item1.product_name === item2.product_name && !!item1.product_name;
+        if (!item1.product && !item2.product) return item1.product_name === item2.product_name && (!!item1.product_name || item1.custom_data?.is_custom_size !== undefined || item1.custom_data?.is_child || item2.custom_data?.is_custom_size !== undefined || item2.custom_data?.is_child);
         return false;
       }
       return item1[field] === item2[field];
@@ -321,7 +321,7 @@ export default function QuotationList() {
     const matches = (item1, item2) => {
       if (field === 'product') {
         if (item1.product && item2.product) return item1.product === item2.product;
-        if (!item1.product && !item2.product) return item1.product_name === item2.product_name && !!item1.product_name;
+        if (!item1.product && !item2.product) return item1.product_name === item2.product_name && (!!item1.product_name || item1.custom_data?.is_custom_size !== undefined || item1.custom_data?.is_child || item2.custom_data?.is_custom_size !== undefined || item2.custom_data?.is_child);
         return false;
       }
       return item1[field] === item2[field];
@@ -419,7 +419,7 @@ export default function QuotationList() {
       let rowSpan = 1;
       const matches = (item1, item2) => {
         if (item1.product && item2.product) return item1.product === item2.product;
-        if (!item1.product && !item2.product) return item1.product_name === item2.product_name && !!item1.product_name;
+        if (!item1.product && !item2.product) return item1.product_name === item2.product_name && (!!item1.product_name || item1.custom_data?.is_custom_size !== undefined || item1.custom_data?.is_child || item2.custom_data?.is_custom_size !== undefined || item2.custom_data?.is_child);
         return false;
       };
       for (let i = index + 1; i < prev.length; i++) {
@@ -448,7 +448,7 @@ export default function QuotationList() {
       
       const matches = (item1, item2) => {
         if (item1.product && item2.product) return item1.product === item2.product;
-        if (!item1.product && !item2.product) return item1.product_name === item2.product_name && !!item1.product_name;
+        if (!item1.product && !item2.product) return item1.product_name === item2.product_name && (!!item1.product_name || item1.custom_data?.is_custom_size !== undefined || item1.custom_data?.is_child || item2.custom_data?.is_custom_size !== undefined || item2.custom_data?.is_child);
         return false;
       };
 
@@ -1702,7 +1702,7 @@ export default function QuotationList() {
                             for (let i = idx + 1; i < prev.length; i++) {
                               const ni = prev[i];
                               const sameGroup = (ni.product && ni.product === prev[idx].product) ||
-                                (!ni.product && !prev[idx].product && ni.product_name === prev[idx].product_name && !!ni.product_name);
+                                (!ni.product && !prev[idx].product && ni.product_name === prev[idx].product_name && (!!ni.product_name || ni.custom_data?.is_custom_size !== undefined || ni.custom_data?.is_child));
                               if (!sameGroup) break;
                               updated[i] = { ...updated[i], product: item.product, product_name: item.product_name, product_image: item.product_image };
                             }
@@ -1933,7 +1933,7 @@ export default function QuotationList() {
                           for (let i = idx + 1; i < prev.length; i++) {
                             const ni = prev[i];
                             const sameGroup = (ni.product && ni.product === prev[idx].product) ||
-                              (!ni.product && !prev[idx].product && ni.product_name === prev[idx].product_name && !!ni.product_name);
+                              (!ni.product && !prev[idx].product && ni.product_name === prev[idx].product_name && (!!ni.product_name || ni.custom_data?.is_custom_size !== undefined || ni.custom_data?.is_child));
                             if (!sameGroup) break;
                             updated[i] = { ...updated[i], product: item.product, product_name: item.product_name, product_image: item.product_image };
                           }
