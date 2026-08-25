@@ -420,18 +420,12 @@ export default function SettingsPanel({ block, onChange, categories = [] }) {
             <Divider style={{ margin: '12px 0' }} />
             <div style={{ fontWeight: 600, color: '#334155', marginBottom: 8, paddingBottom: 4, borderBottom: '1px solid #e2e8f0' }}>Quản lý Cột & Giao diện</div>
             <Form.Item name="columns" label="Danh sách cột hiển thị">
-              <ColumnManager />
+              <ColumnManager categories={categories} />
             </Form.Item>
             <Form.Item name="themeColor" label="Màu Sắc Chủ Đạo">
               <Input type="color" />
             </Form.Item>
-            <Divider style={{ margin: '12px 0' }} />
-            <div style={{ fontWeight: 600, color: '#334155', marginBottom: 8, paddingBottom: 4, borderBottom: '1px solid #e2e8f0' }}>Bộ lọc Thư mục</div>
-            <Form.Item name="allowedCategories" label="Chỉ cho phép chọn các Thư mục này" tooltip="Nếu bỏ trống, sẽ hiển thị toàn bộ">
-              <Select mode="multiple" placeholder="Chọn thư mục..." style={{ width: '100%' }}>
-                {categories.map(c => <Option key={c.id} value={c.name}>{c.name}</Option>)}
-              </Select>
-            </Form.Item>
+
           </>
         );
       case BLOCK_TYPES.TOTALS:

@@ -631,7 +631,7 @@ class ZaloMessage(models.Model):
     class Meta:
         verbose_name = "Tin nhắn Zalo"
         verbose_name_plural = "Tin nhắn Zalo"
-        ordering = ["created_at"]
+        ordering = ["created_at", "id"]
 
     def __str__(self):
         return f"[{self.get_direction_display()}] {self.social_lead.display_name}: {self.content[:30]}"

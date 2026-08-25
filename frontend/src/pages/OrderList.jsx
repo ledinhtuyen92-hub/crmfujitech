@@ -44,7 +44,11 @@ import ReceiptPrintView from '../components/ReceiptPrintView'
 import ZnsSendModal from '../components/ZnsSendModal'
 import { useResponsive } from '../hooks/useResponsive'
 import CustomInfoInput from '../components/CustomInfoInput'
-
+import { MenuOutlined } from '@ant-design/icons';
+import { DndContext, PointerSensor, useSensor, useSensors, KeyboardSensor } from '@dnd-kit/core';
+import { restrictToVerticalAxis } from '@dnd-kit/modifiers';
+import { SortableContext, useSortable, verticalListSortingStrategy, arrayMove, sortableKeyboardCoordinates } from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
 const getProductDisplayName = (p) => p.sku ? `[${p.sku}] ${p.name}` : p.name;
 
 const groupProducts = (items, withUnit = false) => {
@@ -85,6 +89,38 @@ const groupProducts = (items, withUnit = false) => {
 const { Title, Text, Paragraph } = Typography
 const { Option } = Select
 const { TextArea } = Input
+
+const RowContext = React.createContext({});
+
+const DragHandle = () => {
+  const { setActivatorNodeRef, listeners } = React.useContext(RowContext);
+  return (
+    <div
+      ref={setActivatorNodeRef}
+      {...listeners}
+      style={{ cursor: 'grab', display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%' }}
+    >
+      <MenuOutlined style={{ color: '#94a3b8', fontSize: 16 }} />
+    </div>
+  );
+};
+
+const DraggableBodyRow = (props) => {
+  const { attributes, listeners, setNodeRef, setActivatorNodeRef, transform, transition, isDragging } = useSortable({
+    id: props['data-row-key'],
+  });
+  const style = {
+    ...props.style,
+    transform: CSS.Transform.toString(transform && { ...transform, scaleY: 1 }),
+    transition,
+    ...(isDragging ? { position: 'relative', zIndex: 9999, background: '#f8fafc', boxShadow: '0 4px 12px rgba(0,0,0,0.1)' } : {}),
+  };
+  return (
+    <RowContext.Provider value={{ setActivatorNodeRef, listeners }}>
+      <tr {...props} ref={setNodeRef} style={style} {...attributes} />
+    </RowContext.Provider>
+  );
+};
 
 // Trạng thái đơn hàng
 const statusConfig = {
@@ -146,6 +182,21 @@ export default function OrderList() {
   ])
   const [serviceItems, setServiceItems] = useState(() => [])
 
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
+  );
+
+  const handleDragEnd = (event, items, setItems) => {
+    const { active, over } = event;
+    if (active.id !== over?.id) {
+      setItems((prev) => {
+        const activeIndex = prev.findIndex((i) => i.key === active.id);
+        const overIndex = prev.findIndex((i) => i.key === over?.id);
+        return arrayMove(prev, activeIndex, overIndex);
+      });
+    }
+  };
   // Drawer details
   const [drawerVisible, setDrawerVisible] = useState(false)
   const [selectedOrder, setSelectedOrder] = useState(null)
@@ -632,16 +683,50 @@ export default function OrderList() {
   const handleLineChange = (index, field, value) => {
     setFormItems((prev) => {
       const updated = [...prev]
-      updated[index] = { ...updated[index], [field]: value }
-      if (field === 'product') {
-        const prod = products.find((p) => p.id === value)
-        if (prod) {
-          updated[index].unit_price = Number(prod.price || prod.cost_price || 0)
-          updated[index].product_name = prod.name || ''
-          updated[index].unit = prod.unit || 'cái'
-          updated[index].product_image = prod.image_url || prod.image || ''
+      const oldItem = prev[index]
+      
+      const matches = (item1, item2) => {
+        if (item1.product && item2.product) return item1.product === item2.product;
+        if (!item1.product && !item2.product) return item1.product_name === item2.product_name && !!item1.product_name;
+        return false;
+      };
+
+      let groupSize = 1;
+      const isRoot = index === 0 || !matches(prev[index - 1], oldItem);
+      if (isRoot) {
+        for (let i = index + 1; i < prev.length; i++) {
+          if (matches(prev[i], oldItem)) {
+            groupSize++;
+          } else {
+            break;
+          }
         }
       }
+
+      const updateItem = (idx, isChild) => {
+        const currentItem = { ...updated[idx], [field]: value }
+        if (field === 'product') {
+          const prod = products.find((p) => p.id === value)
+          if (prod) {
+            if (!isChild || !currentItem.custom_data?.is_custom_size) {
+              currentItem.unit_price = Number(prod.price || prod.cost_price || 0)
+              currentItem.unit = prod.unit || 'cái'
+            }
+            currentItem.product_name = prod.name || ''
+            currentItem.product_image = prod.image_url || prod.image || ''
+          }
+        }
+        updated[idx] = currentItem
+      };
+
+      updateItem(index, false);
+      
+      if (groupSize > 1 && (field === 'product' || field === 'product_name' || field === 'product_image')) {
+        for (let i = index + 1; i < index + groupSize; i++) {
+          updateItem(i, true);
+        }
+      }
+
       return updated
     })
   }
@@ -761,6 +846,41 @@ export default function OrderList() {
     const isLandscape = tmplCode === 'production_landscape_a4' || et?.layout_config?.paper_orientation === 'landscape'
     
     const productBlock = et?.layout_config?.blocks?.find(b => b.type === 'product_table');
+    
+    const assignProductImage = (matchedProduct, currentCustomData, sourceColId) => {
+      if (!matchedProduct || (!matchedProduct.image_url && !matchedProduct.image)) return currentCustomData;
+      const img = matchedProduct.image_url || matchedProduct.image;
+      
+      const colsToCheck = [];
+      const addCols = (cols) => {
+        for (const c of cols) {
+          if (typeof c === 'object') {
+            colsToCheck.push(c);
+            if (c.children) addCols(c.children);
+          }
+        }
+      };
+      addCols(productBlock?.props?.columns || []);
+      
+      // Columns that handle images via their own mechanism (product_image), not via custom_data
+      const excludeFromFallback = ['name', 'action'];
+      
+      // 1. Try source column first
+      const sourceCol = colsToCheck.find(c => c.id === sourceColId);
+      if (sourceCol?.allowImageUpload && !excludeFromFallback.includes(sourceColId)) {
+        const key = sourceColId === 'note' ? 'note_image' : `img_${sourceColId}`;
+        return { ...currentCustomData, [key]: img };
+      }
+      
+      // 2. Try any other column that allows image upload (skip name/action)
+      const fallbackCol = colsToCheck.find(c => c.allowImageUpload && !excludeFromFallback.includes(c.id));
+      if (fallbackCol) {
+        const key = fallbackCol.id === 'note' ? 'note_image' : `img_${fallbackCol.id}`;
+        return { ...currentCustomData, [key]: img };
+      }
+      
+      return currentCustomData;
+    };
     const serviceBlock = et?.layout_config?.blocks?.find(b => b.type === 'service_table');
     
     // Only enable image features if explicitly configured in template (default: off)
@@ -768,8 +888,32 @@ export default function OrderList() {
     const nameColCfg = hasTemplate
       ? (productBlock?.props?.columns || []).find(c => (typeof c === 'object' ? c.id : c) === 'name')
       : null;
+    const noteColCfg = hasTemplate
+      ? (productBlock?.props?.columns || []).find(c => (typeof c === 'object' ? c.id : c) === 'note')
+      : null;
+    const specColCfg = hasTemplate
+      ? (productBlock?.props?.columns || []).find(c => (typeof c === 'object' ? c.id : c) === 'spec')
+      : null;
+    const nameAllowedCategories = (nameColCfg && typeof nameColCfg === 'object') ? nameColCfg.allowedCategories : null;
+    const hasCategoryFilter = nameAllowedCategories && nameAllowedCategories.length > 0;
+    
+    // enableProductSuggest: "Bật tính năng Ghi nhớ / Lưu mẫu chữ" - independent of category filter
+    // If nameColCfg not found (old template), default to true
+    const enableProductSuggest = nameColCfg && typeof nameColCfg === 'object' ? nameColCfg.enableTemplate !== false : true;
+    // Priority for name column:
+    //  1. hasCategoryFilter → AutoComplete filtered by selected categories
+    //  2. enableProductSuggest (no filter) → CustomInfoInput with template/save feature
+    //  3. neither → plain CustomInfoInput
+
+    let mainProductOptions = [];
+    if (hasCategoryFilter) {
+      mainProductOptions = products.filter(p => p.product_type !== 'service' && nameAllowedCategories.includes(p.category_name));
+    }
+    const mainProductGroupedOptions = groupProducts(mainProductOptions, true);
+    const showProductAutoComplete = hasCategoryFilter;
+
     const enableProductImage = hasTemplate
-      ? (nameColCfg && typeof nameColCfg === 'object' ? nameColCfg.allowImageUpload === true : productBlock?.props?.enableProductImage !== false)
+      ? (nameColCfg && typeof nameColCfg === 'object' && 'allowImageUpload' in nameColCfg ? nameColCfg.allowImageUpload === true : productBlock?.props?.enableProductImage !== false)
       : false;
     const enableProductName = productBlock?.props?.enableProductName !== false;
     const enableProductDescription = productBlock?.props?.enableProductDescription !== false;
@@ -867,9 +1011,14 @@ export default function OrderList() {
         {
           title: 'STT',
           key: 'stt',
-          width: 50,
+          width: 70,
           align: 'center',
-          render: (_, __, idx) => idx + 1,
+          render: (_, __, idx) => (
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
+              <DragHandle />
+              <span>{idx + 1}</span>
+            </div>
+          ),
         },
         {
           title: 'MẪU CỬA / SẢN PHẨM',
@@ -898,24 +1047,55 @@ export default function OrderList() {
                         )}
                       </div>
                     )}
-                    <AutoComplete
-                      style={{ flex: 1, minWidth: 150 }}
-                      value={record.product_name || (prodObj ? prodObj.name : undefined)}
-                      onChange={(v) => {
-                        const matched = products.find(p => p.name === v && p.product_type !== 'service');
-                        if (matched) {
-                          handleLineChange(idx, 'product', matched.id);
-                          handleLineChange(idx, 'product_name', matched.name);
-                          handleLineChange(idx, 'spec', '');
-                        } else {
+                    {showProductAutoComplete ? (
+                      <AutoComplete
+                        style={{ flex: 1, minWidth: 150 }}
+                        value={record.product_name || (prodObj ? prodObj.name : undefined)}
+                        onChange={(v) => {
+                          const matched = products.find(p => p.name === v && p.product_type !== 'service');
+                          setFormItems(prev => {
+                            const updated = [...prev];
+                            const item = { ...updated[idx] };
+                            if (matched) {
+                              item.product = matched.id;
+                              item.product_name = matched.name;
+                              item.product_image = matched.image_url || matched.image || '';
+                              item.unit = item.unit || matched.unit || 'cái';
+                              item.unit_price = item.unit_price || Number(matched.price || matched.cost_price || 0);
+                              item.spec = '';
+                            } else {
+                              item.product = null;
+                              item.product_name = v;
+                              item.product_image = '';
+                            }
+                            updated[idx] = item;
+                            // sync children in same group
+                            for (let i = idx + 1; i < prev.length; i++) {
+                              const ni = prev[i];
+                              const sameGroup = (ni.product && ni.product === prev[idx].product) ||
+                                (!ni.product && !prev[idx].product && ni.product_name === prev[idx].product_name && !!ni.product_name);
+                              if (!sameGroup) break;
+                              updated[i] = { ...updated[i], product: item.product, product_name: item.product_name, product_image: item.product_image };
+                            }
+                            return updated;
+                          });
+                        }}
+                        options={mainProductGroupedOptions}
+                        filterOption={(inputValue, option) => (option?.value || '').toUpperCase().includes(inputValue.toUpperCase())}
+                        placeholder="Chọn hoặc nhập mẫu cửa..."
+                      />
+                    ) : (
+                      <CustomInfoInput
+                        enableTemplate={enableProductSuggest}
+                        style={{ flex: 1, minWidth: 150 }}
+                        value={record.product_name || (prodObj ? prodObj.name : undefined)}
+                        onChange={(v) => {
                           handleLineChange(idx, 'product', null);
                           handleLineChange(idx, 'product_name', v);
-                        }
-                      }}
-                      options={groupProducts(products.filter(p => p.product_type !== 'service'), true)}
-                      filterOption={(inputValue, option) => (option?.value || '').toUpperCase().includes(inputValue.toUpperCase())}
-                      placeholder="Chọn hoặc nhập mẫu cửa..."
-                    />
+                        }}
+                        placeholder="Nhập mẫu cửa..."
+                      />
+                    )}
                     {enableProductImage && (
                       <Upload
                         fileList={[]}
@@ -1025,7 +1205,28 @@ export default function OrderList() {
                     />
                   </div>
                 )}
-                <CustomInfoInput style={{ textAlign: 'center' }} placeholder="Khóa, bản lề, kính..." value={val || ''} onChange={(v) => handleLineChange(idx, 'note', v)} />
+                {
+                  hasNoteCategoryFilter ? (
+                    <AutoComplete
+                      style={{ textAlign: 'center', width: '100%' }}
+                      placeholder="Khóa, bản lề, kính..."
+                      value={val || ''}
+                      onChange={(v) => {
+                        handleLineChange(idx, 'note', v);
+                        const matched = products.find(p => p.name === v);
+                        if (matched) {
+                          const cd = record.custom_data || {};
+                          const updatedCd = assignProductImage(matched, cd, 'note');
+                          handleLineChange(idx, 'custom_data', updatedCd);
+                        }
+                      }}
+                      options={groupProducts(products.filter(p => noteAllowedCategories.includes(p.category_name)), false)}
+                      filterOption={(inputValue, option) => (option?.value || '').toUpperCase().includes(inputValue.toUpperCase())}
+                    />
+                  ) : (
+                    <CustomInfoInput style={{ textAlign: 'center' }} placeholder="Khóa, bản lề, kính..." value={val || ''} onChange={(v) => handleLineChange(idx, 'note', v)} enableTemplate={noteColCfg?.enableTemplate !== false} />
+                  )
+                }
                 {enableNoteImage && (
                   <Upload fileList={[]} showUploadList={false}
                     customRequest={async ({ file, onSuccess, onError }) => {
@@ -1085,10 +1286,17 @@ export default function OrderList() {
         {
           title: '',
           key: 'action',
-          width: 50,
-          render: (_, __, idx) => formItems.length > 1 ? (
-            <Tooltip title="Xoá dòng"><Button type="text" danger shape="circle" icon={<DeleteOutlined />} onClick={() => handleRemoveLine(idx)} /></Tooltip>
-          ) : null,
+          width: 70,
+          render: (_, __, idx) => (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, justifyContent: 'center' }}>
+              <DragHandle />
+              {formItems.length > 1 && (
+                <Tooltip title="Xoá dòng">
+                  <Button type="text" danger shape="circle" icon={<DeleteOutlined />} onClick={() => handleRemoveLine(idx)} />
+                </Tooltip>
+              )}
+            </div>
+          ),
         },
       ]
     } else {
@@ -1122,24 +1330,55 @@ export default function OrderList() {
                       )}
                     </div>
                   )}
-                  <AutoComplete
-                    style={{ flex: 1, minWidth: 150 }}
-                    value={record.product_name || (prodObj ? prodObj.name : undefined)}
-                    onChange={(v) => {
-                      const matched = products.find(p => p.name === v && p.product_type !== 'service');
-                      if (matched) {
-                        handleLineChange(idx, 'product', matched.id);
-                        handleLineChange(idx, 'product_name', matched.name);
-                        handleLineChange(idx, 'spec', '');
-                      } else {
+                  {showProductAutoComplete ? (
+                    <AutoComplete
+                      style={{ flex: 1, minWidth: 150 }}
+                      value={record.product_name || (prodObj ? prodObj.name : undefined)}
+                      onChange={(v) => {
+                        const matched = products.find(p => p.name === v && p.product_type !== 'service');
+                        setFormItems(prev => {
+                          const updated = [...prev];
+                          const item = { ...updated[idx] };
+                          if (matched) {
+                            item.product = matched.id;
+                            item.product_name = matched.name;
+                            item.product_image = matched.image_url || matched.image || '';
+                            item.unit = item.unit || matched.unit || 'cái';
+                            item.unit_price = item.unit_price || Number(matched.price || matched.cost_price || 0);
+                            item.spec = '';
+                          } else {
+                            item.product = null;
+                            item.product_name = v;
+                            item.product_image = '';
+                          }
+                          updated[idx] = item;
+                          // sync children in same group
+                          for (let i = idx + 1; i < prev.length; i++) {
+                            const ni = prev[i];
+                            const sameGroup = (ni.product && ni.product === prev[idx].product) ||
+                              (!ni.product && !prev[idx].product && ni.product_name === prev[idx].product_name && !!ni.product_name);
+                            if (!sameGroup) break;
+                            updated[i] = { ...updated[i], product: item.product, product_name: item.product_name, product_image: item.product_image };
+                          }
+                          return updated;
+                        });
+                      }}
+                      options={mainProductGroupedOptions}
+                      filterOption={(inputValue, option) => (option?.value || '').toUpperCase().includes(inputValue.toUpperCase())}
+                      placeholder="Chọn hoặc nhập sản phẩm..."
+                    />
+                  ) : (
+                    <CustomInfoInput
+                      enableTemplate={enableProductSuggest}
+                      style={{ flex: 1, minWidth: 150 }}
+                      value={record.product_name || (prodObj ? prodObj.name : undefined)}
+                      onChange={(v) => {
                         handleLineChange(idx, 'product', null);
                         handleLineChange(idx, 'product_name', v);
-                      }
-                    }}
-                    options={groupProducts(products.filter(p => p.product_type !== 'service'), true)}
-                    filterOption={(inputValue, option) => (option?.value || '').toUpperCase().includes(inputValue.toUpperCase())}
-                    placeholder="Chọn hoặc nhập sản phẩm..."
-                  />
+                      }}
+                      placeholder="Nhập mẫu cửa..."
+                    />
+                  )}
                   {enableProductImage && (
                     <Upload
                       fileList={[]}
@@ -1319,13 +1558,36 @@ export default function OrderList() {
           title: 'Kích thước / Ghi chú',
           dataIndex: 'note',
           width: 200,
-          render: (val, record, idx) => (
-            <CustomInfoInput
-              placeholder="VD: 800×2000mm, màu vân gỗ, lắp đặt kèm..."
-              value={val || ''}
-              onChange={(v) => handleLineChange(idx, 'note', v)}
-            />
-          ),
+          render: (val, record, idx) => {
+            if (hasNoteCategoryFilter) {
+              return (
+                <AutoComplete
+                  style={{ width: '100%' }}
+                  placeholder="VD: 800×2000mm, màu vân gỗ..."
+                  value={val || ''}
+                  onChange={(v) => {
+                    handleLineChange(idx, 'note', v);
+                    const matched = products.find(p => p.name === v);
+                    if (matched) {
+                      const cd = record.custom_data || {};
+                      const updatedCd = assignProductImage(matched, cd, 'note');
+                      handleLineChange(idx, 'custom_data', updatedCd);
+                    }
+                  }}
+                  options={groupProducts(products.filter(p => noteAllowedCategories.includes(p.category_name)), false)}
+                  filterOption={(inputValue, option) => (option?.value || '').toUpperCase().includes(inputValue.toUpperCase())}
+                />
+              );
+            }
+            return (
+              <CustomInfoInput
+                placeholder="VD: 800×2000mm, màu vân gỗ, lắp đặt kèm..."
+                value={val || ''}
+                onChange={(v) => handleLineChange(idx, 'note', v)}
+                enableTemplate={noteColCfg?.enableTemplate !== false}
+              />
+            );
+          },
         },
         {
           title: 'ĐVT',
@@ -1348,6 +1610,43 @@ export default function OrderList() {
     const productTableBlock = et?.layout_config?.blocks?.find(b => b.type === 'product_table');
     const customColumns = (productTableBlock?.props?.columns || []).filter(col => typeof col === 'object' && (col.id.startsWith('custom_') || col.id.startsWith('group_')));
 
+    const renderCustomCell = (colDef, val, record, idx) => {
+      if (colDef.allowedCategories && colDef.allowedCategories.length > 0) {
+        const filteredProducts = products.filter(p => colDef.allowedCategories.includes(p.category_name));
+        const options = groupProducts(filteredProducts, false);
+        return (
+          <AutoComplete
+            options={options}
+            style={{ width: '100%', minWidth: 100 }}
+            value={record.custom_data?.[colDef.id] || ''}
+            onChange={(v) => {
+              const newData = { ...(record.custom_data || {}) };
+              newData[colDef.id] = v;
+              const matched = products.find(p => p.name === v);
+              const finalData = matched ? assignProductImage(matched, newData, colDef.id) : newData;
+              handleLineChange(idx, 'custom_data', finalData);
+            }}
+            placeholder={`Chọn ${colDef.title.toLowerCase()}...`}
+            filterOption={(inputValue, option) =>
+              (option.value || '').toUpperCase().indexOf(inputValue.toUpperCase()) !== -1
+            }
+          />
+        );
+      }
+      return (
+        <CustomInfoInput 
+          placeholder={`Nhập ${colDef.title.toLowerCase()}...`}
+          value={record.custom_data?.[colDef.id] || ''} 
+          onChange={(v) => {
+            const newData = { ...(record.custom_data || {}) };
+            newData[colDef.id] = v;
+            handleLineChange(idx, 'custom_data', newData);
+          }} 
+          enableTemplate={colDef.enableTemplate !== false}
+        />
+      );
+    };
+
     if (customColumns.length > 0) {
       customColumns.forEach(col => {
         if (col.id.startsWith('group_') && col.children && col.children.length > 0) {
@@ -1357,17 +1656,7 @@ export default function OrderList() {
               title: child.title,
               dataIndex: child.id,
               width: 100,
-              render: (val, record, idx) => (
-                <CustomInfoInput 
-                  placeholder={`Nhập ${child.title.toLowerCase()}...`}
-                  value={record.custom_data?.[child.id] || ''} 
-                  onChange={(v) => {
-                    const newData = { ...(record.custom_data || {}) };
-                    newData[child.id] = v;
-                    handleLineChange(idx, 'custom_data', newData);
-                  }} 
-                />
-              ),
+              render: (val, record, idx) => renderCustomCell(child, val, record, idx),
             }))
           });
         } else if (col.id.startsWith('custom_')) {
@@ -1375,17 +1664,7 @@ export default function OrderList() {
             title: col.title,
             dataIndex: col.id,
             width: 140,
-            render: (val, record, idx) => (
-              <CustomInfoInput 
-                placeholder={`Nhập ${col.title.toLowerCase()}...`}
-                value={record.custom_data?.[col.id] || ''} 
-                onChange={(v) => {
-                  const newData = { ...(record.custom_data || {}) };
-                  newData[col.id] = v;
-                  handleLineChange(idx, 'custom_data', newData);
-                }} 
-              />
-            ),
+            render: (val, record, idx) => renderCustomCell(col, val, record, idx),
           });
         }
       });
@@ -1524,27 +1803,76 @@ export default function OrderList() {
             const { colSpan, isMergedRoot } = getMergeProps(colId, record);
             if (colSpan === 0) return { props: { colSpan: 0 } };
             
-            if (isMergedRoot) {
-              return {
-                children: <CustomInfoInput enableTemplate={colCfg?.enableTemplate !== false} placeholder="Thêm thông tin..." value={record.custom_data?.custom_size_text || ''} onChange={(val) => {
-                  const currentData = record.custom_data || {};
-                  handleLineChange(idx, 'custom_data', { ...currentData, custom_size_text: val });
-                }} />,
-                props: { colSpan }
-              };
-            }
-            
-            const origResult = origRender(val, record, idx);
-            let innerChildren = origResult;
+            let innerChildren;
             let finalProps = { colSpan };
             
-            if (origResult && typeof origResult === 'object' && origResult.children !== undefined) {
-              innerChildren = origResult.children;
-              finalProps = { ...origResult.props, colSpan: (origResult.props?.colSpan !== undefined && origResult.props?.colSpan !== 1) ? origResult.props.colSpan : colSpan };
-            }
-
-            if (React.isValidElement(innerChildren) && innerChildren.type === CustomInfoInput) {
-              innerChildren = React.cloneElement(innerChildren, { enableTemplate: colCfg?.enableTemplate !== false });
+            if (isMergedRoot) {
+              const dimParentCfg = getColConfig('dimensions');
+              if (dimParentCfg?.allowedCategories && dimParentCfg.allowedCategories.length > 0) {
+                const filteredProducts = products.filter(p => dimParentCfg.allowedCategories.includes(p.category_name));
+                const options = groupProducts(filteredProducts, false);
+                innerChildren = (
+                  <AutoComplete
+                    options={options}
+                    style={{ width: '100%', minWidth: 100 }}
+                    value={record.custom_data?.custom_size_text || ''}
+                    onChange={(val) => {
+                      const currentData = record.custom_data || {};
+                      const matched = products.find(p => p.name === val);
+                      let updates = { custom_size_text: val };
+                      
+                      let finalData = { ...currentData, ...updates };
+                      if (matched) {
+                        finalData = assignProductImage(matched, finalData, 'dimensions');
+                      }
+                      
+                      handleLineChange(idx, 'custom_data', finalData);
+                      
+                      if (matched) {
+                        handleLineChange(idx, 'unit', matched.unit || 'cái');
+                        handleLineChange(idx, 'unit_price', Number(matched.price || matched.cost_price || 0));
+                        if (!record.quantity || record.quantity === 0) {
+                          handleLineChange(idx, 'quantity', 1);
+                        }
+                      }
+                    }}
+                    placeholder="Chọn thông tin..."
+                    filterOption={(inputValue, option) => (option.value || '').toUpperCase().includes(inputValue.toUpperCase())}
+                  />
+                );
+              } else {
+                innerChildren = <CustomInfoInput enableTemplate={colCfg?.enableTemplate !== false} placeholder="Thêm thông tin..." value={record.custom_data?.custom_size_text || ''} onChange={(val) => {
+                  const currentData = record.custom_data || {};
+                  const matched = products.find(p => p.name === val);
+                  
+                  let finalData = { ...currentData, custom_size_text: val };
+                  if (matched) {
+                    finalData = assignProductImage(matched, finalData, 'dimensions');
+                  }
+                  
+                  handleLineChange(idx, 'custom_data', finalData);
+                  
+                  if (matched) {
+                    handleLineChange(idx, 'unit', matched.unit || 'cái');
+                    handleLineChange(idx, 'unit_price', Number(matched.price || matched.cost_price || 0));
+                    if (!record.quantity || record.quantity === 0) {
+                      handleLineChange(idx, 'quantity', 1);
+                    }
+                  }
+                }} />;
+              }
+            } else {
+              const origResult = origRender(val, record, idx);
+              innerChildren = origResult;
+              
+              if (origResult && typeof origResult === 'object' && origResult.children !== undefined) {
+                innerChildren = origResult.children;
+                finalProps = { ...origResult.props, colSpan: (origResult.props?.colSpan !== undefined && origResult.props?.colSpan !== 1) ? origResult.props.colSpan : colSpan };
+              }
+  
+              if (React.isValidElement(innerChildren) && innerChildren.type === CustomInfoInput) {
+                innerChildren = React.cloneElement(innerChildren, { enableTemplate: colCfg?.enableTemplate !== false });
+              }
             }
 
             const canUpload = colCfg.allowImageUpload === true;
@@ -1618,6 +1946,13 @@ export default function OrderList() {
     const enableServiceImage = serviceBlock?.props?.enableProductImage !== false;
 
     let baseCols = [
+      {
+        title: '',
+        key: 'sort',
+        width: 40,
+        align: 'center',
+        render: () => <DragHandle />,
+      },
       {
         title: 'STT',
         key: 'stt',
@@ -1898,9 +2233,11 @@ export default function OrderList() {
               unit_price: Number(it.unit_price || 0),
               discount_percent: Number(it.discount_percent || 0),
               note: it.note || '',
-              product_image: it.product_image || '',
-              unit: it.custom_data?.unit || 'cái',
+              product_image: it.product_image || (products.find(p => p.id === it.product)?.image_url || products.find(p => p.id === it.product)?.image) || '',
+              unit: it.custom_data?.unit || (products.find(p => p.id === it.product)?.unit || 'cái'),
+              symbol: it.custom_data?.symbol || it.symbol || '',
               custom_data: it.custom_data || {},
+              product_name: it.product_name || (products.find(p => p.id === it.product)?.name || ''),
             }))
           )
         } else {
@@ -2039,11 +2376,17 @@ export default function OrderList() {
           thickness: Number(it.thickness || 0),
           area: Number(Number(it.area || 0).toFixed(2)),
           spec: it.spec || (prodObj ? prodObj.description : '') || '',
-          warranty: it.warranty || '',
-          note: it.note || '',
+          warranty: it.warranty || '12 tháng',
+          product_image: it.product_image || (prodObj ? (prodObj.image_url || prodObj.image) : '') || '',
+          custom_data: {
+            ...(it.custom_data || {}),
+            unit: it.unit || (prodObj ? prodObj.unit : 'cái'),
+            thickness: Math.round(Number(it.thickness || 0)),
+            symbol: it.custom_data?.symbol || it.symbol || '',
+          },
           quantity: Number(it.quantity || 1),
           discount_percent: Number(it.discount_percent || 0),
-          custom_data: it.custom_data || {},
+          note: it.note || '',
         })
       }
 

@@ -327,14 +327,14 @@ export default function QuotationRenderer({ layoutConfig, layoutStyle, data, ren
         const tableTitle = block.props.tableTitle;
         const enableProductImage = (() => {
           const nameCol = (block.props.columns || []).find(c => (typeof c === 'object' ? c.id : c) === 'name');
-          if (nameCol && typeof nameCol === 'object') return nameCol.allowImageUpload === true;
+          if (nameCol && typeof nameCol === 'object' && 'allowImageUpload' in nameCol) return nameCol.allowImageUpload === true;
           return block.props.enableProductImage !== false;
         })();
         const enableProductName = block.props.enableProductName !== false;
         const enableProductDescription = block.props.enableProductDescription !== false;
         const enableNoteImage = (() => {
           const noteCol = (block.props.columns || []).find(c => (typeof c === 'object' ? c.id : c) === 'note');
-          if (noteCol && typeof noteCol === 'object') return noteCol.allowImageUpload === true;
+          if (noteCol && typeof noteCol === 'object' && 'allowImageUpload' in noteCol) return noteCol.allowImageUpload === true;
           return block.props.enableNoteImage !== false;
         })();
         const useComplexDimensions = block.props.useComplexDimensions !== false;

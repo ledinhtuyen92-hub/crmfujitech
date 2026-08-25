@@ -401,7 +401,7 @@ class FacebookMessage(models.Model):
     class Meta:
         verbose_name = "Tin nhắn Facebook"
         verbose_name_plural = "Tin nhắn Facebook"
-        ordering = ["created_at"]
+        ordering = ["created_at", "id"]
 
     def __str__(self):
         preview = (self.text or "[Đính kèm]")[:40]

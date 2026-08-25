@@ -149,7 +149,7 @@ export default function Products() {
   }, [fetchCategories])
 
   useEffect(() => {
-    if (activeTab === 'products') fetchProducts()
+    if (activeTab === 'products' || activeTab === 'services') fetchProducts()
     else if (activeTab === 'categories') fetchCategories()
   }, [activeTab, fetchProducts, fetchCategories])
 
@@ -896,7 +896,10 @@ export default function Products() {
           <Collapse
             accordion
             activeKey={activeTab}
-            onChange={(key) => setActiveTab(key || 'products')}
+            onChange={(key) => {
+              setActiveTab(key || 'products');
+              setCategoryFilter('');
+            }}
             items={tabItems}
             style={{ background: 'transparent' }}
             bordered={false}
@@ -904,7 +907,10 @@ export default function Products() {
         ) : (
           <Tabs
             activeKey={activeTab}
-            onChange={setActiveTab}
+            onChange={(key) => {
+              setActiveTab(key);
+              setCategoryFilter('');
+            }}
             size="middle"
             items={tabItems}
           />

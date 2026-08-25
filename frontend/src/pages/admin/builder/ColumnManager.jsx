@@ -21,7 +21,7 @@ const PREDEFINED_COLUMNS = [
   { id: 'total', title: 'Thành tiền' }
 ];
 
-function SortableItem({ col, onRemove, onAddChild, onRemoveChild, onUpdateCol, onUpdateChild }) {
+function SortableItem({ col, onRemove, onAddChild, onRemoveChild, onUpdateCol, onUpdateChild, categories = [] }) {
   const { id, title, children: childrenColumns } = col;
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id });
   const [childTitle, setChildTitle] = useState('');
@@ -78,13 +78,29 @@ function SortableItem({ col, onRemove, onAddChild, onRemoveChild, onUpdateCol, o
                   >
                     Cho phép tải ảnh đính kèm
                   </Checkbox>
-                  {(id.startsWith('custom_') || id.startsWith('group_') || id === 'note' || id === 'spec' || id === 'warranty' || id === 'symbol') && (
-                    <Checkbox 
-                      checked={col.enableTemplate !== false} 
-                      onChange={e => onUpdateCol(id, { enableTemplate: e.target.checked })}
-                    >
-                      Bật tính năng Gợi ý / Lưu mẫu chữ
-                    </Checkbox>
+                  {(id === 'name' || id === 'dimensions' || id.startsWith('custom_') || id.startsWith('group_') || id === 'note' || id === 'spec' || id === 'warranty' || id === 'symbol') && (
+                    <>
+                      <Checkbox 
+                        checked={col.enableTemplate !== false} 
+                        onChange={e => onUpdateCol(id, { enableTemplate: e.target.checked })}
+                      >
+                        Bật tính năng Gợi ý / Lưu mẫu chữ
+                      </Checkbox>
+                      <div style={{ marginTop: 8 }}>
+                        <div style={{ fontSize: 12, marginBottom: 4, color: '#475569' }}>Bộ lọc Thư mục (gợi ý sản phẩm):</div>
+                        <Select
+                          mode="multiple"
+                          placeholder="Tất cả thư mục"
+                          style={{ width: '100%' }}
+                          value={col.allowedCategories || []}
+                          onChange={(vals) => onUpdateCol(id, { allowedCategories: vals })}
+                          allowClear
+                          size="small"
+                        >
+                          {categories.map(c => <Option key={c.id} value={c.name}>{c.name}</Option>)}
+                        </Select>
+                      </div>
+                    </>
                   )}
                 {/* Additional column settings can be added here */}
               </div>
@@ -129,13 +145,29 @@ function SortableItem({ col, onRemove, onAddChild, onRemoveChild, onUpdateCol, o
                       >
                         Cho phép tải ảnh đính kèm
                       </Checkbox>
-                      {(child.id.startsWith('custom_') || child.id === 'note' || child.id === 'spec' || child.id === 'warranty' || child.id === 'symbol' || child.id === 'height' || child.id === 'width' || child.id === 'thickness') && (
-                        <Checkbox 
-                          checked={child.enableTemplate !== false} 
-                          onChange={e => onUpdateChild && onUpdateChild(id, child.id, { enableTemplate: e.target.checked })}
-                        >
-                          Bật tính năng Gợi ý / Lưu mẫu chữ
-                        </Checkbox>
+                      {(child.id.startsWith('custom_') || child.id === 'note' || child.id === 'spec' || child.id === 'warranty' || child.id === 'symbol') && (
+                        <>
+                          <Checkbox 
+                            checked={child.enableTemplate !== false} 
+                            onChange={e => onUpdateChild && onUpdateChild(id, child.id, { enableTemplate: e.target.checked })}
+                          >
+                            Bật tính năng Gợi ý / Lưu mẫu chữ
+                          </Checkbox>
+                          <div style={{ marginTop: 8 }}>
+                            <div style={{ fontSize: 12, marginBottom: 4, color: '#475569' }}>Bộ lọc Thư mục (gợi ý sản phẩm):</div>
+                            <Select
+                              mode="multiple"
+                              placeholder="Tất cả thư mục"
+                              style={{ width: '100%' }}
+                              value={child.allowedCategories || []}
+                              onChange={(vals) => onUpdateChild && onUpdateChild(id, child.id, { allowedCategories: vals })}
+                              allowClear
+                              size="small"
+                            >
+                              {categories.map(c => <Option key={c.id} value={c.name}>{c.name}</Option>)}
+                            </Select>
+                          </div>
+                        </>
                       )}
                     </div>
                   }
@@ -172,7 +204,7 @@ function SortableItem({ col, onRemove, onAddChild, onRemoveChild, onUpdateCol, o
   );
 }
 
-export default function ColumnManager({ value = [], onChange }) {
+export default function ColumnManager({ value = [], onChange, categories = [] }) {
   const [selectedToAdd, setSelectedToAdd] = useState(null);
   const [customTitle, setCustomTitle] = useState('');
   const [groupTitle, setGroupTitle] = useState('');
@@ -296,6 +328,7 @@ export default function ColumnManager({ value = [], onChange }) {
                 onRemoveChild={handleRemoveChild}
                 onUpdateCol={handleUpdateCol}
                 onUpdateChild={handleUpdateChild}
+                categories={categories}
               />
             );
           })}
