@@ -2421,7 +2421,7 @@ export default function QuotationList() {
                     onChange={(val) => {
                       const currentData = record.custom_data || {};
                       const matched = products.find(p => p.name === val);
-                      let updates = { custom_size_text: val };
+                      let updates = { custom_size_text: val, actual_product_id: matched ? matched.id : null };
                       
                       let finalData = { ...currentData, ...updates };
                       if (matched) {
@@ -2447,7 +2447,7 @@ export default function QuotationList() {
                   const currentData = record.custom_data || {};
                   const matched = products.find(p => p.name === val);
                   
-                  let finalData = { ...currentData, custom_size_text: val };
+                  let finalData = { ...currentData, custom_size_text: val, actual_product_id: matched ? matched.id : null };
                   if (matched) {
                     finalData = assignProductImage(matched, finalData, 'dimensions');
                   }

@@ -595,6 +595,31 @@ export default function ProductionList() {
         Công đoạn
       </Button>
 
+      {canEdit && record.status !== 'completed' && (
+        <Tooltip title="Đánh dấu Hoàn thành">
+          <Popconfirm
+            title="Đánh dấu Lệnh Sản Xuất này đã Hoàn thành?"
+            onConfirm={async () => {
+              try {
+                await api.patch(`/production/orders/${record.id}/`, { status: 'completed' })
+                messageApi.success('Đã cập nhật trạng thái Hoàn thành')
+                fetchProductionOrders()
+              } catch (error) {
+                messageApi.error('Lỗi khi cập nhật trạng thái')
+              }
+            }}
+            okText="Đồng ý"
+            cancelText="Hủy"
+          >
+            <Button
+              type="text"
+              shape="circle"
+              icon={<CheckCircleOutlined style={{ color: '#10b981' }} />}
+            />
+          </Popconfirm>
+        </Tooltip>
+      )}
+
       {canEdit && (
         <Tooltip title="Sửa lệnh SX">
           <Button

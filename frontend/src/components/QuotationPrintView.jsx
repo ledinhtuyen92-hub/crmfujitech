@@ -161,6 +161,8 @@ export default function QuotationPrintView({ quotation, type = 'quotation', docu
           data={quotationData} 
           renderCustomerSignature={renderCustomerSignature}
           documentType={documentType !== 'quotation' ? documentType : type}
+          hidePricing={hidePricing}
+          hideCustomerInfo={hideCustomerInfo}
         />
       </div>
     </div>

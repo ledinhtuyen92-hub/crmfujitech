@@ -1824,7 +1824,7 @@ export default function OrderList() {
                     onChange={(val) => {
                       const currentData = record.custom_data || {};
                       const matched = products.find(p => p.name === val);
-                      let updates = { custom_size_text: val };
+                      let updates = { custom_size_text: val, actual_product_id: matched ? matched.id : null };
                       
                       let finalData = { ...currentData, ...updates };
                       if (matched) {
@@ -1850,7 +1850,7 @@ export default function OrderList() {
                   const currentData = record.custom_data || {};
                   const matched = products.find(p => p.name === val);
                   
-                  let finalData = { ...currentData, custom_size_text: val };
+                  let finalData = { ...currentData, custom_size_text: val, actual_product_id: matched ? matched.id : null };
                   if (matched) {
                     finalData = assignProductImage(matched, finalData, 'dimensions');
                   }
@@ -3662,7 +3662,7 @@ export default function OrderList() {
           >
             <Select placeholder="Chọn người duyệt...">
               {approvers.map(u => (
-                <Option key={u.id} value={u.id}>{u.fullname || u.username}</Option>
+                <Option key={u.id} value={u.id}>{u.full_name ? `${u.full_name} (${u.username})` : u.username} {u.role_name ? `- ${u.role_name}` : ''}</Option>
               ))}
             </Select>
           </Form.Item>

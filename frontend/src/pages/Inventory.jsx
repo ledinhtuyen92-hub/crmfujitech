@@ -2383,23 +2383,11 @@ export default function Inventory() {
                         placeholder="--- Chọn chung 1 kho ---"
                         onChange={(val) => {
                           const newIds = { ...approveWarehouseIds }
-                          let skipped = 0
                           txns.forEach(t => {
-                            const stock = stockLevels.find(s => Number(s.warehouse) === Number(val) && Number(s.product) === Number(t.product))
-                            const qty = stock ? Number(stock.quantity) : 0
-                            const reqQty = Number(t.quantity)
-                            if (qty >= reqQty) {
-                              newIds[t.id] = val
-                            } else {
-                              skipped++
-                            }
+                            newIds[t.id] = val;
                           })
                           setApproveWarehouseIds(newIds)
-                          if (skipped > 0) {
-                            messageApi.warning(`Đã bỏ qua ${skipped} sản phẩm do không đủ tồn ở kho vừa chọn.`)
-                          } else {
-                            messageApi.success('Đã áp dụng kho xuất cho tất cả sản phẩm.')
-                          }
+                          messageApi.success('Đã áp dụng kho xuất cho tất cả sản phẩm.')
                           
                           // Auto-suggest factory based on linked_warehouse
                           const linkedFactory = factories.find(f => f.linked_warehouse === val)
@@ -2452,7 +2440,7 @@ export default function Inventory() {
                             const reqQty = Number(txn.quantity)
                             const isEnough = qty >= reqQty
                             return (
-                              <Option key={w.id} value={w.id} disabled={!isEnough}>
+                              <Option key={w.id} value={w.id}>
                                 <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                                   <span>{w.name}</span>
                                   <span style={{ color: isEnough ? '#16a34a' : '#dc2626', fontWeight: 600 }}>

@@ -73,18 +73,32 @@ class ProductionOrderViewSet(TenantQuerySetMixin, viewsets.ModelViewSet):
             raise NotFound("Không tìm thấy đơn hàng liên kết.")
             
         from inventory.models import InventoryTransaction
-        txn = InventoryTransaction.objects.filter(
+        txns = InventoryTransaction.objects.filter(
             reference_order=instance.order, 
             type=InventoryTransaction.TYPE_EXPORT
-        ).order_by('-created_at').first()
+        ).order_by('created_at')
         
-        if not txn:
+        if not txns.exists():
             from rest_framework.exceptions import NotFound
             raise NotFound("Không tìm thấy phiếu xuất kho liên kết.")
             
         # Return export details bypass standard view permissions
-        serializer = InventoryTransactionSerializer(txn, context={'request': request})
-        return Response(serializer.data)
+        first_txn = txns.first()
+        serializer = InventoryTransactionSerializer(first_txn, context={'request': request})
+        data = serializer.data
+        
+        # Inject items for frontend TransactionPrintView
+        items = []
+        for t in txns:
+            items.append({
+                "id": t.id,
+                "product_sku": t.product.sku if t.product else "",
+                "product_name": t.custom_product_name if t.custom_product_name else (t.product.name if t.product else ""),
+                "quantity": t.quantity,
+                "unit_cost": t.unit_cost,
+            })
+        data["items"] = items
+        return Response(data)
 
     def get_queryset(self):
         qs = super().get_queryset()

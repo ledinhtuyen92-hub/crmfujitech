@@ -125,7 +125,7 @@ const computeProductSTT = (data, index, field = 'product') => {
  * QuotationRenderer takes the layout_config JSON and actual data (customer, items, totals)
  * and renders the final read-only HTML view.
  */
-export default function QuotationRenderer({ layoutConfig, layoutStyle, data, renderCustomerSignature, documentType = 'quotation' }) {
+export default function QuotationRenderer({ layoutConfig, layoutStyle, data, renderCustomerSignature, documentType = 'quotation', hidePricing = false, hideCustomerInfo = false }) {
   if (!layoutConfig || !Array.isArray(layoutConfig.blocks)) {
     return <div style={{ padding: 20, textAlign: 'center' }}>Mẫu báo giá chưa được thiết kế.</div>;
   }
@@ -245,6 +245,7 @@ export default function QuotationRenderer({ layoutConfig, layoutStyle, data, ren
         ) : null;
         
       case BLOCK_TYPES.CUSTOMER_INFO:
+        if (hideCustomerInfo) return null;
         // Resolve seller info: luôn ưu tiên dữ liệu thực từ company
         const sellerName = company?.name || parseVariables(block.props.companyName || '{{company_name}}', data, company);
         const sellerRep = company?.director_name || parseVariables(block.props.representative || '{{director_name}}', data, company);
@@ -353,7 +354,11 @@ export default function QuotationRenderer({ layoutConfig, layoutStyle, data, ren
               {block.props.showHeader !== false && (
                 <thead>
                   <tr style={{ background: '#fafafa' }}>
-                  {(block.props.columns || []).map(col => {
+                  {(block.props.columns || []).filter(col => {
+                    const colId = typeof col === 'object' ? col.id : col;
+                    if (hidePricing && (colId === 'price' || colId === 'total')) return false;
+                    return true;
+                  }).map(col => {
                     const colId = typeof col === 'object' ? col.id : col;
                     const colTitle = typeof col === 'object' ? col.title : null;
                     if (colId === 'stt') return <th key="stt" style={{ ...thStyle, color: clr, width: 40 }}>{colTitle || 'STT'}</th>;
@@ -414,7 +419,11 @@ export default function QuotationRenderer({ layoutConfig, layoutStyle, data, ren
 
                     return (
                       <tr key={index}>
-                        {(block.props.columns || []).map(col => {
+                        {(block.props.columns || []).filter(col => {
+                          const colId = typeof col === 'object' ? col.id : col;
+                          if (hidePricing && (colId === 'price' || colId === 'total')) return false;
+                          return true;
+                        }).map(col => {
                           const colId = typeof col === 'object' ? col.id : col;
                           const showSpecs = typeof block.props.columns?.[0] === 'object' 
                             ? block.props.columns.some(c => c.id === 'specs')
@@ -436,7 +445,7 @@ export default function QuotationRenderer({ layoutConfig, layoutStyle, data, ren
                           if (colId === 'stt') return rowSpan > 0 ? <td key="stt" rowSpan={rowSpan} style={{ ...tdStyle, textAlign: 'center', fontWeight: 600, color: clr, verticalAlign: 'middle' }}>{sttNum}</td> : null;
                           if (colId === 'name') return rowSpan > 0 ? (
                             <td key="name" rowSpan={rowSpan} style={{...tdStyle, verticalAlign: 'middle', textAlign: 'left', height: '1px'}}>
-                              <div style={{ height: '100%', display: 'flex', flexDirection: 'column', minHeight: 80 }}>
+                              <div style={{ height: '100%', display: 'flex', flexDirection: 'column', minHeight: (enableProductImage && item.product_image) ? 80 : 'auto' }}>
                                 {enableProductImage && item.product_image && (
                                   <div style={{ flex: 1, position: 'relative', width: '100%', minHeight: 0, marginBottom: 4 }}>
                                     <img src={item.product_image} alt="" style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', borderRadius: 4, objectFit: 'contain' }} />
@@ -585,6 +594,7 @@ export default function QuotationRenderer({ layoutConfig, layoutStyle, data, ren
         );
 
       case BLOCK_TYPES.TOTALS:
+        if (hidePricing) return null;
         const isNested = !!block.parentId && block.parentId !== 'canvas';
         return (
           <Row justify={isNested ? "center" : "end"} style={{ marginBottom: 0 }}>
@@ -603,6 +613,7 @@ export default function QuotationRenderer({ layoutConfig, layoutStyle, data, ren
         );
 
       case BLOCK_TYPES.PAYMENT_PROGRESS:
+        if (hidePricing) return null;
         const payments = data?.payment_terms_schedule || [];
         const paidAmount = Number(data?.paid_amount || 0);
         const totalAmount = Number(data?.total_amount || totals?.total || 0);
@@ -658,6 +669,7 @@ export default function QuotationRenderer({ layoutConfig, layoutStyle, data, ren
         );
 
       case BLOCK_TYPES.TERMS:
+        if (hideCustomerInfo) return null;
         let termContent = block.props.content || '';
         termContent = parseVariables(termContent, data, company);
         return (
@@ -671,10 +683,13 @@ export default function QuotationRenderer({ layoutConfig, layoutStyle, data, ren
 
       case BLOCK_TYPES.SIGNATURES:
         return (
-          <Row justify="space-around" style={{ marginTop: 12, textAlign: 'center', paddingBottom: 0, pageBreakInside: 'avoid', breakInside: 'avoid' }}>
-            {Array.from({ length: block.props.columns || 2 }).map((_, idx) => (
+          <Row justify={hideCustomerInfo ? "end" : "space-around"} style={{ marginTop: 12, textAlign: 'center', paddingBottom: 0, pageBreakInside: 'avoid', breakInside: 'avoid' }}>
+            {Array.from({ length: block.props.columns || 2 }).map((_, idx) => {
+              const title = block.props.titles?.[idx] || 'CHỮ KÝ';
+              if (hideCustomerInfo && (title.toUpperCase().includes('KHÁCH HÀNG') || title.toUpperCase().includes('BÊN MUA'))) return null;
+              return (
               <Col xs={24} md={24 / (block.props.columns || 2)} key={idx}>
-                <div style={{ fontWeight: 700, color: clr, fontSize: 13 }}>{block.props.titles?.[idx] || 'CHỮ KÝ'}</div>
+                <div style={{ fontWeight: 700, color: clr, fontSize: 13 }}>{title}</div>
                 <div style={{ fontSize: 11, color: '#64748b', fontStyle: 'italic', marginBottom: 12 }}>(Ký, đóng dấu & ghi rõ họ tên)</div>
                 
                 <div style={{ minHeight: 140, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'flex-start', paddingTop: 10, position: 'relative' }}>
@@ -690,7 +705,8 @@ export default function QuotationRenderer({ layoutConfig, layoutStyle, data, ren
                   )}
                 </div>
               </Col>
-            ))}
+              );
+            })}
           </Row>
         );
 

@@ -160,7 +160,7 @@ def summary(request):
     )
     order_stats["revenue_in_period"] = float(revenue_in_period)
 
-    order_items_qs = OrderItem.objects.filter(order__in=order_qs, item_type="product")
+    order_items_qs = OrderItem.objects.filter(order__in=order_qs, item_type="product").exclude(custom_data__has_key='actual_product_id')
     won_products = order_items_qs.filter(
         order__status__in=["approved", "in_production", "completed"]
     ).aggregate(total=Sum("quantity"))["total"] or 0

@@ -239,28 +239,39 @@ def _create_pending_inventory_export(order):
             if item.item_type == 'service' or (item.product and item.product.product_type == 'service'):
                 continue
                 
-            # Generate custom product name with dimensions
-            custom_name = item.product.name if item.product else item.product_name
+            actual_product_id = item.custom_data.get('actual_product_id') if isinstance(item.custom_data, dict) else None
+            
+            if actual_product_id:
+                from inventory.models import Product
+                real_product = Product.objects.filter(id=actual_product_id).first()
+                txn_product = real_product if real_product else item.product
+                custom_name = real_product.name if real_product else (item.product.name if item.product else item.product_name)
+            else:
+                txn_product = item.product
+                custom_name = item.product.name if item.product else item.product_name
+
             dims = []
             
             def format_dim(val):
                 f_val = float(val)
                 return f"{int(f_val)}" if f_val.is_integer() else f"{f_val}"
                 
-            if hasattr(item, 'length') and item.length and float(item.length) > 0: dims.append(format_dim(item.length))
-            if hasattr(item, 'height') and item.height and float(item.height) > 0: dims.append(format_dim(item.height))
-            if hasattr(item, 'width') and item.width and float(item.width) > 0: dims.append(format_dim(item.width))
-            if hasattr(item, 'thickness') and item.thickness and float(item.thickness) > 0: dims.append(format_dim(item.thickness))
-            
-            if dims:
-                custom_name += f" ({' x '.join(dims)})"
+            if not actual_product_id:
+                if hasattr(item, 'length') and item.length and float(item.length) > 0: dims.append(format_dim(item.length))
+                if hasattr(item, 'height') and item.height and float(item.height) > 0: dims.append(format_dim(item.height))
+                if hasattr(item, 'width') and item.width and float(item.width) > 0: dims.append(format_dim(item.width))
+                if hasattr(item, 'thickness') and item.thickness and float(item.thickness) > 0: dims.append(format_dim(item.thickness))
+                
+                if dims:
+                    custom_name += f" ({' x '.join(dims)})"
 
+            from inventory.models import InventoryTransaction
             InventoryTransaction.objects.create(
                 company=order.company,
                 transaction_code=txn_code,
                 type=InventoryTransaction.TYPE_EXPORT,
                 status=InventoryTransaction.STATUS_PENDING,
-                product=item.product,
+                product=txn_product,
                 custom_product_name=custom_name,
                 warehouse=None,
                 quantity=item.quantity,
