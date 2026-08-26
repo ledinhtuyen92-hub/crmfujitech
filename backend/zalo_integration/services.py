@@ -158,7 +158,9 @@ def convert_social_lead(social_lead, phone_number: str, assigned_user=None, cust
         social_lead.is_customer_converted = True
         if phone_number and not social_lead.detected_phone:
             social_lead.detected_phone = phone_number
-        social_lead.save(update_fields=["status", "is_customer_converted", "detected_phone", "updated_at"])
+        if customer.assigned_to and not social_lead.assigned_to:
+            social_lead.assigned_to = customer.assigned_to
+        social_lead.save(update_fields=["status", "is_customer_converted", "detected_phone", "assigned_to", "updated_at"])
 
     if getattr(social_lead, 'ai_summary', None):
         creator = action_user or assigned_user or social_lead.assigned_to

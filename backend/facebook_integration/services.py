@@ -511,6 +511,30 @@ def process_fb_webhook_message(entry: dict):
             if profile.get("avatar") and not lead.fb_user_avatar:
                 lead.fb_user_avatar = profile["avatar"]
 
+        # ── Tự động kế thừa assigned_to từ Customer đã có ──────────────────
+        # Nếu lead vừa tạo mới (hoặc chưa được phân công), tìm customer đã liên kết
+        # với fb_user_id này (qua các lead khác) để kế thừa người phụ trách.
+        if not lead.assigned_to:
+            try:
+                from crm.models import Customer
+                # Tìm customer qua các lead cũ có cùng fb_user_id (có thể từ page khác)
+                existing_lead_with_customer = FacebookLead.objects.filter(
+                    company=page_config.company,
+                    fb_user_id=customer_psid,
+                    customer__isnull=False,
+                    customer__assigned_to__isnull=False,
+                ).exclude(id=lead.id).select_related('customer').first()
+                if existing_lead_with_customer:
+                    assigned = existing_lead_with_customer.customer.assigned_to
+                    lead.assigned_to = assigned
+                    lead.customer = existing_lead_with_customer.customer
+                    lead.is_customer_converted = True
+                    lead.save(update_fields=["assigned_to", "customer", "is_customer_converted"])
+                    logger.info(f"[FB Webhook] Inherited assigned_to={assigned} for new lead from existing customer")
+            except Exception as e:
+                logger.error(f"[FB Webhook] Failed to inherit assigned_to: {e}")
+        # ────────────────────────────────────────────────────────────────────
+
         # Cập nhật trạng thái is_customer_converted nếu cần
         if lead.customer:
             from crm.models import Customer
@@ -836,7 +860,9 @@ def convert_facebook_lead(lead, phone_number: str, assigned_user=None, customer_
     lead.is_customer_converted = True
     if phone_number and not lead.detected_phone:
         lead.detected_phone = phone_number
-    lead.save(update_fields=["customer", "is_customer_converted", "detected_phone", "updated_at"])
+    if customer.assigned_to and not lead.assigned_to:
+        lead.assigned_to = customer.assigned_to
+    lead.save(update_fields=["customer", "is_customer_converted", "detected_phone", "assigned_to", "updated_at"])
     
     if getattr(lead, 'ai_summary', None):
         creator = action_user or assigned_user or lead.assigned_to
@@ -968,6 +994,24 @@ def sync_page_conversations_history(page_config, max_conversations: int = 100, l
                     lead.has_unread_message = unread
                     lead.unread_count = unread_cnt
                 lead.save()
+
+            # ── Tự động kế thừa assigned_to từ Customer đã có ─────────────
+            if not lead.assigned_to:
+                try:
+                    existing_lead_with_customer = FacebookLead.objects.filter(
+                        company=page_config.company,
+                        fb_user_id=psid,
+                        customer__isnull=False,
+                        customer__assigned_to__isnull=False,
+                    ).exclude(id=lead.id).select_related('customer').first()
+                    if existing_lead_with_customer:
+                        lead.assigned_to = existing_lead_with_customer.customer.assigned_to
+                        lead.customer = existing_lead_with_customer.customer
+                        lead.is_customer_converted = True
+                        lead.save(update_fields=["assigned_to", "customer", "is_customer_converted"])
+                except Exception as e:
+                    logger.error(f"[SyncHistory] Failed to inherit assigned_to: {e}")
+            # ────────────────────────────────────────────────────────────────
 
             synced_conversations += 1
 

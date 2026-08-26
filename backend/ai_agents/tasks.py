@@ -1154,6 +1154,8 @@ def _apply_extracted_info(lead, phone, email, address, platform):
                 lead.is_customer_converted = True
                 if platform == 'zalo': lead.customer = existing_customer
                 elif platform == 'facebook': lead.customer_id = existing_customer.id
+                if existing_customer.assigned_to and not lead.assigned_to:
+                    lead.assigned_to = existing_customer.assigned_to
                 updated = True
             elif auto_create:
                 new_customer = Customer.objects.create(
@@ -1167,6 +1169,8 @@ def _apply_extracted_info(lead, phone, email, address, platform):
                 lead.is_customer_converted = True
                 if platform == 'zalo': lead.customer = new_customer
                 elif platform == 'facebook': lead.customer_id = new_customer.id
+                if new_customer.assigned_to and not lead.assigned_to:
+                    lead.assigned_to = new_customer.assigned_to
                 updated = True
                 
     if updated:
