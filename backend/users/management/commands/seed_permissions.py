@@ -114,6 +114,7 @@ PERMISSIONS = [
     # ── Zalo Integration (Tích hợp Zalo OA) ───────────────────────
     {"code": "zalo.view", "name": "Xem danh sách hội thoại (Zalo Inbox)", "module": "zalo"},
     {"code": "zalo.view_all_inbox", "name": "Xem toàn bộ hội thoại Zalo (không giới hạn bởi phân công)", "module": "zalo"},
+    {"code": "zalo.view_unassigned_inbox", "name": "Xem các hội thoại Zalo chưa được phân công", "module": "zalo"},
     {"code": "zalo.send_zns", "name": "Gửi tin nhắn ZNS chăm sóc khách hàng", "module": "zalo"},
     {"code": "zalo.config", "name": "Cấu hình kết nối Zalo OA & Mẫu ZNS", "module": "zalo"},
     {"code": "zalo.manage_templates", "name": "Quản lý mẫu in & cấu hình tự động ZNS", "module": "zalo"},
@@ -125,6 +126,7 @@ PERMISSIONS = [
     # ── Facebook Integration (Tích hợp Facebook Multi-Page) ────────
     {"code": "facebook.view_inbox", "name": "Xem Hộp thư Facebook (Multi-Page Inbox)", "module": "facebook"},
     {"code": "facebook.view_all_inbox", "name": "Xem toàn bộ hội thoại Facebook (không giới hạn bởi phân công)", "module": "facebook"},
+    {"code": "facebook.view_unassigned_inbox", "name": "Xem các hội thoại Facebook chưa được phân công", "module": "facebook"},
     {"code": "facebook.chat", "name": "Chat trực tiếp với khách hàng trên Facebook", "module": "facebook"},
     {"code": "facebook.create_customer", "name": "Tạo khách hàng từ hội thoại Facebook", "module": "facebook"},
     {"code": "facebook.manage_config", "name": "Quản lý kết nối Trang Facebook & Cấu hình tự động quét SĐT", "module": "facebook"},

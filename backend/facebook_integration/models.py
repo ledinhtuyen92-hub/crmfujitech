@@ -376,6 +376,19 @@ class FacebookMessage(models.Model):
         default="customer",
         verbose_name="Người gửi",
     )
+    sender_role = models.CharField(
+        max_length=20,
+        null=True,
+        blank=True,
+        choices=[("ai", "AI"), ("sale", "Sale"), ("system", "Hệ thống")],
+        verbose_name="Vai trò gửi",
+    )
+    sender_name = models.CharField(
+        max_length=100,
+        null=True,
+        blank=True,
+        verbose_name="Tên người gửi (nếu có)",
+    )
     text = models.TextField(
         blank=True,
         verbose_name="Nội dung văn bản",

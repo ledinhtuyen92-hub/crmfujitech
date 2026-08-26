@@ -1411,9 +1411,6 @@ export default function ZaloInboxPage() {
                     const isOutbound = msg.direction === 'outbound'
                     return (
                       <div key={msg.id} style={{ display: 'flex', flexDirection: 'column', alignItems: isOutbound ? 'flex-end' : 'flex-start', marginBottom: 16 }}>
-                        <Text type="secondary" style={{ fontSize: 11, marginBottom: 4, marginLeft: isOutbound ? 0 : 36, marginRight: isOutbound ? 8 : 0 }}>
-                          {msg.sender_name}
-                        </Text>
                         <div style={{ display: 'flex', gap: 8, alignItems: 'flex-start', flexDirection: isOutbound ? 'row-reverse' : 'row' }}>
                           {!isOutbound && <Avatar size={28} src={selectedLead.avatar_url} icon={<UserOutlined />} />}
                           <div style={{
@@ -1454,6 +1451,9 @@ export default function ZaloInboxPage() {
                           </div>
                         </div>
                         <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginTop: 4, marginRight: isOutbound ? 8 : 0, marginLeft: isOutbound ? 0 : 36 }}>
+                          {isOutbound && msg.sender_name && (
+                            <Text type="secondary" style={{ fontSize: 10 }}>{msg.sender_name} &bull;</Text>
+                          )}
                           <Text type="secondary" style={{ fontSize: 10 }}>
                             {dayjs(msg.created_at).format('HH:mm DD/MM/YYYY')}
                           </Text>

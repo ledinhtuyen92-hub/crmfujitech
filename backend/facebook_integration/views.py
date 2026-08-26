@@ -319,7 +319,8 @@ class FacebookLeadViewSet(mixins.UpdateModelMixin, mixins.DestroyModelMixin, vie
         # ── Cơ chế tầm nhìn giới hạn (giống Pancake) ─────────────────────────
         # Admin công ty và Superuser luôn thấy tất cả hội thoại
         # Nhân viên có quyền "facebook.view_all_inbox" thấy tất cả hội thoại
-        # Nhân viên KHÔNG có quyền đó chỉ thấy: Chưa phân công + Đã phân công cho chính mình
+        # Nhân viên có quyền "facebook.view_unassigned_inbox" thấy: Chưa phân công + Đã phân công cho chính mình
+        # Nhân viên KHÔNG có quyền đó chỉ thấy: Đã phân công cho chính mình
         is_admin = user.is_superuser or user.is_company_admin
         if not is_admin:
             has_view_all = (
@@ -327,7 +328,13 @@ class FacebookLeadViewSet(mixins.UpdateModelMixin, mixins.DestroyModelMixin, vie
             )
             if not has_view_all:
                 from django.db.models import Q
-                qs = qs.filter(Q(assigned_to__isnull=True) | Q(assigned_to=user))
+                has_view_unassigned = (
+                    user.role and user.role.permissions.filter(code="facebook.view_unassigned_inbox").exists()
+                )
+                if has_view_unassigned:
+                    qs = qs.filter(Q(assigned_to__isnull=True) | Q(assigned_to=user))
+                else:
+                    qs = qs.filter(assigned_to=user)
         # ─────────────────────────────────────────────────────────────────────
 
         show_inactive = self.request.query_params.get("show_inactive")
@@ -505,6 +512,8 @@ class FacebookLeadViewSet(mixins.UpdateModelMixin, mixins.DestroyModelMixin, vie
                 text=text,
                 attachment_url=saved_file_url or attachment_url or "",
                 attachment_type=attachment_type if (saved_file_url or file_obj or attachment_url) else "",
+                sender_role="sale",
+                sender_name=getattr(request.user, 'fullname', request.user.username),
             )
             lead.last_message_at = msg.created_at
             lead.last_message_preview = (text or "[Đính kèm]")[:255]

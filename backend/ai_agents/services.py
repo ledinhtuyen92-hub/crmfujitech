@@ -12,7 +12,7 @@ import anthropic
 logger = logging.getLogger(__name__)
 
 # ========================================================
-# ► HẰẶNG DẪN JSON CHO AI: Điều chỉnh ở đây hoặc trực tiếp trên Giao diện
+# ► HẰNG DẪN JSON CHO AI: Điều chỉnh ở đây hoặc trực tiếp trên Giao diện
 # (Khi để trống trường Core Prompt trên UI, hệ thống sẽ dùng mẫu dưới đây)
 # ========================================================
 DEFAULT_JSON_TEMPLATE = """{
@@ -282,15 +282,11 @@ def generate_ai_reply(agent: AiAgent, conversation_history: list, lead_name: str
         return {'error': True, 'reply': 'Hệ thống AI chưa được cấu hình API Key.', 'sentiment': 'handoff', 'summary': ''}
 
     json_template = agent.core_prompt_template.strip() if agent.core_prompt_template else DEFAULT_JSON_TEMPLATE
+    core_rules = agent.core_system_rules.strip() if agent.core_system_rules else DEFAULT_SYSTEM_RULES
 
     system_prompt = f"""Bạn là {agent.name}. {agent.system_prompt}
 Bạn đang chat với khách hàng (thông tin context bổ sung: {lead_name}).
-Nhiệm vụ của bạn là tư vấn tận tình, chuyên nghiệp và hỗ trợ khách hàng.
-NGUYÊN TẮC QUAN TRỌNG: 
-1. Tuyệt đối KHÔNG gọi đích danh tên khách hàng trong câu trả lời. Chỉ xưng hô chung là "anh" hoặc "chị" (tự suy đoán giới tính hoặc dùng "anh/chị").
-2. Luôn ưu tiên trả lời TRỰC TIẾP vào câu hỏi cuối cùng hoặc HÌNH ẢNH cuối cùng khách gửi. Nếu khách gửi ảnh, phải tập trung tư vấn về sản phẩm trong ảnh (dựa vào RAG Context) thay vì bị phân tâm bởi các sản phẩm ở tin nhắn cũ.
-3. KHÔNG XIN SỐ ĐIỆN THOẠI liên tục. Chỉ khéo léo xin SĐT khi khách hàng đã thực sự quan tâm, ưng ý sản phẩm.
-4. Luôn duy trì cuộc hội thoại bằng cách đặt CÂU HỎI MỞ ở cuối câu trả lời để kích thích khách hàng tương tác (hỏi về sở thích, màu sắc, kích thước, nhu cầu...).
+{core_rules}
 TRẢ LỜI BẮT BUỘC THEO ĐỊNH DẠNG JSON SAU (không trả về Markdown, chỉ JSON thôi):
 {json_template}"""
 

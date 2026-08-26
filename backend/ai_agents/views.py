@@ -109,8 +109,11 @@ class AiAgentViewSet(viewsets.ModelViewSet):
 
     @action(detail=False, methods=['GET'], url_path='default-prompt')
     def default_prompt(self, request):
-        from .services import DEFAULT_JSON_TEMPLATE
-        return Response({'template': DEFAULT_JSON_TEMPLATE})
+        from .services import DEFAULT_JSON_TEMPLATE, DEFAULT_SYSTEM_RULES
+        return Response({
+            'template': DEFAULT_JSON_TEMPLATE,
+            'core_system_rules': DEFAULT_SYSTEM_RULES
+        })
 
     @action(detail=False, methods=['POST'])
     def reset_usage_stats(self, request):

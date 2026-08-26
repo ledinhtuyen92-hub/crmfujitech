@@ -296,13 +296,15 @@ class ZaloMessageSerializer(serializers.ModelSerializer):
         fields = [
             "id", "social_lead", "direction", "content",
             "attachment_url", "attachment_type", "payload", "zalo_msg_id",
-            "sender_user", "sender_name", "created_at",
+            "sender_user", "sender_role", "sender_name", "created_at",
         ]
         read_only_fields = ["id", "social_lead", "direction", "zalo_msg_id", "created_at"]
 
     def get_sender_name(self, obj):
         if obj.direction == ZaloMessage.DIRECTION_INBOUND:
             return obj.social_lead.display_name
+        if obj.sender_name:
+            return obj.sender_name
         if obj.sender_user:
-            return obj.sender_user.full_name or obj.sender_user.username
+            return getattr(obj.sender_user, 'fullname', obj.sender_user.username)
         return "Hệ thống"

@@ -333,17 +333,17 @@ function MessageBubble({ msg, lead, showAvatar = true }) {
           )}
         </div>
       )}
-      <div style={{
-        maxWidth: '68%',
-        padding: hasOnlyMedia ? 0 : '10px 14px',
-        borderRadius: isPage ? '18px 18px 4px 18px' : '18px 18px 18px 4px',
-        background: hasOnlyMedia ? 'transparent' : isPage ? '#1877f2' : '#f0f0f0',
-        color: isPage ? '#fff' : '#1a1a1a',
-        fontSize: 14,
-        lineHeight: 1.5,
-        boxShadow: hasOnlyMedia ? 'none' : isPage ? '0 1px 4px rgba(24,119,242,0.25)' : '0 1px 4px rgba(0,0,0,0.08)',
-        overflow: 'hidden',
-      }}>
+        <div style={{
+          maxWidth: '68%',
+          padding: hasOnlyMedia ? 0 : '10px 14px',
+          borderRadius: isPage ? '18px 18px 4px 18px' : '18px 18px 18px 4px',
+          background: hasOnlyMedia ? 'transparent' : isPage ? '#1877f2' : '#f0f0f0',
+          color: isPage ? '#fff' : '#1a1a1a',
+          fontSize: 14,
+          lineHeight: 1.5,
+          boxShadow: hasOnlyMedia ? 'none' : isPage ? '0 1px 4px rgba(24,119,242,0.25)' : '0 1px 4px rgba(0,0,0,0.08)',
+          overflow: 'hidden',
+        }}>
         {msg.attachment_type === 'carousel' && Array.isArray(msg.payload) && (
           <div style={{ marginBottom: msg.text ? 8 : 0, display: 'flex', gap: 8, overflowX: 'auto', paddingBottom: 4, paddingRight: 12 }}>
             {msg.payload.map((item, idx) => (
@@ -429,14 +429,20 @@ function MessageBubble({ msg, lead, showAvatar = true }) {
           </div>
         )}
         <div style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: isPage ? 'flex-end' : 'flex-start',
+          gap: 4,
           fontSize: 10,
           marginTop: 4,
           opacity: isPage ? 0.8 : 0.6,
-          textAlign: isPage ? 'right' : 'left',
           textShadow: hasOnlyMedia ? '0 1px 2px rgba(0,0,0,0.5)' : 'none',
           color: hasOnlyMedia ? '#6b7280' : 'inherit',
         }}>
-          {formatTime(msg.created_at)}
+          {isPage && msg.sender_name && (
+            <span>{msg.sender_name} &bull;</span>
+          )}
+          <span>{formatTime(msg.created_at)}</span>
         </div>
       </div>
     </div>

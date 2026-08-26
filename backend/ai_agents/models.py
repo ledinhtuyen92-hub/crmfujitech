@@ -95,6 +95,7 @@ class AiAgent(models.Model):
     )
     model_name = models.CharField(max_length=100, default='gpt-4o-mini')
     system_prompt = models.TextField(help_text="Nhân cách và hướng dẫn hành vi cho AI", blank=True)
+    core_system_rules = models.TextField(help_text="Luật ngầm định cốt lõi của hệ thống", blank=True, null=True)
     core_prompt_template = models.TextField(help_text="Cấu trúc JSON cốt lõi của AI", blank=True, null=True)
     temperature = models.FloatField(default=0.7, help_text="Độ sáng tạo (0 - 1)")
     

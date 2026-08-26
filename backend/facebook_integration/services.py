@@ -539,17 +539,40 @@ def process_fb_webhook_message(entry: dict):
             att_url = att.get("payload", {}).get("url", "")
 
         msg_created = False
-        if msg_id:
-            _, msg_created = FacebookMessage.objects.get_or_create(
-                fb_message_id=msg_id,
-                defaults={
-                    "lead": lead,
-                    "sender_type": sender_type,
-                    "text": msg_text,
-                    "attachment_url": att_url,
-                    "attachment_type": att_type,
-                }
+        # Xác định sender_role thông minh: nếu lead đang bật AI → tin nhắn outbound từ page
+        # rất có thể là do AI gửi, không phải nhân viên trực tiếp trên Fanpage.
+        if sender_type == "page":
+            page_ai_on = (
+                lead.page_config is not None
+                and lead.page_config.is_ai_active
+                and lead.page_config.ai_agent_id
+                and lead.is_ai_active
             )
+            default_role = "ai" if page_ai_on else "system"
+            default_name = "Trợ lý AI" if page_ai_on else "Hệ thống Fanpage"
+        else:
+            default_role = None
+            default_name = None
+
+        if msg_id:
+            # Dùng get_or_create: nếu AI task đã tạo bản ghi với fb_message_id này trước
+            # (sender_role=ai), thì get_or_create sẽ tìm thấy và KHÔNG ghi đè.
+            existing = FacebookMessage.objects.filter(fb_message_id=msg_id).first()
+            if existing:
+                # Bản ghi đã có (do AI task hoặc Sale tạo trước) → không ghi đè sender_role
+                msg_created = False
+            else:
+                FacebookMessage.objects.create(
+                    lead=lead,
+                    fb_message_id=msg_id,
+                    sender_type=sender_type,
+                    text=msg_text,
+                    attachment_url=att_url,
+                    attachment_type=att_type,
+                    sender_role=default_role,
+                    sender_name=default_name,
+                )
+                msg_created = True
         else:
             FacebookMessage.objects.create(
                 lead=lead,
@@ -557,6 +580,8 @@ def process_fb_webhook_message(entry: dict):
                 text=msg_text,
                 attachment_url=att_url,
                 attachment_type=att_type,
+                sender_role=default_role,
+                sender_name=default_name,
             )
             msg_created = True
 

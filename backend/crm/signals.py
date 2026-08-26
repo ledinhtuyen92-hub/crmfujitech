@@ -77,3 +77,27 @@ def on_customer_saved(sender, instance, created, **kwargs):
                 instance.name,
                 exc,
             )
+
+        # ── Tự động đồng bộ Nhân viên phụ trách sang Zalo / Facebook ──
+        try:
+            from zalo_integration.models import SocialLead
+            from facebook_integration.models import FacebookLead
+
+            # Cập nhật các hội thoại Zalo
+            updated_zalo = SocialLead.objects.filter(customer_id=instance.pk).update(assigned_to=instance.assigned_to)
+            
+            # Cập nhật các hội thoại Facebook
+            updated_fb = FacebookLead.objects.filter(customer_id=instance.pk).update(assigned_to=instance.assigned_to)
+
+            if updated_zalo > 0 or updated_fb > 0:
+                logger.info(
+                    "Synced assignment for customer %s to %s Zalo leads and %s FB leads", 
+                    instance.name, updated_zalo, updated_fb
+                )
+        except Exception as exc:
+            logger.error(
+                "Failed to sync assignment to social leads for customer %s: %s",
+                instance.name,
+                exc,
+            )
+        # ─────────────────────────────────────────────────────────────

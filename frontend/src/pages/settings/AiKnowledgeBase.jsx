@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from 'react'
 import { Card, Table, Button, Space, Typography, Tag, Modal, Form, Input, Upload, message, Radio, Divider, Spin, Collapse, Alert, Checkbox, Segmented, Row, Col, List, Select } from 'antd'
-import { PlusOutlined, UploadOutlined, RobotOutlined, BookOutlined, EyeOutlined, EditOutlined, SyncOutlined, DeleteOutlined, BulbOutlined, MinusCircleOutlined, QuestionCircleOutlined, DownloadOutlined } from '@ant-design/icons'
+import { PlusOutlined, UploadOutlined, RobotOutlined, BookOutlined, EyeOutlined, EditOutlined, SyncOutlined, DeleteOutlined, BulbOutlined, MinusCircleOutlined, QuestionCircleOutlined, DownloadOutlined, ScissorOutlined } from '@ant-design/icons'
 import api from '../../utils/api'
 import { useAuth } from '../../contexts/AuthContext'
 import { useResponsive } from '../../hooks/useResponsive'
@@ -31,6 +31,67 @@ export default function AiKnowledgeBase() {
   const [currentDoc, setCurrentDoc] = useState(null)
   const [editForm] = Form.useForm()
   const [editSubmitting, setEditSubmitting] = useState(false)
+  const [splittingIndex, setSplittingIndex] = useState(null)
+
+  // Hàm tách nội dung một cặp Hỏi-Đáp đang chứa nhiều cặp chất chồng thành nhiều entry riêng
+  const splitQAItem = (name, index, add, remove) => {
+    const qaList = editForm.getFieldValue('qa_list');
+    const currentItem = qaList[name];
+    const combinedText = [currentItem.question, currentItem.answer].filter(Boolean).join('\n');
+
+    // Tất cả các pattern nhận dạng ĐẦU CÂU HỎI
+    // Hỗ trợ: Q:, Hỏi:, Câu hỏi:, Khách hàng:, Khách:, KH:, Question:
+    const questionLineRegex = /^(?:Q|Question|Hỏi|Câu hỏi|Khách hàng|Khách|KH)\s*[:.]\s*/i;
+
+    // Tất cả các pattern nhận dạng ĐẦU CÂU TRẢ LỜI
+    // Hỗ trợ: A:, Answer:, Đáp:, Trả lời:, TL:, Bot:, AI:, Shop:, CSKH:, Sale:
+    const answerLineRegex = /^(?:A|Answer|Đáp|Trả lời|TL|Bot|AI|Shop|CSKH|Sale|Nhân viên)\s*[:.]\s*/i;
+
+    // Tách đoạn theo điểm bắt đầu câu hỏi mới (dùng multiline)
+    const splitRegex = /(?=^(?:Q|Question|Hỏi|Câu hỏi|Khách hàng|Khách|KH)\s*[:.]\s*)/im;
+
+    const segments = combinedText.split(splitRegex).map(s => s.trim()).filter(Boolean);
+
+    if (segments.length <= 1) {
+      message.info('Không phát hiện được nhiều cặp Hỏi-Đáp để tách. Hệ thống nhận dạng các định dạng: Q:, A:, Hỏi:, Đáp:, Khách hàng:, Trả lời:...');
+      return;
+    }
+
+    const newPairs = segments.map(seg => {
+      const lines = seg.split('\n').map(l => l.trim()).filter(Boolean);
+      let question = '';
+      let answerLines = [];
+      let inAnswer = false;
+      for (const line of lines) {
+        if (questionLineRegex.test(line)) {
+          question = line.replace(questionLineRegex, '').trim();
+          inAnswer = false;
+        } else if (answerLineRegex.test(line)) {
+          answerLines.push(line.replace(answerLineRegex, '').trim());
+          inAnswer = true;
+        } else if (inAnswer) {
+          answerLines.push(line);
+        } else if (!question) {
+          question = line;
+        } else {
+          answerLines.push(line);
+        }
+      }
+      return { question: question || seg, answer: answerLines.join('\n'), images: [] };
+    }).filter(p => p.question || p.answer);
+
+    if (newPairs.length <= 1) {
+      message.info('Không phát hiện được nhiều cặp Hỏi-Đáp để tách.');
+      return;
+    }
+
+    // Xóa cái cũ, thêm các cặp mới vào đúng vị trí
+    remove(name);
+    for (let i = newPairs.length - 1; i >= 0; i--) {
+      add(newPairs[i], index);
+    }
+    message.success(`Đã tách thành ${newPairs.length} cặp Hỏi-Đáp riêng biệt.`);
+  };
   
   const [isImportModalVisible, setIsImportModalVisible] = useState(false)
   const [importForm] = Form.useForm()
@@ -357,7 +418,6 @@ export default function AiKnowledgeBase() {
         let uploadedQaList = [];
         for (const qa of (values.qa_list || [])) {
           let answerText = qa.answer || '';
-          
           if (qa.images && qa.images.length > 0) {
             for (const fileItem of qa.images) {
               if (fileItem.isExisting && fileItem.url) {
@@ -368,36 +428,48 @@ export default function AiKnowledgeBase() {
                   const uploadFormData = new FormData();
                   uploadFormData.append('file', file);
                   try {
-                    const uploadRes = await api.post('core/upload/', uploadFormData, {
-                      headers: { 'Content-Type': 'multipart/form-data' }
-                    });
-                    if (uploadRes.data?.url) {
-                      answerText += `\n\n![${file.name}](${uploadRes.data.url})`;
-                    }
+                    const uploadRes = await api.post('core/upload/', uploadFormData, { headers: { 'Content-Type': 'multipart/form-data' } });
+                    if (uploadRes.data?.url) answerText += `\n\n![${file.name}](${uploadRes.data.url})`;
                   } catch (err) {
-                    console.error("Lỗi khi tải ảnh Hỏi-Đáp:", err);
+                    console.error("Lỗi khi tải ảnh:", err);
                     message.error(`Không thể tải lên ảnh: ${file.name}`);
                   }
                 }
               }
             }
           }
-          uploadedQaList.push({ question: qa.question, answer: answerText });
+          uploadedQaList.push({ question: qa.question || '', answer: answerText });
         }
-        values.content = uploadedQaList.map(qa => `Hỏi: ${qa.question}\nĐáp: ${qa.answer}`).join('\n\n') || '';
-        delete values.qa_list;
+
+        // Luôn gộp tất cả cặp Q&A vào content của CÙNG 1 tài liệu
+        const content = uploadedQaList
+          .filter(qa => qa.question || qa.answer)
+          .map(qa => `Hỏi: ${qa.question}\nĐáp: ${qa.answer}`)
+          .join('\n\n') || '';
+        const payload = { ...values, content };
+        delete payload.qa_list;
+
+        if (currentDoc.isGroup) {
+          await Promise.all(currentDoc.children.map(c => api.patch(`/ai_agents/knowledge/${c.id}/`, payload)))
+        } else {
+          await api.patch(`/ai_agents/knowledge/${currentDoc.id}/`, payload)
+        }
+      } else {
+        const payload = { ...values };
+        delete payload.qa_list;
+        if (currentDoc.isGroup) {
+          await Promise.all(currentDoc.children.map(c => api.patch(`/ai_agents/knowledge/${c.id}/`, payload)))
+        } else {
+          await api.patch(`/ai_agents/knowledge/${currentDoc.id}/`, payload)
+        }
       }
 
-      if (currentDoc.isGroup) {
-        await Promise.all(currentDoc.children.map(c => api.patch(`/ai_agents/knowledge/${c.id}/`, values)))
-      } else {
-        await api.patch(`/ai_agents/knowledge/${currentDoc.id}/`, values)
-      }
-      message.success('Đã lưu thông tin tài liệu')
+      message.success('Đã lưu thành công!')
       setIsEditModalVisible(false)
       fetchData()
     } catch (err) {
-      message.error('Lỗi khi sửa tài liệu')
+      console.error(err)
+      message.error('Lỗi khi lưu: ' + (err?.response?.data?.detail || err.message || ''))
     } finally {
       setEditSubmitting(false)
     }
@@ -1406,7 +1478,6 @@ export default function AiKnowledgeBase() {
                           <Form.Item
                             {...restField}
                             name={[name, 'question']}
-                            rules={[{ required: true, message: 'Nhập câu hỏi' }]}
                             style={{ marginBottom: 12 }}
                           >
                             <Input placeholder="Câu hỏi (Ví dụ: Shop có giao hàng chủ nhật không?)" prefix={<QuestionCircleOutlined style={{ color: '#1677ff', marginRight: 4 }} />} />
@@ -1414,7 +1485,6 @@ export default function AiKnowledgeBase() {
                           <Form.Item
                             {...restField}
                             name={[name, 'answer']}
-                            rules={[{ required: true, message: 'Nhập câu trả lời' }]}
                             style={{ marginBottom: 0 }}
                           >
                             <Input.TextArea autoSize={{ minRows: 2, maxRows: 6 }} placeholder="Câu trả lời (có thể chứa link ảnh cũ)" />
@@ -1439,7 +1509,13 @@ export default function AiKnowledgeBase() {
                             </Upload>
                           </Form.Item>
                         </Col>
-                        <Col span={2} style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                        <Col span={2} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
+                          <Button
+                            type="text"
+                            icon={<ScissorOutlined style={{ color: '#faad14' }} />}
+                            onClick={() => splitQAItem(name, name, add, remove)}
+                            title="Tách các cặp Hỏi-Đáp đang lằn lộn trong mục này thành nhiều mục riêng"
+                          />
                           <Button type="text" danger icon={<MinusCircleOutlined />} onClick={() => remove(name)} />
                         </Col>
                       </Row>
@@ -1466,7 +1542,19 @@ export default function AiKnowledgeBase() {
           <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 24 }}>
             <Space>
               <Button onClick={() => setIsEditModalVisible(false)}>Hủy</Button>
-              <Button type="primary" htmlType="submit" loading={editSubmitting}>
+              <Button
+                type="primary"
+                loading={editSubmitting}
+                onClick={async () => {
+                  try {
+                    const values = await editForm.validateFields();
+                    handleSaveEdit(values);
+                  } catch (err) {
+                    console.error('Form validation failed:', err);
+                    message.error('Vui lòng kiểm tra lại các trường bị bỏ trống.');
+                  }
+                }}
+              >
                 Lưu thay đổi
               </Button>
             </Space>

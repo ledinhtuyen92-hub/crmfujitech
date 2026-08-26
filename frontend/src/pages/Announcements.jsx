@@ -232,6 +232,7 @@ const Announcements = () => {
             title: 'Tiêu đề',
             dataIndex: 'title',
             key: 'title',
+            width: 250,
             render: (text, record) => {
                 const isRead = record.is_read;
                 return (

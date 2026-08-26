@@ -17,10 +17,21 @@ export default function AiAgentSettings() {
   const [form] = Form.useForm();
   // Template mặc định lấy từ Backend (Single Source of Truth - chỉ sửa tại services.py)
   const [defaultJsonTemplate, setDefaultJsonTemplate] = useState('');
+  const DEFAULT_CORE_SYSTEM_RULES = `Nhiệm vụ của bạn là tư vấn tận tình, chuyên nghiệp và hỗ trợ khách hàng.
+NGUYÊN TẮC QUAN TRỌNG: 
+1. Tuyệt đối KHÔNG gọi đích danh tên khách hàng trong câu trả lời. Chỉ xưng hô chung là "anh" hoặc "chị" (tự suy đoán giới tính hoặc dùng "anh/chị").
+2. Luôn ưu tiên trả lời TRỰC TIẾP vào câu hỏi cuối cùng hoặc HÌNH ẢNH cuối cùng khách gửi. Nếu khách gửi ảnh, phải tập trung tư vấn về sản phẩm trong ảnh (dựa vào RAG Context) thay vì bị phân tâm bởi các sản phẩm ở tin nhắn cũ.
+3. KHÔNG XIN SỐ ĐIỆN THOẠI liên tục. Chỉ khéo léo xin SĐT khi khách hàng đã thực sự quan tâm, ưng ý sản phẩm.
+4. Luôn duy trì cuộc hội thoại bằng cách đặt CÂU HỎI MỞ ở cuối câu trả lời để kích thích khách hàng tương tác (hỏi về sở thích, màu sắc, kích thước, nhu cầu...).
+5. Khi khách gửi VIDEO ([Video đính kèm]), AUDIO ([Audio đính kèm]) hoặc TỆP ([Tệp đính kèm]): Hãy phản hồi thân thiện, xác nhận đã nhận được (ví dụ: "Dạ, em đã nhận được video/file anh/chị gửi ạ"), sau đó chủ động hỏi thêm thông tin hoặc gợi ý tư vấn liên quan. Không nói rằng bạn không xem được video.`;
+  const [defaultCoreSystemRules, setDefaultCoreSystemRules] = useState(DEFAULT_CORE_SYSTEM_RULES);
 
   useEffect(() => {
     api.get('/ai_agents/agents/default-prompt/').then(res => {
       setDefaultJsonTemplate(res.data.template);
+      if (res.data.core_system_rules) {
+        setDefaultCoreSystemRules(res.data.core_system_rules);
+      }
     }).catch(() => {});
   }, []);
   
@@ -278,16 +289,20 @@ export default function AiAgentSettings() {
 
     // Luôn lấy template mới nhất từ Backend trước khi điền vào form
     let currentTemplate = defaultJsonTemplate;
+    let currentSystemRules = defaultCoreSystemRules;
     try {
-      const res = await api.get('/ai/agents/default-prompt/');
+      const res = await api.get('/ai_agents/agents/default-prompt/');
       currentTemplate = res.data.template;
+      currentSystemRules = res.data.core_system_rules;
       setDefaultJsonTemplate(currentTemplate);
+      setDefaultCoreSystemRules(currentSystemRules);
     } catch (e) {}
 
     if (agent) {
       form.setFieldsValue({
         ...agent,
-        core_prompt_template: agent.core_prompt_template || currentTemplate
+        core_prompt_template: agent.core_prompt_template || currentTemplate,
+        core_system_rules: agent.core_system_rules || currentSystemRules
       });
     } else {
       form.resetFields();
@@ -310,7 +325,8 @@ export default function AiAgentSettings() {
         enable_drip_followup: false,
         drip_followup_hours: 24,
         debounce_delay: 4,
-        core_prompt_template: currentTemplate
+        core_prompt_template: currentTemplate,
+        core_system_rules: currentSystemRules
       });
     }
     setModalVisible(true);
@@ -871,6 +887,43 @@ export default function AiAgentSettings() {
 
           <Collapse ghost style={{ background: '#f5f5f5', borderRadius: 8, marginBottom: 12 }}>
             <Panel header={<Text strong style={{ color: '#d9363e' }}>Tùy chỉnh Cốt lõi AI (Dành cho Chuyên gia - Developer Mode)</Text>} key="1">
+              <Form.Item 
+                name='core_system_rules' 
+                label={
+                  <Space>
+                    <Text strong>Luật ngầm định (Core System Rules)</Text>
+                    <Tooltip title="Đây là các nguyên tắc cốt lõi của hệ thống (như cấm gọi tên khách, quy tắc xử lý ảnh/video) được gài cứng ở Backend. Sửa ở đây để ghi đè luật ngầm định cho Agent này.">
+                      <InfoCircleOutlined style={{ color: '#888' }} />
+                    </Tooltip>
+                    <Button 
+                      size="small" 
+                      type="dashed" 
+                      onClick={() => form.setFieldsValue({ core_system_rules: defaultCoreSystemRules })}
+                    >
+                      ↺ Khôi phục mặc định
+                    </Button>
+                  </Space>
+                }
+              >
+                <Input.TextArea 
+                  autoSize={{ minRows: 10, maxRows: 25 }}
+                  style={{ 
+                    fontFamily: "'Consolas', 'Menlo', 'Courier New', monospace", 
+                    fontSize: 14, 
+                    lineHeight: '1.6',
+                    backgroundColor: '#1e1e1e', 
+                    color: '#e6e6e6',
+                    padding: '16px',
+                    borderRadius: '8px',
+                    border: '1px solid #333'
+                  }} 
+                  placeholder="Để trống để sử dụng Luật ngầm định của Backend..." 
+                />
+              </Form.Item>
+              <Text type="secondary" style={{ fontSize: 12, display: 'block', marginBottom: 24 }}>
+                Lưu ý: Việc xóa hoặc sửa đổi các luật ngầm định (như cấm gọi tên khách hàng, cách xử lý ảnh/video) có thể khiến AI phản hồi sai lệch so với chuẩn của hệ thống.
+              </Text>
+
               <Form.Item 
                 name='core_prompt_template' 
                 label={

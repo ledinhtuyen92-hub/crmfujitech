@@ -595,6 +595,19 @@ class ZaloMessage(models.Model):
         verbose_name="Hướng tin nhắn",
         db_index=True,
     )
+    sender_role = models.CharField(
+        max_length=20,
+        null=True,
+        blank=True,
+        choices=[("ai", "AI"), ("sale", "Sale"), ("system", "Hệ thống")],
+        verbose_name="Vai trò gửi",
+    )
+    sender_name = models.CharField(
+        max_length=100,
+        null=True,
+        blank=True,
+        verbose_name="Tên người gửi (nếu có)",
+    )
     content = models.TextField(
         blank=True,
         verbose_name="Nội dung tin nhắn",

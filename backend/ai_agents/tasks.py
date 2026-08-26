@@ -164,8 +164,18 @@ def process_ai_reply_zalo(lead_id, is_followup=False, trigger_msg_id=None):
         for m in reversed(messages):
             role = 'user' if m.direction == ZaloMessage.DIRECTION_INBOUND else 'assistant'
             msg_dict = {'role': role, 'content': m.content or ''}
-            if m.attachment_url:
-                msg_dict['image_url'] = m.attachment_url
+            # Chỉ truyền URL ảnh cho AI, bỏ qua video/audio/file (OpenAI không hỗ trợ)
+            att_type = (m.attachment_type or '').lower()
+            if m.attachment_url and att_type in ('image', ''):
+                # Nếu không có attachment_type, đoán qua URL
+                url_lower = (m.attachment_url or '').lower()
+                is_video = att_type == 'video' or any(ext in url_lower for ext in ['.mp4', '.mov', '.avi', '.webm', 'video'])
+                is_audio = att_type == 'audio' or any(ext in url_lower for ext in ['.mp3', '.wav', '.ogg', '.m4a'])
+                if not is_video and not is_audio:
+                    msg_dict['image_url'] = m.attachment_url
+            if m.attachment_url and att_type in ('video', 'audio', 'file'):
+                type_label = {'video': 'Video', 'audio': 'Audio', 'file': 'Tệp'}.get(att_type, 'Đính kèm')
+                msg_dict['content'] = (msg_dict['content'] or '') + f' ([{type_label} đính kèm])'
             if not msg_dict['content'] and not msg_dict.get('image_url'):
                 msg_dict['content'] = '([File đính kèm])'
             history.append(msg_dict)
@@ -175,8 +185,9 @@ def process_ai_reply_zalo(lead_id, is_followup=False, trigger_msg_id=None):
         if latest_user_msg and latest_user_msg.direction == ZaloMessage.DIRECTION_INBOUND:
             search_query = latest_user_msg.content or ""
             
-            # Nếu tin nhắn có ảnh, dịch ảnh ra text để tìm kiếm
-            if latest_user_msg.attachment_url:
+            # Nếu tin nhắn có ảnh (không phải video/audio/file), dịch ảnh ra text để tìm kiếm
+            zalo_att_type = (latest_user_msg.attachment_type or '').lower()
+            if latest_user_msg.attachment_url and zalo_att_type not in ('video', 'audio', 'file'):
                 try:
                     from ai_agents.services import generate_image_description, get_api_keys
                     provider = getattr(lead.oa_config.ai_agent.company.ai_settings, 'default_embedding_provider', 'openai')
@@ -215,7 +226,9 @@ def process_ai_reply_zalo(lead_id, is_followup=False, trigger_msg_id=None):
                     social_lead=lead,
                     direction=ZaloMessage.DIRECTION_OUTBOUND,
                     content="Lỗi phản hồi tự động",
-                    payload={"is_system_alert": True, "error_message": result.get('reply')}
+                    payload={"is_system_alert": True, "error_message": result.get('reply')},
+                    sender_role="ai",
+                    sender_name="Trợ lý AI",
                 )
             return
             
@@ -278,7 +291,9 @@ def process_ai_reply_zalo(lead_id, is_followup=False, trigger_msg_id=None):
                     content=f"[Đã gửi Danh sách tìm kiếm: {product_search_keyword}]",
                     attachment_type="carousel",
                     payload=products_for_carousel,
-                    zalo_msg_id=car_msg_id
+                    zalo_msg_id=car_msg_id,
+                    sender_role="ai",
+                    sender_name="Trợ lý AI",
                 )
 
         if not reply_text and not image_url and not product_search_keyword:
@@ -289,7 +304,9 @@ def process_ai_reply_zalo(lead_id, is_followup=False, trigger_msg_id=None):
                 social_lead=lead,
                 direction=ZaloMessage.DIRECTION_OUTBOUND,
                 content="Lỗi phản hồi tự động",
-                payload={"is_system_alert": True, "error_message": "AI không tạo ra câu trả lời hợp lệ."}
+                payload={"is_system_alert": True, "error_message": "AI không tạo ra câu trả lời hợp lệ."},
+                sender_role="ai",
+                sender_name="Trợ lý AI",
             )
 
         if reply_text or image_url:
@@ -315,7 +332,9 @@ def process_ai_reply_zalo(lead_id, is_followup=False, trigger_msg_id=None):
                     social_lead=lead,
                     direction=ZaloMessage.DIRECTION_OUTBOUND,
                     content="Lỗi gửi tin",
-                    payload={"is_system_alert": True, "error_code": error_code, "error_message": err_msg}
+                    payload={"is_system_alert": True, "error_code": error_code, "error_message": err_msg},
+                    sender_role="ai",
+                    sender_name="Trợ lý AI",
                 )
             else:
                 ZaloMessage.objects.create(
@@ -323,7 +342,9 @@ def process_ai_reply_zalo(lead_id, is_followup=False, trigger_msg_id=None):
                     social_lead=lead,
                     direction=ZaloMessage.DIRECTION_OUTBOUND,
                     content=reply_text or "[Hình ảnh]",
-                    zalo_msg_id=resp.get("data", {}).get("message_id", "") if resp and "data" in resp else ""
+                    zalo_msg_id=resp.get("data", {}).get("message_id", "") if resp and "data" in resp else "",
+                    sender_role="ai",
+                    sender_name="Trợ lý AI",
                 )
                 
                 if lead.is_ai_active:
@@ -364,8 +385,17 @@ def process_ai_reply_facebook(lead_id, is_followup=False, trigger_msg_id=None):
         for m in reversed(messages):
             role = 'user' if m.sender_type == 'customer' else 'assistant'
             msg_dict = {'role': role, 'content': m.text or ''}
-            if m.attachment_url:
-                msg_dict['image_url'] = m.attachment_url
+            # Chỉ truyền URL ảnh cho AI, bỏ qua video/audio/file (OpenAI không hỗ trợ)
+            att_type = (m.attachment_type or '').lower()
+            if m.attachment_url and att_type not in ('video', 'audio', 'file'):
+                url_lower = (m.attachment_url or '').lower()
+                is_video = any(ext in url_lower for ext in ['.mp4', '.mov', '.avi', '.webm', 'video_redirect', '/videos/'])
+                is_audio = any(ext in url_lower for ext in ['.mp3', '.wav', '.ogg', '.m4a'])
+                if not is_video and not is_audio:
+                    msg_dict['image_url'] = m.attachment_url
+            if m.attachment_url and att_type in ('video', 'audio', 'file'):
+                type_label = {'video': 'Video', 'audio': 'Audio', 'file': 'Tệp'}.get(att_type, 'Đính kèm')
+                msg_dict['content'] = (msg_dict['content'] or '') + f' ([{type_label} đính kèm])'
             if not msg_dict['content'] and not msg_dict.get('image_url'):
                 msg_dict['content'] = '([File đính kèm])'
             history.append(msg_dict)
@@ -375,8 +405,9 @@ def process_ai_reply_facebook(lead_id, is_followup=False, trigger_msg_id=None):
         if latest_user_msg and latest_user_msg.sender_type == 'customer':
             search_query = latest_user_msg.text or ""
             
-            # Nếu tin nhắn có ảnh, dịch ảnh ra text để tìm kiếm
-            if latest_user_msg.attachment_url:
+            # Nếu tin nhắn có ảnh (không phải video/audio/file), dịch ảnh ra text để tìm kiếm
+            fb_att_type = (latest_user_msg.attachment_type or '').lower()
+            if latest_user_msg.attachment_url and fb_att_type not in ('video', 'audio', 'file'):
                 try:
                     from ai_agents.services import generate_image_description, get_api_keys
                     provider = getattr(lead.page_config.ai_agent.company.ai_settings, 'default_embedding_provider', 'openai')
@@ -413,7 +444,9 @@ def process_ai_reply_facebook(lead_id, is_followup=False, trigger_msg_id=None):
                     lead=lead,
                     sender_type='page',
                     text="Lỗi phản hồi tự động",
-                    payload={"is_system_alert": True, "error_message": result.get('reply')}
+                    payload={"is_system_alert": True, "error_message": result.get('reply')},
+                    sender_role="ai",
+                    sender_name="Trợ lý AI",
                 )
             return
 
@@ -492,7 +525,9 @@ def process_ai_reply_facebook(lead_id, is_followup=False, trigger_msg_id=None):
                 lead=lead,
                 sender_type='page',
                 text="Lỗi phản hồi tự động",
-                payload={"is_system_alert": True, "error_message": "AI không tạo ra câu trả lời hợp lệ."}
+                payload={"is_system_alert": True, "error_message": "AI không tạo ra câu trả lời hợp lệ."},
+                sender_role="ai",
+                sender_name="Trợ lý AI",
             )
 
         update_fields = []
@@ -509,12 +544,38 @@ def process_ai_reply_facebook(lead_id, is_followup=False, trigger_msg_id=None):
                     lead=lead,
                     sender_type='page',
                     text="Lỗi gửi tin",
-                    payload={"is_system_alert": True, "error_message": err_msg}
+                    payload={"is_system_alert": True, "error_message": err_msg},
+                    sender_role="ai",
+                    sender_name="Trợ lý AI",
                 )
             else:
-                # KHÔNG tạo FacebookMessage cục bộ nữa vì webhook message_echoes sẽ chịu trách nhiệm tạo.
-                # Tránh tình trạng lưu trùng 2 tin nhắn trên giao diện.
-                pass
+                # Dùng update_or_create: nếu webhook echo đã tạo bản ghi trước
+                # (với sender_role=system), thì sẽ CẬP NHẬT lại thành AI.
+                # Nếu chưa có thì tạo mới.
+                msg_id = resp.get("message_id")
+                if msg_id:
+                    FacebookMessage.objects.update_or_create(
+                        fb_message_id=msg_id,
+                        defaults={
+                            "lead": lead,
+                            "sender_type": "page",
+                            "text": reply_text,
+                            "attachment_url": image_url or "",
+                            "attachment_type": "image" if image_url else "",
+                            "sender_role": "ai",
+                            "sender_name": "Trợ lý AI",
+                        }
+                    )
+                else:
+                    FacebookMessage.objects.create(
+                        lead=lead,
+                        sender_type='page',
+                        text=reply_text,
+                        attachment_url=image_url or "",
+                        attachment_type="image" if image_url else "",
+                        sender_role="ai",
+                        sender_name="Trợ lý AI",
+                    )
                 
                 if lead.is_ai_active:
                     lead.has_unread_message = False
