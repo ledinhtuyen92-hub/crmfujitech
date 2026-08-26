@@ -84,7 +84,7 @@ def on_customer_saved(sender, instance, created, **kwargs):
             from facebook_integration.models import FacebookLead
 
             # Cập nhật các hội thoại Zalo
-            updated_zalo = SocialLead.objects.filter(customer_id=instance.pk).update(assigned_to=instance.assigned_to)
+            updated_zalo = SocialLead.objects.filter(converted_customer=instance).update(assigned_to=instance.assigned_to)
             
             # Cập nhật các hội thoại Facebook
             updated_fb = FacebookLead.objects.filter(customer_id=instance.pk).update(assigned_to=instance.assigned_to)

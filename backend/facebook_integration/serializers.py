@@ -94,6 +94,12 @@ def check_and_sync_converted_fb(obj):
     if obj.customer_id:
         cust = Customer.objects.filter(id=obj.customer_id).first()
         if cust:
+            needs_save = False
+            if cust.assigned_to and not obj.assigned_to:
+                obj.assigned_to = cust.assigned_to
+                needs_save = True
+            if needs_save:
+                obj.save(update_fields=["assigned_to", "updated_at"])
             return True, cust.name
         else:
             obj.customer = None
@@ -105,10 +111,16 @@ def check_and_sync_converted_fb(obj):
     if company_id and obj.detected_phone:
         cust = Customer.objects.filter(company_id=company_id, phone=obj.detected_phone).first()
         if cust:
+            needs_save = False
             if not obj.is_customer_converted or obj.customer_id != cust.id:
                 obj.customer = cust
                 obj.is_customer_converted = True
-                obj.save(update_fields=["customer", "is_customer_converted", "updated_at"])
+                needs_save = True
+            if cust.assigned_to and not obj.assigned_to:
+                obj.assigned_to = cust.assigned_to
+                needs_save = True
+            if needs_save:
+                obj.save(update_fields=["customer", "is_customer_converted", "assigned_to", "updated_at"])
             return True, cust.name
 
     # 3. Nếu không có customer và cũng không khớp SĐT, clear trạng thái nếu đang bị True giả

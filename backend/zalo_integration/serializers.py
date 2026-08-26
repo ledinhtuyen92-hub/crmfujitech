@@ -97,9 +97,15 @@ def check_and_sync_converted_zalo(obj):
     cust = getattr(obj, "converted_customer", None)
     if cust:
         if Customer.objects.filter(id=cust.id).exists():
+            needs_save = False
             if not obj.is_customer_converted:
                 obj.is_customer_converted = True
-                obj.save(update_fields=["is_customer_converted", "updated_at"])
+                needs_save = True
+            if cust.assigned_to and not obj.assigned_to:
+                obj.assigned_to = cust.assigned_to
+                needs_save = True
+            if needs_save:
+                obj.save(update_fields=["is_customer_converted", "assigned_to", "updated_at"])
             return True, cust.id, cust.name
         else:
             obj.is_customer_converted = False
@@ -109,9 +115,21 @@ def check_and_sync_converted_zalo(obj):
     if getattr(obj, "company_id", None) and obj.detected_phone:
         cust = Customer.objects.filter(company_id=obj.company_id, phone=obj.detected_phone).first()
         if cust:
+            needs_save = False
             if not obj.is_customer_converted:
                 obj.is_customer_converted = True
-                obj.save(update_fields=["is_customer_converted", "updated_at"])
+                needs_save = True
+            if cust.assigned_to and not obj.assigned_to:
+                obj.assigned_to = cust.assigned_to
+                needs_save = True
+            if needs_save:
+                obj.save(update_fields=["is_customer_converted", "assigned_to", "updated_at"])
+            # Auto-link the customer relation
+            try:
+                cust.social_lead = obj
+                cust.save(update_fields=["social_lead"])
+            except:
+                pass
             return True, cust.id, cust.name
 
     if obj.is_customer_converted:
