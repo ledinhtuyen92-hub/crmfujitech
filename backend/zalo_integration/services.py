@@ -158,7 +158,9 @@ def convert_social_lead(social_lead, phone_number: str, assigned_user=None, cust
         social_lead.is_customer_converted = True
         if phone_number and not social_lead.detected_phone:
             social_lead.detected_phone = phone_number
-        if customer.assigned_to and not social_lead.assigned_to:
+        
+        auto_assign = social_lead.oa_config.auto_assign_lead_to_customer_assignee if social_lead.oa_config else True
+        if auto_assign and customer.assigned_to and not social_lead.assigned_to:
             social_lead.assigned_to = customer.assigned_to
         social_lead.save(update_fields=["status", "is_customer_converted", "detected_phone", "assigned_to", "updated_at"])
 

@@ -46,7 +46,7 @@ class ZaloOaConfigSerializer(serializers.ModelSerializer):
             "access_token", "refresh_token", "token_expires_at",
             "token_expires_at_display", "is_token_near_expiry",
             "webhook_secret", "auto_send_payment_zns", "auto_send_delivery_zns", 
-            "auto_send_birthday_zns", "auto_create_customer_from_phone", "lead_cleanup_days",
+            "auto_send_birthday_zns", "auto_create_customer_from_phone", "auto_assign_lead_to_customer_assignee", "lead_cleanup_days",
             "request_phone_template", "request_email_template", "is_active", "ai_agent", "is_ai_active",
             "created_at", "updated_at",
         ]
@@ -75,7 +75,7 @@ class ZaloOaConfigWriteSerializer(serializers.ModelSerializer):
             "oa_name", "use_system_config", "app_id", "secret_key", "oa_id",
             "access_token", "refresh_token", "token_expires_at",
             "webhook_secret", "auto_send_payment_zns", "auto_send_delivery_zns", 
-            "auto_send_birthday_zns", "auto_create_customer_from_phone", "lead_cleanup_days",
+            "auto_send_birthday_zns", "auto_create_customer_from_phone", "auto_assign_lead_to_customer_assignee", "lead_cleanup_days",
             "request_phone_template", "request_email_template", "is_active", "ai_agent", "is_ai_active"
         ]
 
@@ -101,7 +101,8 @@ def check_and_sync_converted_zalo(obj):
             if not obj.is_customer_converted:
                 obj.is_customer_converted = True
                 needs_save = True
-            if cust.assigned_to and not obj.assigned_to:
+            auto_assign = obj.oa_config.auto_assign_lead_to_customer_assignee if hasattr(obj, "oa_config") and obj.oa_config else True
+            if auto_assign and cust.assigned_to and not obj.assigned_to:
                 obj.assigned_to = cust.assigned_to
                 needs_save = True
             if needs_save:
@@ -119,7 +120,8 @@ def check_and_sync_converted_zalo(obj):
             if not obj.is_customer_converted:
                 obj.is_customer_converted = True
                 needs_save = True
-            if cust.assigned_to and not obj.assigned_to:
+            auto_assign = obj.oa_config.auto_assign_lead_to_customer_assignee if hasattr(obj, "oa_config") and obj.oa_config else True
+            if auto_assign and cust.assigned_to and not obj.assigned_to:
                 obj.assigned_to = cust.assigned_to
                 needs_save = True
             if needs_save:

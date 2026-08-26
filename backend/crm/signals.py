@@ -83,11 +83,17 @@ def on_customer_saved(sender, instance, created, **kwargs):
             from zalo_integration.models import SocialLead
             from facebook_integration.models import FacebookLead
 
-            # Cập nhật các hội thoại Zalo
-            updated_zalo = SocialLead.objects.filter(converted_customer=instance).update(assigned_to=instance.assigned_to)
+            # Cập nhật các hội thoại Zalo (chỉ cập nhật nếu OA cấu hình cho phép)
+            updated_zalo = SocialLead.objects.filter(
+                converted_customer=instance,
+                oa_config__auto_assign_lead_to_customer_assignee=True
+            ).update(assigned_to=instance.assigned_to)
             
-            # Cập nhật các hội thoại Facebook
-            updated_fb = FacebookLead.objects.filter(customer_id=instance.pk).update(assigned_to=instance.assigned_to)
+            # Cập nhật các hội thoại Facebook (chỉ cập nhật nếu Page cấu hình cho phép)
+            updated_fb = FacebookLead.objects.filter(
+                customer_id=instance.pk,
+                page_config__auto_assign_lead_to_customer_assignee=True
+            ).update(assigned_to=instance.assigned_to)
 
             if updated_zalo > 0 or updated_fb > 0:
                 logger.info(

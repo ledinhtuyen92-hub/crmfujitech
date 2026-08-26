@@ -55,7 +55,7 @@ class FacebookPageConfigSerializer(serializers.ModelSerializer):
             "page_access_token", "token_expires_at", "token_expires_at_display",
             "is_token_valid", "is_token_near_expiry",
             "webhook_verify_token", "page_avatar", "is_active",
-            "auto_create_customer_from_phone", "lead_cleanup_days",
+            "auto_create_customer_from_phone", "auto_assign_lead_to_customer_assignee", "lead_cleanup_days",
             "request_phone_template", "request_email_template",
             "assigned_to", "assigned_to_name", "ai_agent", "is_ai_active",
             "created_at", "updated_at",
@@ -95,7 +95,8 @@ def check_and_sync_converted_fb(obj):
         cust = Customer.objects.filter(id=obj.customer_id).first()
         if cust:
             needs_save = False
-            if cust.assigned_to and not obj.assigned_to:
+            auto_assign = obj.page_config.auto_assign_lead_to_customer_assignee if hasattr(obj, "page_config") and obj.page_config else True
+            if auto_assign and cust.assigned_to and not obj.assigned_to:
                 obj.assigned_to = cust.assigned_to
                 needs_save = True
             if needs_save:
@@ -116,7 +117,8 @@ def check_and_sync_converted_fb(obj):
                 obj.customer = cust
                 obj.is_customer_converted = True
                 needs_save = True
-            if cust.assigned_to and not obj.assigned_to:
+            auto_assign = obj.page_config.auto_assign_lead_to_customer_assignee if hasattr(obj, "page_config") and obj.page_config else True
+            if auto_assign and cust.assigned_to and not obj.assigned_to:
                 obj.assigned_to = cust.assigned_to
                 needs_save = True
             if needs_save:

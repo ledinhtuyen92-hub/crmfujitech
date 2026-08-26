@@ -94,6 +94,11 @@ class FacebookPageConfig(models.Model):
         verbose_name="Tự động tạo KH khi phát hiện SĐT",
         help_text="Tự động tạo hồ sơ Khách hàng vào CRM khi nhận diện được SĐT trong hội thoại.",
     )
+    auto_assign_lead_to_customer_assignee = models.BooleanField(
+        default=True,
+        verbose_name="Tự động gán hội thoại theo Nhân viên phụ trách",
+        help_text="Nếu bật, khi hội thoại được liên kết với một Khách hàng đã có người phụ trách, hội thoại sẽ tự động được gán cho nhân viên đó."
+    )
     lead_cleanup_days = models.IntegerField(
         default=30,
         verbose_name="Số ngày dọn dẹp Lead rác",

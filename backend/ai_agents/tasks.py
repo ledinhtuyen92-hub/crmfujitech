@@ -1149,12 +1149,18 @@ def _apply_extracted_info(lead, phone, email, address, platform):
             elif platform == 'facebook':
                 auto_create = lead.page_config.auto_create_customer_from_phone if lead.page_config else False
                 
+            auto_assign = False
+            if platform == 'zalo':
+                auto_assign = lead.oa_config.auto_assign_lead_to_customer_assignee if lead.oa_config else True
+            elif platform == 'facebook':
+                auto_assign = lead.page_config.auto_assign_lead_to_customer_assignee if lead.page_config else True
+
             if already_exists:
                 existing_customer = Customer.objects.filter(company=company, phone=norm_phone).first()
                 lead.is_customer_converted = True
                 if platform == 'zalo': lead.customer = existing_customer
                 elif platform == 'facebook': lead.customer_id = existing_customer.id
-                if existing_customer.assigned_to and not lead.assigned_to:
+                if auto_assign and existing_customer.assigned_to and not lead.assigned_to:
                     lead.assigned_to = existing_customer.assigned_to
                 updated = True
             elif auto_create:
@@ -1169,7 +1175,7 @@ def _apply_extracted_info(lead, phone, email, address, platform):
                 lead.is_customer_converted = True
                 if platform == 'zalo': lead.customer = new_customer
                 elif platform == 'facebook': lead.customer_id = new_customer.id
-                if new_customer.assigned_to and not lead.assigned_to:
+                if auto_assign and new_customer.assigned_to and not lead.assigned_to:
                     lead.assigned_to = new_customer.assigned_to
                 updated = True
                 

@@ -220,6 +220,7 @@ export default function FacebookConfigPage() {
         app_secret: '',
         webhook_verify_token: page.webhook_verify_token,
         auto_create_customer_from_phone: page.auto_create_customer_from_phone,
+        auto_assign_lead_to_customer_assignee: page.auto_assign_lead_to_customer_assignee ?? true,
         lead_cleanup_days: page.lead_cleanup_days || 30,
         request_phone_template: page.request_phone_template,
         request_email_template: page.request_email_template,
@@ -231,6 +232,8 @@ export default function FacebookConfigPage() {
       form.setFieldsValue({
         use_system_config: true,
         is_active: true,
+        auto_create_customer_from_phone: false,
+        auto_assign_lead_to_customer_assignee: true,
         lead_cleanup_days: 30,
         request_phone_template: "Dạ chào bạn, để tiện chuyên viên tư vấn chi tiết và gửi bảng giá ưu đãi, bạn cho mình xin số điện thoại liên hệ với ạ ❤️",
         request_email_template: "Dạ bạn cho mình xin địa chỉ Email để bên em gửi catalogue và thông tin chi tiết qua email cho mình nhé 📧",
@@ -563,12 +566,12 @@ export default function FacebookConfigPage() {
           )}
           <Divider>✅ Trạng thái & Tính năng</Divider>
           <Row gutter={16}>
-            <Col xs={24} md={8}>
+            <Col xs={24} md={6}>
               <Form.Item name="is_active" label="Trạng thái" valuePropName="checked">
                 <Switch checkedChildren="Hoạt động" unCheckedChildren="Tạm dừng" />
               </Form.Item>
             </Col>
-            <Col xs={24} md={8}>
+            <Col xs={24} md={6}>
               <Form.Item
                 name="auto_create_customer_from_phone"
                 label="Tự tạo KH từ SĐT"
@@ -578,7 +581,17 @@ export default function FacebookConfigPage() {
                 <Switch checkedChildren="🤖 Tự động" unCheckedChildren="👆 Thủ công" />
               </Form.Item>
             </Col>
-            <Col xs={24} md={8}>
+            <Col xs={24} md={6}>
+              <Form.Item
+                name="auto_assign_lead_to_customer_assignee"
+                label="Tự động gán hội thoại"
+                valuePropName="checked"
+                tooltip="Tự động gán hội thoại cho nhân viên phụ trách Khách hàng đó"
+              >
+                <Switch checkedChildren="🤖 Bật" unCheckedChildren="👆 Tắt" />
+              </Form.Item>
+            </Col>
+            <Col xs={24} md={6}>
               <Form.Item
                 name="lead_cleanup_days"
                 label="Dọn dẹp Lead rác"

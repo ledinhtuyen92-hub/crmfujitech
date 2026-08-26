@@ -126,6 +126,7 @@ export default function ZaloConfigPage() {
         auto_send_delivery_zns: targetConfig.auto_send_delivery_zns,
         auto_send_birthday_zns: targetConfig.auto_send_birthday_zns,
         auto_create_customer_from_phone: targetConfig.auto_create_customer_from_phone || false,
+        auto_assign_lead_to_customer_assignee: targetConfig.auto_assign_lead_to_customer_assignee ?? true,
         lead_cleanup_days: targetConfig.lead_cleanup_days,
         request_phone_template: targetConfig.request_phone_template,
         request_email_template: targetConfig.request_email_template,
@@ -141,6 +142,7 @@ export default function ZaloConfigPage() {
         auto_send_delivery_zns: false,
         auto_send_birthday_zns: false,
         auto_create_customer_from_phone: false,
+        auto_assign_lead_to_customer_assignee: true,
         lead_cleanup_days: 30,
         request_phone_template: "Vui lòng chia sẻ số điện thoại để chúng tôi có thể liên hệ hỗ trợ tốt nhất.",
         request_email_template: "Xin chào quý khách! Để thuận tiện gửi thông tin và tài liệu, xin vui lòng chia sẻ địa chỉ Email của quý khách tại đây ạ.",
@@ -631,6 +633,14 @@ export default function ZaloConfigPage() {
             help="Nếu bật: Khi khách gửi SĐT trong Zalo Inbox sẽ tự động thêm vào Khách hàng hệ thống."
           >
             <Switch checkedChildren="Bật tự động" unCheckedChildren="Tắt (Sale thêm thủ công)" />
+          </Form.Item>
+          <Form.Item 
+            name="auto_assign_lead_to_customer_assignee" 
+            label="Tự động gán hội thoại theo Nhân viên phụ trách" 
+            valuePropName="checked"
+            help="Nếu bật: Khi hội thoại gắn với một Khách hàng đã có nhân viên phụ trách, hội thoại sẽ tự động gán cho nhân viên đó."
+          >
+            <Switch checkedChildren="Bật tự động" unCheckedChildren="Tắt" />
           </Form.Item>
           <Form.Item
             name="lead_cleanup_days"

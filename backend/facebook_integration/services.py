@@ -860,7 +860,9 @@ def convert_facebook_lead(lead, phone_number: str, assigned_user=None, customer_
     lead.is_customer_converted = True
     if phone_number and not lead.detected_phone:
         lead.detected_phone = phone_number
-    if customer.assigned_to and not lead.assigned_to:
+        
+    auto_assign = lead.page_config.auto_assign_lead_to_customer_assignee if lead.page_config else True
+    if auto_assign and customer.assigned_to and not lead.assigned_to:
         lead.assigned_to = customer.assigned_to
     lead.save(update_fields=["customer", "is_customer_converted", "detected_phone", "assigned_to", "updated_at"])
     
