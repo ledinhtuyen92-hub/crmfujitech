@@ -78,11 +78,11 @@ npm run build
 cd ..
 echo "✅ Frontend da duoc build xong!"
 
-# 6. Restart Backend
+# 6. Restart Backend & Celery
 echo ""
-echo "🐍 [5/6] Dang khoi dong lai Backend de nhan code Python moi..."
-docker restart crm_web
-echo "✅ Backend da duoc khoi dong lai!"
+echo "🐍 [5/6] Dang khoi dong lai Backend & Celery de nhan code Python moi..."
+docker restart crm_web crm_celery crm_celery_beat
+echo "✅ Backend va Celery da duoc khoi dong lai!"
 
 # 7. Reload Nginx de phuc vu file moi nhat
 echo ""
