@@ -28,7 +28,15 @@ def auto_assign_customer(sender, instance, **kwargs):
     """Tự động phân bổ Lead xoay vòng đều đặn (True Round-robin) dựa trên thời gian nhận Lead gần nhất."""
     if not instance.pk and not instance.assigned_to:
         company = instance.company
-        if company and hasattr(company, "settings") and company.settings.lead_routing == "round_robin":
+        if company:
+            has_round_robin = False
+            try:
+                if company.settings and company.settings.lead_routing == "round_robin":
+                    has_round_robin = True
+            except Exception:
+                pass
+                
+            if has_round_robin:
             from users.models import User
             from django.db.models import Max, F
 

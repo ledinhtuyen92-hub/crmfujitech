@@ -26,7 +26,10 @@ def trigger_zns_on_payment_receipt(sender, instance, created, **kwargs):
     company = instance.company
     if not company or not company.is_active:
         return
-    if not hasattr(company, "settings") or not company.settings:
+    try:
+        if not company.settings:
+            return
+    except Exception:
         return
     if "zalo" not in (company.settings.active_modules or []):
         return
@@ -98,7 +101,10 @@ def trigger_zns_on_order_completed(sender, instance, **kwargs):
     company = instance.company
     if not company or not company.is_active:
         return
-    if not hasattr(company, "settings") or not company.settings:
+    try:
+        if not company.settings:
+            return
+    except Exception:
         return
     if "zalo" not in (company.settings.active_modules or []):
         return
