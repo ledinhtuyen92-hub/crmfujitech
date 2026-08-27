@@ -26,6 +26,14 @@ echo ""
 echo "📥 [1/5] Dang keo code moi nhat tu GitHub (nhanh main)..."
 # Khôi phục mọi thay đổi cục bộ (nếu có) để tránh lỗi kẹt git
 git fetch origin main
+
+# Kiem tra xem requirements.txt co thay doi khong truoc khi reset
+if git diff --name-only HEAD origin/main | grep -q 'backend/requirements.txt'; then
+    REQUIREMENTS_CHANGED=1
+else
+    REQUIREMENTS_CHANGED=0
+fi
+
 git reset --hard origin/main
 echo "✅ Code da duoc cap nhat thanh cong!"
 
@@ -54,8 +62,13 @@ echo "✅ File .env da duoc cau hinh tu dong cho: $DOMAIN"
 
 # 2.5 Khoi dong cac dich vu moi (neu co)
 echo ""
-echo "🐳 Dang khoi dong / cap nhat Docker containers..."
-docker compose up -d --build
+if [ "$REQUIREMENTS_CHANGED" -eq 1 ]; then
+    echo "📦 Phat hien thu vien moi (requirements.txt)! Dang rebuild Docker..."
+    docker compose up -d --build
+else
+    echo "🐳 Khong co thu vien moi. Dang khoi dong / cap nhat Docker (nhanh)..."
+    docker compose up -d
+fi
 
 # 3. Chay migrate neu co thay doi DB schema
 echo ""
