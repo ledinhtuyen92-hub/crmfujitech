@@ -10,6 +10,10 @@ RUN apt-get update \
     && apt-get install -y --no-install-recommends \
         build-essential \
         libpq-dev \
+        libjpeg-dev \
+        zlib1g-dev \
+        libpng-dev \
+        libwebp-dev \
     && rm -rf /var/lib/apt/lists/*
 
 COPY requirements.txt .

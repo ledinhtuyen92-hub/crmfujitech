@@ -7,9 +7,13 @@ from ai_agents.tasks import sync_company_products_to_rag
 @receiver(post_delete, sender=Product)
 def product_sync_to_rag(sender, instance, **kwargs):
     company = instance.company
-    # Kiểm tra xem công ty có cấu hình bật tự động đồng bộ RAG không
-    if hasattr(company, 'ai_settings') and company.ai_settings.auto_sync_products:
-        sync_company_products_to_rag.delay(company.id)
+    try:
+        # Sử dụng try/except thay vì hasattr vì OneToOneField descriptor luôn tồn tại, 
+        # gọi hasattr sẽ trả về True nhưng truy cập có thể raise RelatedObjectDoesNotExist
+        if company.ai_settings and company.ai_settings.auto_sync_products:
+            sync_company_products_to_rag.delay(company.id)
+    except Exception: # Bắt luôn cả RelatedObjectDoesNotExist
+        pass
 
 from .models import ProductTemplate
 
