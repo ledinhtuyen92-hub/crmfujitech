@@ -38,9 +38,14 @@ def search_products_for_carousel(company, keyword: str, limit: int = 3):
         
 
     products_query = Q(name__icontains=keyword) | Q(template__description__icontains=keyword) | Q(sku__icontains=keyword)
+    
+    # Sử dụng AND (phải chứa TẤT CẢ các từ khóa) thay vì OR để kết quả chính xác hơn, tránh lỗi ra phụ kiện
+    word_query = Q()
     for kw in keyword.split():
-        if len(kw) >= 3:
-            products_query |= Q(name__icontains=kw) | Q(sku__icontains=kw)
+        if len(kw) >= 2:
+            word_query &= Q(name__icontains=kw)
+    if word_query:
+        products_query |= word_query
             
     products = Product.objects.filter(
         company=company,
@@ -69,9 +74,13 @@ def search_products_for_carousel(company, keyword: str, limit: int = 3):
     # Lấy thêm từ Kho tri thức (RAG) không phụ thuộc vào việc đã đủ limit hay chưa
 
     docs_query = Q(title__icontains=keyword) | Q(content__icontains=keyword)
+    
+    doc_word_query = Q()
     for kw in keyword.split():
-        if len(kw) >= 3:
-            docs_query |= Q(title__icontains=kw) | Q(content__icontains=kw)
+        if len(kw) >= 2:
+            doc_word_query &= (Q(title__icontains=kw) | Q(content__icontains=kw))
+    if doc_word_query:
+        docs_query |= doc_word_query
             
     docs = AiKnowledgeDocument.objects.filter(
         agent__company=company,
