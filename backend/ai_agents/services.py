@@ -17,7 +17,7 @@ logger = logging.getLogger(__name__)
 # ========================================================
 DEFAULT_JSON_TEMPLATE = """{
     "thought": "Phân tích tâm lý khách. Quyết định chiến thuật: Ưu tiên đặt câu hỏi mở để giữ tương tác. CHỈ xin SĐT khi khách đã rất quan tâm, cần báo giá chi tiết, hoặc cần khảo sát tận nơi. Tuyệt đối không xin số dồn dập ở những câu đầu.",
-    "reply": "Câu trả lời gửi khách. NẾU BẠN GỬI ẢNH (Bằng product_search_keyword) thì BẮT BUỘC trong câu trả lời phải nhắc đến việc bạn đang gửi ảnh (Ví dụ: 'Để em gửi anh vài mẫu nhé'). LUÔN KẾT THÚC bằng một câu hỏi mở để khách phản hồi, trừ khi đã chốt được SĐT.",
+    "reply": "Câu trả lời gửi khách. NẾU BẠN GỬI ẢNH (Bằng product_search_keyword) thì BẮT BUỘC trong câu trả lời phải nhắc đến việc bạn đang gửi ảnh (Ví dụ: 'Để em gửi anh vài mẫu nhé'). LUÔN KẾT THÚC bằng một câu hỏi mở để khách phản hồi, trừ khi đã chốt được SĐT. ĐIỀN '[STOP]' NẾU KHÁCH CHỈ NHẮN NGẮN GỌN XÁC NHẬN (Ok, vâng, dạ...) HOẶC THẢ TIM VÀ HỘI THOẠI ĐÃ KẾT THÚC.",
     "sentiment": "angry / handoff / neutral",
     "image_url": "Đường link (URL) của ảnh sản phẩm (nếu khách yêu cầu 1 ảnh DUY NHẤT). Nên ưu tiên dùng product_search_keyword để gửi được nhiều mẫu hơn.",
     "product_search_keyword": "BẮT BUỘC ĐIỀN TỪ KHÓA NẾU KHÁCH YÊU CẦU 'gửi ảnh', 'cho xem VÀI MẪU', hoặc 'cho thêm mẫu khác'. LƯU Ý: Nếu khách nói 'cho thêm mẫu khác', BẮT BUỘC phải lấy lại TỪ KHÓA SẢN PHẨM Ở NGỮ CẢNH TRƯỚC (VD: khách đang hỏi 'cửa composite' thì điền 'cửa composite', tuyệt đối KHÔNG điền 'mẫu khác'). Hệ thống sẽ tự động tìm 5 mẫu gửi cho khách. Nếu không cần tìm ảnh thì ĐỂ TRỐNG.",
