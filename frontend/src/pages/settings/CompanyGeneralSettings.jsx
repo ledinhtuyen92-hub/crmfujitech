@@ -144,9 +144,7 @@ export default function CompanyGeneralSettings() {
       if (signatureFile) {
         formData.append('director_signature', signatureFile)
       }
-      const res = await api.patch('users/my-company/', formData, {
-        headers: { 'Content-Type': 'multipart/form-data' },
-      })
+      const res = await api.patchForm('users/my-company/', formData)
       setCompanyInfo(res.data)
       setLogoFile(null)
       setStampFile(null)

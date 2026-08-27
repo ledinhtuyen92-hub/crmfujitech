@@ -784,9 +784,7 @@ export default function FacebookInboxPage() {
       if (requestPhone) formData.append('request_phone', 'true')
       if (requestEmail) formData.append('request_email', 'true')
 
-      const res = await api.post(`/facebook/leads/${selectedLead.id}/send-message/`, formData, {
-        headers: { 'Content-Type': 'multipart/form-data' }
-      })
+      const res = await api.postForm(`/facebook/leads/${selectedLead.id}/send-message/`, formData)
       setMessages(prev => [...prev, res.data])
       if (!file && !requestPhone && !requestEmail) setMsgText('')
       // Sau khi gửi: reset cờ để scroll xuống xem tin vừa gửi
@@ -876,7 +874,7 @@ export default function FacebookInboxPage() {
       formData.append('title', quickMediaTitle || file.name)
       formData.append('media_type', quickMediaType)
       formData.append('folder', quickMediaFolder || 'Chung')
-      await api.post('/facebook/quick-media/', formData, { headers: { 'Content-Type': 'multipart/form-data' } })
+      await api.postForm('/facebook/quick-media/', formData)
       message.success(`Đã tải lên "${file.name}"!`)
       setQuickMediaTitle('')
       fetchQuickMedia()

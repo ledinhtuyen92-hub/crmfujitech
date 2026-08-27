@@ -332,9 +332,7 @@ export default function OrderList() {
     const formData = new FormData()
     formData.append('file', file)
     try {
-      const res = await api.post('/core/upload/', formData, {
-        headers: { 'Content-Type': 'multipart/form-data' }
-      })
+      const res = await api.postForm('/core/upload/', formData)
       if (res.data && res.data.url) {
         setReceiptFileList(prev => [...prev, {
           uid: file.uid,
@@ -1112,9 +1110,7 @@ export default function OrderList() {
                           try {
                             const formData = new FormData();
                             formData.append('image', file);
-                            const res = await api.post('/sales/quotations/upload-item-image/', formData, {
-                              headers: { 'Content-Type': 'multipart/form-data' },
-                            });
+                            const res = await api.postForm('/sales/quotations/upload-item-image/', formData);
                             handleLineChange(idx, 'product_image', res.data.url);
                             messageApi.open({ key, type: 'success', content: 'Đã tải ảnh thành công!', duration: 2 });
                             onSuccess("ok");
@@ -1241,7 +1237,7 @@ export default function OrderList() {
                       try {
                         const formData = new FormData();
                         formData.append('image', file);
-                        const res = await api.post('/sales/quotations/upload-item-image/', formData, { headers: { 'Content-Type': 'multipart/form-data' } });
+                        const res = await api.postForm('/sales/quotations/upload-item-image/', formData);
                         const currentData = record.custom_data || {};
                         handleLineChange(idx, 'custom_data', { ...currentData, note_image: res.data.url });
                         messageApi.open({ key, type: 'success', content: 'Đã tải ảnh ghi chú!', duration: 2 });
@@ -1395,9 +1391,7 @@ export default function OrderList() {
                         try {
                           const formData = new FormData();
                           formData.append('image', file);
-                          const res = await api.post('/sales/quotations/upload-item-image/', formData, {
-                            headers: { 'Content-Type': 'multipart/form-data' },
-                          });
+                          const res = await api.postForm('/sales/quotations/upload-item-image/', formData);
                           handleLineChange(idx, 'product_image', res.data.url);
                           messageApi.open({ key, type: 'success', content: 'Đã tải ảnh thành công!', duration: 2 });
                           onSuccess("ok");
@@ -1912,9 +1906,7 @@ export default function OrderList() {
                       try {
                         const formData = new FormData();
                         formData.append('image', file);
-                        const res = await api.post('/sales/quotations/upload-item-image/', formData, {
-                          headers: { 'Content-Type': 'multipart/form-data' },
-                        });
+                        const res = await api.postForm('/sales/quotations/upload-item-image/', formData);
                         const currentData = record.custom_data || {};
                         handleLineChange(idx, 'custom_data', { ...currentData, [imgKey]: res.data.url });
                         messageApi.open({ key, type: 'success', content: 'Đã tải ảnh thành công!', duration: 2 });
@@ -1992,9 +1984,7 @@ export default function OrderList() {
                   try {
                     const formData = new FormData();
                     formData.append('image', file);
-                    const res = await api.post('/sales/quotations/upload-item-image/', formData, {
-                      headers: { 'Content-Type': 'multipart/form-data' },
-                    });
+                    const res = await api.postForm('/sales/quotations/upload-item-image/', formData);
                     handleServiceLineChange(index, 'product_image', res.data.url);
                     messageApi.success("Đã tải ảnh thành công!");
                     onSuccess("ok");

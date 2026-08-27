@@ -428,7 +428,7 @@ export default function AiKnowledgeBase() {
                   const uploadFormData = new FormData();
                   uploadFormData.append('file', file);
                   try {
-                    const uploadRes = await api.post('core/upload/', uploadFormData, { headers: { 'Content-Type': 'multipart/form-data' } });
+                    const uploadRes = await api.postForm('core/upload/', uploadFormData);
                     if (uploadRes.data?.url) answerText += `\n\n![${file.name}](${uploadRes.data.url})`;
                   } catch (err) {
                     console.error("Lỗi khi tải ảnh:", err);
@@ -492,9 +492,7 @@ export default function AiKnowledgeBase() {
           if (details.content) {
             formData.append('content', details.content)
           }
-          return api.post('/ai_agents/knowledge/', formData, {
-            headers: { 'Content-Type': 'multipart/form-data' }
-          })
+          return api.postForm('/ai_agents/knowledge/', formData)
         })
         await Promise.all(promises)
       } else if (docType === 'file' && fileList.length > 0) {
@@ -505,9 +503,7 @@ export default function AiKnowledgeBase() {
           formData.append('agent', values.agent)
           formData.append('doc_type', 'file')
           formData.append('file_attachment', file.originFileObj || file)
-          return api.post('/ai_agents/knowledge/', formData, {
-            headers: { 'Content-Type': 'multipart/form-data' }
-          })
+          return api.postForm('/ai_agents/knowledge/', formData)
         })
         await Promise.all(promises)
       } else if (values.doc_type === 'qa') {
@@ -523,9 +519,7 @@ export default function AiKnowledgeBase() {
                 const uploadFormData = new FormData();
                 uploadFormData.append('file', file);
                 try {
-                  const uploadRes = await api.post('core/upload/', uploadFormData, {
-                    headers: { 'Content-Type': 'multipart/form-data' }
-                  });
+                  const uploadRes = await api.postForm('core/upload/', uploadFormData);
                   if (uploadRes.data?.url) {
                     answerText += `\n\n![${file.name}](${uploadRes.data.url})`;
                   }
@@ -545,9 +539,7 @@ export default function AiKnowledgeBase() {
         formData.append('doc_type', values.doc_type)
         const qaContent = uploadedQaList.map(qa => `Hỏi: ${qa.question}\nĐáp: ${qa.answer}`).join('\n\n') || ''
         formData.append('content', qaContent)
-        await api.post('/ai_agents/knowledge/', formData, {
-          headers: { 'Content-Type': 'multipart/form-data' }
-        })
+        await api.postForm('/ai_agents/knowledge/', formData)
       } else {
         message.warning('Vui lòng chọn file tải lên')
         setSubmitting(false)

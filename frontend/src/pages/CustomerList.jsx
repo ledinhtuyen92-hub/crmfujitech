@@ -461,11 +461,7 @@ function CustomerList() {
     formData.append('file', importFile)
 
     try {
-      const res = await api.post('/crm/customers/import-csv/', formData, {
-        headers: {
-          'Content-Type': 'multipart/form-data',
-        },
-      })
+      const res = await api.postForm('/crm/customers/import-csv/', formData)
       message.success(res.data.detail || 'Nhập dữ liệu thành công!')
       setImportModalVisible(false)
       setImportFile(null)
@@ -587,11 +583,7 @@ function CustomerList() {
           formData.append('files', file.originFileObj || file);
         });
         
-        await api.post(`/crm/interactions/${interactionId}/upload-files/`, formData, {
-          headers: {
-            'Content-Type': 'multipart/form-data',
-          },
-        });
+        await api.postForm(`/crm/interactions/${interactionId}/upload-files/`, formData);
       }
       
       message.success('Đã ghi nhận lịch sử chăm sóc!')

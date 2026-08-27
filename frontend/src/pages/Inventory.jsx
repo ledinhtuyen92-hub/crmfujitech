@@ -493,14 +493,10 @@ export default function Inventory() {
       }
 
       if (editingProduct) {
-        await api.patch(`/inventory/products/${editingProduct.id}/`, formData, {
-          headers: { 'Content-Type': 'multipart/form-data' },
-        })
+        await api.patchForm(`/inventory/products/${editingProduct.id}/`, formData)
         messageApi.success('Cập nhật sản phẩm thành công!')
       } else {
-        await api.post('/inventory/products/', formData, {
-          headers: { 'Content-Type': 'multipart/form-data' },
-        })
+        await api.postForm('/inventory/products/', formData)
         messageApi.success('Thêm sản phẩm mới thành công!')
       }
       setProductModalVisible(false)

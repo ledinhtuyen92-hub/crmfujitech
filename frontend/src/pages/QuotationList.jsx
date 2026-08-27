@@ -1368,9 +1368,7 @@ export default function QuotationList() {
                   try {
                     const formData = new FormData();
                     formData.append('image', file);
-                    const res = await api.post('/sales/quotations/upload-item-image/', formData, {
-                      headers: { 'Content-Type': 'multipart/form-data' },
-                    });
+                    const res = await api.postForm('/sales/quotations/upload-item-image/', formData);
                     handleServiceLineChange(index, 'product_image', res.data.url);
                     messageApi.success("Đã tải ảnh thành công!");
                     onSuccess("ok");
@@ -1736,9 +1734,7 @@ export default function QuotationList() {
                           try {
                             const formData = new FormData();
                             formData.append('image', file);
-                            const res = await api.post('/sales/quotations/upload-item-image/', formData, {
-                              headers: { 'Content-Type': 'multipart/form-data' },
-                            });
+                            const res = await api.postForm('/sales/quotations/upload-item-image/', formData);
                             handleLineChange(idx, 'product_image', res.data.url);
                             messageApi.open({ key, type: 'success', content: 'Đã tải ảnh thành công!', duration: 2 });
                             onSuccess("ok");
@@ -1967,9 +1963,7 @@ export default function QuotationList() {
                         try {
                           const formData = new FormData();
                           formData.append('image', file);
-                          const res = await api.post('/sales/quotations/upload-item-image/', formData, {
-                            headers: { 'Content-Type': 'multipart/form-data' },
-                          });
+                          const res = await api.postForm('/sales/quotations/upload-item-image/', formData);
                           handleLineChange(idx, 'product_image', res.data.url);
                           messageApi.open({ key, type: 'success', content: 'Đã tải ảnh thành công!', duration: 2 });
                           onSuccess("ok");
@@ -2509,9 +2503,7 @@ export default function QuotationList() {
                       try {
                         const formData = new FormData();
                         formData.append('image', file);
-                        const res = await api.post('/sales/quotations/upload-item-image/', formData, {
-                          headers: { 'Content-Type': 'multipart/form-data' },
-                        });
+                        const res = await api.postForm('/sales/quotations/upload-item-image/', formData);
                         const cd = record.custom_data || {};
                         handleLineChange(idx, 'custom_data', { ...cd, [imgKey]: res.data.url });
                         messageApi.open({ key, type: 'success', content: 'Tải ảnh thành công!', duration: 2 });

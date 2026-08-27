@@ -104,9 +104,7 @@ export default function ProductTemplateTab({ categories }) {
         formData.append('image', variantImageFile)
       }
       
-      await api.post(`/inventory/product-templates/${editingTemplate.id}/generate_variants/`, formData, {
-        headers: { 'Content-Type': 'multipart/form-data' }
-      })
+      await api.postForm(`/inventory/product-templates/${editingTemplate.id}/generate_variants/`, formData)
       message.success('Sinh biến thể thành công! Bạn có thể xem trong tab Sản phẩm.')
       setVariantModalOpen(false)
     } catch (err) {

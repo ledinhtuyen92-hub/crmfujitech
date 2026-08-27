@@ -555,9 +555,7 @@ export default function ZaloInboxPage() {
       if (requestPhone) formData.append('request_phone', 'true')
       if (requestEmail) formData.append('request_email', 'true')
 
-      const res = await api.post(`/zalo/social-leads/${selectedLead.id}/send-message/`, formData, {
-        headers: { 'Content-Type': 'multipart/form-data' }
-      })
+      const res = await api.postForm(`/zalo/social-leads/${selectedLead.id}/send-message/`, formData)
 
       setMessages(prev => [...prev, res.data])
       setMessageText('')

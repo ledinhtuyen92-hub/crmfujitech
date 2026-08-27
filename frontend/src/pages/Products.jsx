@@ -211,14 +211,10 @@ export default function Products() {
       }
 
       if (editingProduct) {
-        await api.patch(`/inventory/products/${editingProduct.id}/?include_inactive=true`, formData, {
-          headers: { 'Content-Type': 'multipart/form-data' },
-        })
+        await api.patchForm(`/inventory/products/${editingProduct.id}/?include_inactive=true`, formData)
         messageApi.success('Cập nhật sản phẩm thành công!')
       } else {
-        await api.post('/inventory/products/', formData, {
-          headers: { 'Content-Type': 'multipart/form-data' },
-        })
+        await api.postForm('/inventory/products/', formData)
         messageApi.success('Thêm sản phẩm mới thành công!')
       }
       setProductModalVisible(false)
@@ -327,9 +323,7 @@ export default function Products() {
 
     try {
       messageApi.loading({ content: 'Đang xử lý file...', key: 'importing' })
-      const res = await api.post('/inventory/products/import-csv/', formData, {
-        headers: { 'Content-Type': 'multipart/form-data' },
-      })
+      const res = await api.postForm('/inventory/products/import-csv/', formData)
       messageApi.success({ content: res.data.detail, key: 'importing' })
       fetchProducts()
       fetchCategories()
