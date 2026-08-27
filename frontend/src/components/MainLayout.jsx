@@ -156,7 +156,7 @@ function MainLayout({ children, isDarkMode, toggleTheme }) {
         ...(hasPermission('notifications.view_announcements') ? [{
           key: '/announcements',
           icon: <NotificationOutlined />,
-          label: <Link to="/announcements">Thông báo {unreadAnnouncementsCount > 0 && <Badge count={unreadAnnouncementsCount} style={{ marginLeft: 8 }} />}</Link>,
+          label: <Link to="/announcements">Thông báo nội bộ {unreadAnnouncementsCount > 0 && <Badge count={unreadAnnouncementsCount} style={{ marginLeft: 8 }} />}</Link>,
         }] : []),
         ...(isModuleActive('approvals') ? [{
           key: '/approvals',

@@ -216,7 +216,7 @@ class ZaloWebhookView(APIView):
 
         msg_created = False
         if message_id:
-            _, msg_created = ZaloMessage.objects.get_or_create(
+            new_msg, msg_created = ZaloMessage.objects.get_or_create(
                 zalo_msg_id=message_id,
                 defaults={
                     "company": company,
@@ -229,7 +229,7 @@ class ZaloWebhookView(APIView):
             )
         else:
             # Không có msg_id (hiếm) → tạo mới luôn
-            ZaloMessage.objects.create(
+            new_msg = ZaloMessage.objects.create(
                 company=company,
                 social_lead=social_lead,
                 direction=ZaloMessage.DIRECTION_INBOUND,
@@ -249,7 +249,7 @@ class ZaloWebhookView(APIView):
                 social_lead.refresh_from_db(fields=['is_ai_active'])
             if social_lead.is_ai_active:
                 from ai_agents.tasks import trigger_zalo_ai
-                trigger_zalo_ai(social_lead.id)
+                trigger_zalo_ai(social_lead.id, trigger_msg_id=new_msg.id if new_msg else None)
 
     def _handle_oa_send_message(self, company, oa_config, data):
         """Xử lý khi OA (nhân viên hoặc AI) nhắn tin cho user (webhook echo)."""

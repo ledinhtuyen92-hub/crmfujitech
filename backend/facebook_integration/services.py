@@ -585,8 +585,9 @@ def process_fb_webhook_message(entry: dict):
             if existing:
                 # Bản ghi đã có (do AI task hoặc Sale tạo trước) → không ghi đè sender_role
                 msg_created = False
+                new_msg = existing
             else:
-                FacebookMessage.objects.create(
+                new_msg = FacebookMessage.objects.create(
                     lead=lead,
                     fb_message_id=msg_id,
                     sender_type=sender_type,
@@ -598,7 +599,7 @@ def process_fb_webhook_message(entry: dict):
                 )
                 msg_created = True
         else:
-            FacebookMessage.objects.create(
+            new_msg = FacebookMessage.objects.create(
                 lead=lead,
                 sender_type=sender_type,
                 text=msg_text,
@@ -648,7 +649,7 @@ def process_fb_webhook_message(entry: dict):
                 lead.refresh_from_db(fields=['is_ai_active'])
             if lead.is_ai_active:
                 from ai_agents.tasks import trigger_facebook_ai
-                trigger_facebook_ai(lead.id)
+                trigger_facebook_ai(lead.id, trigger_msg_id=new_msg.id if new_msg else None)
 
 
 # ── Trích xuất và xử lý SĐT từ hội thoại Facebook ───────────────────────────

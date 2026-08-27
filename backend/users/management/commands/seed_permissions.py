@@ -132,6 +132,7 @@ PERMISSIONS = [
     {"code": "facebook.manage_config", "name": "Quản lý kết nối Trang Facebook & Cấu hình tự động quét SĐT", "module": "facebook"},
     {"code": "facebook.delete_conversation", "name": "Xóa hội thoại Facebook", "module": "facebook"},
     {"code": "facebook.assign", "name": "Phân công hội thoại Facebook", "module": "facebook"},
+    {"code": "facebook.sync_history", "name": "Đồng bộ lịch sử hội thoại Facebook", "module": "facebook"},
 
     # ── Internal Announcements (Thông báo nội bộ) ───────────────────
     {"code": "notifications.view_announcements", "name": "Xem thông báo nội bộ", "module": "notifications"},

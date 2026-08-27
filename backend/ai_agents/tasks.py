@@ -589,21 +589,19 @@ def process_ai_reply_facebook(lead_id, is_followup=False, trigger_msg_id=None):
     except Exception as e:
         logger.error(f'Facebook AI Task Error: {e}')
 
-def trigger_zalo_ai(lead_id, is_followup=False):
+def trigger_zalo_ai(lead_id, is_followup=False, trigger_msg_id=None):
     from zalo_integration.models import ZaloMessage
-    latest_msg = None
-    if not is_followup:
+    if not is_followup and not trigger_msg_id:
         latest_msg = ZaloMessage.objects.filter(social_lead_id=lead_id, direction=ZaloMessage.DIRECTION_INBOUND).order_by('-created_at').first()
-    msg_id = latest_msg.id if latest_msg else None
-    threading.Thread(target=process_ai_reply_zalo, args=(lead_id, is_followup, msg_id)).start()
+        trigger_msg_id = latest_msg.id if latest_msg else None
+    threading.Thread(target=process_ai_reply_zalo, args=(lead_id, is_followup, trigger_msg_id)).start()
 
-def trigger_facebook_ai(lead_id, is_followup=False):
+def trigger_facebook_ai(lead_id, is_followup=False, trigger_msg_id=None):
     from facebook_integration.models import FacebookMessage
-    latest_msg = None
-    if not is_followup:
+    if not is_followup and not trigger_msg_id:
         latest_msg = FacebookMessage.objects.filter(lead_id=lead_id, sender_type='customer').order_by('-created_at').first()
-    msg_id = latest_msg.id if latest_msg else None
-    threading.Thread(target=process_ai_reply_facebook, args=(lead_id, is_followup, msg_id)).start()
+        trigger_msg_id = latest_msg.id if latest_msg else None
+    threading.Thread(target=process_ai_reply_facebook, args=(lead_id, is_followup, trigger_msg_id)).start()
 
 from celery import shared_task
 from datetime import timedelta

@@ -5,6 +5,9 @@ from django.conf.urls.static import static
 from django.http import HttpResponse
 from .views import UploadAPIView
 
+# Chuyển hướng người dùng chưa đăng nhập về trang đăng nhập của Frontend
+admin.site.login_url = '/login'
+
 urlpatterns = [
     path('admin/', admin.site.urls),
     path('api/core/upload/', UploadAPIView.as_view(), name='core-upload'),

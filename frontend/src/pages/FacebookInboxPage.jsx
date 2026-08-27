@@ -457,6 +457,7 @@ export default function FacebookInboxPage() {
   const canViewAllInbox = isCompanyAdmin || hasPermission('facebook.view_all_inbox')
   const canChat = isCompanyAdmin || hasPermission('facebook.chat')
   const canCreateCustomer = isCompanyAdmin || hasPermission('facebook.create_customer')
+  const canSyncHistory = isCompanyAdmin || hasPermission('facebook.sync_history')
   // Resizable columns
   const [leftColWidth, setLeftColWidth] = useState(270)
   const [rightColWidth, setRightColWidth] = useState(260)
@@ -1345,18 +1346,20 @@ export default function FacebookInboxPage() {
           >
             Quét tất cả liên hệ
           </Button>
-          <Button
-            size="small"
-            type="primary"
-            style={{ background: '#8b5cf6', borderColor: '#8b5cf6' }}
-            icon={<HistoryOutlined />}
-            onClick={() => {
-              setSyncTargetPage(selectedPage !== 'all' ? selectedPage : (pages[0]?.id || 'all'))
-              setSyncModal(true)
-            }}
-          >
-            Đồng bộ lịch sử
-          </Button>
+          {canSyncHistory && (
+            <Button
+              size="small"
+              type="primary"
+              style={{ background: '#8b5cf6', borderColor: '#8b5cf6' }}
+              icon={<HistoryOutlined />}
+              onClick={() => {
+                setSyncTargetPage(selectedPage !== 'all' ? selectedPage : (pages[0]?.id || 'all'))
+                setSyncModal(true)
+              }}
+            >
+              Đồng bộ lịch sử
+            </Button>
+          )}
           <Button
             size="small"
             style={{ background: '#10b981', color: '#fff', borderColor: '#10b981' }}
