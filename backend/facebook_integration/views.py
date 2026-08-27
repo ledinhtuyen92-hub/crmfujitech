@@ -43,6 +43,7 @@ from .services import (
     smart_extract_vn_phone,
     subscribe_app_to_page,
     sync_page_conversations_history,
+    verify_facebook_webhook_signature,
 )
 
 logger = logging.getLogger(__name__)
@@ -748,6 +749,18 @@ class FacebookWebhookView(APIView):
         data = request.data
         if data.get("object") != "page":
             return Response({"status": "ignored"})
+            
+        # Xác thực chữ ký Facebook
+        received_sig = request.META.get("HTTP_X_HUB_SIGNATURE_256", "")
+        if received_sig:
+            from users.models import SystemSettings
+            sys_settings = SystemSettings.objects.first()
+            app_secret = sys_settings.facebook_app_secret if sys_settings else None
+            
+            if app_secret:
+                if not verify_facebook_webhook_signature(request.body, received_sig, app_secret):
+                    logger.warning("[Facebook Webhook] Invalid signature.")
+                    return Response({"error": "Invalid signature"}, status=403)
 
         entries = data.get("entry", [])
         for entry in entries:
@@ -777,6 +790,14 @@ class QuickMediaAssetViewSet(viewsets.ModelViewSet):
         media_type = self.request.data.get("media_type", "image")
 
         if file_obj and not file_url:
+            # Xác thực phần mở rộng file (Bảo mật)
+            import os
+            ext = os.path.splitext(file_obj.name)[1].lower()
+            allowed_extensions = {'.jpg', '.jpeg', '.png', '.gif', '.mp4', '.mov', '.pdf', '.doc', '.docx', '.xls', '.xlsx'}
+            if ext not in allowed_extensions:
+                from rest_framework.exceptions import ValidationError
+                raise ValidationError({"file": f"Loại file không được hỗ trợ. Chỉ cho phép các định dạng ảnh, video và tài liệu an toàn."})
+
             filename = f"quick_media/{uuid.uuid4().hex[:12]}_{file_obj.name}"
             saved_path = default_storage.save(filename, file_obj)
             file_url = f"/media/{saved_path}"

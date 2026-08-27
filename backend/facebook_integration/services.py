@@ -422,6 +422,26 @@ def subscribe_app_to_page(page_id: str, page_access_token: str) -> dict:
 
 # ── Xử lý Webhook Message từ Meta ────────────────────────────────────────────
 
+import hmac
+import hashlib
+
+def verify_facebook_webhook_signature(request_body: bytes, received_signature: str, app_secret: str) -> bool:
+    """
+    Xác thực chữ ký từ Meta Webhook.
+    Meta gửi header X-Hub-Signature-256 dưới dạng 'sha256=mac'
+    """
+    if not received_signature or not app_secret:
+        return False
+    
+    try:
+        expected_mac = hmac.new(app_secret.encode('utf-8'), request_body, hashlib.sha256).hexdigest()
+        expected_signature = f"sha256={expected_mac}"
+        return hmac.compare_digest(expected_signature, received_signature)
+    except Exception as e:
+        import logging
+        logging.getLogger(__name__).error(f"Error verifying FB signature: {e}")
+        return False
+
 def process_fb_webhook_message(entry: dict):
     """
     Xử lý một entry từ Webhook payload của Facebook Messenger.
