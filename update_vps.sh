@@ -55,7 +55,7 @@ echo "✅ File .env da duoc cau hinh tu dong cho: $DOMAIN"
 # 2.5 Khoi dong cac dich vu moi (neu co)
 echo ""
 echo "🐳 Dang khoi dong / cap nhat Docker containers..."
-docker compose up -d
+docker compose up -d --build
 
 # 3. Chay migrate neu co thay doi DB schema
 echo ""
