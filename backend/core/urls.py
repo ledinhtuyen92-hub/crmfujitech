@@ -1,5 +1,6 @@
 from django.contrib import admin
-from django.urls import path, include
+from django.urls import path, include, re_path
+from django.views.static import serve
 from django.conf import settings
 from django.conf.urls.static import static
 from django.http import HttpResponse
@@ -33,4 +34,11 @@ urlpatterns = [
     path('api/facebook/', include('facebook_integration.urls')),
     # ── AI Agents (Multi-Agent Auto-Sale) ─────────────────────────────
     path('api/ai_agents/', include('ai_agents.urls')),
-] + static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
+]
+
+# Explicitly serve media files even in DEBUG=False (since Nginx might not be configured for it yet)
+urlpatterns += [
+    re_path(r'^media/(?P<path>.*)$', serve, {
+        'document_root': settings.MEDIA_ROOT,
+    }),
+]

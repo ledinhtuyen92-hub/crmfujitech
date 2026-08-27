@@ -99,9 +99,16 @@ echo "✅ Backend va Celery da duoc khoi dong lai!"
 
 # 7. Reload Nginx de phuc vu file moi nhat
 echo ""
-echo "🌐 [6/6] Dang reload Nginx de ap dung giao dien moi..."
+echo "🔥 [6/6] Dang reload Nginx de ap dung giao dien moi..."
 systemctl reload nginx
 echo "✅ Nginx da duoc reload!"
+
+# 7.5 Cap nhat quyen thu muc media de Django (appuser) va Nginx co the doc/ghi
+echo ""
+echo "🔥 [7/7] Kiem tra va cap nhat quyen thu muc media..."
+mkdir -p backend/media
+chmod -R 777 backend/media
+echo "✅ Thu muc media da duoc cap quyen!"
 
 echo ""
 echo "=========================================================="
