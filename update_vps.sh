@@ -37,6 +37,10 @@ fi
 git reset --hard origin/main
 echo "✅ Code da duoc cap nhat thanh cong!"
 
+# Xoa volume media_data cu (neu con ton tai tu lan chay truoc bi loi)
+# Gio da chuyen sang bind mount ./backend/media nen volume nay khong can nua
+docker volume rm crmfujitech_media_data 2>/dev/null && echo "🗑  Da xoa volume media_data cu." || true
+
 # 2.1 Tu dong cau hinh file .env theo VPS
 echo ""
 echo "⚙  [2/5] Tu dong cap nhat file .env theo cau hinh VPS..."
@@ -62,13 +66,31 @@ echo "✅ File .env da duoc cau hinh tu dong cho: $DOMAIN"
 
 # 2.5 Khoi dong cac dich vu moi (neu co)
 echo ""
+# Tao truoc thu muc media tren host voi quyen dung (appuser uid=1000)
+mkdir -p backend/media/products backend/media/products/templates backend/media/uploads backend/media/company_signatures
+chmod -R 775 backend/media
+
 if [ "$REQUIREMENTS_CHANGED" -eq 1 ]; then
-    echo "📦 Phat hien thu vien moi (requirements.txt)! Dang rebuild Docker..."
+    echo "📦 Phat hien thu vien moi (requirements.txt/Dockerfile)! Dang rebuild Docker..."
     docker compose up -d --build
 else
     echo "🐳 Khong co thu vien moi. Dang khoi dong / cap nhat Docker (nhanh)..."
     docker compose up -d
 fi
+
+# Doi crm_web khoi dong hoan toan truoc khi chay docker exec
+echo "⏳ Dang cho container crm_web san sang..."
+RETRIES=30
+until docker exec crm_web echo "ready" > /dev/null 2>&1; do
+    RETRIES=$((RETRIES - 1))
+    if [ "$RETRIES" -le 0 ]; then
+        echo "❌ Loi: container crm_web khong khoi dong duoc sau 60 giay!"
+        docker logs crm_web --tail 30
+        exit 1
+    fi
+    sleep 2
+done
+echo "✅ Container crm_web da san sang!"
 
 # 3. Chay migrate neu co thay doi DB schema
 echo ""
