@@ -490,6 +490,8 @@ export default function Inventory() {
       formData.append('is_active', values.is_active !== false)
       if (productImageFile) {
         formData.append('image', productImageFile)
+      } else if (editingProduct && !productPreviewImage) {
+        formData.append('image', '') // Gửi chuỗi rỗng để báo backend xóa ảnh
       }
 
       if (editingProduct) {
