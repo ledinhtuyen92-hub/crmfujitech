@@ -36,6 +36,8 @@ SECRET_KEY = env('SECRET_KEY', default='django-insecure-qv&bi1etd=g#jse2hnl8*-&n
 DEBUG = env('DEBUG')
 
 ALLOWED_HOSTS = env.list('ALLOWED_HOSTS', default=["*"])
+SITE_URL = env('SITE_URL', default='http://localhost:8000')
+CSRF_TRUSTED_ORIGINS = [SITE_URL]
 
 
 # Application definition
