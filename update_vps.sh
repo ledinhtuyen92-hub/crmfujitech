@@ -27,8 +27,8 @@ echo "📥 [1/5] Dang keo code moi nhat tu GitHub (nhanh main)..."
 # Khôi phục mọi thay đổi cục bộ (nếu có) để tránh lỗi kẹt git
 git fetch origin main
 
-# Kiem tra xem requirements.txt co thay doi khong truoc khi reset
-if git diff --name-only HEAD origin/main | grep -q 'backend/requirements.txt'; then
+# Kiem tra xem requirements.txt hoac Dockerfile co thay doi khong truoc khi reset
+if git diff --name-only HEAD origin/main | grep -qE 'backend/requirements.txt|backend/Dockerfile|docker-compose.yml'; then
     REQUIREMENTS_CHANGED=1
 else
     REQUIREMENTS_CHANGED=0
@@ -103,11 +103,21 @@ echo "🔥 [6/6] Dang reload Nginx de ap dung giao dien moi..."
 systemctl reload nginx
 echo "✅ Nginx da duoc reload!"
 
-# 7.5 Cap nhat quyen thu muc media de Django (appuser) va Nginx co the doc/ghi
+# 7.5 Cap nhat quyen thu muc media va dam bao named volume co du lieu cu (neu co)
 echo ""
 echo "🔥 [7/7] Kiem tra va cap nhat quyen thu muc media..."
-mkdir -p backend/media
-chmod -R 777 backend/media
+# Tao thu muc tren host (backup / fallback)
+mkdir -p backend/media/products backend/media/products/templates backend/media/uploads
+
+# Di chuyen du lieu media cu vao named volume neu volume chua co du lieu
+MEDIA_IN_VOLUME=$(docker exec crm_web sh -c "ls /app/media/ 2>/dev/null | wc -l" 2>/dev/null || echo "0")
+if [ "$MEDIA_IN_VOLUME" = "0" ] && [ -d "backend/media" ] && [ "$(ls -A backend/media 2>/dev/null)" ]; then
+    echo "=> Dang sao chep media cu vao Docker volume..."
+    docker cp backend/media/. crm_web:/app/media/ 2>/dev/null || true
+fi
+
+# Cap quyen cho appuser (uid 1000) trong container
+docker exec crm_web sh -c "chown -R 1000:1000 /app/media 2>/dev/null || chmod -R 775 /app/media" 2>/dev/null || true
 echo "✅ Thu muc media da duoc cap quyen!"
 
 echo ""

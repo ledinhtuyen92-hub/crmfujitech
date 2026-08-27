@@ -37,7 +37,25 @@ DEBUG = env('DEBUG')
 
 ALLOWED_HOSTS = env.list('ALLOWED_HOSTS', default=["*"])
 SITE_URL = env('SITE_URL', default='http://localhost:8000')
-CSRF_TRUSTED_ORIGINS = [SITE_URL]
+
+# CSRF trusted origins: thêm cả http và https của SITE_URL
+_csrf_origins = [SITE_URL]
+if SITE_URL.startswith('https://'):
+    _csrf_origins.append(SITE_URL.replace('https://', 'http://'))
+elif SITE_URL.startswith('http://'):
+    _csrf_origins.append(SITE_URL.replace('http://', 'https://'))
+CSRF_TRUSTED_ORIGINS = _csrf_origins
+
+# Thêm các domain phụ (subdomain) nếu có
+_extra_csrf = env.list('CSRF_TRUSTED_ORIGINS', default=[])
+if _extra_csrf:
+    CSRF_TRUSTED_ORIGINS += _extra_csrf
+
+# ── Reverse Proxy (Nginx) Settings ────────────────────────────────────
+# Khi Django chạy sau Nginx, cần trust X-Forwarded-Proto header
+# để nhận biết request là HTTPS (quan trọng cho CSRF khi upload file)
+USE_X_FORWARDED_HOST = True
+SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
 
 
 # Application definition
@@ -167,10 +185,25 @@ AUTH_USER_MODEL = 'users.User'
 
 # ── CORS ─────────────────────────────────────────────────────────────
 # Cho phép Frontend ở cổng 5173 được phép lấy dữ liệu
-CORS_ALLOWED_ORIGINS = [
+_cors_origins = [
     "http://localhost:5173",
     "http://127.0.0.1:5173",
+    "http://localhost:3000",
+    "http://127.0.0.1:3000",
 ]
+# Tự động thêm SITE_URL vào CORS để hoạt động trên VPS
+if SITE_URL and SITE_URL not in _cors_origins:
+    _cors_origins.append(SITE_URL)
+    # Thêm cả phần frontend (port 3000) nếu site là HTTPS
+    if SITE_URL.startswith('https://'):
+        _domain = SITE_URL.rstrip('/')
+        _cors_origins.append(_domain.replace('https://', 'http://'))
+
+# Thêm các origin tùy chỉnh từ env
+_extra_cors = env.list('CORS_ALLOWED_ORIGINS', default=[])
+_cors_origins += _extra_cors
+
+CORS_ALLOWED_ORIGINS = list(set(_cors_origins))
 CORS_ALLOW_CREDENTIALS = True
 
 

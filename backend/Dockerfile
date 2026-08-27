@@ -29,6 +29,9 @@ RUN apt-get update \
     && apt-get install -y --no-install-recommends \
         libpq5 \
         postgresql-client \
+        libjpeg62-turbo \
+        libpng16-16 \
+        libwebp7 \
     && rm -rf /var/lib/apt/lists/* \
     && useradd -m -u 1000 appuser
 
@@ -40,6 +43,10 @@ RUN pip install --upgrade pip \
     && rm -rf /wheels
 
 COPY --chown=appuser:appuser . .
+
+# Tạo thư mục media với quyền write
+RUN mkdir -p /app/media/products /app/media/products/templates /app/media/uploads \
+    && chown -R appuser:appuser /app/media
 
 USER appuser
 
