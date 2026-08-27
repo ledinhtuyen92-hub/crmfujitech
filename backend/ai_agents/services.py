@@ -37,7 +37,9 @@ NGUYÊN TẮC QUAN TRỌNG:
 3. KHÔNG XIN SỐ ĐIỆN THOẠI liên tục. Chỉ khéo léo xin SĐT khi khách hàng đã thực sự quan tâm, ưng ý sản phẩm.
 4. Luôn duy trì cuộc hội thoại bằng cách đặt CÂU HỎI MỞ ở cuối câu trả lời để kích thích khách hàng tương tác (hỏi về sở thích, màu sắc, kích thước, nhu cầu...).
 5. Khi khách gửi VIDEO ([Video đính kèm]), AUDIO ([Audio đính kèm]) hoặc TỆP ([Tệp đính kèm]): Hãy phản hồi thân thiện, xác nhận đã nhận được (ví dụ: "Dạ, em đã nhận được video/file anh chị gửi ạ"), sau đó chủ động hỏi thêm thông tin hoặc gợi ý tư vấn liên quan. Không nói rằng bạn không xem được video.
-6. DỪNG ĐÚNG LÚC DỰA VÀO NGỮ CẢNH: AI luôn được cung cấp lịch sử chat. Hãy tự phân tích: Nếu tin nhắn cuối của khách chỉ là lời xác nhận ngắn ('Ok', 'Cảm ơn', 'Vâng') hoặc thả tim/like (👍) VÀ bối cảnh trước đó cho thấy cuộc trò chuyện đã kết thúc (bạn đã chào tạm biệt, hứa chuyển thông tin cho Sale, v.v.), hãy điền "[STOP]" vào trường "reply" để giữ im lặng. Tuy nhiên, nếu khách nói 'Ok' mang ý nghĩa đồng ý để chuyển sang bước tiếp theo hoặc vẫn đang trong quá trình tư vấn, hãy tiếp tục trả lời bình thường."""
+6. DỪNG ĐÚNG LÚC DỰA VÀO NGỮ CẢNH: 
+- Bạn CHỈ ĐƯỢC PHÉP điền "[STOP]" vào trường "reply" (để giữ im lặng) NẾU: khách chỉ nhắn xác nhận ngắn gọn ("ok", "cảm ơn", "vâng", "👍") VÀ cuộc hội thoại ĐÃ KẾT THÚC (bạn đã chào tạm biệt, hoặc đã có SĐT và hứa sẽ cho Sale gọi lại).
+- NẾU khách nói "Ok", "Vâng" mang ý nghĩa đồng ý để cung cấp thông tin (ví dụ bạn vừa hỏi xin SĐT, khách nói "ok em"), TUYỆT ĐỐI KHÔNG ĐƯỢC DỪNG, hãy tiếp tục trả lời bình thường (ví dụ: "Dạ vâng, anh nhắn số Zalo cho em nhé")."""
 
 def get_provider_for_model(model_name: str) -> str:
     if not model_name:
