@@ -751,16 +751,19 @@ class FacebookWebhookView(APIView):
             return Response({"status": "ignored"})
             
         # Xác thực chữ ký Facebook
-        received_sig = request.META.get("HTTP_X_HUB_SIGNATURE_256", "")
-        if received_sig:
-            from users.models import SystemSettings
-            sys_settings = SystemSettings.objects.first()
-            app_secret = sys_settings.facebook_app_secret if sys_settings else None
-            
-            if app_secret:
-                if not verify_facebook_webhook_signature(request.body, received_sig, app_secret):
-                    logger.warning("[Facebook Webhook] Invalid signature.")
-                    return Response({"error": "Invalid signature"}, status=403)
+        from users.models import SystemSettings
+        sys_settings = SystemSettings.objects.first()
+        app_secret = sys_settings.facebook_app_secret if sys_settings else None
+        
+        if app_secret:
+            received_sig = request.META.get("HTTP_X_HUB_SIGNATURE_256", "")
+            if not received_sig:
+                logger.warning("[Facebook Webhook] Missing signature header.")
+                return Response({"error": "Missing signature"}, status=403)
+                
+            if not verify_facebook_webhook_signature(request.body, received_sig, app_secret):
+                logger.warning("[Facebook Webhook] Invalid signature.")
+                return Response({"error": "Invalid signature"}, status=403)
 
         entries = data.get("entry", [])
         for entry in entries:
