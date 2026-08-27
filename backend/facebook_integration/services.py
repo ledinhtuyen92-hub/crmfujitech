@@ -492,6 +492,9 @@ def process_fb_webhook_message(entry: dict):
         if message_data:
             msg_id = message_data.get("mid", "")
             msg_text = message_data.get("text", "")
+            # Xử lý nút Like / Sticker của Facebook để AI có thể hiểu dưới dạng text
+            if message_data.get("sticker_id") and not msg_text:
+                msg_text = "[Khách gửi icon / thả Like 👍]"
         elif postback_data:
             msg_id = f"pb_{messaging.get('timestamp', '')}"
             payload = postback_data.get("payload", "")
