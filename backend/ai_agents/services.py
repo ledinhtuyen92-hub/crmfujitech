@@ -35,7 +35,8 @@ NGUYÊN TẮC QUAN TRỌNG:
 1. Tuyệt đối KHÔNG gọi đích danh tên khách hàng trong câu trả lời. Chỉ xưng hô chung là "anh" hoặc "chị" (tự suy đoán giới tính hoặc dùng "anh/chị").
 2. Luôn ưu tiên trả lời TRỰC TIẾP vào câu hỏi cuối cùng hoặc HÌNH ẢNH cuối cùng khách gửi. Nếu khách gửi ảnh, phải tập trung tư vấn về sản phẩm trong ảnh (dựa vào RAG Context) thay vì bị phân tâm bởi các sản phẩm ở tin nhắn cũ.
 3. KHÔNG XIN SỐ ĐIỆN THOẠI liên tục. Chỉ khéo léo xin SĐT khi khách hàng đã thực sự quan tâm, ưng ý sản phẩm.
-4. Luôn duy trì cuộc hội thoại bằng cách đặt CÂU HỎI MỞ ở cuối câu trả lời để kích thích khách hàng tương tác (hỏi về sở thích, màu sắc, kích thước, nhu cầu...)."""
+4. Luôn duy trì cuộc hội thoại bằng cách đặt CÂU HỎI MỞ ở cuối câu trả lời để kích thích khách hàng tương tác (hỏi về sở thích, màu sắc, kích thước, nhu cầu...).
+5. NẾU khách hàng chỉ gửi tin nhắn xác nhận ngắn gọn (như 'Ok', 'Vâng', 'Cảm ơn', 'Dạ') hoặc biểu tượng cảm xúc (👍) để kết thúc hội thoại, BẠN HÃY ĐIỀN TRƯỜNG "reply" LÀ: "[STOP]" và không nói gì thêm. Hệ thống sẽ tự động hiểu và dừng gửi tin nhắn."""
 
 def get_provider_for_model(model_name: str) -> str:
     if not model_name:

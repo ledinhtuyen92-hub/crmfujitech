@@ -272,6 +272,10 @@ def process_ai_reply_zalo(lead_id, is_followup=False, trigger_msg_id=None):
 
         # 5. Gửi tin nhắn (có Human Typing)
         reply_text = result.get('reply')
+        if reply_text and reply_text.strip() == '[STOP]':
+            logger.info(f"[AI Zalo] AI decided to stop conversing for lead {lead.id}")
+            return
+
         image_url = result.get('image_url')
         if image_url and isinstance(image_url, str) and image_url.startswith('/'):
             image_url = f"{get_public_domain()}{image_url}"
@@ -490,6 +494,10 @@ def process_ai_reply_facebook(lead_id, is_followup=False, trigger_msg_id=None):
 
         # 5. Gửi tin nhắn (có Human Typing)
         reply_text = result.get('reply')
+        if reply_text and reply_text.strip() == '[STOP]':
+            logger.info(f"[AI Facebook] AI decided to stop conversing for lead {lead.id}")
+            return
+
         image_url = result.get('image_url')
         if image_url and isinstance(image_url, str) and image_url.startswith('/'):
             image_url = f"{get_public_domain()}{image_url}"
