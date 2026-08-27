@@ -293,9 +293,14 @@ def generate_ai_reply(agent: AiAgent, conversation_history: list, lead_name: str
     json_template = agent.core_prompt_template.strip() if agent.core_prompt_template else DEFAULT_JSON_TEMPLATE
     core_rules = agent.core_system_rules.strip() if agent.core_system_rules else DEFAULT_SYSTEM_RULES
 
+    extra_rules = ""
+    # Ép AI không dùng product_search_keyword nếu tính năng bị tắt
+    if not getattr(agent.company.ai_settings, 'auto_sync_products', True):
+        extra_rules = "\nLƯU Ý QUAN TRỌNG: Tính năng kết nối Sản phẩm đã bị TẮT. BẠN TUYỆT ĐỐI KHÔNG ĐƯỢC TỰ TÌM SẢN PHẨM, PHẢI ĐỂ TRỐNG TRƯỜNG `product_search_keyword`."
+
     system_prompt = f"""Bạn là {agent.name}. {agent.system_prompt}
 Bạn đang chat với khách hàng (thông tin context bổ sung: {lead_name}).
-{core_rules}
+{core_rules}{extra_rules}
 TRẢ LỜI BẮT BUỘC THEO ĐỊNH DẠNG JSON SAU (không trả về Markdown, chỉ JSON thôi):
 {json_template}"""
 

@@ -291,7 +291,8 @@ def process_ai_reply_zalo(lead_id, is_followup=False, trigger_msg_id=None):
             
         # Check for function calling (product search)
         product_search_keyword = result.get('product_search_keyword')
-        if product_search_keyword:
+        auto_sync = getattr(lead.oa_config.ai_agent.company.ai_settings, 'auto_sync_products', True)
+        if product_search_keyword and auto_sync:
             from zalo_integration.services import send_zalo_carousel
             products_for_carousel = search_products_for_carousel(lead.company, product_search_keyword, limit=5)
             if products_for_carousel:
@@ -527,7 +528,8 @@ def process_ai_reply_facebook(lead_id, is_followup=False, trigger_msg_id=None):
 
         # Check for function calling (product search)
         product_search_keyword = result.get('product_search_keyword')
-        if product_search_keyword:
+        auto_sync = getattr(lead.page.company.ai_settings, 'auto_sync_products', True)
+        if product_search_keyword and auto_sync:
             from facebook_integration.services import send_facebook_carousel
             products_for_carousel = search_products_for_carousel(lead.company, product_search_keyword, limit=5)
             if products_for_carousel:
