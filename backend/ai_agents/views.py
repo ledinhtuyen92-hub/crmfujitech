@@ -8,7 +8,7 @@ from django.db import transaction
 from .models import AiKnowledgeChunk
 from .models import SystemAiKey, CompanyAiSettings, AiAgent, AiKnowledgeDocument, CompanyAiKey, AiModelPricing
 from .serializers import SystemAiKeySerializer, CompanyAiSettingsSerializer, AiAgentSerializer, AiKnowledgeDocumentSerializer, CompanyAiKeySerializer, AiModelPricingSerializer
-from .services import DEFAULT_JSON_TEMPLATE
+from .services import DEFAULT_JSON_TEMPLATE, DEFAULT_SYSTEM_RULES
 
 logger = logging.getLogger(__name__)
 
@@ -57,7 +57,10 @@ class AiAgentViewSet(viewsets.ModelViewSet):
     @action(detail=False, methods=['get'], url_path='default-prompt')
     def default_prompt(self, request):
         """Trả về cấu trúc JSON mặc định dùng trong Core Prompt (Single Source of Truth)."""
-        return Response({'template': DEFAULT_JSON_TEMPLATE})
+        return Response({
+            'template': DEFAULT_JSON_TEMPLATE,
+            'core_system_rules': DEFAULT_SYSTEM_RULES
+        })
         
     def perform_create(self, serializer):
         self._verify_agent_model(serializer.validated_data)
