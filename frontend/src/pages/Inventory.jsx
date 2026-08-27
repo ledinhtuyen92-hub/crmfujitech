@@ -37,7 +37,6 @@ import {
   Tabs,
   Tag,
   Typography,
-  Upload,
   message,
   List,
   Collapse,
@@ -1922,24 +1921,28 @@ export default function Inventory() {
             </Col>
             <Col xs={24} md={24}>
               <Form.Item label="Hình ảnh sản phẩm (Tải lên ảnh mẫu cửa / sản phẩm)">
-                <Upload
-                  beforeUpload={(file) => {
-                    const isImage = file.type.startsWith('image/')
+                <input
+                  type="file"
+                  accept="image/*"
+                  ref={(el) => { if (el) window._invProductImageInputRef = el; }}
+                  style={{ display: 'none' }}
+                  onChange={(e) => {
+                    const file = e.target.files?.[0]
+                    if (!file) return
+                    const isImage = file.type.startsWith('image/') || /\.(jpg|jpeg|png|gif|webp)$/i.test(file.name)
                     if (!isImage) {
-                      message.error('Chỉ được tải lên file hình ảnh!')
-                      return false
+                      message.error('Chỉ được tải lên file hình ảnh (jpg, png, gif)!')
+                      e.target.value = ''
+                      return
                     }
                     setProductImageFile(file)
                     setProductPreviewImage(URL.createObjectURL(file))
-                    return false
+                    e.target.value = ''
                   }}
-                  maxCount={1}
-                  showUploadList={false}
-                >
-                  <Button icon={<UploadOutlined />} style={{ marginBottom: 8 }}>
-                    Chọn hình ảnh sản phẩm
-                  </Button>
-                </Upload>
+                />
+                <Button icon={<UploadOutlined />} style={{ marginBottom: 8 }} onClick={() => window._invProductImageInputRef?.click()}>
+                  Chọn hình ảnh sản phẩm
+                </Button>
                 {productPreviewImage && (
                   <div style={{ marginTop: 8, position: 'relative', display: 'inline-block' }}>
                     <img
