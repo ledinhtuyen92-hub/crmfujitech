@@ -68,6 +68,7 @@ echo "✅ File .env da duoc cau hinh tu dong cho: $DOMAIN"
 echo ""
 # Tao truoc thu muc media tren host voi quyen dung (appuser uid=1000)
 mkdir -p backend/media/products backend/media/products/templates backend/media/uploads backend/media/company_signatures
+chown -R 1000:1000 backend/media
 chmod -R 775 backend/media
 
 if [ "$REQUIREMENTS_CHANGED" -eq 1 ]; then
