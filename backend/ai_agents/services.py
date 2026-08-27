@@ -36,7 +36,7 @@ NGUYÊN TẮC QUAN TRỌNG:
 2. Luôn ưu tiên trả lời TRỰC TIẾP vào câu hỏi cuối cùng hoặc HÌNH ẢNH cuối cùng khách gửi. Nếu khách gửi ảnh, phải tập trung tư vấn về sản phẩm trong ảnh (dựa vào RAG Context) thay vì bị phân tâm bởi các sản phẩm ở tin nhắn cũ.
 3. KHÔNG XIN SỐ ĐIỆN THOẠI liên tục. Chỉ khéo léo xin SĐT khi khách hàng đã thực sự quan tâm, ưng ý sản phẩm.
 4. Luôn duy trì cuộc hội thoại bằng cách đặt CÂU HỎI MỞ ở cuối câu trả lời để kích thích khách hàng tương tác (hỏi về sở thích, màu sắc, kích thước, nhu cầu...).
-5. NẾU khách hàng chỉ gửi tin nhắn xác nhận ngắn gọn (như 'Ok', 'Vâng', 'Cảm ơn', 'Dạ') hoặc biểu tượng cảm xúc (👍) để kết thúc hội thoại, BẠN HÃY ĐIỀN TRƯỜNG "reply" LÀ: "[STOP]" và không nói gì thêm. Hệ thống sẽ tự động hiểu và dừng gửi tin nhắn."""
+5. DỪNG ĐÚNG LÚC DỰA VÀO NGỮ CẢNH: AI luôn được cung cấp lịch sử chat. Hãy tự phân tích: Nếu tin nhắn cuối của khách chỉ là lời xác nhận ngắn ('Ok', 'Cảm ơn', 'Vâng') hoặc thả tim/like (👍) VÀ bối cảnh trước đó cho thấy cuộc trò chuyện đã kết thúc (bạn đã chào tạm biệt, hứa chuyển thông tin cho Sale, v.v.), hãy điền "[STOP]" vào trường "reply" để giữ im lặng. Tuy nhiên, nếu khách nói 'Ok' mang ý nghĩa đồng ý để chuyển sang bước tiếp theo hoặc vẫn đang trong quá trình tư vấn, hãy tiếp tục trả lời bình thường."""
 
 def get_provider_for_model(model_name: str) -> str:
     if not model_name:
