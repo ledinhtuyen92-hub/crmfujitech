@@ -43,6 +43,17 @@ class ProductSerializer(serializers.ModelSerializer):
     image_url = serializers.SerializerMethodField()
     sku = serializers.CharField(max_length=100, required=False, allow_blank=True, allow_null=True)
 
+    def to_internal_value(self, data):
+        # Khi frontend gửi FormData qua PATCH để xóa ảnh, nó sẽ gửi image = '' hoặc 'null'
+        # DRF mặc định sẽ báo lỗi 'The submitted data was not a file'. Ta cần chuyển thành None.
+        if 'image' in data and data.get('image') in ('', 'null', 'undefined', None):
+            try:
+                data = data.copy()
+                data['image'] = None
+            except AttributeError:
+                pass # Đề phòng data không phải dict/QueryDict
+        return super().to_internal_value(data)
+
     class Meta:
         model = Product
         fields = [
