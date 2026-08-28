@@ -17,9 +17,10 @@ logger = logging.getLogger(__name__)
 # ========================================================
 DEFAULT_JSON_TEMPLATE = """{
     "thought": "Phân tích tâm lý khách. Quyết định chiến thuật: Ưu tiên đặt câu hỏi mở để giữ tương tác. CHỈ xin SĐT khi khách đã rất quan tâm, cần báo giá chi tiết, hoặc cần khảo sát tận nơi. Tuyệt đối không xin số dồn dập ở những câu đầu.",
-    "reply": "Câu trả lời gửi khách. NẾU BẠN GỬI ẢNH (Bằng product_search_keyword) thì BẮT BUỘC trong câu trả lời phải nhắc đến việc bạn đang gửi ảnh (Ví dụ: 'Để em gửi anh vài mẫu nhé'). LUÔN KẾT THÚC bằng một câu hỏi mở để khách phản hồi, trừ khi đã chốt được SĐT. ĐIỀN '[STOP]' NẾU KHÁCH CHỈ NHẮN NGẮN GỌN XÁC NHẬN (Ok, vâng, dạ...) HOẶC THẢ TIM VÀ HỘI THOẠI ĐÃ KẾT THÚC.",
+    "reply": "Câu trả lời gửi khách. LUÔN KẾT THÚC bằng một câu hỏi mở để khách phản hồi, trừ khi đã chốt được SĐT. ĐIỀN '[STOP]' NẾU KHÁCH CHỈ NHẮN NGẮN GỌN XÁC NHẬN (Ok, vâng, dạ...) HOẶC THẢ TIM VÀ HỘI THOẠI ĐÃ KẾT THÚC.",
     "sentiment": "angry / handoff / neutral",
     "product_search_keyword": "BẮT BUỘC ĐIỀN TỪ KHÓA NẾU KHÁCH YÊU CẦU 'gửi ảnh', 'cho xem VÀI MẪU'. LƯU Ý: Phải điền CHÍNH XÁC và ĐẦY ĐỦ tên dòng sản phẩm (VD: 'Cửa composite 1 cánh', 'Tủ lạnh Samsung Inverter') thay vì điền chung chung ('Cửa', 'Tủ lạnh') để tránh hệ thống gửi nhầm sang các phụ kiện. Nếu không cần tìm ảnh thì ĐỂ TRỐNG.",
+    "image_urls": ["Điền danh sách CÁC ĐƯỜNG LINK ẢNH (được cung cấp trong RAG dưới dạng ![ảnh](url)) mà bạn muốn gửi cho khách. NẾU KHÔNG CÓ THÌ ĐỂ RỖNG []"],
     "extracted_info": {
         "phone": "Trích xuất SĐT nếu có (nếu không có thì để rỗng)",
         "address": "Trích xuất địa chỉ nếu có (nếu không có thì để rỗng)",
@@ -296,7 +297,7 @@ def generate_ai_reply(agent: AiAgent, conversation_history: list, lead_name: str
     core_rules = agent.core_system_rules.strip() if agent.core_system_rules else DEFAULT_SYSTEM_RULES
 
     # Force AI to return markdown images if present in RAG
-    image_enforcement_rule = "\nNẾU TRONG [TRÍCH XUẤT KIẾN THỨC NỘI BỘ] CÓ KÈM HÌNH ẢNH (định dạng ![ảnh](url)), BẠN BẮT BUỘC PHẢI SAO CHÉP Y NGUYÊN TẤT CẢ CÁC ĐOẠN MÃ ![ảnh](url) ĐÓ vào trong câu trả lời (trường 'reply') để hệ thống gửi ảnh cho khách. Tuyệt đối không được tự ý bỏ bớt bất kỳ ảnh nào."
+    image_enforcement_rule = "\nNẾU TRONG [TRÍCH XUẤT KIẾN THỨC NỘI BỘ] CÓ KÈM HÌNH ẢNH (định dạng ![ảnh](url)), BẠN BẮT BUỘC PHẢI SAO CHÉP Y NGUYÊN TẤT CẢ CÁC ĐƯỜNG LINK URL ĐÓ vào mảng 'image_urls' trong JSON để hệ thống gửi ảnh cho khách. Tuyệt đối không được tự ý bỏ bớt bất kỳ ảnh nào liên quan đến câu trả lời."
     core_rules += image_enforcement_rule
 
     extra_rules = ""
