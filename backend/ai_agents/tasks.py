@@ -284,6 +284,10 @@ def process_ai_reply_zalo(lead_id, is_followup=False, trigger_msg_id=None):
         reply_text = result.get('reply')
         
         image_urls_to_send = []
+        
+        # 1. Thêm ảnh lấy trực tiếp từ RAG (ưu tiên)
+        if 'rag_image_urls' in locals() and rag_image_urls:
+            image_urls_to_send.extend(rag_image_urls)
         if isinstance(result.get('image_urls'), list):
             image_urls_to_send.extend([u for u in result['image_urls'] if isinstance(u, str) and u.startswith('http')])
         if isinstance(result.get('image_url'), str) and result.get('image_url').strip():
@@ -366,12 +370,62 @@ def process_ai_reply_zalo(lead_id, is_followup=False, trigger_msg_id=None):
                     return
                 
             update_fields = []
-                        )
+            
+            # Gửi TẤT CẢ ảnh trước tiên
+            for img_url in unique_images:
+                resp = send_zalo_chat_message(lead.oa_config, lead.social_id, text="", image_url=img_url)
+                if resp.get("error", 0) == 0:
+                    ZaloMessage.objects.create(
+                        company=lead.company,
+                        social_lead=lead,
+                        direction=ZaloMessage.DIRECTION_OUTBOUND,
+                        content="[Hình ảnh]",
+                        attachment_url=img_url,
+                        zalo_msg_id=resp.get("data", {}).get("message_id", "") if resp and "data" in resp else "",
+                        sender_role="ai",
+                        sender_name="Trợ lý AI",
+                    )
+                import time
+                time.sleep(1)
                 
-                if lead.is_ai_active:
-                    lead.has_unread_message = False
-                    lead.unread_count = 0
-                    update_fields.extend(['has_unread_message', 'unread_count'])
+            # Gửi text sau cùng
+            if reply_text:
+                resp = send_zalo_chat_message(lead.oa_config, lead.social_id, text=reply_text)
+                error_code = resp.get("error", 0)
+                
+                if error_code != 0:
+                    err_msg = resp.get("message", "")
+                    logger.error(f"[AI Zalo Error] Zalo API Error {error_code}: {err_msg}")
+                    lead.is_ai_active = False
+                    lead.has_unread_message = True
+                    update_fields.extend(['is_ai_active', 'has_unread_message'])
+                    
+                    ZaloMessage.objects.create(
+                        company=lead.company,
+                        social_lead=lead,
+                        direction=ZaloMessage.DIRECTION_OUTBOUND,
+                        content="Lỗi gửi tin",
+                        payload={"is_system_alert": True, "error_code": error_code, "error_message": err_msg},
+                        sender_role="ai",
+                        sender_name="Trợ lý AI",
+                    )
+                else:
+                    ZaloMessage.objects.create(
+                        company=lead.company,
+                        social_lead=lead,
+                        direction=ZaloMessage.DIRECTION_OUTBOUND,
+                        content=reply_text,
+                        zalo_msg_id=resp.get("data", {}).get("message_id", "") if resp and "data" in resp else "",
+                        sender_role="ai",
+                        sender_name="Trợ lý AI",
+                    )
+            
+            # Đã phản hồi (dù có lỗi hay thành công) thì đánh dấu không còn tin nhắn chưa đọc
+            if lead.is_ai_active:
+                lead.has_unread_message = False
+                lead.unread_count = 0
+                update_fields.extend(['has_unread_message', 'unread_count'])
+                
             if is_followup:
                 lead.has_ai_followed_up = True
                 update_fields.append('has_ai_followed_up')
@@ -640,11 +694,13 @@ def process_ai_reply_facebook(lead_id, is_followup=False, trigger_msg_id=None):
                         sender_role="ai",
                         sender_name="Trợ lý AI",
                     )
+            
+            # Đã phản hồi (dù có lỗi hay thành công) thì đánh dấu không còn tin nhắn chưa đọc
+            if lead.is_ai_active:
+                lead.has_unread_message = False
+                lead.unread_count = 0
+                update_fields.extend(['has_unread_message', 'unread_count'])
                 
-                if lead.is_ai_active:
-                    lead.has_unread_message = False
-                    lead.unread_count = 0
-                    update_fields.extend(['has_unread_message', 'unread_count'])
             if is_followup:
                 lead.has_ai_followed_up = True
                 update_fields.append('has_ai_followed_up')
