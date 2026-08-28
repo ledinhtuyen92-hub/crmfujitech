@@ -105,6 +105,10 @@ echo "🔐 [3/5] Dang nap lai danh sach quyen he thong..."
 docker exec -i crm_web python manage.py seed_permissions
 echo "✅ Permissions da duoc cap nhat!"
 
+echo "🤖 Dang cap nhat lai Core Prompt cho AI..."
+docker exec -i crm_web python manage.py shell -c "from ai_agents.models import AiAgent; [setattr(a, 'core_system_rules', (a.core_system_rules or '').replace('![ảnh]', '![...]')) or setattr(a, 'core_prompt_template', (a.core_prompt_template or '').replace('![ảnh]', '![...]')) or a.save() for a in AiAgent.objects.all()]"
+echo "✅ Core Prompt da duoc cap nhat!"
+
 # 5. Build lai Frontend
 echo ""
 echo "⚛  [4/5] Dang bien dich lai giao dien React (Frontend)..."
