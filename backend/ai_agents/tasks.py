@@ -217,6 +217,12 @@ def process_ai_reply_zalo(lead_id, is_followup=False, trigger_msg_id=None):
             if search_query.strip():
                 from ai_agents.rag_processor import search_knowledge
                 rag_search_text = search_knowledge(lead.oa_config.ai_agent, search_query.strip(), limit=4)
+                
+                # Trích xuất ảnh trực tiếp từ nội dung RAG
+                import re
+                rag_image_urls = re.findall(r'!\[.*?\]\((.*?)\)', rag_search_text)
+                rag_image_urls = [u.strip() for u in rag_image_urls if u.strip()]
+                
                 rag_search_text += get_product_context(lead.company, search_query.strip(), history)
 
         if is_followup:
@@ -282,19 +288,40 @@ def process_ai_reply_zalo(lead_id, is_followup=False, trigger_msg_id=None):
 
         # 5. Gửi tin nhắn (có Human Typing)
         reply_text = result.get('reply')
+        
+        image_urls_to_send = []
+        
+        # 1. Thêm ảnh lấy trực tiếp từ RAG (ưu tiên)
+        if 'rag_image_urls' in locals() and rag_image_urls:
+            image_urls_to_send.extend(rag_image_urls)
+        if isinstance(result.get('image_urls'), list):
+            image_urls_to_send.extend([u for u in result['image_urls'] if isinstance(u, str) and u.startswith('http')])
+        if isinstance(result.get('image_url'), str) and result.get('image_url').strip():
+            image_urls_to_send.append(result['image_url'])
+
         if reply_text and isinstance(reply_text, str):
             reply_text = reply_text.replace('[STOP]', '').strip()
-        if not reply_text or reply_text == '[STOP]':
+            
+            import re
+            md_urls = re.findall(r'!\[.*?\]\((.*?)\)', reply_text)
+            for md_url in md_urls:
+                image_urls_to_send.append(md_url.strip())
+            reply_text = re.sub(r'!\[.*?\]\(.*?\)', '', reply_text).strip()
+
+        unique_images = []
+        for url in image_urls_to_send:
+            if not url: continue
+            if url.startswith('/'):
+                url = f"{get_public_domain()}{url}"
+            elif 'localhost:' in url or '127.0.0.1:' in url:
+                from urllib.parse import urlparse
+                url = f"{get_public_domain()}{urlparse(url).path}"
+            if url not in unique_images:
+                unique_images.append(url)
+
+        if not reply_text and not unique_images and result.get('reply') == '[STOP]':
             logger.info(f"[AI Zalo] AI decided to stop conversing for lead {lead.id}")
             return
-
-        image_url = result.get('image_url')
-        if image_url and isinstance(image_url, str):
-            if image_url.startswith('/'):
-                image_url = f"{get_public_domain()}{image_url}"
-            elif 'localhost:' in image_url or '127.0.0.1:' in image_url:
-                from urllib.parse import urlparse
-                image_url = f"{get_public_domain()}{urlparse(image_url).path}"
             
         # Check for function calling (product search)
         product_search_keyword = result.get('product_search_keyword')
@@ -323,7 +350,7 @@ def process_ai_reply_zalo(lead_id, is_followup=False, trigger_msg_id=None):
                     sender_name="Trợ lý AI",
                 )
 
-        if not reply_text and not image_url and not product_search_keyword:
+        if not reply_text and not unique_images and not product_search_keyword:
             # AI did not return anything to send!
             logger.error(f"[AI Zalo Internal Error] AI returned empty reply for lead {lead.id}")
             ZaloMessage.objects.create(
@@ -336,7 +363,7 @@ def process_ai_reply_zalo(lead_id, is_followup=False, trigger_msg_id=None):
                 sender_name="Trợ lý AI",
             )
 
-        if reply_text or image_url:
+        if reply_text or unique_images:
             if ai_agent.enable_human_typing:
                 import time
                 delay = min(len(reply_text or '') * 0.03, 5.0) # max 5s delay
@@ -348,7 +375,8 @@ def process_ai_reply_zalo(lead_id, is_followup=False, trigger_msg_id=None):
                     logger.info(f"Zalo AI double debounce: Bỏ qua gửi tin nhắn do khách đã gửi tin mới {latest_check.id}")
                     return
                 
-            resp = send_zalo_chat_message(lead.oa_config, lead.social_id, text=reply_text, image_url=image_url)
+            first_image = unique_images[0] if unique_images else ""
+            resp = send_zalo_chat_message(lead.oa_config, lead.social_id, text=reply_text, image_url=first_image)
             
             error_code = resp.get("error", 0)
             
@@ -379,6 +407,22 @@ def process_ai_reply_zalo(lead_id, is_followup=False, trigger_msg_id=None):
                     sender_role="ai",
                     sender_name="Trợ lý AI",
                 )
+                
+                for img_url in unique_images[1:]:
+                    import time
+                    time.sleep(1)
+                    img_resp = send_zalo_chat_message(lead.oa_config, lead.social_id, text="", image_url=img_url)
+                    if img_resp.get("error", 0) == 0:
+                        ZaloMessage.objects.create(
+                            company=lead.company,
+                            social_lead=lead,
+                            direction=ZaloMessage.DIRECTION_OUTBOUND,
+                            content="[Hình ảnh]",
+                            payload={"image_url": img_url},
+                            zalo_msg_id=img_resp.get("data", {}).get("message_id", "") if img_resp and "data" in img_resp else "",
+                            sender_role="ai",
+                            sender_name="Trợ lý AI",
+                        )
                 
                 if lead.is_ai_active:
                     lead.has_unread_message = False
@@ -460,6 +504,12 @@ def process_ai_reply_facebook(lead_id, is_followup=False, trigger_msg_id=None):
             if search_query.strip():
                 from ai_agents.rag_processor import search_knowledge
                 rag_search_text = search_knowledge(lead.page_config.ai_agent, search_query.strip(), limit=4)
+                
+                # Trích xuất ảnh trực tiếp từ nội dung RAG
+                import re
+                rag_image_urls = re.findall(r'!\[.*?\]\((.*?)\)', rag_search_text)
+                rag_image_urls = [u.strip() for u in rag_image_urls if u.strip()]
+                
                 rag_search_text += get_product_context(lead.company, search_query.strip(), history)
         if is_followup:
             drip_hours = lead.page_config.ai_agent.drip_followup_hours or 24
@@ -524,21 +574,42 @@ def process_ai_reply_facebook(lead_id, is_followup=False, trigger_msg_id=None):
 
         # 5. Gửi tin nhắn (có Human Typing)
         reply_text = result.get('reply')
+        
+        image_urls_to_send = []
+        
+        # 1. Thêm ảnh lấy trực tiếp từ RAG (ưu tiên)
+        if 'rag_image_urls' in locals() and rag_image_urls:
+            image_urls_to_send.extend(rag_image_urls)
+        if isinstance(result.get('image_urls'), list):
+            image_urls_to_send.extend([u for u in result['image_urls'] if isinstance(u, str) and u.startswith('http')])
+        if isinstance(result.get('image_url'), str) and result.get('image_url').strip():
+            image_urls_to_send.append(result['image_url'])
+
         if reply_text and isinstance(reply_text, str):
             reply_text = reply_text.replace('[STOP]', '').strip()
-        if not reply_text or reply_text == '[STOP]':
+            
+            import re
+            md_urls = re.findall(r'!\[.*?\]\((.*?)\)', reply_text)
+            for md_url in md_urls:
+                image_urls_to_send.append(md_url.strip())
+            reply_text = re.sub(r'!\[.*?\]\(.*?\)', '', reply_text).strip()
+
+        unique_images = []
+        for url in image_urls_to_send:
+            if not url: continue
+            if url.startswith('/'):
+                url = f"{get_public_domain()}{url}"
+            elif 'localhost:' in url or '127.0.0.1:' in url:
+                from urllib.parse import urlparse
+                url = f"{get_public_domain()}{urlparse(url).path}"
+            if url not in unique_images:
+                unique_images.append(url)
+
+        if not reply_text and not unique_images and result.get('reply') == '[STOP]':
             logger.info(f"[AI Facebook] AI decided to stop conversing for lead {lead.id}")
             return
-
-        image_url = result.get('image_url')
-        if image_url and isinstance(image_url, str):
-            if image_url.startswith('/'):
-                image_url = f"{get_public_domain()}{image_url}"
-            elif 'localhost:' in image_url or '127.0.0.1:' in image_url:
-                from urllib.parse import urlparse
-                image_url = f"{get_public_domain()}{urlparse(image_url).path}"
             
-        if reply_text or image_url:
+        if reply_text or unique_images:
             if ai_agent.enable_human_typing:
                 import time
                 delay = min(len(reply_text or '') * 0.03, 5.0) # max 5s delay
@@ -561,15 +632,14 @@ def process_ai_reply_facebook(lead_id, is_followup=False, trigger_msg_id=None):
         except Exception:
             auto_sync = True
             
+        products_for_carousel = []
         if product_search_keyword and auto_sync:
             from facebook_integration.services import send_facebook_carousel
             products_for_carousel = search_products_for_carousel(lead.company, product_search_keyword, limit=5)
             if products_for_carousel:
-                car_resp = send_facebook_carousel(lead.page_config.page_access_token, lead.fb_user_id, products_for_carousel)
-                # KHÔNG tạo FacebookMessage ở đây nữa vì webhook message_echoes sẽ tự động tạo tin nhắn này trên hệ thống
-                pass
+                send_facebook_carousel(lead.page_config.page_access_token, lead.fb_user_id, products_for_carousel)
 
-        if not reply_text and not image_url and not products_for_carousel:
+        if not reply_text and not unique_images and not products_for_carousel:
             # AI did not return anything to send!
             logger.error(f"[AI Facebook Internal Error] AI returned empty reply for lead {lead.id}")
             FacebookMessage.objects.create(
@@ -580,15 +650,19 @@ def process_ai_reply_facebook(lead_id, is_followup=False, trigger_msg_id=None):
                 sender_role="ai",
                 sender_name="Trợ lý AI",
             )
+            return
 
         update_fields = []
-        if reply_text or image_url:
+        if reply_text or unique_images:
             if not is_followup and trigger_msg_id:
                 latest_check = FacebookMessage.objects.filter(lead=lead, sender_type='customer').order_by('-created_at').first()
                 if latest_check and latest_check.id != trigger_msg_id:
                     logger.info(f"Facebook AI double debounce: Bỏ qua gửi tin nhắn do khách đã gửi tin mới {latest_check.id}")
                     return
-            resp = send_facebook_message(lead.page_config.page_access_token, lead.fb_user_id, message_text=reply_text, attachment_url=image_url)
+            
+            first_image = unique_images[0] if unique_images else None
+            resp = send_facebook_message(lead.page_config.page_access_token, lead.fb_user_id, message_text=reply_text, attachment_url=first_image)
+            
             if not resp.get("success"):
                 err_msg = resp.get("error", "Unknown error")
                 logger.error(f"[AI Facebook Error] Facebook API Error: {err_msg}")
@@ -605,33 +679,29 @@ def process_ai_reply_facebook(lead_id, is_followup=False, trigger_msg_id=None):
                     sender_name="Trợ lý AI",
                 )
             else:
-                # Dùng update_or_create: nếu webhook echo đã tạo bản ghi trước
-                # (với sender_role=system), thì sẽ CẬP NHẬT lại thành AI.
-                # Nếu chưa có thì tạo mới.
-                msg_id = resp.get("message_id")
-                if msg_id:
-                    FacebookMessage.objects.update_or_create(
-                        fb_message_id=msg_id,
-                        defaults={
-                            "lead": lead,
-                            "sender_type": "page",
-                            "text": reply_text,
-                            "attachment_url": image_url or "",
-                            "attachment_type": "image" if image_url else "",
-                            "sender_role": "ai",
-                            "sender_name": "Trợ lý AI",
-                        }
-                    )
-                else:
-                    FacebookMessage.objects.create(
-                        lead=lead,
-                        sender_type='page',
-                        text=reply_text,
-                        attachment_url=image_url or "",
-                        attachment_type="image" if image_url else "",
-                        sender_role="ai",
-                        sender_name="Trợ lý AI",
-                    )
+                FacebookMessage.objects.create(
+                    lead=lead,
+                    sender_type='page',
+                    text=reply_text or "[Hình ảnh]",
+                    fb_message_id=resp.get("message_id", ""),
+                    sender_role="ai",
+                    sender_name="Trợ lý AI",
+                )
+                
+                for img_url in unique_images[1:]:
+                    import time
+                    time.sleep(1)
+                    img_resp = send_facebook_message(lead.page_config.page_access_token, lead.fb_user_id, message_text="", attachment_url=img_url)
+                    if img_resp.get("success"):
+                        FacebookMessage.objects.create(
+                            lead=lead,
+                            sender_type='page',
+                            text="[Hình ảnh]",
+                            attachment_url=img_url,
+                            fb_message_id=img_resp.get("message_id", ""),
+                            sender_role="ai",
+                            sender_name="Trợ lý AI",
+                        )
                 
                 if lead.is_ai_active:
                     lead.has_unread_message = False
@@ -925,7 +995,7 @@ def sync_company_products_to_rag(company_id):
             img_url = p.template.image.url
             
         if img_url:
-            line += f" | Hình ảnh (URL): {img_url}"
+            line += f" | Hình ảnh (URL): ![ảnh]({img_url})"
             
         content_lines.append(line)
         
