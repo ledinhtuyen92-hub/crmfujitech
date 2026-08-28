@@ -225,6 +225,12 @@ class ZaloWebhookView(APIView):
             elif "gif" in message_obj:
                 attachment_type = "gif"
                 attachment_url = message_obj.get("gif", {}).get("url", "") or message_obj.get("gif", {}).get("gif_url", "")
+                
+        # SUPER DEBUG FALLBACK
+        # Nếu Zalo gửi một định dạng sticker/event cực dị mà không có cả text lẫn link ảnh
+        # Ta nhồi toàn bộ cục JSON thô vào text để hiện lên màn hình giao diện cho dễ debug
+        if not message_text and not attachment_url:
+            message_text = f"[DEBUG_RAW] {json.dumps(data, ensure_ascii=False)}"
 
         msg_created = False
         if message_id:
