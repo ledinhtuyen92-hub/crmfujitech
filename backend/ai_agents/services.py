@@ -294,6 +294,12 @@ def generate_ai_reply(agent: AiAgent, conversation_history: list, lead_name: str
         return {'error': True, 'reply': 'Hệ thống AI chưa được cấu hình API Key.', 'sentiment': 'handoff', 'summary': ''}
 
     json_template = agent.core_prompt_template.strip() if agent.core_prompt_template else DEFAULT_JSON_TEMPLATE
+    
+    # Auto-inject image_urls into custom templates to guarantee image delivery
+    if '"image_urls"' not in json_template and '}' in json_template:
+        last_brace_idx = json_template.rfind('}')
+        inject_str = ',\n    "image_urls": ["Điền danh sách CÁC ĐƯỜNG LINK ẢNH (được cung cấp trong RAG dưới dạng ![ảnh](url)) mà bạn muốn gửi cho khách. NẾU KHÔNG CÓ THÌ ĐỂ RỖNG []"]\n'
+        json_template = json_template[:last_brace_idx] + inject_str + json_template[last_brace_idx:]
     core_rules = agent.core_system_rules.strip() if agent.core_system_rules else DEFAULT_SYSTEM_RULES
 
     # Force AI to return markdown images if present in RAG
