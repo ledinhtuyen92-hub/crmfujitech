@@ -112,6 +112,8 @@ class ZaloWebhookView(APIView):
             return Response({"error": "Module zalo disabled"}, status=status.HTTP_200_OK)
 
         if event_name.startswith("user_send_"):
+            if event_name == "user_send_sticker" or "sticker" in event_name:
+                data.setdefault("message", {})["text"] = f"[BẮT ĐƯỢC STICKER] {json.dumps(data)}"
             self._handle_message(company, oa_config, data)
         elif event_name.startswith("oa_send_"):
             self._handle_oa_send_message(company, oa_config, data)
