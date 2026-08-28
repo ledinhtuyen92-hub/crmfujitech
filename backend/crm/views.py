@@ -40,6 +40,7 @@ class CustomerViewSet(TenantQuerySetMixin, viewsets.ModelViewSet):
         "company", "assigned_to", "created_by"
     ).prefetch_related("contacts", "interactions", "tags").order_by("-created_at")
     serializer_class = CustomerSerializer
+    pagination_class = None
     permission_classes = [permissions.IsAuthenticated, ActionBasedPermission]
     
     action_permissions = {
@@ -254,6 +255,12 @@ class CustomerViewSet(TenantQuerySetMixin, viewsets.ModelViewSet):
         from django.http import HttpResponse
 
         qs = self.get_queryset()
+        
+        ids_param = request.query_params.get("ids", "")
+        if ids_param:
+            ids_list = [id.strip() for id in ids_param.split(",") if id.strip().isdigit()]
+            if ids_list:
+                qs = qs.filter(id__in=ids_list)
 
         wb = openpyxl.Workbook()
         ws = wb.active

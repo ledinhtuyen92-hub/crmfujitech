@@ -36,6 +36,8 @@ SECRET_KEY = env('SECRET_KEY', default='django-insecure-qv&bi1etd=g#jse2hnl8*-&n
 DEBUG = env('DEBUG')
 
 ALLOWED_HOSTS = env.list('ALLOWED_HOSTS', default=["*"])
+if DEBUG:
+    ALLOWED_HOSTS += ['.ngrok-free.dev', '.ngrok-free.app', '.ngrok.app', '.ngrok.io', '*']
 SITE_URL = env('SITE_URL', default='http://localhost:8000')
 
 # CSRF trusted origins: thêm cả http và https của SITE_URL

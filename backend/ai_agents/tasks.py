@@ -1,4 +1,5 @@
 import threading
+# pyrefly: ignore [missing-import]
 from django.utils import timezone
 from .models import AiAgent
 from .services import generate_ai_reply
@@ -281,7 +282,9 @@ def process_ai_reply_zalo(lead_id, is_followup=False, trigger_msg_id=None):
 
         # 5. Gửi tin nhắn (có Human Typing)
         reply_text = result.get('reply')
-        if reply_text and reply_text.strip() == '[STOP]':
+        if reply_text and isinstance(reply_text, str):
+            reply_text = reply_text.replace('[STOP]', '').strip()
+        if not reply_text or reply_text == '[STOP]':
             logger.info(f"[AI Zalo] AI decided to stop conversing for lead {lead.id}")
             return
 
@@ -510,7 +513,9 @@ def process_ai_reply_facebook(lead_id, is_followup=False, trigger_msg_id=None):
 
         # 5. Gửi tin nhắn (có Human Typing)
         reply_text = result.get('reply')
-        if reply_text and reply_text.strip() == '[STOP]':
+        if reply_text and isinstance(reply_text, str):
+            reply_text = reply_text.replace('[STOP]', '').strip()
+        if not reply_text or reply_text == '[STOP]':
             logger.info(f"[AI Facebook] AI decided to stop conversing for lead {lead.id}")
             return
 
@@ -1177,35 +1182,14 @@ def _apply_extracted_info(lead, phone, email, address, platform):
                 auto_create = lead.oa_config.auto_create_customer_from_phone if lead.oa_config else False
             elif platform == 'facebook':
                 auto_create = lead.page_config.auto_create_customer_from_phone if lead.page_config else False
-                
-            auto_assign = False
-            if platform == 'zalo':
-                auto_assign = lead.oa_config.auto_assign_lead_to_customer_assignee if lead.oa_config else True
-            elif platform == 'facebook':
-                auto_assign = lead.page_config.auto_assign_lead_to_customer_assignee if lead.page_config else True
 
-            if already_exists:
-                existing_customer = Customer.objects.filter(company=company, phone=norm_phone).first()
-                lead.is_customer_converted = True
-                if platform == 'zalo': lead.customer = existing_customer
-                elif platform == 'facebook': lead.customer_id = existing_customer.id
-                if auto_assign and existing_customer.assigned_to and not lead.assigned_to:
-                    lead.assigned_to = existing_customer.assigned_to
-                updated = True
-            elif auto_create:
-                new_customer = Customer.objects.create(
-                    company=company,
-                    phone=norm_phone,
-                    name=getattr(lead, 'display_name', getattr(lead, 'fb_user_name', '')) or (f"Zalo Khách {norm_phone}" if platform == 'zalo' else f"FB Khách {norm_phone}"),
-                    source="Zalo" if platform == 'zalo' else "Facebook",
-                    status="new",
-                    address=lead.detected_address or ""
-                )
-                lead.is_customer_converted = True
-                if platform == 'zalo': lead.customer = new_customer
-                elif platform == 'facebook': lead.customer_id = new_customer.id
-                if auto_assign and new_customer.assigned_to and not lead.assigned_to:
-                    lead.assigned_to = new_customer.assigned_to
+            if already_exists or auto_create:
+                if platform == 'zalo':
+                    from zalo_integration.services import convert_social_lead
+                    convert_social_lead(lead, norm_phone, email=lead.detected_email, address=lead.detected_address)
+                elif platform == 'facebook':
+                    from facebook_integration.services import convert_facebook_lead
+                    convert_facebook_lead(lead, norm_phone, email=lead.detected_email, address=lead.detected_address)
                 updated = True
                 
     if updated:

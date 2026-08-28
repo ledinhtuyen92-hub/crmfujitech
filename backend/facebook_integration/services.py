@@ -292,22 +292,32 @@ def send_facebook_message(
 def get_fb_user_profile(page_access_token: str, psid: str) -> dict:
     """
     Lấy tên và avatar của người dùng Facebook từ PSID.
+    Thử lại 1 lần nếu không lấy được tên (Facebook API đôi khi không trả).
     """
     url = f"{FB_GRAPH_API_BASE}/{psid}"
     params = {
         "fields": "name,profile_pic",
         "access_token": page_access_token
     }
-    try:
-        resp = requests.get(url, params=params, timeout=8)
-        data = resp.json()
-        if "error" not in data:
-            return {
-                "name": data.get("name", ""),
-                "avatar": data.get("profile_pic", "")
-            }
-    except Exception as e:
-        logger.error(f"[Facebook] Error getting user profile for {psid}: {e}")
+    max_retries = 2
+    for attempt in range(max_retries):
+        try:
+            resp = requests.get(url, params=params, timeout=8)
+            data = resp.json()
+            if "error" not in data:
+                name = data.get("name", "")
+                avatar = data.get("profile_pic", "")
+                if name or attempt == max_retries - 1:
+                    return {"name": name, "avatar": avatar}
+                # Tên rỗng, thử lại sau 1 giây
+                import time
+                time.sleep(1)
+                continue
+        except Exception as e:
+            logger.error(f"[Facebook] Error getting user profile for {psid} (attempt {attempt+1}): {e}")
+            if attempt < max_retries - 1:
+                import time
+                time.sleep(1)
     return {"name": "", "avatar": ""}
 
 
@@ -523,13 +533,13 @@ def process_fb_webhook_message(entry: dict):
             fb_user_id=customer_psid,
             defaults={
                 "company": page_config.company,
-                "fb_user_name": profile.get("name", ""),
+                "fb_user_name": profile.get("name", "") or f"FB {customer_psid[-6:]}",
                 "fb_user_avatar": profile.get("avatar", ""),
                 "assigned_to": page_config.assigned_to,
             }
         )
         if not created:
-            if profile.get("name") and not lead.fb_user_name:
+            if profile.get("name") and (not lead.fb_user_name or lead.fb_user_name.startswith("FB ")):
                 lead.fb_user_name = profile["name"]
             if profile.get("avatar") and not lead.fb_user_avatar:
                 lead.fb_user_avatar = profile["avatar"]

@@ -436,7 +436,12 @@ function CustomerList() {
 
   const handleExportCsv = async () => {
     try {
+      const params = {}
+      if (selectedRowKeys && selectedRowKeys.length > 0) {
+        params.ids = selectedRowKeys.join(',')
+      }
       const response = await api.get('/crm/customers/export-csv/', {
+        params,
         responseType: 'blob', // Quan trọng để lấy file
       })
       const url = window.URL.createObjectURL(new Blob([response.data]))
@@ -888,13 +893,13 @@ function CustomerList() {
     (hasPermission('crm.import')) && {
       key: 'import',
       icon: <ImportOutlined />,
-      label: 'Nhập CSV',
+      label: 'Nhập Excel',
       onClick: () => { if (!checkMaintenance()) setImportModalVisible(true) }
     },
     (hasPermission('crm.export')) && {
       key: 'export',
       icon: <ExportOutlined />,
-      label: 'Xuất CSV',
+      label: 'Xuất Excel',
       onClick: handleExportCsv
     },
     { type: 'divider' },
@@ -1768,9 +1773,9 @@ function CustomerList() {
         </Form>
       </Modal>
 
-      {/* Modal Import CSV */}
+      {/* Modal Import Excel */}
       <Modal
-        title="Nhập khách hàng từ CSV"
+        title="Nhập khách hàng từ Excel"
         open={importModalVisible}
         onCancel={() => setImportModalVisible(false)}
         onOk={handleImportCsv}
@@ -1780,7 +1785,7 @@ function CustomerList() {
       >
         <div style={{ marginBottom: 16 }}>
           <Text>
-            Vui lòng chuẩn bị file CSV theo cấu trúc 6 cột: 
+            Vui lòng chuẩn bị file Excel theo cấu trúc 6 cột: 
             <strong> Tên, SĐT, Email, Địa chỉ, Tỉnh/Thành phố, Tags.</strong>
             <br />
             <Text type="secondary" style={{ fontSize: 13 }}>
@@ -1793,7 +1798,7 @@ function CustomerList() {
           </Text>
           <div style={{ marginTop: 12 }}>
             <Button size="small" type="dashed" onClick={handleDownloadTemplate}>
-              Tải file mẫu CSV
+              Tải file mẫu Excel
             </Button>
           </div>
         </div>
