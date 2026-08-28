@@ -19,7 +19,7 @@ DEFAULT_JSON_TEMPLATE = """{
     "thought": "Phân tích tâm lý khách. Quyết định chiến thuật: Ưu tiên đặt câu hỏi mở để giữ tương tác. CHỈ xin SĐT khi khách đã rất quan tâm, cần báo giá chi tiết, hoặc cần khảo sát tận nơi. Tuyệt đối không xin số dồn dập ở những câu đầu.",
     "reply": "Câu trả lời gửi khách. NẾU BẠN GỬI ẢNH (Bằng product_search_keyword) thì BẮT BUỘC trong câu trả lời phải nhắc đến việc bạn đang gửi ảnh (Ví dụ: 'Để em gửi anh vài mẫu nhé'). LUÔN KẾT THÚC bằng một câu hỏi mở để khách phản hồi, trừ khi đã chốt được SĐT. ĐIỀN '[STOP]' NẾU KHÁCH CHỈ NHẮN NGẮN GỌN XÁC NHẬN (Ok, vâng, dạ...) HOẶC THẢ TIM VÀ HỘI THOẠI ĐÃ KẾT THÚC.",
     "sentiment": "angry / handoff / neutral",
-    "image_url": "Trích xuất chính xác Đường link (URL) của ảnh từ Tri thức RAG nếu có (Ví dụ: nếu trong RAG có đoạn ![ảnh](https://abc.com/1.jpg) thì điền https://abc.com/1.jpg vào đây). Tuyệt đối không tự bịa ra link.",
+    "image_url": "Trích xuất chính xác Đường link (URL) của ảnh từ [TRÍCH XUẤT KIẾN THỨC NỘI BỘ] nếu có (Ví dụ: ![ảnh](https://abc.com/1.jpg) thì điền https://abc.com/1.jpg). TUYỆT ĐỐI KHÔNG lấy link ảnh từ tin nhắn của khách hàng. Tuyệt đối không tự bịa ra link.",
     "product_search_keyword": "BẮT BUỘC ĐIỀN TỪ KHÓA NẾU KHÁCH YÊU CẦU 'gửi ảnh', 'cho xem VÀI MẪU'. LƯU Ý: Phải điền CHÍNH XÁC và ĐẦY ĐỦ tên dòng sản phẩm (VD: 'Cửa composite 1 cánh', 'Tủ lạnh Samsung Inverter') thay vì điền chung chung ('Cửa', 'Tủ lạnh') để tránh hệ thống gửi nhầm sang các phụ kiện. Nếu không cần tìm ảnh thì ĐỂ TRỐNG.",
     "extracted_info": {
         "phone": "Trích xuất SĐT nếu có (nếu không có thì để rỗng)",
@@ -259,6 +259,7 @@ def generate_image_description(image_url: str, api_keys, provider: str = 'gemini
                 
                 img_url_payload = {"url": image_url}
                 try:
+                    import requests
                     resp = requests.get(image_url, timeout=10)
                     if resp.status_code == 200:
                         mime_type = resp.headers.get('content-type', 'image/jpeg')

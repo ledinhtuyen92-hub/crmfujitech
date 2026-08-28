@@ -226,7 +226,13 @@ def search_knowledge(agent, query: str, limit: int = 4):
             knowledge_texts = []
             for c in chunks:
                 if getattr(c, 'distance', 1) < 0.7:  # Threshold
-                    knowledge_texts.append(f"- (Nguồn: {c.document.title}) {c.content}")
+                    text_to_append = f"- (Nguồn: {c.document.title}) {c.content}"
+                    if getattr(c.document, 'file_attachment', None) and getattr(c.document.file_attachment, 'name', None):
+                        # Không gửi lại ảnh cho khách nếu tài liệu là ảnh mẫu (dạy AI nhận diện)
+                        if c.document.doc_type != 'image':
+                            img_url = c.document.file_attachment.url
+                            text_to_append += f"\n  (Kèm ảnh minh họa: ![ảnh]({img_url}))"
+                    knowledge_texts.append(text_to_append)
                     
             if knowledge_texts:
                 return "\n\n[TRÍCH XUẤT KIẾN THỨC NỘI BỘ TỪ CÔNG TY (RAG)]:\n" + "\n".join(knowledge_texts) + "\n(Hãy ưu tiên sử dụng những kiến thức trên để trả lời khách hàng một cách chính xác nhất)."

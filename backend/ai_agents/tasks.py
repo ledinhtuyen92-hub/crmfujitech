@@ -289,8 +289,12 @@ def process_ai_reply_zalo(lead_id, is_followup=False, trigger_msg_id=None):
             return
 
         image_url = result.get('image_url')
-        if image_url and isinstance(image_url, str) and image_url.startswith('/'):
-            image_url = f"{get_public_domain()}{image_url}"
+        if image_url and isinstance(image_url, str):
+            if image_url.startswith('/'):
+                image_url = f"{get_public_domain()}{image_url}"
+            elif 'localhost:' in image_url or '127.0.0.1:' in image_url:
+                from urllib.parse import urlparse
+                image_url = f"{get_public_domain()}{urlparse(image_url).path}"
             
         # Check for function calling (product search)
         product_search_keyword = result.get('product_search_keyword')
@@ -462,6 +466,7 @@ def process_ai_reply_facebook(lead_id, is_followup=False, trigger_msg_id=None):
             history.append({'role': 'system', 'content': f'Khách hàng đã không phản hồi hơn {drip_hours} giờ. Hãy viết một câu chào hỏi, gợi mở hoặc hỏi thăm khéo léo để tiếp tục câu chuyện một cách tự nhiên nhất.'})
 
         result = generate_ai_reply(lead.page_config.ai_agent, history, lead.fb_user_name + rag_search_text)
+        logger.info(f"[AI Facebook] Raw AI result for lead {lead.id}: {result}")
         if result.get('error'):
             logger.error(f"[AI Facebook Internal Error] {result.get('reply')}")
             lead.is_ai_active = False
@@ -526,8 +531,12 @@ def process_ai_reply_facebook(lead_id, is_followup=False, trigger_msg_id=None):
             return
 
         image_url = result.get('image_url')
-        if image_url and isinstance(image_url, str) and image_url.startswith('/'):
-            image_url = f"{get_public_domain()}{image_url}"
+        if image_url and isinstance(image_url, str):
+            if image_url.startswith('/'):
+                image_url = f"{get_public_domain()}{image_url}"
+            elif 'localhost:' in image_url or '127.0.0.1:' in image_url:
+                from urllib.parse import urlparse
+                image_url = f"{get_public_domain()}{urlparse(image_url).path}"
             
         if reply_text or image_url:
             if ai_agent.enable_human_typing:
