@@ -221,10 +221,11 @@ def process_ai_reply_zalo(lead_id, is_followup=False, trigger_msg_id=None):
                 from ai_agents.rag_processor import search_knowledge
                 rag_search_text = search_knowledge(lead.oa_config.ai_agent, search_query.strip(), limit=4)
                 
-                # Trích xuất tối đa 2 ảnh đầu tiên từ RAG để gửi trực tiếp cho khách (không phụ thuộc vào AI)
+                # Trích xuất ảnh TỪ DUY NHẤT chunk đầu tiên (chuẩn nhất) để cho phép gửi nhiều ảnh trong 1 Q&A, nhưng không bị thừa ảnh từ các Q&A phụ khác
+                rag_first_chunk = rag_search_text.split('\n- (Nguồn:')[1] if '\n- (Nguồn:' in rag_search_text else rag_search_text
                 import re
-                rag_image_urls = re.findall(r'!\[.*?\]\((.*?)\)', rag_search_text)
-                rag_image_urls = [u.strip() for u in rag_image_urls if u.strip()][:2]
+                rag_image_urls = re.findall(r'!\[.*?\]\((.*?)\)', rag_first_chunk)
+                rag_image_urls = [u.strip() for u in rag_image_urls if u.strip()]
                 
                 rag_search_text += get_product_context(lead.company, search_query.strip(), history)
 
@@ -515,10 +516,11 @@ def process_ai_reply_facebook(lead_id, is_followup=False, trigger_msg_id=None):
                 from ai_agents.rag_processor import search_knowledge
                 rag_search_text = search_knowledge(lead.page_config.ai_agent, search_query.strip(), limit=4)
                 
-                # Trích xuất tối đa 2 ảnh đầu tiên từ RAG để gửi trực tiếp cho khách (không phụ thuộc vào AI)
+                # Trích xuất ảnh TỪ DUY NHẤT chunk đầu tiên (chuẩn nhất) để cho phép gửi nhiều ảnh trong 1 Q&A, nhưng không bị thừa ảnh từ các Q&A phụ khác
+                rag_first_chunk = rag_search_text.split('\n- (Nguồn:')[1] if '\n- (Nguồn:' in rag_search_text else rag_search_text
                 import re
-                rag_image_urls = re.findall(r'!\[.*?\]\((.*?)\)', rag_search_text)
-                rag_image_urls = [u.strip() for u in rag_image_urls if u.strip()][:2]
+                rag_image_urls = re.findall(r'!\[.*?\]\((.*?)\)', rag_first_chunk)
+                rag_image_urls = [u.strip() for u in rag_image_urls if u.strip()]
                 
                 rag_search_text += get_product_context(lead.company, search_query.strip(), history)
         if is_followup:
