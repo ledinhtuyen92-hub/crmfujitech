@@ -300,7 +300,7 @@ def generate_ai_reply(agent: AiAgent, conversation_history: list, lead_name: str
     extra_rules = ""
     # Ép AI không dùng product_search_keyword nếu tính năng bị tắt
     if not getattr(agent.company.ai_settings, 'auto_sync_products', True):
-        extra_rules = "\nLƯU Ý QUAN TRỌNG: Tính năng kết nối Sản phẩm đã bị TẮT. BẠN TUYỆT ĐỐI KHÔNG ĐƯỢC TỰ TÌM SẢN PHẨM VÀ KHÔNG ĐƯỢC HỨA HẸN GỬI ẢNH (Bắt buộc để trống trường `product_search_keyword`). Nếu khách yêu cầu xem ảnh/mẫu, hãy khéo léo báo rằng hệ thống không gửi được ảnh tại đây và XIN SỐ ĐIỆN THOẠI ZALO để nhân viên tư vấn gửi trực tiếp Catalogue ảnh mẫu cho khách."
+        extra_rules = "\nLƯU Ý: Tính năng tự động tìm kiếm Sản phẩm (product_search_keyword) hiện đang TẮT. Tuyệt đối ĐỂ TRỐNG trường này. Tuy nhiên, nếu trong RAG có hình ảnh sẵn, bạn VẪN PHẢI tuân thủ Quy tắc gửi ảnh (sao chép vào image_urls) như bình thường."
     else:
         extra_rules = "\nLƯU Ý: Tính năng kết nối Sản phẩm đang BẬT. Nếu khách hàng muốn xem mẫu/ảnh, HÃY SỬ DỤNG trường `product_search_keyword` để tìm và gửi ảnh, đồng thời báo với khách trong câu trả lời là bạn đang gửi ảnh mẫu cho họ xem."
 
