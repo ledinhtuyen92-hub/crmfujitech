@@ -295,6 +295,10 @@ def generate_ai_reply(agent: AiAgent, conversation_history: list, lead_name: str
     json_template = agent.core_prompt_template.strip() if agent.core_prompt_template else DEFAULT_JSON_TEMPLATE
     core_rules = agent.core_system_rules.strip() if agent.core_system_rules else DEFAULT_SYSTEM_RULES
 
+    # Force AI to return markdown images if present in RAG
+    image_enforcement_rule = "\nNẾU TRONG [TRÍCH XUẤT KIẾN THỨC NỘI BỘ] CÓ KÈM HÌNH ẢNH (định dạng ![ảnh](url)), BẠN BẮT BUỘC PHẢI SAO CHÉP Y NGUYÊN đoạn mã ![ảnh](url) đó vào trong câu trả lời (trường 'reply') để hệ thống gửi ảnh cho khách."
+    core_rules += image_enforcement_rule
+
     extra_rules = ""
     # Ép AI không dùng product_search_keyword nếu tính năng bị tắt
     if not getattr(agent.company.ai_settings, 'auto_sync_products', True):
@@ -305,7 +309,7 @@ def generate_ai_reply(agent: AiAgent, conversation_history: list, lead_name: str
     system_prompt = f"""Bạn là {agent.name}. {agent.system_prompt}
 Bạn đang chat với khách hàng (thông tin context bổ sung: {lead_name}).
 {core_rules}{extra_rules}
-TRẢ LỜI BẮT BUỘC THEO ĐỊNH DẠNG JSON SAU (không trả về Markdown, chỉ JSON thôi):
+TRẢ LỜI BẮT BUỘC THEO ĐỊNH DẠNG JSON SAU (chỉ trả về JSON thuần túy, không bọc trong ```json...```):
 {json_template}"""
 
     last_error = None

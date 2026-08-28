@@ -217,12 +217,6 @@ def process_ai_reply_zalo(lead_id, is_followup=False, trigger_msg_id=None):
             if search_query.strip():
                 from ai_agents.rag_processor import search_knowledge
                 rag_search_text = search_knowledge(lead.oa_config.ai_agent, search_query.strip(), limit=4)
-                
-                # Trích xuất ảnh trực tiếp từ nội dung RAG
-                import re
-                rag_image_urls = re.findall(r'!\[.*?\]\((.*?)\)', rag_search_text)
-                rag_image_urls = [u.strip() for u in rag_image_urls if u.strip()]
-                
                 rag_search_text += get_product_context(lead.company, search_query.strip(), history)
 
         if is_followup:
@@ -290,10 +284,6 @@ def process_ai_reply_zalo(lead_id, is_followup=False, trigger_msg_id=None):
         reply_text = result.get('reply')
         
         image_urls_to_send = []
-        
-        # 1. Thêm ảnh lấy trực tiếp từ RAG (ưu tiên)
-        if 'rag_image_urls' in locals() and rag_image_urls:
-            image_urls_to_send.extend(rag_image_urls)
         if isinstance(result.get('image_urls'), list):
             image_urls_to_send.extend([u for u in result['image_urls'] if isinstance(u, str) and u.startswith('http')])
         if isinstance(result.get('image_url'), str) and result.get('image_url').strip():
@@ -375,53 +365,7 @@ def process_ai_reply_zalo(lead_id, is_followup=False, trigger_msg_id=None):
                     logger.info(f"Zalo AI double debounce: Bỏ qua gửi tin nhắn do khách đã gửi tin mới {latest_check.id}")
                     return
                 
-            first_image = unique_images[0] if unique_images else ""
-            resp = send_zalo_chat_message(lead.oa_config, lead.social_id, text=reply_text, image_url=first_image)
-            
-            error_code = resp.get("error", 0)
-            
             update_fields = []
-            if error_code != 0:
-                err_msg = resp.get("message", "")
-                logger.error(f"[AI Zalo Error] Zalo API Error {error_code}: {err_msg}")
-                lead.is_ai_active = False
-                lead.has_unread_message = True
-                update_fields.extend(['is_ai_active', 'has_unread_message'])
-                
-                ZaloMessage.objects.create(
-                    company=lead.company,
-                    social_lead=lead,
-                    direction=ZaloMessage.DIRECTION_OUTBOUND,
-                    content="Lỗi gửi tin",
-                    payload={"is_system_alert": True, "error_code": error_code, "error_message": err_msg},
-                    sender_role="ai",
-                    sender_name="Trợ lý AI",
-                )
-            else:
-                ZaloMessage.objects.create(
-                    company=lead.company,
-                    social_lead=lead,
-                    direction=ZaloMessage.DIRECTION_OUTBOUND,
-                    content=reply_text or "[Hình ảnh]",
-                    zalo_msg_id=resp.get("data", {}).get("message_id", "") if resp and "data" in resp else "",
-                    sender_role="ai",
-                    sender_name="Trợ lý AI",
-                )
-                
-                for img_url in unique_images[1:]:
-                    import time
-                    time.sleep(1)
-                    img_resp = send_zalo_chat_message(lead.oa_config, lead.social_id, text="", image_url=img_url)
-                    if img_resp.get("error", 0) == 0:
-                        ZaloMessage.objects.create(
-                            company=lead.company,
-                            social_lead=lead,
-                            direction=ZaloMessage.DIRECTION_OUTBOUND,
-                            content="[Hình ảnh]",
-                            payload={"image_url": img_url},
-                            zalo_msg_id=img_resp.get("data", {}).get("message_id", "") if img_resp and "data" in img_resp else "",
-                            sender_role="ai",
-                            sender_name="Trợ lý AI",
                         )
                 
                 if lead.is_ai_active:
@@ -504,12 +448,6 @@ def process_ai_reply_facebook(lead_id, is_followup=False, trigger_msg_id=None):
             if search_query.strip():
                 from ai_agents.rag_processor import search_knowledge
                 rag_search_text = search_knowledge(lead.page_config.ai_agent, search_query.strip(), limit=4)
-                
-                # Trích xuất ảnh trực tiếp từ nội dung RAG
-                import re
-                rag_image_urls = re.findall(r'!\[.*?\]\((.*?)\)', rag_search_text)
-                rag_image_urls = [u.strip() for u in rag_image_urls if u.strip()]
-                
                 rag_search_text += get_product_context(lead.company, search_query.strip(), history)
         if is_followup:
             drip_hours = lead.page_config.ai_agent.drip_followup_hours or 24
@@ -576,10 +514,6 @@ def process_ai_reply_facebook(lead_id, is_followup=False, trigger_msg_id=None):
         reply_text = result.get('reply')
         
         image_urls_to_send = []
-        
-        # 1. Thêm ảnh lấy trực tiếp từ RAG (ưu tiên)
-        if 'rag_image_urls' in locals() and rag_image_urls:
-            image_urls_to_send.extend(rag_image_urls)
         if isinstance(result.get('image_urls'), list):
             image_urls_to_send.extend([u for u in result['image_urls'] if isinstance(u, str) and u.startswith('http')])
         if isinstance(result.get('image_url'), str) and result.get('image_url').strip():
@@ -660,48 +594,52 @@ def process_ai_reply_facebook(lead_id, is_followup=False, trigger_msg_id=None):
                     logger.info(f"Facebook AI double debounce: Bỏ qua gửi tin nhắn do khách đã gửi tin mới {latest_check.id}")
                     return
             
-            first_image = unique_images[0] if unique_images else None
-            resp = send_facebook_message(lead.page_config.page_access_token, lead.fb_user_id, message_text=reply_text, attachment_url=first_image)
+            update_fields = []
             
-            if not resp.get("success"):
-                err_msg = resp.get("error", "Unknown error")
-                logger.error(f"[AI Facebook Error] Facebook API Error: {err_msg}")
-                lead.is_ai_active = False
-                lead.has_unread_message = True
-                update_fields.extend(['is_ai_active', 'has_unread_message'])
+            # Gửi TẤT CẢ ảnh trước tiên
+            for img_url in unique_images:
+                resp = send_facebook_message(lead.page_config.page_access_token, lead.fb_user_id, message_text="", attachment_url=img_url)
+                if resp.get("success"):
+                    FacebookMessage.objects.create(
+                        lead=lead,
+                        sender_type='page',
+                        text="[Hình ảnh]",
+                        attachment_url=img_url,
+                        fb_message_id=resp.get("message_id", ""),
+                        sender_role="ai",
+                        sender_name="Trợ lý AI",
+                    )
+                import time
+                time.sleep(1)
                 
-                FacebookMessage.objects.create(
-                    lead=lead,
-                    sender_type='page',
-                    text="Lỗi gửi tin",
-                    payload={"is_system_alert": True, "error_message": err_msg},
-                    sender_role="ai",
-                    sender_name="Trợ lý AI",
-                )
-            else:
-                FacebookMessage.objects.create(
-                    lead=lead,
-                    sender_type='page',
-                    text=reply_text or "[Hình ảnh]",
-                    fb_message_id=resp.get("message_id", ""),
-                    sender_role="ai",
-                    sender_name="Trợ lý AI",
-                )
+            # Gửi text sau cùng
+            if reply_text:
+                resp = send_facebook_message(lead.page_config.page_access_token, lead.fb_user_id, message_text=reply_text)
                 
-                for img_url in unique_images[1:]:
-                    import time
-                    time.sleep(1)
-                    img_resp = send_facebook_message(lead.page_config.page_access_token, lead.fb_user_id, message_text="", attachment_url=img_url)
-                    if img_resp.get("success"):
-                        FacebookMessage.objects.create(
-                            lead=lead,
-                            sender_type='page',
-                            text="[Hình ảnh]",
-                            attachment_url=img_url,
-                            fb_message_id=img_resp.get("message_id", ""),
-                            sender_role="ai",
-                            sender_name="Trợ lý AI",
-                        )
+                if not resp.get("success"):
+                    err_msg = resp.get("error", "Unknown error")
+                    logger.error(f"[AI Facebook Error] Facebook API Error: {err_msg}")
+                    lead.is_ai_active = False
+                    lead.has_unread_message = True
+                    update_fields.extend(['is_ai_active', 'has_unread_message'])
+                    
+                    FacebookMessage.objects.create(
+                        lead=lead,
+                        sender_type='page',
+                        text="Lỗi gửi tin",
+                        payload={"is_system_alert": True, "error_message": err_msg},
+                        sender_role="ai",
+                        sender_name="Trợ lý AI",
+                    )
+                else:
+                    FacebookMessage.objects.create(
+                        lead=lead,
+                        sender_type='page',
+                        text=reply_text,
+                        fb_message_id=resp.get("message_id", ""),
+                        sender_role="ai",
+                        sender_name="Trợ lý AI",
+                    )
                 
                 if lead.is_ai_active:
                     lead.has_unread_message = False
