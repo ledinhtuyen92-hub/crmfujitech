@@ -746,7 +746,7 @@ def ai_drip_followup():
     for agent in agents:
         hours = agent.drip_followup_hours or 24
         cutoff_end   = now - timedelta(hours=hours)        # Quá giờ cài đặt
-        cutoff_start = now - timedelta(hours=hours, minutes=15)  # Tránh gửi lại nếu task chạy trễ
+        cutoff_start = now - timedelta(hours=hours + 72)     # Cửa sổ 3 ngày (thay vì 15 phút) để tránh lỡ task nếu Celery bị trễ, nhưng không quá lâu để tránh spam khách cũ
         
         # 1. Quét Zalo — khách chưa phản hồi (có thể Sale đang tiếp quản)
         zalo_leads = ZaloLead.objects.filter(
