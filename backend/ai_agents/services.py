@@ -39,7 +39,8 @@ NGUYÊN TẮC QUAN TRỌNG:
 5. Khi khách gửi VIDEO ([Video đính kèm]), AUDIO ([Audio đính kèm]) hoặc TỆP ([Tệp đính kèm]): Hãy phản hồi thân thiện, xác nhận đã nhận được (ví dụ: "Dạ, em đã nhận được video/file anh chị gửi ạ"), sau đó chủ động hỏi thêm thông tin hoặc gợi ý tư vấn liên quan. Không nói rằng bạn không xem được video.
 6. QUY TẮC DỪNG HỘI THOẠI [STOP]: 
 - NẾU CHƯA LẤY ĐƯỢC SỐ ĐIỆN THOẠI CỦA KHÁCH: TUYỆT ĐỐI KHÔNG ĐƯỢC DỪNG (không được xuất [STOP]). Dù khách chỉ nhắn "ok", "vâng", gửi icon 👍, thả tim... bạn VẪN PHẢI tiếp tục trả lời, chủ động khơi gợi nhu cầu, mời chào hoặc nhắc khéo lại lời đề nghị xin số điện thoại/hẹn lịch.
-- CHỈ ĐƯỢC PHÉP điền "[STOP]" vào trường "reply" (để giữ im lặng) KHI VÀ CHỈ KHI: Bạn ĐÃ CÓ số điện thoại của khách, hoặc cuộc tư vấn đã hoàn toàn kết thúc (bạn đã chào tạm biệt) VÀ tin nhắn cuối cùng của khách chỉ là xác nhận ngắn gọn ("ok", "cảm ơn", thả tim 👍)."""
+- CHỈ ĐƯỢC PHÉP điền "[STOP]" vào trường "reply" (để giữ im lặng) KHI VÀ CHỈ KHI: Bạn ĐÃ CÓ số điện thoại của khách, hoặc cuộc tư vấn đã hoàn toàn kết thúc (bạn đã chào tạm biệt) VÀ tin nhắn cuối cùng của khách chỉ là xác nhận ngắn gọn ("ok", "cảm ơn", thả tim 👍).
+7. QUY TẮC GỬI ẢNH: NẾU TRONG [TRÍCH XUẤT KIẾN THỨC NỘI BỘ] CÓ KÈM HÌNH ẢNH (định dạng ![ảnh](url)), BẠN BẮT BUỘC PHẢI SAO CHÉP Y NGUYÊN TẤT CẢ CÁC ĐƯỜNG LINK URL ĐÓ vào mảng 'image_urls' trong JSON để hệ thống gửi ảnh cho khách. Tuyệt đối không được tự ý bỏ bớt bất kỳ ảnh nào liên quan đến câu trả lời."""
 
 def get_provider_for_model(model_name: str) -> str:
     if not model_name:
@@ -295,10 +296,6 @@ def generate_ai_reply(agent: AiAgent, conversation_history: list, lead_name: str
 
     json_template = agent.core_prompt_template.strip() if agent.core_prompt_template else DEFAULT_JSON_TEMPLATE
     core_rules = agent.core_system_rules.strip() if agent.core_system_rules else DEFAULT_SYSTEM_RULES
-
-    # Force AI to return markdown images if present in RAG
-    image_enforcement_rule = "\nNẾU TRONG [TRÍCH XUẤT KIẾN THỨC NỘI BỘ] CÓ KÈM HÌNH ẢNH (định dạng ![ảnh](url)), BẠN BẮT BUỘC PHẢI SAO CHÉP Y NGUYÊN TẤT CẢ CÁC ĐƯỜNG LINK URL ĐÓ vào mảng 'image_urls' trong JSON để hệ thống gửi ảnh cho khách. Tuyệt đối không được tự ý bỏ bớt bất kỳ ảnh nào liên quan đến câu trả lời."
-    core_rules += image_enforcement_rule
 
     extra_rules = ""
     # Ép AI không dùng product_search_keyword nếu tính năng bị tắt
