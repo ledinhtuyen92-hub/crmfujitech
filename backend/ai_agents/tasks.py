@@ -220,13 +220,6 @@ def process_ai_reply_zalo(lead_id, is_followup=False, trigger_msg_id=None):
             if search_query.strip():
                 from ai_agents.rag_processor import search_knowledge
                 rag_search_text = search_knowledge(lead.oa_config.ai_agent, search_query.strip(), limit=4)
-                
-                # Trích xuất ảnh TỪ DUY NHẤT chunk đầu tiên (chuẩn nhất) để cho phép gửi nhiều ảnh trong 1 Q&A, nhưng không bị thừa ảnh từ các Q&A phụ khác
-                rag_first_chunk = rag_search_text.split('\n- (Nguồn:')[1] if '\n- (Nguồn:' in rag_search_text else rag_search_text
-                import re
-                rag_image_urls = re.findall(r'!\[.*?\]\((.*?)\)', rag_first_chunk)
-                rag_image_urls = [u.strip() for u in rag_image_urls if u.strip()]
-                
                 rag_search_text += get_product_context(lead.company, search_query.strip(), history)
 
         if is_followup:
@@ -294,10 +287,6 @@ def process_ai_reply_zalo(lead_id, is_followup=False, trigger_msg_id=None):
         reply_text = result.get('reply')
         
         image_urls_to_send = []
-        
-        # 1. Thêm ảnh lấy trực tiếp từ RAG (ưu tiên)
-        if 'rag_image_urls' in locals() and rag_image_urls:
-            image_urls_to_send.extend(rag_image_urls)
         if isinstance(result.get('image_urls'), list):
             image_urls_to_send.extend([u for u in result['image_urls'] if isinstance(u, str) and u.startswith('http')])
         if isinstance(result.get('image_url'), str) and result.get('image_url').strip():
@@ -515,13 +504,6 @@ def process_ai_reply_facebook(lead_id, is_followup=False, trigger_msg_id=None):
             if search_query.strip():
                 from ai_agents.rag_processor import search_knowledge
                 rag_search_text = search_knowledge(lead.page_config.ai_agent, search_query.strip(), limit=4)
-                
-                # Trích xuất ảnh TỪ DUY NHẤT chunk đầu tiên (chuẩn nhất) để cho phép gửi nhiều ảnh trong 1 Q&A, nhưng không bị thừa ảnh từ các Q&A phụ khác
-                rag_first_chunk = rag_search_text.split('\n- (Nguồn:')[1] if '\n- (Nguồn:' in rag_search_text else rag_search_text
-                import re
-                rag_image_urls = re.findall(r'!\[.*?\]\((.*?)\)', rag_first_chunk)
-                rag_image_urls = [u.strip() for u in rag_image_urls if u.strip()]
-                
                 rag_search_text += get_product_context(lead.company, search_query.strip(), history)
         if is_followup:
             drip_hours = lead.page_config.ai_agent.drip_followup_hours or 24
@@ -588,10 +570,6 @@ def process_ai_reply_facebook(lead_id, is_followup=False, trigger_msg_id=None):
         reply_text = result.get('reply')
         
         image_urls_to_send = []
-        
-        # 1. Thêm ảnh lấy trực tiếp từ RAG (ưu tiên)
-        if 'rag_image_urls' in locals() and rag_image_urls:
-            image_urls_to_send.extend(rag_image_urls)
         if isinstance(result.get('image_urls'), list):
             image_urls_to_send.extend([u for u in result['image_urls'] if isinstance(u, str) and u.startswith('http')])
         if isinstance(result.get('image_url'), str) and result.get('image_url').strip():
