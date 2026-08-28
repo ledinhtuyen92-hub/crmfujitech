@@ -387,7 +387,7 @@ def top_sellers(request):
     product_count_subquery = product_qs.values('order__created_by').annotate(t=Sum('quantity')).values('t')
 
     # Lấy toàn bộ nhân viên có phát sinh đơn hàng, không phân biệt phòng ban
-    users = User.objects.filter(cf, is_active=True)
+    users = User.objects.filter(cf, is_active=True, is_superuser=False)
     users = apply_dashboard_scope(users, request, user, user_field=None)
     users = users.annotate(
         total_revenue=Coalesce(Subquery(revenue_subquery), Decimal('0.0'), output_field=DecimalField()),

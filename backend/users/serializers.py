@@ -186,6 +186,7 @@ class UserSerializer(serializers.ModelSerializer):
             "permissions",
             "is_superuser",
             "is_company_admin",
+            "is_auto_assign_target",
             "is_active",
             "department",
             "department_name",

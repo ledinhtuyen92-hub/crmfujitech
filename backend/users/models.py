@@ -218,6 +218,11 @@ class User(AbstractUser):
         verbose_name="Là Admin công ty",
         help_text="Tài khoản quản trị cao nhất của công ty (Owner/Giám đốc). Có toàn quyền trong công ty.",
     )
+    is_auto_assign_target = models.BooleanField(
+        default=False,
+        verbose_name="Nhận khách tự động",
+        help_text="Ghi đè cấu hình Role: Nếu bật, tài khoản này sẽ được chia khách tự động.",
+    )
     department = models.ForeignKey(
         "Department",
         on_delete=models.SET_NULL,

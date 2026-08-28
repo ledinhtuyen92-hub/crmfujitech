@@ -115,6 +115,7 @@ export default function UserManagement() {
             department: user.department,
             is_active: user.is_active,
             is_company_admin: user.is_company_admin,
+            is_auto_assign_target: user.is_auto_assign_target,
             password: '',
           }
         : {
@@ -127,6 +128,7 @@ export default function UserManagement() {
             department: undefined,
             is_active: true,
             is_company_admin: false,
+            is_auto_assign_target: false,
             password: '',
           },
     )
@@ -593,6 +595,28 @@ export default function UserManagement() {
               </Form.Item>
             </Col>
           </Row>
+          <Form.Item
+            noStyle
+            shouldUpdate={(prevValues, currentValues) => prevValues.role !== currentValues.role}
+          >
+            {({ getFieldValue }) => {
+              const selectedRoleId = getFieldValue('role');
+              const selectedRole = roles.find((r) => r.id === selectedRoleId);
+              const hasAutoAssignRole = selectedRole && selectedRole.is_auto_assign_target;
+
+              if (hasAutoAssignRole) return null;
+
+              return (
+                <Row gutter={24}>
+                  <Col xs={24} md={24}>
+                    <Form.Item name="is_auto_assign_target" label="Nhận khách tự động (Quyền mở rộng)" valuePropName="checked" help="Hiển thị do tài khoản đang không có Nhóm quyền nhận khách. Bật lên nếu muốn tài khoản này được nhận khách.">
+                      <Switch checkedChildren="Có nhận" unCheckedChildren="Không nhận" />
+                    </Form.Item>
+                  </Col>
+                </Row>
+              );
+            }}
+          </Form.Item>
 
           <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 8 }}>
             <Button onClick={() => setModalOpen(false)}>Hủy</Button>

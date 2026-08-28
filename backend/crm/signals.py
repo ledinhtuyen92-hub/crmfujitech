@@ -38,15 +38,16 @@ def auto_assign_customer(sender, instance, **kwargs):
                 
             if has_round_robin:
                 from users.models import User
-                from django.db.models import Max, F
+                from django.db.models import Max, F, Q
 
                 sale_user = (
                     User.objects.filter(
                         company=company,
                         is_active=True,
-                        is_company_admin=False,
                         is_superuser=False,
-                        role__is_auto_assign_target=True,
+                    )
+                    .filter(
+                        Q(role__is_auto_assign_target=True) | Q(is_auto_assign_target=True)
                     )
                     .annotate(last_lead_time=Max("assigned_customers__created_at"))
                     .order_by(F("last_lead_time").asc(nulls_first=True))
