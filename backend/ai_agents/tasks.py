@@ -182,7 +182,10 @@ def process_ai_reply_zalo(lead_id, is_followup=False, trigger_msg_id=None):
                 is_video = att_type == 'video' or any(ext in url_lower for ext in ['.mp4', '.mov', '.avi', '.webm', 'video'])
                 is_audio = att_type == 'audio' or any(ext in url_lower for ext in ['.mp3', '.wav', '.ogg', '.m4a'])
                 if not is_video and not is_audio:
-                    msg_dict['image_url'] = m.attachment_url
+                    if role == 'user':
+                        msg_dict['image_url'] = m.attachment_url
+                    else:
+                        msg_dict['content'] = (msg_dict['content'] or '') + ' ([Hình ảnh đính kèm])'
             if m.attachment_url and att_type in ('video', 'audio', 'file'):
                 type_label = {'video': 'Video', 'audio': 'Audio', 'file': 'Tệp'}.get(att_type, 'Đính kèm')
                 msg_dict['content'] = (msg_dict['content'] or '') + f' ([{type_label} đính kèm])'
@@ -467,7 +470,10 @@ def process_ai_reply_facebook(lead_id, is_followup=False, trigger_msg_id=None):
                 is_video = any(ext in url_lower for ext in ['.mp4', '.mov', '.avi', '.webm', 'video_redirect', '/videos/'])
                 is_audio = any(ext in url_lower for ext in ['.mp3', '.wav', '.ogg', '.m4a'])
                 if not is_video and not is_audio:
-                    msg_dict['image_url'] = m.attachment_url
+                    if role == 'user':
+                        msg_dict['image_url'] = m.attachment_url
+                    else:
+                        msg_dict['content'] = (msg_dict['content'] or '') + ' ([Hình ảnh đính kèm])'
             if m.attachment_url and att_type in ('video', 'audio', 'file'):
                 type_label = {'video': 'Video', 'audio': 'Audio', 'file': 'Tệp'}.get(att_type, 'Đính kèm')
                 msg_dict['content'] = (msg_dict['content'] or '') + f' ([{type_label} đính kèm])'
@@ -1070,7 +1076,10 @@ def summarize_facebook_conversation(lead_id, customer_id, action_user_id=None):
             role = 'user' if m.sender_type == 'customer' else 'assistant'
             msg_dict = {'role': role, 'content': m.text or ''}
             if m.attachment_url:
-                msg_dict['image_url'] = m.attachment_url
+                if role == 'user':
+                    msg_dict['image_url'] = m.attachment_url
+                else:
+                    msg_dict['content'] = (msg_dict['content'] or '') + ' ([Hình ảnh đính kèm])'
             if not msg_dict['content'] and not msg_dict.get('image_url'):
                 msg_dict['content'] = '([File đính kèm])'
             history.append(msg_dict)
@@ -1114,7 +1123,10 @@ def summarize_zalo_conversation(lead_id, customer_id, action_user_id=None):
             role = 'user' if m.direction == ZaloMessage.DIRECTION_INBOUND else 'assistant'
             msg_dict = {'role': role, 'content': m.content or ''}
             if m.attachment_url:
-                msg_dict['image_url'] = m.attachment_url
+                if role == 'user':
+                    msg_dict['image_url'] = m.attachment_url
+                else:
+                    msg_dict['content'] = (msg_dict['content'] or '') + ' ([Hình ảnh đính kèm])'
             if not msg_dict['content'] and not msg_dict.get('image_url'):
                 msg_dict['content'] = '([File đính kèm])'
             history.append(msg_dict)
