@@ -288,7 +288,14 @@ def process_ai_reply_zalo(lead_id, is_followup=False, trigger_msg_id=None):
         
         image_urls_to_send = []
         if isinstance(result.get('image_urls'), list):
-            image_urls_to_send.extend([u for u in result['image_urls'] if isinstance(u, str)])
+            import re
+            for u in result['image_urls']:
+                if isinstance(u, str):
+                    md_match = re.search(r'!\[.*?\]\((.*?)\)', u)
+                    if md_match:
+                        image_urls_to_send.append(md_match.group(1).strip())
+                    else:
+                        image_urls_to_send.append(u.strip())
         if isinstance(result.get('image_url'), str) and result.get('image_url').strip():
             image_urls_to_send.append(result['image_url'])
 
@@ -571,7 +578,14 @@ def process_ai_reply_facebook(lead_id, is_followup=False, trigger_msg_id=None):
         
         image_urls_to_send = []
         if isinstance(result.get('image_urls'), list):
-            image_urls_to_send.extend([u for u in result['image_urls'] if isinstance(u, str)])
+            import re
+            for u in result['image_urls']:
+                if isinstance(u, str):
+                    md_match = re.search(r'!\[.*?\]\((.*?)\)', u)
+                    if md_match:
+                        image_urls_to_send.append(md_match.group(1).strip())
+                    else:
+                        image_urls_to_send.append(u.strip())
         if isinstance(result.get('image_url'), str) and result.get('image_url').strip():
             image_urls_to_send.append(result['image_url'])
 
