@@ -20,7 +20,7 @@ DEFAULT_JSON_TEMPLATE = """{
     "reply": "Câu trả lời gửi khách. LUÔN KẾT THÚC bằng một câu hỏi mở để khách phản hồi, trừ khi đã chốt được SĐT. ĐIỀN '[STOP]' NẾU KHÁCH CHỈ NHẮN NGẮN GỌN XÁC NHẬN (Ok, vâng, dạ...) HOẶC THẢ TIM VÀ HỘI THOẠI ĐÃ KẾT THÚC.",
     "sentiment": "angry / handoff / neutral",
     "product_search_keyword": "BẮT BUỘC ĐIỀN TỪ KHÓA NẾU KHÁCH YÊU CẦU 'gửi ảnh', 'cho xem VÀI MẪU'. LƯU Ý: Phải điền CHÍNH XÁC và ĐẦY ĐỦ tên dòng sản phẩm (VD: 'Cửa composite 1 cánh', 'Tủ lạnh Samsung Inverter') thay vì điền chung chung ('Cửa', 'Tủ lạnh') để tránh hệ thống gửi nhầm sang các phụ kiện. Nếu không cần tìm ảnh thì ĐỂ TRỐNG.",
-    "image_urls": ["Điền danh sách CÁC ĐƯỜNG LINK ẢNH (được cung cấp trong RAG dưới dạng ![ảnh](url)) mà bạn muốn gửi cho khách. NẾU KHÔNG CÓ THÌ ĐỂ RỖNG []"],
+    "image_urls": ["Điền danh sách CÁC ĐƯỜNG LINK ẢNH (được cung cấp trong RAG dưới dạng ![...](url)) mà bạn muốn gửi cho khách. NẾU KHÔNG CÓ THÌ ĐỂ RỖNG []"],
     "extracted_info": {
         "phone": "Trích xuất SĐT nếu có (nếu không có thì để rỗng)",
         "address": "Trích xuất địa chỉ nếu có (nếu không có thì để rỗng)",
@@ -40,7 +40,7 @@ NGUYÊN TẮC QUAN TRỌNG:
 6. QUY TẮC DỪNG HỘI THOẠI [STOP]: 
 - NẾU CHƯA LẤY ĐƯỢC SỐ ĐIỆN THOẠI CỦA KHÁCH: TUYỆT ĐỐI KHÔNG ĐƯỢC DỪNG (không được xuất [STOP]). Dù khách chỉ nhắn "ok", "vâng", gửi icon 👍, thả tim... bạn VẪN PHẢI tiếp tục trả lời, chủ động khơi gợi nhu cầu, mời chào hoặc nhắc khéo lại lời đề nghị xin số điện thoại/hẹn lịch.
 - CHỈ ĐƯỢC PHÉP điền "[STOP]" vào trường "reply" (để giữ im lặng) KHI VÀ CHỈ KHI: Bạn ĐÃ CÓ số điện thoại của khách, hoặc cuộc tư vấn đã hoàn toàn kết thúc (bạn đã chào tạm biệt) VÀ tin nhắn cuối cùng của khách chỉ là xác nhận ngắn gọn ("ok", "cảm ơn", thả tim 👍).
-7. QUY TẮC GỬI ẢNH: NẾU TRONG [TRÍCH XUẤT KIẾN THỨC NỘI BỘ] CÓ KÈM HÌNH ẢNH (định dạng ![ảnh](url)), BẠN BẮT BUỘC PHẢI SAO CHÉP Y NGUYÊN TẤT CẢ CÁC ĐƯỜNG LINK URL ĐÓ vào mảng 'image_urls' trong JSON để hệ thống gửi ảnh cho khách. Tuyệt đối không được tự ý bỏ bớt bất kỳ ảnh nào liên quan đến câu trả lời."""
+7. QUY TẮC GỬI ẢNH: NẾU TRONG [TRÍCH XUẤT KIẾN THỨC NỘI BỘ] CÓ KÈM HÌNH ẢNH (định dạng ![...](url)), BẠN BẮT BUỘC PHẢI SAO CHÉP Y NGUYÊN TẤT CẢ CÁC ĐƯỜNG LINK URL ĐÓ vào mảng 'image_urls' trong JSON để hệ thống gửi ảnh cho khách. Tuyệt đối không được tự ý bỏ bớt bất kỳ ảnh nào liên quan đến câu trả lời."""
 
 def get_provider_for_model(model_name: str) -> str:
     if not model_name:
