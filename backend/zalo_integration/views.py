@@ -211,7 +211,7 @@ class ZaloWebhookView(APIView):
         if attachments and len(attachments) > 0:
             att = attachments[0]
             attachment_type = att.get("type", "")
-            if attachment_type in ("image", "file", "audio"):
+            if attachment_type in ("image", "file", "audio", "video", "sticker", "gif"):
                 attachment_url = att.get("payload", {}).get("url", "")
 
         msg_created = False

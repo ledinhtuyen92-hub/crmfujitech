@@ -1436,7 +1436,7 @@ export default function ZaloInboxPage() {
                               )}
                               {msg.attachment_url && msg.attachment_type !== 'carousel' && (
                                 <div style={{ marginBottom: msg.content ? 8 : 0 }}>
-                                  {msg.attachment_type === 'image' ? (
+                                  {['image', 'sticker', 'gif'].includes(msg.attachment_type) ? (
                                     <img src={msg.attachment_url} alt="attachment" style={{ maxWidth: '100%', borderRadius: 8 }} />
                                   ) : (
                                     <a href={msg.attachment_url} target="_blank" rel="noreferrer" style={{ color: isOutbound ? '#fff' : '#0068ff', textDecoration: 'underline' }}>
