@@ -338,6 +338,12 @@ def process_ai_reply_zalo(lead_id, is_followup=False, trigger_msg_id=None):
                 delay = min(len(reply_text or '') * 0.03, 5.0) # max 5s delay
                 time.sleep(delay)
                 
+            if not is_followup and trigger_msg_id:
+                latest_check = ZaloMessage.objects.filter(social_lead=lead, direction=ZaloMessage.DIRECTION_INBOUND).order_by('-created_at').first()
+                if latest_check and latest_check.id != trigger_msg_id:
+                    logger.info(f"Zalo AI double debounce: Bỏ qua gửi tin nhắn do khách đã gửi tin mới {latest_check.id}")
+                    return
+                
             resp = send_zalo_chat_message(lead.oa_config, lead.social_id, text=reply_text, image_url=image_url)
             
             error_code = resp.get("error", 0)
@@ -568,6 +574,11 @@ def process_ai_reply_facebook(lead_id, is_followup=False, trigger_msg_id=None):
 
         update_fields = []
         if reply_text or image_url:
+            if not is_followup and trigger_msg_id:
+                latest_check = FacebookMessage.objects.filter(lead=lead, sender_type='customer').order_by('-created_at').first()
+                if latest_check and latest_check.id != trigger_msg_id:
+                    logger.info(f"Facebook AI double debounce: Bỏ qua gửi tin nhắn do khách đã gửi tin mới {latest_check.id}")
+                    return
             resp = send_facebook_message(lead.page_config.page_access_token, lead.fb_user_id, message_text=reply_text, attachment_url=image_url)
             if not resp.get("success"):
                 err_msg = resp.get("error", "Unknown error")
