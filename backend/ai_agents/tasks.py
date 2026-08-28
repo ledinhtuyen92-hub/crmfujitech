@@ -27,6 +27,15 @@ def get_public_domain():
     import os
     return getattr(settings, 'SITE_URL', os.environ.get('SITE_URL', 'https://crm.mlgautobot.click')).rstrip('/')
 
+def sanitize_image_url(url_to_send):
+    if not url_to_send:
+        return url_to_send
+    if url_to_send.startswith('http://localhost') or url_to_send.startswith('http://127.0.0.1') or url_to_send.startswith('/'):
+        from urllib.parse import urlparse
+        parsed = urlparse(url_to_send)
+        path = parsed.path if parsed.path.startswith('/') else '/' + parsed.path
+        return f"{get_public_domain()}{path}"
+    return url_to_send
 
 
 def search_products_for_carousel(company, keyword: str, limit: int = 3):
@@ -293,11 +302,12 @@ def process_ai_reply_zalo(lead_id, is_followup=False, trigger_msg_id=None):
                 if isinstance(u, str):
                     md_match = re.search(r'!\[.*?\]\((.*?)\)', u)
                     if md_match:
-                        image_urls_to_send.append(md_match.group(1).strip())
+                        url_to_send = md_match.group(1).strip()
                     else:
-                        image_urls_to_send.append(u.strip())
+                        url_to_send = u.strip()
+                    image_urls_to_send.append(sanitize_image_url(url_to_send))
         if isinstance(result.get('image_url'), str) and result.get('image_url').strip():
-            image_urls_to_send.append(result['image_url'])
+            image_urls_to_send.append(sanitize_image_url(result['image_url']))
 
         if reply_text and isinstance(reply_text, str):
             reply_text = reply_text.replace('[STOP]', '').strip()
@@ -305,7 +315,7 @@ def process_ai_reply_zalo(lead_id, is_followup=False, trigger_msg_id=None):
             import re
             md_urls = re.findall(r'!\[.*?\]\((.*?)\)', reply_text)
             for md_url in md_urls:
-                image_urls_to_send.append(md_url.strip())
+                image_urls_to_send.append(sanitize_image_url(md_url.strip()))
             reply_text = re.sub(r'!\[.*?\]\(.*?\)', '', reply_text).strip()
 
         unique_images = []
@@ -583,11 +593,12 @@ def process_ai_reply_facebook(lead_id, is_followup=False, trigger_msg_id=None):
                 if isinstance(u, str):
                     md_match = re.search(r'!\[.*?\]\((.*?)\)', u)
                     if md_match:
-                        image_urls_to_send.append(md_match.group(1).strip())
+                        url_to_send = md_match.group(1).strip()
                     else:
-                        image_urls_to_send.append(u.strip())
+                        url_to_send = u.strip()
+                    image_urls_to_send.append(sanitize_image_url(url_to_send))
         if isinstance(result.get('image_url'), str) and result.get('image_url').strip():
-            image_urls_to_send.append(result['image_url'])
+            image_urls_to_send.append(sanitize_image_url(result['image_url']))
 
         if reply_text and isinstance(reply_text, str):
             reply_text = reply_text.replace('[STOP]', '').strip()
@@ -595,7 +606,7 @@ def process_ai_reply_facebook(lead_id, is_followup=False, trigger_msg_id=None):
             import re
             md_urls = re.findall(r'!\[.*?\]\((.*?)\)', reply_text)
             for md_url in md_urls:
-                image_urls_to_send.append(md_url.strip())
+                image_urls_to_send.append(sanitize_image_url(md_url.strip()))
             reply_text = re.sub(r'!\[.*?\]\(.*?\)', '', reply_text).strip()
 
         unique_images = []
