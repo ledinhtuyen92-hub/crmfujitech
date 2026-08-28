@@ -296,7 +296,7 @@ def generate_ai_reply(agent: AiAgent, conversation_history: list, lead_name: str
     core_rules = agent.core_system_rules.strip() if agent.core_system_rules else DEFAULT_SYSTEM_RULES
 
     # Force AI to return markdown images if present in RAG
-    image_enforcement_rule = "\nNẾU TRONG [TRÍCH XUẤT KIẾN THỨC NỘI BỘ] CÓ KÈM HÌNH ẢNH (định dạng ![ảnh](url)), BẠN BẮT BUỘC PHẢI SAO CHÉP Y NGUYÊN đoạn mã ![ảnh](url) đó vào trong câu trả lời (trường 'reply') để hệ thống gửi ảnh cho khách."
+    image_enforcement_rule = "\nNẾU TRONG [TRÍCH XUẤT KIẾN THỨC NỘI BỘ] CÓ KÈM HÌNH ẢNH (định dạng ![ảnh](url)), BẠN BẮT BUỘC PHẢI SAO CHÉP Y NGUYÊN TẤT CẢ CÁC ĐOẠN MÃ ![ảnh](url) ĐÓ vào trong câu trả lời (trường 'reply') để hệ thống gửi ảnh cho khách. Tuyệt đối không được tự ý bỏ bớt bất kỳ ảnh nào."
     core_rules += image_enforcement_rule
 
     extra_rules = ""
