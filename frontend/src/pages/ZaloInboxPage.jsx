@@ -1438,6 +1438,10 @@ export default function ZaloInboxPage() {
                                 <div style={{ marginBottom: msg.content ? 8 : 0 }}>
                                   {['image', 'sticker', 'gif'].includes(msg.attachment_type) ? (
                                     <img src={msg.attachment_url} alt="attachment" style={{ maxWidth: '100%', borderRadius: 8 }} />
+                                  ) : msg.attachment_type === 'video' ? (
+                                    <video controls src={msg.attachment_url} style={{ maxWidth: '100%', maxHeight: 260, borderRadius: 8, background: '#000' }} />
+                                  ) : msg.attachment_type === 'audio' ? (
+                                    <audio controls src={msg.attachment_url} style={{ maxWidth: 240 }} />
                                   ) : (
                                     <a href={msg.attachment_url} target="_blank" rel="noreferrer" style={{ color: isOutbound ? '#fff' : '#0068ff', textDecoration: 'underline' }}>
                                       <PaperClipOutlined /> Tệp đính kèm ({msg.attachment_type})
