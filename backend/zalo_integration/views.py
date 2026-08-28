@@ -213,6 +213,18 @@ class ZaloWebhookView(APIView):
             attachment_type = att.get("type", "")
             if attachment_type in ("image", "file", "audio", "video", "sticker", "gif"):
                 attachment_url = att.get("payload", {}).get("url", "")
+                if not attachment_url and attachment_type == "sticker":
+                    attachment_url = att.get("payload", {}).get("sticker_url", "")
+                    
+        # Fallback: Zalo OA also sends sticker/gif directly under message
+        if not attachment_url:
+            message_obj = data.get("message", {})
+            if "sticker" in message_obj:
+                attachment_type = "sticker"
+                attachment_url = message_obj.get("sticker", {}).get("url", "") or message_obj.get("sticker", {}).get("sticker_url", "")
+            elif "gif" in message_obj:
+                attachment_type = "gif"
+                attachment_url = message_obj.get("gif", {}).get("url", "") or message_obj.get("gif", {}).get("gif_url", "")
 
         msg_created = False
         if message_id:
