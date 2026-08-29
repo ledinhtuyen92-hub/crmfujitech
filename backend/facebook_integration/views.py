@@ -303,6 +303,7 @@ class FacebookLeadViewSet(mixins.UpdateModelMixin, mixins.DestroyModelMixin, vie
     """
     Danh sách hội thoại Facebook và chi tiết.
     Yêu cầu quyền: facebook.view_inbox
+    """
     permission_classes = [IsAuthenticated, ActionBasedPermission]
     pagination_class = InboxPagination
     action_permissions = {
