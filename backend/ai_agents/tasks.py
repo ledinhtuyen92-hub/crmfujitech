@@ -685,7 +685,25 @@ def process_ai_reply_facebook(lead_id, is_followup=False, trigger_msg_id=None):
             
             # Gửi TẤT CẢ ảnh trước tiên
             for img_url in unique_images:
-                resp = send_facebook_message(lead.page_config.page_access_token, lead.fb_user_id, message_text="", attachment_url=img_url)
+                file_obj = None
+                try:
+                    import urllib.request, urllib.parse, io
+                    encoded_url = urllib.parse.quote(img_url, safe=":/")
+                    req = urllib.request.Request(encoded_url, headers={'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)'})
+                    resp_dl = urllib.request.urlopen(req, timeout=10)
+                    if resp_dl.getcode() == 200:
+                        file_bytes = resp_dl.read()
+                        file_obj = io.BytesIO(file_bytes)
+                        file_obj.name = "attachment.jpg"
+                        if ".png" in img_url.lower(): file_obj.name = "attachment.png"
+                        file_obj.content_type = "image/jpeg" if ".jpg" in file_obj.name else "image/png"
+                except Exception as e:
+                    logger.warning(f"[AI Facebook] Failed to download image {img_url} locally: {e}")
+                
+                if file_obj:
+                    resp = send_facebook_message(lead.page_config.page_access_token, lead.fb_user_id, message_text="", file_obj=file_obj, attachment_type="image")
+                else:
+                    resp = send_facebook_message(lead.page_config.page_access_token, lead.fb_user_id, message_text="", attachment_url=img_url)
                 if resp.get("success"):
                     FacebookMessage.objects.create(
                         lead=lead,
@@ -693,6 +711,17 @@ def process_ai_reply_facebook(lead_id, is_followup=False, trigger_msg_id=None):
                         text="[Hình ảnh]",
                         attachment_url=img_url,
                         fb_message_id=resp.get("message_id", ""),
+                        sender_role="ai",
+                        sender_name="Trợ lý AI",
+                    )
+                else:
+                    err_msg = resp.get("error", "Unknown error")
+                    logger.error(f"[AI Facebook Error] Facebook API Image Error: {err_msg}")
+                    FacebookMessage.objects.create(
+                        lead=lead,
+                        sender_type='page',
+                        text="Lỗi gửi ảnh",
+                        payload={"is_system_alert": True, "error_message": err_msg},
                         sender_role="ai",
                         sender_name="Trợ lý AI",
                     )
