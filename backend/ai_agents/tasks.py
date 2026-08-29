@@ -604,7 +604,13 @@ def process_ai_reply_facebook(lead_id, is_followup=False, trigger_msg_id=None):
                     else:
                         image_urls_to_send.append(u.strip())
         if isinstance(result.get('image_url'), str) and result.get('image_url').strip():
-            image_urls_to_send.append(result['image_url'])
+            import re
+            u = result['image_url']
+            md_match = re.search(r'!\[.*?\]\((.*?)\)', u)
+            if md_match:
+                image_urls_to_send.append(md_match.group(1).strip())
+            else:
+                image_urls_to_send.append(u.strip())
 
         if reply_text and isinstance(reply_text, str):
             reply_text = reply_text.replace('[STOP]', '').strip()
