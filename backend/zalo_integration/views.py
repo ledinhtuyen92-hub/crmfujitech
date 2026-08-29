@@ -21,7 +21,8 @@ from users.permissions import (
     IsModuleActivePermission,
     ActionBasedPermission,
 )
-
+from .models import (
+    SocialLead, ZaloOaConfig, ZaloMessage, ZaloMessageTemplate,
     ZaloLeadTag, ZaloLeadNote, ZaloQuickReply
 )
 from core.pagination import InboxPagination
