@@ -20,6 +20,7 @@ from .models import (
     FacebookLead, FacebookMessage, FacebookPageConfig, QuickMediaAsset,
     FacebookLeadTag, FacebookLeadNote, FacebookQuickReply,
 )
+from core.pagination import InboxPagination
 from .serializers import (
     FacebookLeadListSerializer,
     FacebookLeadSerializer,
@@ -302,8 +303,8 @@ class FacebookLeadViewSet(mixins.UpdateModelMixin, mixins.DestroyModelMixin, vie
     """
     Danh sách hội thoại Facebook và chi tiết.
     Yêu cầu quyền: facebook.view_inbox
-    """
     permission_classes = [IsAuthenticated, ActionBasedPermission]
+    pagination_class = InboxPagination
     action_permissions = {
         "destroy": "facebook.delete_conversation",
         "send_message": "facebook.chat",

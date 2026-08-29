@@ -220,6 +220,8 @@ export default function ZaloInboxPage() {
   const canCreateCustomer = isCompanyAdmin || hasPermission('zalo.create_customer')
 
   const [leads, setLeads] = useState([])
+  const [page, setPage] = useState(1)
+  const [hasMore, setHasMore] = useState(false)
   const [loading, setLoading] = useState(false)
   const [extracting, setExtracting] = useState(false)
   const [extractModalVisible, setExtractModalVisible] = useState(false)
@@ -362,30 +364,61 @@ export default function ZaloInboxPage() {
     } catch {}
   }
 
-  const fetchLeads = useCallback(async (background = false) => {
-    if (!background) setLoading(true)
+  const fetchLeads = useCallback(async (background = false, isLoadMore = false) => {
+    if (!background && !isLoadMore) setLoading(true)
     try {
       const params = {}
       if (search) params.search = search
       if (statusFilter) params.status = statusFilter
       if (phoneFilterMode === 'has_phone') params.has_phone = 'true'
-      else if (phoneFilterMode === 'no_phone') params.has_phone = 'false'
+      if (phoneFilterMode === 'no_phone') params.has_phone = 'false'
       if (replyFilter) params.reply_filter = replyFilter
       if (sortBy) params.sort_by = sortBy
-      if (selectedOaFilter && selectedOaFilter !== 'all') params.oa_config = selectedOaFilter
+      if (selectedOaFilter && selectedOaFilter !== 'all') params.oa_id = selectedOaFilter
       if (isStarredOnly) params.is_starred = 'true'
-      if (tagFilter && tagFilter !== 'all') params.tag = tagFilter
+      if (tagFilter && tagFilter !== 'all') params.tag_id = tagFilter
       if (assignedToFilter && assignedToFilter !== 'all') params.assigned_to = assignedToFilter
 
+      params.page = isLoadMore ? page + 1 : 1
+      params.page_size = 50
+
       const res = await api.get('/zalo/social-leads/', { params })
-      const data = Array.isArray(res.data) ? res.data : res.data?.results ?? []
-      setLeads(data)
+      const data = res.data?.results ?? (Array.isArray(res.data) ? res.data : [])
+
+      if (isLoadMore) {
+        setLeads(prev => {
+          const merged = [...prev]
+          data.forEach(item => {
+            if (!merged.find(x => x.id === item.id)) merged.push(item)
+          })
+          return merged
+        })
+        setPage(params.page)
+      } else if (!background) {
+        setLeads(data)
+        setPage(1)
+      } else {
+        setLeads(prev => {
+          let merged = [...prev]
+          data.forEach(item => {
+            const idx = merged.findIndex(x => x.id === item.id)
+            if (idx !== -1) merged[idx] = item
+            else merged.push(item)
+          })
+          merged.sort((a, b) => new Date(b.last_message_at) - new Date(a.last_message_at))
+          return merged
+        })
+      }
+
+      if (res.data?.next) setHasMore(true)
+      else setHasMore(false)
+
     } catch {
       if (!background) message.error('Không thể tải danh sách Social Leads.')
     } finally {
-      if (!background) setLoading(false)
+      if (!background && !isLoadMore) setLoading(false)
     }
-  }, [search, statusFilter, phoneFilterMode, replyFilter, sortBy, selectedOaFilter, isStarredOnly, tagFilter, assignedToFilter])
+  }, [search, statusFilter, phoneFilterMode, replyFilter, sortBy, selectedOaFilter, isStarredOnly, tagFilter, assignedToFilter, page])
 
   const fetchDetail = async (leadId, background = false) => {
     if (!background) setDetailLoading(true)

@@ -22,10 +22,9 @@ from users.permissions import (
     ActionBasedPermission,
 )
 
-from .models import (
-    SocialLead, ZaloMessageLog, ZaloMessageTemplate, ZaloOaConfig,
     ZaloLeadTag, ZaloLeadNote, ZaloQuickReply
 )
+from core.pagination import InboxPagination
 from .serializers import (
     ConvertLeadSerializer,
     SocialLeadDetailSerializer,
@@ -599,8 +598,8 @@ class SocialLeadViewSet(viewsets.ModelViewSet):
         IsActiveUserAndCompany,
         CheckDataMaintenanceMode,
         IsModuleActivePermission,
-        ActionBasedPermission,
     ]
+    pagination_class = InboxPagination
     action_permissions = {
         "list": ["zalo.view", "crm.view_all", "crm.view_assigned"],
         "retrieve": ["zalo.view", "crm.view_all", "crm.view_assigned"],

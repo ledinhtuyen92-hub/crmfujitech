@@ -505,6 +505,8 @@ export default function FacebookInboxPage() {
   const [pages, setPages] = useState([])
   const [selectedPage, setSelectedPage] = useState('all')
   const [leads, setLeads] = useState([])
+  const [page, setPage] = useState(1)
+  const [hasMore, setHasMore] = useState(false)
   const [selectedLead, setSelectedLead] = useState(null)
   const [messages, setMessages] = useState([])
   const [search, setSearch] = useState('')
@@ -603,8 +605,8 @@ export default function FacebookInboxPage() {
     } catch { /* silent */ }
   }
 
-  const fetchLeads = async (silent = false) => {
-    if (!silent) setLoading(true)
+  const fetchLeads = async (silent = false, isLoadMore = false) => {
+    if (!silent && !isLoadMore) setLoading(true)
     try {
       const params = {}
       if (selectedPage && selectedPage !== 'all') params.page_config = selectedPage
@@ -618,10 +620,43 @@ export default function FacebookInboxPage() {
       if (isStarredOnly) params.is_starred = 'true'
       if (tagFilter && tagFilter !== 'all') params.tag_id = tagFilter
       if (assignedToFilter && assignedToFilter !== 'all') params.assigned_to = assignedToFilter
+      
+      params.page = isLoadMore ? page + 1 : 1
+      params.page_size = 50
+
       const res = await api.get('/facebook/leads/', { params })
-      setLeads(Array.isArray(res.data) ? res.data : res.data?.results ?? [])
+      const data = res.data?.results ?? (Array.isArray(res.data) ? res.data : [])
+
+      if (isLoadMore) {
+        setLeads(prev => {
+          const merged = [...prev]
+          data.forEach(item => {
+            if (!merged.find(x => x.id === item.id)) merged.push(item)
+          })
+          return merged
+        })
+        setPage(params.page)
+      } else if (!silent) {
+        setLeads(data)
+        setPage(1)
+      } else {
+        setLeads(prev => {
+          let merged = [...prev]
+          data.forEach(item => {
+            const idx = merged.findIndex(x => x.id === item.id)
+            if (idx !== -1) merged[idx] = item
+            else merged.push(item)
+          })
+          merged.sort((a, b) => new Date(b.last_message_at) - new Date(a.last_message_at))
+          return merged
+        })
+      }
+
+      if (res.data?.next) setHasMore(true)
+      else setHasMore(false)
+
     } catch { if (!silent) message.error('Không thể tải danh sách hội thoại Facebook.') }
-    finally { if (!silent) setLoading(false) }
+    finally { if (!silent && !isLoadMore) setLoading(false) }
   }
 
   const fetchMessages = async (lead, silent = false) => {
