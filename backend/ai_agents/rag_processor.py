@@ -187,7 +187,10 @@ def search_knowledge(agent, query: str, limit: int = 4):
         
     try:
         # Determine provider
-        provider = getattr(agent.company.ai_settings, 'default_embedding_provider', 'openai')
+        try:
+            provider = agent.company.ai_settings.default_embedding_provider
+        except Exception:
+            provider = 'openai'
         keys = get_api_keys(agent.company, provider)
         
         if not keys:

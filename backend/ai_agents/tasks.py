@@ -203,7 +203,10 @@ def process_ai_reply_zalo(lead_id, is_followup=False, trigger_msg_id=None):
             if latest_user_msg.attachment_url and zalo_att_type not in ('video', 'audio', 'file'):
                 try:
                     from ai_agents.services import generate_image_description, get_api_keys
-                    provider = getattr(lead.oa_config.ai_agent.company.ai_settings, 'default_embedding_provider', 'openai')
+                    try:
+                        provider = lead.oa_config.ai_agent.company.ai_settings.default_embedding_provider
+                    except Exception:
+                        provider = 'openai'
                     keys = get_api_keys(lead.oa_config.ai_agent.company, provider)
                     if keys:
                         img_desc = generate_image_description(
@@ -494,7 +497,10 @@ def process_ai_reply_facebook(lead_id, is_followup=False, trigger_msg_id=None):
             if latest_user_msg.attachment_url and fb_att_type not in ('video', 'audio', 'file'):
                 try:
                     from ai_agents.services import generate_image_description, get_api_keys
-                    provider = getattr(lead.page_config.ai_agent.company.ai_settings, 'default_embedding_provider', 'openai')
+                    try:
+                        provider = lead.page_config.ai_agent.company.ai_settings.default_embedding_provider
+                    except Exception:
+                        provider = 'openai'
                     keys = get_api_keys(lead.page_config.ai_agent.company, provider)
                     if keys:
                         img_desc = generate_image_description(
@@ -921,7 +927,10 @@ def process_document_rag(doc_id):
     
     try:
         doc = AiKnowledgeDocument.objects.get(id=doc_id)
-        provider = getattr(doc.agent.company.ai_settings, 'default_embedding_provider', 'openai')
+        try:
+            provider = doc.agent.company.ai_settings.default_embedding_provider
+        except Exception:
+            provider = 'openai'
         
         # Lưu lại nền tảng đọc vào doc
         doc.embedding_provider = provider
@@ -1017,7 +1026,10 @@ def sync_company_products_to_rag(company_id):
     if not first_agent:
         return
         
-    provider = getattr(first_agent.company.ai_settings, 'default_embedding_provider', 'openai')
+    try:
+        provider = first_agent.company.ai_settings.default_embedding_provider
+    except Exception:
+        provider = 'openai'
     doc, created = AiKnowledgeDocument.objects.get_or_create(
         agent=first_agent,
         title='Danh mục Sản phẩm Hệ thống (Auto)',
@@ -1047,7 +1059,10 @@ def sync_product_image_description(template_id):
         if not template.image:
             return
             
-        provider = getattr(template.company.ai_settings, 'default_embedding_provider', 'openai')
+        try:
+            provider = template.company.ai_settings.default_embedding_provider
+        except Exception:
+            provider = 'openai'
         keys = get_api_keys(template.company, provider)
         if not keys:
             return

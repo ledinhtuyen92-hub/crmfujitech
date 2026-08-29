@@ -244,7 +244,10 @@ class AiKnowledgeDocumentViewSet(viewsets.ModelViewSet):
         from pgvector.django import L2Distance
         
         company = request.user.company
-        provider = getattr(company.ai_settings, 'default_embedding_provider', 'openai')
+        try:
+            provider = company.ai_settings.default_embedding_provider
+        except Exception:
+            provider = 'openai'
         keys = get_api_keys(company, provider)
         
         if not keys:
@@ -371,7 +374,10 @@ class AiKnowledgeDocumentViewSet(viewsets.ModelViewSet):
         try:
             agent = AiAgent.objects.get(id=agent_id, company=request.user.company)
             # Master document
-            provider = getattr(agent.company.ai_settings, 'default_embedding_provider', 'openai')
+            try:
+                provider = agent.company.ai_settings.default_embedding_provider
+            except Exception:
+                provider = 'openai'
             doc, created = AiKnowledgeDocument.objects.get_or_create(
                 agent=agent,
                 title='📚 Tổng hợp Q&A Hội thoại (Auto)',
@@ -422,7 +428,10 @@ class AiKnowledgeDocumentViewSet(viewsets.ModelViewSet):
         except AiAgent.DoesNotExist:
             return Response({'error': 'Không tìm thấy Trợ lý AI đích'}, status=404)
             
-        provider = getattr(request.user.company.ai_settings, 'default_embedding_provider', 'openai')
+        try:
+            provider = request.user.company.ai_settings.default_embedding_provider
+        except Exception:
+            provider = 'openai'
         
         imported_count = 0
         for doc_data in docs_data:
@@ -472,7 +481,10 @@ class CompanyAiSettingsViewSet(viewsets.ModelViewSet):
         # Tạo document trước để UI thấy ngay lập tức
         first_agent = AiAgent.objects.filter(company_id=request.user.company.id).first()
         if first_agent:
-            provider = getattr(request.user.company.ai_settings, 'default_embedding_provider', 'openai')
+            try:
+                provider = request.user.company.ai_settings.default_embedding_provider
+            except Exception:
+                provider = 'openai'
             doc, created = AiKnowledgeDocument.objects.get_or_create(
                 agent=first_agent,
                 title='Danh mục Sản phẩm Hệ thống (Auto)',

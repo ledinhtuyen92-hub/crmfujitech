@@ -297,9 +297,14 @@ def generate_ai_reply(agent: AiAgent, conversation_history: list, lead_name: str
     json_template = agent.core_prompt_template.strip() if agent.core_prompt_template else DEFAULT_JSON_TEMPLATE
     core_rules = agent.core_system_rules.strip() if agent.core_system_rules else DEFAULT_SYSTEM_RULES
 
+    try:
+        auto_sync = agent.company.ai_settings.auto_sync_products
+    except Exception:
+        auto_sync = True
+        
     extra_rules = ""
     # Ép AI không dùng product_search_keyword nếu tính năng bị tắt
-    if not getattr(agent.company.ai_settings, 'auto_sync_products', True):
+    if not auto_sync:
         extra_rules = "\nLƯU Ý: Tính năng tự động tìm kiếm Sản phẩm (product_search_keyword) hiện đang TẮT. Tuyệt đối ĐỂ TRỐNG trường này. Tuy nhiên, nếu trong RAG có hình ảnh sẵn, bạn VẪN PHẢI tuân thủ Quy tắc gửi ảnh (sao chép vào image_urls) như bình thường."
     else:
         extra_rules = "\nLƯU Ý: Tính năng kết nối Sản phẩm đang BẬT. Nếu khách hàng muốn xem mẫu/ảnh, HÃY SỬ DỤNG trường `product_search_keyword` để tìm và gửi ảnh, đồng thời báo với khách trong câu trả lời là bạn đang gửi ảnh mẫu cho họ xem."
