@@ -125,7 +125,10 @@ def get_product_context(company, search_query, history=None):
         sku_lower = sku.lower() if sku else ""
         name_lower = name.lower() if name else ""
         
-        if (sku_lower and sku_lower in full_text) or (name_lower and len(name_lower) > 4 and name_lower in full_text):
+        import re
+        words = set(re.findall(r'\b\w+\b', full_text))
+        
+        if (sku_lower and sku_lower in words) or (name_lower and len(name_lower) > 4 and name_lower in full_text):
             matched_products.append(p)
             if len(matched_products) >= 3:
                 break
@@ -290,9 +293,13 @@ def process_ai_reply_zalo(lead_id, is_followup=False, trigger_msg_id=None):
         reply_text = result.get('reply')
         
         image_urls_to_send = []
-        if isinstance(result.get('image_urls'), list):
+        raw_image_urls = result.get('image_urls')
+        if isinstance(raw_image_urls, str):
+            raw_image_urls = [raw_image_urls]
+            
+        if isinstance(raw_image_urls, list):
             import re
-            for u in result['image_urls']:
+            for u in raw_image_urls:
                 if isinstance(u, str):
                     md_match = re.search(r'!\[.*?\]\((.*?)\)', u)
                     if md_match:
@@ -583,9 +590,13 @@ def process_ai_reply_facebook(lead_id, is_followup=False, trigger_msg_id=None):
         reply_text = result.get('reply')
         
         image_urls_to_send = []
-        if isinstance(result.get('image_urls'), list):
+        raw_image_urls = result.get('image_urls')
+        if isinstance(raw_image_urls, str):
+            raw_image_urls = [raw_image_urls]
+            
+        if isinstance(raw_image_urls, list):
             import re
-            for u in result['image_urls']:
+            for u in raw_image_urls:
                 if isinstance(u, str):
                     md_match = re.search(r'!\[.*?\]\((.*?)\)', u)
                     if md_match:
