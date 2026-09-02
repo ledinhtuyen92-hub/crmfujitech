@@ -22,7 +22,7 @@ FB_GRAPH_API_BASE = "https://graph.facebook.com/v25.0"
 def take_thread_control(page_access_token: str, recipient_psid: str, metadata: str = "") -> bool:
     """
     Lấy lại quyền kiểm soát thread từ ứng dụng khác (Meta AI Business, chatbot v.v.).
-    Cần thiết khi thread bị chiếm bởi ứng dụng khác và ta muốn gửi tin nhắn.
+    Chỉ hoạt động khi app là Primary Receiver trong Handover Protocol.
     Trả về True nếu thành công, False nếu thất bại.
     """
     url = f"{FB_GRAPH_API_BASE}/me/take_thread_control"
@@ -42,6 +42,91 @@ def take_thread_control(page_access_token: str, recipient_psid: str, metadata: s
     except Exception as e:
         logger.error(f"[Facebook] Exception khi take_thread_control: {e}")
         return False
+
+
+def pass_thread_control_to_inbox(page_access_token: str, recipient_psid: str) -> bool:
+    """
+    Chuyển quyền kiểm soát thread về Page Inbox (app_id=263902037430900).
+    Hoạt động ngay cả khi app không phải Primary Receiver.
+    Đây là fallback khi take_thread_control thất bại.
+    Trả về True nếu thành công, False nếu thất bại.
+    """
+    # App ID cố định của Facebook Page Inbox (secondary receiver mặc định)
+    PAGE_INBOX_APP_ID = "263902037430900"
+    url = f"{FB_GRAPH_API_BASE}/me/pass_thread_control"
+    payload = {
+        "recipient": {"id": recipient_psid},
+        "target_app_id": PAGE_INBOX_APP_ID,
+        "metadata": "Returning control to Page Inbox",
+    }
+    params = {"access_token": page_access_token}
+    try:
+        resp = requests.post(url, params=params, json=payload, timeout=10)
+        data = resp.json()
+        if "error" in data:
+            logger.warning(f"[Facebook] pass_thread_control_to_inbox lỗi: {data['error']}")
+            return False
+        logger.info(f"[Facebook] pass_thread_control_to_inbox thành công cho PSID {recipient_psid}")
+        return True
+    except Exception as e:
+        logger.error(f"[Facebook] Exception khi pass_thread_control_to_inbox: {e}")
+        return False
+
+
+def send_via_conversation_api(
+    page_access_token: str,
+    page_id: str,
+    recipient_psid: str,
+    message_text: str,
+) -> dict:
+    """
+    Gửi tin nhắn qua Conversations API thay vì Send API.
+    Endpoint này dùng quyền của Page Admin để gửi trực tiếp vào conversation,
+    có thể bỏ qua thread control khi app có đủ quyền hạn trên Page.
+    Đây là tiers 3 - fallback cuối cùng khi cả take và pass đều thất bại.
+    """
+    if not page_id:
+        return {"success": False, "error": "Thiếu page_id cho Conversations API."}
+
+    # Bước 1: Tìm conversation_id
+    conv_url = f"{FB_GRAPH_API_BASE}/{page_id}/conversations"
+    conv_params = {
+        "user_id": recipient_psid,
+        "fields": "id",
+        "access_token": page_access_token,
+        "limit": 1,
+    }
+    conv_id = None
+    try:
+        r = requests.get(conv_url, params=conv_params, timeout=10)
+        data = r.json()
+        convs = data.get("data", [])
+        if convs:
+            conv_id = convs[0].get("id")
+    except Exception as e:
+        logger.error(f"[Facebook] send_via_conversation_api: lỗi tìm conv_id: {e}")
+        return {"success": False, "error": f"Không tìm được hội thoại: {e}"}
+
+    if not conv_id:
+        return {"success": False, "error": "Không tìm thấy hội thoại trên Facebook."}
+
+    # Bước 2: Gửi tin nhắn qua /{conv_id}/messages
+    msg_url = f"{FB_GRAPH_API_BASE}/{conv_id}/messages"
+    msg_params = {"access_token": page_access_token}
+    msg_payload = {"message": message_text}
+    try:
+        r2 = requests.post(msg_url, params=msg_params, json=msg_payload, timeout=10)
+        resp_data = r2.json()
+        if "error" in resp_data:
+            err = resp_data["error"]
+            logger.error(f"[Facebook] send_via_conversation_api lỗi: {err}")
+            return {"success": False, "error": err.get("message", "Lỗi gửi qua Conversations API")}
+        msg_id = resp_data.get("id") or resp_data.get("message_id")
+        logger.info(f"[Facebook] send_via_conversation_api thành công: {msg_id}")
+        return {"success": True, "message_id": msg_id}
+    except Exception as e:
+        logger.error(f"[Facebook] Exception khi send_via_conversation_api: {e}")
+        return {"success": False, "error": str(e)}
 
 
 # ── Tái sử dụng thuật toán quét SĐT thông minh ───────────────────────────────
@@ -213,10 +298,15 @@ def send_facebook_message(
     file_obj = None,
     attachment_type: str = "image",
     quick_replies: list = None,
+    page_id: str = None,
 ) -> dict:
     """
     Gửi tin nhắn văn bản (hoặc ảnh/file đính kèm, quick replies) từ Trang Facebook tới khách hàng.
     Hỗ trợ gửi trực tiếp file binary qua multipart/form-data.
+    Có 3 tầng fallback khi gặp lỗi #10 (Meta AI đang kiểm soát thread):
+      Tier 1: take_thread_control (cần là Primary Receiver)
+      Tier 2: pass_thread_control_to_inbox (chuyển quyền về Page Inbox)
+      Tier 3: send_via_conversation_api (gửi qua Conversations API - cần page_id)
     """
     if not page_access_token or not recipient_psid:
         return {"success": False, "error": "Thiếu token hoặc recipient_id."}
@@ -337,7 +427,9 @@ def send_facebook_message(
                 # Lỗi #10: Thread đang bị kiểm soát bởi ứng dụng khác (Meta AI Business v.v.)
                 # → Tự động lấy lại quyền kiểm soát và gửi lại
                 if err_code == 10:
-                    logger.info(f"[Facebook] Thread bị kiểm soát bởi ứng dụng khác (lỗi #10). Đang take_thread_control...")
+                    logger.info(f"[Facebook] Thread bị kiểm soát bởi ứng dụng khác (lỗi #10). Thử 3 tầng fallback...")
+
+                    # ── Tier 1: take_thread_control (cần là Primary Receiver) ──
                     if take_thread_control(page_access_token, recipient_psid):
                         try:
                             resp2 = requests.post(url, params=params, json=payload, timeout=10)
@@ -345,13 +437,52 @@ def send_facebook_message(
                             if "error" in resp_data2:
                                 logger.error(f"[Facebook] Vẫn lỗi sau take_thread_control: {resp_data2['error']}")
                                 if not last_message_id:
-                                    return {"success": False, "error": resp_data2["error"].get("message", "Lỗi gửi tin nhắn sau khi lấy lại quyền thread")}
+                                    return {"success": False, "error": resp_data2["error"].get("message", "Lỗi gửi sau khi lấy lại quyền thread")}
                             else:
                                 last_message_id = resp_data2.get("message_id") or last_message_id
                         except Exception as e2:
-                            logger.error(f"[Facebook] Exception khi gửi lại sau take_thread_control: {e2}")
                             if not last_message_id:
                                 return {"success": False, "error": str(e2)}
+
+                    # ── Tier 2: pass_thread_control_to_inbox ──────────────────
+                    elif pass_thread_control_to_inbox(page_access_token, recipient_psid):
+                        logger.info("[Facebook] pass_thread_control_to_inbox OK, đang gửi lại...")
+                        try:
+                            resp2 = requests.post(url, params=params, json=payload, timeout=10)
+                            resp_data2 = resp2.json()
+                            if "error" in resp_data2:
+                                logger.error(f"[Facebook] Vẫn lỗi sau pass_thread_control: {resp_data2['error']}")
+                                if not last_message_id:
+                                    # Tier 3: Conversations API
+                                    if page_id and message_text:
+                                        logger.info("[Facebook] Thử Tier 3: Conversations API...")
+                                        r3 = send_via_conversation_api(page_access_token, page_id, recipient_psid, message_text)
+                                        if r3.get("success"):
+                                            last_message_id = r3.get("message_id")
+                                        else:
+                                            return {"success": False, "error": r3.get("error", "Lỗi gửi tin nhắn sau mọi fallback")}
+                                    else:
+                                        return {"success": False, "error": resp_data2["error"].get("message", "Lỗi gửi sau pass thread control")}
+                            else:
+                                last_message_id = resp_data2.get("message_id") or last_message_id
+                        except Exception as e2:
+                            if not last_message_id:
+                                return {"success": False, "error": str(e2)}
+
+                    # ── Tier 3: Conversations API (fallback cuối) ────────────
+                    elif page_id and message_text:
+                        logger.info("[Facebook] Tier 1 và Tier 2 thất bại, thử Tier 3: Conversations API...")
+                        r3 = send_via_conversation_api(page_access_token, page_id, recipient_psid, message_text)
+                        if r3.get("success"):
+                            last_message_id = r3.get("message_id")
+                        else:
+                            if not last_message_id:
+                                return {
+                                    "success": False,
+                                    "error": "Hội thoại này đang bị Meta AI kiểm soát. Đã thử 3 phương pháp nhưng không thành công. Vui lòng vào Meta Business Suite, tắt AI cho hội thoại này rồi thử lại.",
+                                }
+
+                    # — Không có page_id — Không thể dùng Tier 3 ─────────
                     else:
                         if not last_message_id:
                             return {

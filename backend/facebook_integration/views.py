@@ -506,6 +506,7 @@ class FacebookLeadViewSet(mixins.UpdateModelMixin, mixins.DestroyModelMixin, vie
             file_obj=file_obj,
             attachment_type=attachment_type,
             quick_replies=quick_replies or None,
+            page_id=str(config.page_id) if config.page_id else None,
         )
 
         if result.get("success"):
