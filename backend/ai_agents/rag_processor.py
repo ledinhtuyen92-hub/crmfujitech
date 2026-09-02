@@ -237,9 +237,9 @@ def search_knowledge(agent, query: str, limit: int = 4):
                     clean_content = re.sub(r'\n*!\[.*?\]\(https?://[^\)]+\)\n*', ' ', c.content).strip()
                     text_to_append = f"- (Nguồn: {c.document.title}) {clean_content}"
 
-                    # ── Ảnh từ file_attachment của document (doc_type != 'image') ──
+                    # ── Ảnh từ file_attachment của document (doc_type == 'image') ──
                     if getattr(c.document, 'file_attachment', None) and getattr(c.document.file_attachment, 'name', None):
-                        if c.document.doc_type != 'image':
+                        if c.document.doc_type == 'image':
                             img_url = c.document.file_attachment.url
                             if img_url not in seen_img_urls:
                                 seen_img_urls.add(img_url)
