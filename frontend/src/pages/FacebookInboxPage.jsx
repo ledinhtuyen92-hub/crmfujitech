@@ -28,6 +28,7 @@ import {
   VideoCameraOutlined,
   RobotOutlined,
   StopOutlined,
+  SyncOutlined,
   ArrowLeftOutlined
 } from '@ant-design/icons'
 import {
@@ -878,6 +879,24 @@ export default function FacebookInboxPage() {
     } catch (err) {
       message.error(err.response?.data?.error || 'Không tìm thấy thông tin liên hệ.')
     }
+  }
+
+  const handleSyncLeadMessages = async () => {
+    if (!selectedLead) return
+    setSyncing(true)
+    try {
+      const res = await api.post(`/facebook/leads/${selectedLead.id}/sync-messages/`)
+      const newCount = res.data?.data?.synced_messages || 0
+      if (newCount > 0) {
+        message.success(`🔄 ${res.data.detail}`)
+        fetchMessages(selectedLead)
+        fetchLeads(true)
+      } else {
+        message.info(res.data.detail)
+      }
+    } catch (err) {
+      message.error(err.response?.data?.error || 'Lỗi khi đồng bộ tin nhắn từ Facebook.')
+    } finally { setSyncing(false) }
   }
 
   const handleScanAllPhones = async () => {
@@ -1910,6 +1929,17 @@ export default function FacebookInboxPage() {
                       style={{ borderRadius: 16 }}
                     >
                       Quét LH
+                    </Button>
+                  </Tooltip>
+                  <Tooltip title="Đồng bộ tin nhắn bị thiếu từ Facebook (dùng khi Meta AI đã tắt nhưng tin nhắn khách chưa vào hệ thống)">
+                    <Button
+                      size="small"
+                      icon={<SyncOutlined spin={syncing} />}
+                      onClick={handleSyncLeadMessages}
+                      loading={syncing}
+                      style={{ borderRadius: 16, borderColor: '#1877f2', color: '#1877f2' }}
+                    >
+                      Đồng bộ TN
                     </Button>
                   </Tooltip>
                   {canDeleteConversation && (

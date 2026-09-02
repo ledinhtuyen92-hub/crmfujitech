@@ -17,6 +17,33 @@ logger = logging.getLogger(__name__)
 FB_GRAPH_API_BASE = "https://graph.facebook.com/v25.0"
 
 
+# ── Facebook Handover Protocol ───────────────────────────────────────────────
+
+def take_thread_control(page_access_token: str, recipient_psid: str, metadata: str = "") -> bool:
+    """
+    Lấy lại quyền kiểm soát thread từ ứng dụng khác (Meta AI Business, chatbot v.v.).
+    Cần thiết khi thread bị chiếm bởi ứng dụng khác và ta muốn gửi tin nhắn.
+    Trả về True nếu thành công, False nếu thất bại.
+    """
+    url = f"{FB_GRAPH_API_BASE}/me/take_thread_control"
+    payload = {
+        "recipient": {"id": recipient_psid},
+        "metadata": metadata or "CRM agent taking control",
+    }
+    params = {"access_token": page_access_token}
+    try:
+        resp = requests.post(url, params=params, json=payload, timeout=10)
+        data = resp.json()
+        if "error" in data:
+            logger.warning(f"[Facebook] take_thread_control lỗi: {data['error']}")
+            return False
+        logger.info(f"[Facebook] take_thread_control thành công cho PSID {recipient_psid}")
+        return True
+    except Exception as e:
+        logger.error(f"[Facebook] Exception khi take_thread_control: {e}")
+        return False
+
+
 # ── Tái sử dụng thuật toán quét SĐT thông minh ───────────────────────────────
 
 def normalize_phone(phone: str) -> str:
@@ -230,9 +257,28 @@ def send_facebook_message(
             resp = requests.post(url, params=params, data=data, files=files, timeout=30)
             resp_data = resp.json()
             if "error" in resp_data:
-                logger.error(f"[Facebook] Lỗi gửi file binary: {resp_data['error']}")
-                return {"success": False, "error": resp_data["error"].get("message", "Lỗi gửi file lên Meta")}
-            last_message_id = resp_data.get("message_id")
+                err = resp_data["error"]
+                err_code = err.get("code")
+                logger.error(f"[Facebook] Lỗi gửi file binary: {err}")
+                if err_code == 10:
+                    logger.info("[Facebook] Thread bị kiểm soát (lỗi #10) khi gửi file. Đang take_thread_control...")
+                    if take_thread_control(page_access_token, recipient_psid):
+                        # Seek lại file và retry
+                        if hasattr(file_obj, "seek"):
+                            file_obj.seek(0)
+                        file_content2 = file_obj.read() if hasattr(file_obj, "read") else file_obj
+                        files2 = {"filedata": (file_name, file_content2, content_type)}
+                        resp2 = requests.post(url, params=params, data=data, files=files2, timeout=30)
+                        resp_data2 = resp2.json()
+                        if "error" in resp_data2:
+                            return {"success": False, "error": resp_data2["error"].get("message", "Lỗi gửi file sau khi lấy lại quyền thread")}
+                        last_message_id = resp_data2.get("message_id")
+                    else:
+                        return {"success": False, "error": "Hội thoại đang bị kiểm soát bởi Meta AI. Không thể gửi file."}
+                else:
+                    return {"success": False, "error": err.get("message", "Lỗi gửi file lên Meta")}
+            else:
+                last_message_id = resp_data.get("message_id")
         except Exception as e:
             logger.error(f"[Facebook] Exception khi gửi file binary: {e}")
             return {"success": False, "error": str(e)}
@@ -251,9 +297,23 @@ def send_facebook_message(
             resp = requests.post(url, params=params, json=payload, timeout=15)
             resp_data = resp.json()
             if "error" in resp_data:
-                logger.error(f"[Facebook] Lỗi gửi attachment URL: {resp_data['error']}")
-                return {"success": False, "error": resp_data["error"].get("message", "Lỗi gửi attachment URL")}
-            last_message_id = resp_data.get("message_id")
+                err = resp_data["error"]
+                err_code = err.get("code")
+                logger.error(f"[Facebook] Lỗi gửi attachment URL: {err}")
+                if err_code == 10:
+                    logger.info("[Facebook] Thread bị kiểm soát (lỗi #10) khi gửi attachment URL. Đang take_thread_control...")
+                    if take_thread_control(page_access_token, recipient_psid):
+                        resp2 = requests.post(url, params=params, json=payload, timeout=15)
+                        resp_data2 = resp2.json()
+                        if "error" in resp_data2:
+                            return {"success": False, "error": resp_data2["error"].get("message", "Lỗi gửi attachment URL sau khi lấy lại quyền thread")}
+                        last_message_id = resp_data2.get("message_id")
+                    else:
+                        return {"success": False, "error": "Hội thoại đang bị kiểm soát bởi Meta AI. Không thể gửi file đính kèm."}
+                else:
+                    return {"success": False, "error": err.get("message", "Lỗi gửi attachment URL")}
+            else:
+                last_message_id = resp_data.get("message_id")
         except Exception as e:
             logger.error(f"[Facebook] Exception khi gửi attachment URL: {e}")
             return {"success": False, "error": str(e)}
@@ -271,9 +331,36 @@ def send_facebook_message(
             resp = requests.post(url, params=params, json=payload, timeout=10)
             resp_data = resp.json()
             if "error" in resp_data:
-                logger.error(f"[Facebook] Lỗi gửi text/quick_replies: {resp_data['error']}")
-                if not last_message_id:
-                    return {"success": False, "error": resp_data["error"].get("message", "Lỗi gửi tin nhắn")}
+                err = resp_data["error"]
+                err_code = err.get("code")
+                logger.error(f"[Facebook] Lỗi gửi text/quick_replies: {err}")
+                # Lỗi #10: Thread đang bị kiểm soát bởi ứng dụng khác (Meta AI Business v.v.)
+                # → Tự động lấy lại quyền kiểm soát và gửi lại
+                if err_code == 10:
+                    logger.info(f"[Facebook] Thread bị kiểm soát bởi ứng dụng khác (lỗi #10). Đang take_thread_control...")
+                    if take_thread_control(page_access_token, recipient_psid):
+                        try:
+                            resp2 = requests.post(url, params=params, json=payload, timeout=10)
+                            resp_data2 = resp2.json()
+                            if "error" in resp_data2:
+                                logger.error(f"[Facebook] Vẫn lỗi sau take_thread_control: {resp_data2['error']}")
+                                if not last_message_id:
+                                    return {"success": False, "error": resp_data2["error"].get("message", "Lỗi gửi tin nhắn sau khi lấy lại quyền thread")}
+                            else:
+                                last_message_id = resp_data2.get("message_id") or last_message_id
+                        except Exception as e2:
+                            logger.error(f"[Facebook] Exception khi gửi lại sau take_thread_control: {e2}")
+                            if not last_message_id:
+                                return {"success": False, "error": str(e2)}
+                    else:
+                        if not last_message_id:
+                            return {
+                                "success": False,
+                                "error": "Hội thoại này đang được kiểm soát bởi Meta AI hoặc ứng dụng khác. Không thể lấy lại quyền gửi tin nhắn. Vui lòng tắt ứng dụng đó trên Meta Business Suite và thử lại.",
+                            }
+                else:
+                    if not last_message_id:
+                        return {"success": False, "error": err.get("message", "Lỗi gửi tin nhắn")}
             else:
                 last_message_id = resp_data.get("message_id") or last_message_id
         except Exception as e:
@@ -926,7 +1013,165 @@ def convert_facebook_lead(lead, phone_number: str, assigned_user=None, customer_
 
 # ── Đồng bộ Lịch sử Trò chuyện từ Graph API ──────────────────────────────────
 
+def sync_lead_messages(lead, limit_messages: int = 100) -> dict:
+    """
+    Đồng bộ tin nhắn bị thiếu cho một hội thoại (lead) cụ thể từ Facebook Graph API.
+    Thường dùng khi Meta AI Business đã kiểm soát thread và chặn webhook,
+    khiến tin nhắn của khách không được gửi về hệ thống.
+
+    Quy trình:
+    1. Tìm conversation_id của lead bằng cách query /conversations?user_id={psid}
+    2. Kéo messages từ /{conv_id}/messages
+    3. Chỉ lưu những tin nhắn chưa có trong DB (get_or_create theo fb_message_id)
+    4. Cập nhật last_message_at, last_message_preview, unread nếu có tin mới
+
+    Trả về dict: {synced_messages: int, skipped: int, conversation_id: str}
+    """
+    from facebook_integration.models import FacebookMessage
+    from django.utils.dateparse import parse_datetime
+
+    page_config = lead.page_config
+    if not page_config or not page_config.page_access_token:
+        raise ValueError("Hội thoại này chưa được liên kết với Trang Facebook hợp lệ.")
+
+    token = page_config.page_access_token
+    psid = lead.fb_user_id
+    page_id = str(page_config.page_id)
+
+    # Bước 1: Tìm conversation_id qua /conversations?user_id={psid}
+    conv_url = f"{FB_GRAPH_API_BASE}/{page_id}/conversations"
+    conv_params = {
+        "user_id": psid,
+        "fields": "id,updated_time,snippet,unread_count",
+        "access_token": token,
+        "limit": 1,
+    }
+    conv_id = None
+    try:
+        resp = requests.get(conv_url, params=conv_params, timeout=10)
+        resp_data = resp.json()
+        convs = resp_data.get("data", [])
+        if convs:
+            conv_id = convs[0].get("id")
+            # Cập nhật metadata hội thoại nếu có
+            upd_str = convs[0].get("updated_time")
+            snippet = convs[0].get("snippet", "")
+            unread_cnt = int(convs[0].get("unread_count", 0) or 0)
+            upd_dt = parse_datetime(upd_str) if upd_str else None
+            if upd_dt and (not lead.last_message_at or upd_dt > lead.last_message_at):
+                lead.last_message_at = upd_dt
+                if snippet:
+                    lead.last_message_preview = snippet[:255]
+                lead.has_unread_message = (unread_cnt > 0)
+                lead.unread_count = unread_cnt
+                lead.save(update_fields=["last_message_at", "last_message_preview", "has_unread_message", "unread_count"])
+        else:
+            logger.warning(f"[SyncLeadMessages] Không tìm thấy conversation_id cho PSID={psid}")
+    except Exception as e:
+        logger.error(f"[SyncLeadMessages] Lỗi tìm conversation_id: {e}")
+        raise ValueError(f"Không thể tìm thấy hội thoại trên Facebook: {e}")
+
+    if not conv_id:
+        raise ValueError("Không tìm được conversation_id từ Facebook. PSID có thể không còn tồn tại hoặc token hết hạn.")
+
+    # Bước 2: Kéo messages từ /{conv_id}/messages
+    msg_url = f"{FB_GRAPH_API_BASE}/{conv_id}/messages"
+    msg_params = {
+        "fields": "id,created_time,from,to,message,attachments{id,mime_type,name,size,image_data,video_data,file_url,payload}",
+        "access_token": token,
+        "limit": min(limit_messages, 100),
+    }
+
+    synced_messages = 0
+    skipped = 0
+
+    try:
+        m_resp = requests.get(msg_url, params=msg_params, timeout=15)
+        if m_resp.status_code != 200:
+            logger.error(f"[SyncLeadMessages] Lỗi gọi /messages: {m_resp.status_code} - {m_resp.text}")
+            raise ValueError(f"Facebook API trả lỗi: {m_resp.status_code}")
+
+        m_data = m_resp.json().get("data", [])
+        m_data.reverse()  # Sắp xếp cũ → mới
+
+        for m_item in m_data:
+            m_id = m_item.get("id")
+            if not m_id:
+                continue
+
+            # Xác định người gửi
+            m_from = m_item.get("from", {})
+            from_id = str(m_from.get("id", ""))
+            s_type = "customer" if (from_id and str(from_id) == str(psid)) else "page"
+            m_text = m_item.get("message", "")
+
+            # Xử lý đính kèm
+            att_url = None
+            att_type = ""
+            atts = m_item.get("attachments", {}).get("data", [])
+            if atts:
+                first_att = atts[0]
+                mime = (first_att.get("mime_type") or "").lower()
+                payload = first_att.get("payload", {})
+                img_data = first_att.get("image_data", {})
+                vid_data = first_att.get("video_data", {})
+                att_url = (
+                    payload.get("url")
+                    or img_data.get("url")
+                    or img_data.get("preview_url")
+                    or vid_data.get("url")
+                    or vid_data.get("preview_url")
+                    or first_att.get("file_url")
+                    or first_att.get("url")
+                )
+                if mime.startswith("video/") or vid_data or (att_url and any(ext in att_url.lower() for ext in [".mp4", ".mov", ".avi", ".webm", "/videos/", "video_redirect"])):
+                    att_type = "video"
+                elif mime.startswith("image/") or img_data or (att_url and any(ext in att_url.lower() for ext in [".jpg", ".jpeg", ".png", ".gif", ".webp"])):
+                    att_type = "image"
+                elif mime.startswith("audio/") or (att_url and any(ext in att_url.lower() for ext in [".mp3", ".wav", ".ogg", ".m4a"])):
+                    att_type = "audio"
+                elif att_url:
+                    att_type = "image"
+
+            c_dt_str = m_item.get("created_time")
+            c_dt = parse_datetime(c_dt_str) if c_dt_str else timezone.now()
+
+            # Chỉ lưu tin nhắn chưa có trong DB
+            msg_obj, m_created = FacebookMessage.objects.get_or_create(
+                fb_message_id=m_id,
+                defaults={
+                    "lead": lead,
+                    "sender_type": s_type,
+                    "text": m_text,
+                    "attachment_url": att_url,
+                    "attachment_type": att_type,
+                }
+            )
+            if m_created:
+                FacebookMessage.objects.filter(id=msg_obj.id).update(created_at=c_dt)
+                synced_messages += 1
+                # Tự động phát hiện SĐT/Email từ tin nhắn khách
+                if s_type == "customer" and m_text:
+                    extract_and_process_phone_fb(lead, m_text)
+            else:
+                skipped += 1
+
+    except ValueError:
+        raise
+    except Exception as e:
+        logger.error(f"[SyncLeadMessages] Lỗi kéo messages: {e}")
+        raise ValueError(f"Lỗi khi đồng bộ tin nhắn: {e}")
+
+    logger.info(f"[SyncLeadMessages] Lead {lead.id} (PSID={psid}): synced={synced_messages}, skipped={skipped}")
+    return {
+        "synced_messages": synced_messages,
+        "skipped": skipped,
+        "conversation_id": conv_id,
+    }
+
+
 def sync_page_conversations_history(page_config, max_conversations: int = 100, limit_messages: int = 50):
+
     """
     Kéo danh sách hội thoại cũ (/conversations) và tin nhắn (/messages)
     cho một Trang Facebook từ Graph API.

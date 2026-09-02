@@ -43,6 +43,7 @@ from .services import (
     send_facebook_message,
     smart_extract_vn_phone,
     subscribe_app_to_page,
+    sync_lead_messages,
     sync_page_conversations_history,
     verify_facebook_webhook_signature,
 )
@@ -524,6 +525,30 @@ class FacebookLeadViewSet(mixins.UpdateModelMixin, mixins.DestroyModelMixin, vie
             return Response(FacebookMessageSerializer(msg).data, status=status.HTTP_201_CREATED)
         else:
             return Response({"error": result.get("error")}, status=status.HTTP_400_BAD_REQUEST)
+
+    @action(detail=True, methods=["post"], url_path="sync-messages")
+    def sync_messages(self, request, pk=None):
+        """
+        Đồng bộ tin nhắn bị thiếu cho hội thoại này từ Facebook Graph API.
+        Dùng khi Meta AI Business đã bật và chặn webhook, khiến tin nhắn
+        của khách không được nhận về hệ thống.
+        """
+        lead = self.get_object()
+        limit_messages = int(request.data.get("limit_messages", 100))
+        try:
+            res = sync_lead_messages(lead, limit_messages=limit_messages)
+            new_count = res["synced_messages"]
+            if new_count > 0:
+                detail = f"Đã đồng bộ {new_count} tin nhắn mới cho hội thoại này."
+            else:
+                detail = "Hội thoại đã cập nhật đầy đủ, không có tin nhắn mới nào cần đồng bộ."
+            return Response({
+                "detail": detail,
+                "data": res,
+            })
+        except Exception as e:
+            logger.error(f"[SyncMessages Action] Lead {pk}: {e}")
+            return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
     @action(detail=True, methods=["post"], url_path="rescan-phone")
     def rescan_phone(self, request, pk=None):
