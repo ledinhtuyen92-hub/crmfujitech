@@ -1,11 +1,10 @@
 """
-Management command để debug luồng RAG + ảnh Q&A trên VPS.
+Debug luồng ảnh Q&A trong RAG pipeline.
 
-Sử dụng:
-    python manage.py debug_rag_images --query "nhà máy ở đâu" --agent-id 1
-    python manage.py debug_rag_images --query "nhà máy ở đâu" --agent-id 1 --full
+Chạy trên VPS:
+    docker exec -it crm_web python manage.py debug_rag_images --agent-id 1
 
-Không tạo file/ảnh nào. Chỉ in log ra stdout.
+Chỉ cần 1 lệnh, kết quả in ra rõ ràng ở cuối.
 """
 
 import re
@@ -13,163 +12,156 @@ from django.core.management.base import BaseCommand, CommandError
 from ai_agents.models import AiAgent, AiKnowledgeDocument, AiKnowledgeChunk
 
 
+QUERY = "nhà máy ở đâu"   # Câu test cố định
+LIMIT = 6
+THRESHOLD = 0.7
+
+OK  = "  [OK]  "
+ERR = " [LỖI] "
+INF = " [INFO] "
+
 class Command(BaseCommand):
-    help = "Debug RAG pipeline và ảnh Q&A - kiểm tra từng bước không tạo file"
+    help = "Kiểm tra tại sao ảnh Q&A không được gửi cho khách"
 
     def add_arguments(self, parser):
-        parser.add_argument("--query", type=str, required=True, help="Câu hỏi của khách cần test")
-        parser.add_argument("--agent-id", type=int, required=True, help="ID của AiAgent cần debug")
-        parser.add_argument("--full", action="store_true", help="In toàn bộ content của document")
-        parser.add_argument("--threshold", type=float, default=0.7, help="Ngưỡng cosine distance (mặc định 0.7)")
+        parser.add_argument("--agent-id", type=int, required=True)
+        parser.add_argument("--query", type=str, default=QUERY)
+
+    def p(self, line=""):
+        self.stdout.write(line)
+
+    def ok(self, msg):
+        self.stdout.write(self.style.SUCCESS(f"{OK} {msg}"))
+
+    def err(self, msg):
+        self.stdout.write(self.style.ERROR(f"{ERR} {msg}"))
+
+    def inf(self, msg):
+        self.stdout.write(self.style.WARNING(f"{INF} {msg}"))
 
     def handle(self, *args, **options):
-        query = options["query"]
         agent_id = options["agent_id"]
-        full = options["full"]
-        threshold = options["threshold"]
+        query    = options["query"]
+        errors   = []   # Danh sách lỗi tổng hợp cuối cùng
 
-        self.stdout.write(self.style.SUCCESS("=" * 70))
-        self.stdout.write(self.style.SUCCESS("  DEBUG RAG IMAGES"))
-        self.stdout.write(self.style.SUCCESS("=" * 70))
+        self.p("=" * 65)
+        self.p(f"  CHẨN ĐOÁN ẢNH Q&A  |  query: '{query}'")
+        self.p("=" * 65)
 
-        # ── 1. Lấy Agent ─────────────────────────────────────────────────────
+        # ── 1. Agent ─────────────────────────────────────────────────
         try:
             agent = AiAgent.objects.get(id=agent_id)
+            self.ok(f"Agent: {agent.name} (id={agent.id})")
         except AiAgent.DoesNotExist:
-            raise CommandError(f"Không tìm thấy AiAgent id={agent_id}")
+            self.err(f"Không tìm thấy AiAgent id={agent_id}")
+            return
 
-        self.stdout.write(f"\n[1] Agent: {agent.name} (id={agent.id}, company={agent.company.name})")
-
-        # ── 2. Kiểm tra documents Q&A có ảnh ─────────────────────────────────
-        qa_docs = AiKnowledgeDocument.objects.filter(agent=agent, doc_type="qa", status="completed")
-        self.stdout.write(f"\n[2] Tài liệu Q&A đã học (status=completed): {qa_docs.count()} doc")
-
-        img_found_in_content = 0
-        for doc in qa_docs:
-            img_urls = re.findall(r"!\[.*?\]\((https?://[^\)]+)\)", doc.content or "")
-            if img_urls:
-                img_found_in_content += 1
-                self.stdout.write(self.style.WARNING(f"   ✔ Doc id={doc.id}: '{doc.title}' → {len(img_urls)} ảnh nhúng"))
-                for u in img_urls:
-                    self.stdout.write(f"       {u}")
-                if full:
-                    self.stdout.write(f"   --- Content ---\n{doc.content[:2000]}\n   ---")
-
-        if img_found_in_content == 0:
-            self.stdout.write(self.style.ERROR(
-                "   ✗ Không tìm thấy ảnh markdown trong bất kỳ doc Q&A nào!\n"
-                "     Kiểm tra lại: ảnh có được upload thành công không? URL có đúng không?"
-            ))
-        
-        # ── 3. Kiểm tra chunks của doc Q&A ───────────────────────────────────
-        self.stdout.write(f"\n[3] Chunks từ Q&A docs có ảnh:")
-        for doc in qa_docs:
-            img_urls_in_doc = re.findall(r"!\[.*?\]\((https?://[^\)]+)\)", doc.content or "")
-            if not img_urls_in_doc:
-                continue
-            chunks = AiKnowledgeChunk.objects.filter(document=doc).order_by("id")
-            self.stdout.write(f"\n   Doc id={doc.id} → {chunks.count()} chunks:")
-            for i, ch in enumerate(chunks):
-                has_img = bool(re.findall(r"!\[.*?\]\((https?://[^\)]+)\)", ch.content))
-                img_marker = "📷" if has_img else "  "
-                snippet = ch.content[:120].replace("\n", " ")
-                self.stdout.write(f"   {img_marker} Chunk #{i+1}: {snippet}...")
-
-        # ── 4. Chạy search_knowledge và in kết quả ────────────────────────────
-        self.stdout.write(f"\n[4] Chạy search_knowledge(query='{query}', threshold={threshold}):")
+        # ── 2. Code version check ────────────────────────────────────
         try:
+            import inspect
             from ai_agents.rag_processor import search_knowledge
-            result = search_knowledge(agent, query, limit=6)
-            if result:
-                self.stdout.write(self.style.SUCCESS("\n   ✔ search_knowledge trả về:\n"))
-                self.stdout.write(result)
-
-                img_in_result = re.findall(r"!\[.*?\]\((https?://[^\)]+)\)", result)
-                if img_in_result:
-                    self.stdout.write(self.style.SUCCESS(f"\n   ✔ TÌM THẤY {len(img_in_result)} ảnh trong kết quả RAG:"))
-                    for u in img_in_result:
-                        self.stdout.write(f"     {u}")
-                else:
-                    self.stdout.write(self.style.ERROR(
-                        "\n   ✗ KHÔNG có ảnh trong kết quả RAG!\n"
-                        "     → Nguyên nhân có thể do:\n"
-                        "       a) Chunk chứa ảnh không được chọn (kém liên quan semantic)\n"
-                        "       b) URL ảnh trong content không phải dạng http(s)\n"
-                        "       c) Cosine distance > threshold (chunk quá xa với query)"
-                    ))
+            src = inspect.getsource(search_knowledge)
+            if "seen_img_urls" in src and "HÌNH ẢNH ĐÍNH KÈM" in src:
+                self.ok("Code rag_processor.py: phiên bản MỚI (có logic tìm ảnh)")
             else:
-                self.stdout.write(self.style.ERROR(
-                    "\n   ✗ search_knowledge trả về rỗng!\n"
-                    "     → Kiểm tra: API key có hợp lệ không? Embedding đã được tạo chưa?"
-                ))
+                self.err("Code rag_processor.py: phiên bản CŨ — chưa load code mới!")
+                errors.append("Container chưa chạy code mới. Cần: docker restart crm_web")
         except Exception as e:
-            self.stdout.write(self.style.ERROR(f"\n   ✗ Exception: {e}"))
-            import traceback
-            self.stdout.write(traceback.format_exc())
+            self.err(f"Không import được rag_processor: {e}")
+            errors.append(str(e))
 
-        # ── 5. Kiểm tra embedding có tồn tại không ───────────────────────────
-        self.stdout.write(f"\n[5] Kiểm tra embedding của Q&A docs có ảnh:")
+        # ── 3. Tài liệu Q&A có ảnh ───────────────────────────────────
+        qa_docs_with_img = []
+        qa_docs = AiKnowledgeDocument.objects.filter(
+            agent=agent, doc_type="qa", status="completed"
+        )
+        self.inf(f"Tổng Q&A docs (completed): {qa_docs.count()}")
+        for doc in qa_docs:
+            urls = re.findall(r"!\[.*?\]\((https?://[^\)]+)\)", doc.content or "")
+            if urls:
+                qa_docs_with_img.append((doc, urls))
+                self.ok(f"Doc id={doc.id} '{doc.title[:40]}': {len(urls)} ảnh")
+                for u in urls:
+                    self.p(f"          → {u}")
+
+        if not qa_docs_with_img:
+            self.err("Không tìm thấy ảnh https:// trong bất kỳ doc Q&A nào!")
+            errors.append(
+                "Ảnh không có trong doc.content với URL https://\n"
+                "  Gợi ý: URL ảnh có thể đang là /media/... (relative) thay vì https://..."
+            )
+
+        # ── 4. Chạy search_knowledge ──────────────────────────────────
+        self.p()
+        self.inf(f"Gọi search_knowledge('{query}', limit={LIMIT})...")
+        try:
+            rag_result = search_knowledge(agent, query, limit=LIMIT)
+        except Exception as e:
+            self.err(f"search_knowledge crash: {e}")
+            import traceback; self.p(traceback.format_exc())
+            errors.append(f"search_knowledge lỗi: {e}")
+            rag_result = ""
+
+        if not rag_result:
+            self.err("search_knowledge trả về rỗng (không tìm được chunk nào khớp)")
+            errors.append("RAG không tìm được chunk nào — kiểm tra API key và embedding")
+        else:
+            self.ok(f"search_knowledge trả về {len(rag_result)} ký tự")
+
+            # Có section ảnh không?
+            if "[HÌNH ẢNH ĐÍNH KÈM" in rag_result:
+                img_urls_in_result = re.findall(r"!\[.*?\]\((https?://[^\)]+)\)", rag_result)
+                self.ok(f"Section [HÌNH ẢNH ĐÍNH KÈM] CÓ trong RAG — {len(img_urls_in_result)} URL ảnh:")
+                for u in img_urls_in_result:
+                    self.p(f"          → {u}")
+            else:
+                self.err("Section [HÌNH ẢNH ĐÍNH KÈM] KHÔNG có trong RAG result!")
+                # Phân tích nguyên nhân
+                chunks_in_result = re.findall(r"\(Nguồn: ([^\)]+)\)", rag_result)
+                self.inf(f"Các nguồn được chọn: {chunks_in_result}")
+
+                # Kiểm tra chunk từ doc Q&A có ảnh có được chọn không
+                img_doc_titles = [d.title for d, _ in qa_docs_with_img]
+                matched = [s for s in chunks_in_result if any(t[:20] in s for t in img_doc_titles)]
+                if matched:
+                    self.err(f"Chunk từ doc có ảnh ĐÃ được chọn nhưng ảnh vẫn không xuất hiện → Bug trong code extract ảnh!")
+                    errors.append("Bug: doc Q&A có ảnh được chọn nhưng seen_img_urls bị rỗng → cần xem lại regex hoặc doc.content")
+                else:
+                    self.err("Không có chunk nào từ doc Q&A có ảnh được RAG chọn (threshold quá chặt)")
+                    errors.append(
+                        f"Chunk Q&A nhà máy không lọt qua threshold={THRESHOLD}\n"
+                        "  Gợi ý: hạ threshold hoặc tách riêng Q&A có ảnh thành doc riêng"
+                    )
+
+        # ── 5. Kiểm tra embedding ─────────────────────────────────────
+        self.p()
         try:
             provider = agent.company.ai_settings.default_embedding_provider
         except Exception:
             provider = "openai"
-        self.stdout.write(f"   Provider: {provider}")
+        self.inf(f"Embedding provider: {provider}")
 
-        for doc in qa_docs:
-            img_urls_in_doc = re.findall(r"!\[.*?\]\((https?://[^\)]+)\)", doc.content or "")
-            if not img_urls_in_doc:
-                continue
-            chunks = AiKnowledgeChunk.objects.filter(document=doc)
+        for doc, _ in qa_docs_with_img:
+            total  = AiKnowledgeChunk.objects.filter(document=doc).count()
             if provider == "gemini":
-                embedded = chunks.exclude(embedding_gemini=None).count()
+                embed = AiKnowledgeChunk.objects.filter(document=doc).exclude(embedding_gemini=None).count()
             else:
-                embedded = chunks.exclude(embedding=None).count()
-            total = chunks.count()
-            status_str = self.style.SUCCESS(f"{embedded}/{total} chunks có embedding") if embedded == total else self.style.ERROR(f"{embedded}/{total} chunks có embedding — THIẾU!")
-            self.stdout.write(f"   Doc id={doc.id}: {status_str}")
-
-        # ── 6. Test cosine distance thực tế ──────────────────────────────────
-        self.stdout.write(f"\n[6] Cosine distance của các chunks Q&A có ảnh với query '{query}':")
-        try:
-            from ai_agents.services import get_api_keys
-            from ai_agents.rag_processor import get_embeddings, get_gemini_embeddings
-            from pgvector.django import CosineDistance
-
-            keys = get_api_keys(agent.company, provider)
-            if keys:
-                if provider == "gemini":
-                    query_vector = get_gemini_embeddings([query], keys[0])[0]
-                else:
-                    query_vector = get_embeddings([query], keys[0])[0]
-
-                for doc in qa_docs:
-                    img_urls_in_doc = re.findall(r"!\[.*?\]\((https?://[^\)]+)\)", doc.content or "")
-                    if not img_urls_in_doc:
-                        continue
-                    if provider == "gemini":
-                        chunks = AiKnowledgeChunk.objects.filter(
-                            document=doc, embedding_gemini__isnull=False
-                        ).annotate(dist=CosineDistance("embedding_gemini", query_vector)).order_by("dist")
-                    else:
-                        chunks = AiKnowledgeChunk.objects.filter(
-                            document=doc, embedding__isnull=False
-                        ).annotate(dist=CosineDistance("embedding", query_vector)).order_by("dist")
-
-                    self.stdout.write(f"\n   Doc id={doc.id} '{doc.title}':")
-                    for ch in chunks:
-                        dist = round(ch.dist, 4)
-                        has_img = bool(re.findall(r"!\[.*?\]\((https?://[^\)]+)\)", ch.content))
-                        color = self.style.SUCCESS if dist < threshold else self.style.ERROR
-                        img_label = " 📷[CÓ ẢNH]" if has_img else ""
-                        snippet = ch.content[:80].replace("\n", " ")
-                        self.stdout.write(color(f"     dist={dist} {'✔PASS' if dist < threshold else '✗FAIL'}{img_label}: {snippet}..."))
+                embed = AiKnowledgeChunk.objects.filter(document=doc).exclude(embedding=None).count()
+            if embed == total:
+                self.ok(f"Doc id={doc.id}: {embed}/{total} chunks có embedding")
             else:
-                self.stdout.write(self.style.ERROR("   ✗ Không có API key để tính cosine distance"))
-        except Exception as e:
-            self.stdout.write(self.style.ERROR(f"   ✗ Exception: {e}"))
-            import traceback
-            self.stdout.write(traceback.format_exc())
+                self.err(f"Doc id={doc.id}: CHỈ {embed}/{total} chunks có embedding — thiếu!")
+                errors.append(f"Doc id={doc.id} thiếu embedding. Chạy lại: process_document_rag.delay({doc.id})")
 
-        self.stdout.write(self.style.SUCCESS("\n" + "=" * 70))
-        self.stdout.write(self.style.SUCCESS("  XONG. Xem kết quả ở trên để tìm nguyên nhân."))
-        self.stdout.write(self.style.SUCCESS("=" * 70 + "\n"))
+        # ── TỔNG KẾT ─────────────────────────────────────────────────
+        self.p()
+        self.p("=" * 65)
+        if not errors:
+            self.ok("TẤT CẢ BƯỚC ĐỀU PASS — Ảnh có trong RAG context!")
+            self.p("  → Nếu AI vẫn không gửi ảnh, vấn đề nằm ở AI system prompt")
+            self.p("    Cần kiểm tra: core_prompt_template có hướng dẫn image_urls không?")
+        else:
+            self.err(f"TÌM THẤY {len(errors)} LỖI CẦN SỬA:")
+            for i, e in enumerate(errors, 1):
+                self.p(self.style.ERROR(f"\n  [{i}] {e}"))
+        self.p("=" * 65)
