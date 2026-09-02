@@ -227,18 +227,52 @@ def search_knowledge(agent, query: str, limit: int = 4):
             
         if chunks:
             knowledge_texts = []
+            import re
+            seen_img_urls = set()
             for c in chunks:
                 if getattr(c, 'distance', 1) < 0.7:  # Threshold
                     text_to_append = f"- (Nguồn: {c.document.title}) {c.content}"
+
+                    # ── Ảnh từ file_attachment của document (doc_type != 'image') ──
                     if getattr(c.document, 'file_attachment', None) and getattr(c.document.file_attachment, 'name', None):
-                        # Không gửi lại ảnh cho khách nếu tài liệu là ảnh mẫu (dạy AI nhận diện)
                         if c.document.doc_type != 'image':
                             img_url = c.document.file_attachment.url
-                            text_to_append += f"\n  (Kèm ảnh minh họa: ![ảnh]({img_url}))"
+                            if img_url not in seen_img_urls:
+                                text_to_append += f"\n  (Kèm ảnh minh họa: ![ảnh]({img_url}))"
+                                seen_img_urls.add(img_url)
+
+                    # ── Ảnh nhúng trong chunk content (Q&A với ảnh inline) ──
+                    chunk_img_urls = re.findall(r'!\[.*?\]\((https?://[^\)]+)\)', c.content)
+                    for img_url in chunk_img_urls:
+                        if img_url not in seen_img_urls:
+                            seen_img_urls.add(img_url)
+
+                    # ── Nếu chunk không chứa ảnh nhưng document gốc Q&A có ảnh,
+                    #    tìm thêm từ full content của document để không bỏ sót ──
+                    if c.document.doc_type == 'qa' and c.document.content:
+                        doc_img_urls = re.findall(r'!\[.*?\]\((https?://[^\)]+)\)', c.document.content)
+                        for img_url in doc_img_urls:
+                            if img_url not in seen_img_urls:
+                                seen_img_urls.add(img_url)
+
                     knowledge_texts.append(text_to_append)
-                    
+
+            # Nếu có ảnh tìm được, ghép vào cuối context để AI chắc chắn nhận diện
+            img_instruction = ""
+            if seen_img_urls:
+                img_list = "\n".join(f"  ![ảnh]({u})" for u in seen_img_urls)
+                img_instruction = (
+                    f"\n\n[HÌNH ẢNH ĐÍNH KÈM - BẮT BUỘC GỬI CHO KHÁCH]:\n{img_list}\n"
+                    "(Sao chép TOÀN BỘ URL ảnh trên vào mảng 'image_urls' trong JSON phản hồi của bạn.)"
+                )
+
             if knowledge_texts:
-                return "\n\n[TRÍCH XUẤT KIẾN THỨC NỘI BỘ TỪ CÔNG TY (RAG)]:\n" + "\n".join(knowledge_texts) + "\n(Hãy ưu tiên sử dụng những kiến thức trên để trả lời khách hàng một cách chính xác nhất)."
+                return (
+                    "\n\n[TRÍCH XUẤT KIẾN THỨC NỘI BỘ TỪ CÔNG TY (RAG)]:\n"
+                    + "\n".join(knowledge_texts)
+                    + "\n(Hãy ưu tiên sử dụng những kiến thức trên để trả lời khách hàng một cách chính xác nhất)."
+                    + img_instruction
+                )
                 
     except Exception as e:
         logging.getLogger(__name__).error(f"RAG Search Error: {e}")
