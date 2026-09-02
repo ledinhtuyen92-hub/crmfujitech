@@ -231,21 +231,25 @@ def search_knowledge(agent, query: str, limit: int = 4):
             seen_img_urls = set()
             for c in chunks:
                 if getattr(c, 'distance', 1) < 0.7:  # Threshold
-                    text_to_append = f"- (Nguồn: {c.document.title}) {c.content}"
+
+                    # Strip ảnh markdown khỏi text chunk trước khi hiển thị cho AI
+                    # (ảnh sẽ được gom vào [HÌNH ẢNH ĐÍNH KÈM] ở cuối — chỉ 1 nơi duy nhất)
+                    clean_content = re.sub(r'\n*!\[.*?\]\(https?://[^\)]+\)\n*', ' ', c.content).strip()
+                    text_to_append = f"- (Nguồn: {c.document.title}) {clean_content}"
 
                     # ── Ảnh từ file_attachment của document (doc_type != 'image') ──
                     if getattr(c.document, 'file_attachment', None) and getattr(c.document.file_attachment, 'name', None):
                         if c.document.doc_type != 'image':
                             img_url = c.document.file_attachment.url
                             if img_url not in seen_img_urls:
-                                text_to_append += f"\n  (Kèm ảnh minh họa: ![ảnh]({img_url}))"
                                 seen_img_urls.add(img_url)
 
-                    # ── Ảnh nhúng trong chunk content (Q&A với ảnh inline) ──
+                    # ── Ảnh nhúng trong chunk content gốc (Q&A với ảnh inline) ──
                     chunk_img_urls = re.findall(r'!\[.*?\]\((https?://[^\)]+)\)', c.content)
                     for img_url in chunk_img_urls:
                         if img_url not in seen_img_urls:
                             seen_img_urls.add(img_url)
+
 
                     # ── Nếu chunk không chứa ảnh nhưng document gốc Q&A có ảnh,
                     #    tìm thêm từ full content của document để không bỏ sót ──
