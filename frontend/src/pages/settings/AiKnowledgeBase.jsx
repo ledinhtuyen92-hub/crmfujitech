@@ -866,9 +866,9 @@ export default function AiKnowledgeBase() {
           </Collapse>
 
         <Card bordered={false} style={{ borderRadius: 12 }} styles={{ body: { padding: isMobile ? '16px 12px' : 24 } }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+          <div style={{ display: 'flex', flexDirection: isMobile ? 'column' : 'row', justifyContent: 'space-between', alignItems: isMobile ? 'flex-start' : 'center', marginBottom: 16, gap: isMobile ? 12 : 0 }}>
             <Title level={5} style={{ margin: 0 }}>Kho tài liệu đã huấn luyện</Title>
-            <Space>
+            <Space style={{ flexWrap: 'wrap' }}>
               <Button icon={<DownloadOutlined />} onClick={handleExportData}>Xuất dữ liệu</Button>
               <Button icon={<UploadOutlined />} onClick={() => setIsImportModalVisible(true)}>Nhập dữ liệu</Button>
             </Space>
