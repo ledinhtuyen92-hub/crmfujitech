@@ -226,7 +226,14 @@ def process_ai_reply_zalo(lead_id, is_followup=False, trigger_msg_id=None):
             if search_query.strip():
                 from ai_agents.rag_processor import search_knowledge
                 rag_search_text = search_knowledge(lead.oa_config.ai_agent, search_query.strip(), limit=4)
-                rag_search_text += get_product_context(lead.company, search_query.strip(), history)
+                # Chỉ đưa sản phẩm vào context AI khi cờ "Tự động đồng bộ Sản phẩm" đang BẬ T trong AiSettings
+                try:
+                    zalo_auto_sync = getattr(lead.oa_config.ai_agent.company.ai_settings, 'auto_sync_products', False)
+                except Exception:
+                    zalo_auto_sync = False
+                if zalo_auto_sync:
+                    rag_search_text += get_product_context(lead.company, search_query.strip(), history)
+
 
         if is_followup:
             drip_hours = lead.oa_config.ai_agent.drip_followup_hours or 24
@@ -524,7 +531,13 @@ def process_ai_reply_facebook(lead_id, is_followup=False, trigger_msg_id=None):
             if search_query.strip():
                 from ai_agents.rag_processor import search_knowledge
                 rag_search_text = search_knowledge(lead.page_config.ai_agent, search_query.strip(), limit=4)
-                rag_search_text += get_product_context(lead.company, search_query.strip(), history)
+                # Chỉ đưa sản phẩm vào context AI khi cờ "Tự động đồng bộ Sản phẩm" đang BẬ T trong AiSettings
+                try:
+                    fb_auto_sync = getattr(lead.page_config.ai_agent.company.ai_settings, 'auto_sync_products', False)
+                except Exception:
+                    fb_auto_sync = False
+                if fb_auto_sync:
+                    rag_search_text += get_product_context(lead.company, search_query.strip(), history)
         if is_followup:
             drip_hours = lead.page_config.ai_agent.drip_followup_hours or 24
             history.append({'role': 'system', 'content': f'Khách hàng đã không phản hồi hơn {drip_hours} giờ. Hãy viết một câu chào hỏi, gợi mở hoặc hỏi thăm khéo léo để tiếp tục câu chuyện một cách tự nhiên nhất.'})
