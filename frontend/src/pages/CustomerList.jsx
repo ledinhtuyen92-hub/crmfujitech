@@ -1032,8 +1032,8 @@ function CustomerList() {
               </Select>
             </Col>
           )}
-          <Col xs={24} sm={12} md={(hasPermission('crm.assign') || hasPermission('crm.auto_assign') || hasPermission('crm.view_all')) ? 6 : 8} style={{ textAlign: 'right', marginBottom: 8 }}>
-            <Space>
+          <Col xs={24} sm={12} md={(hasPermission('crm.assign') || hasPermission('crm.auto_assign') || hasPermission('crm.view_all')) ? 6 : 8} style={{ textAlign: isMobile ? 'left' : 'right', marginBottom: 8 }}>
+            <Space wrap>
               <Button 
                 type={isNewUnattendedFilter ? "primary" : "default"}
                 danger={isNewUnattendedFilter}
