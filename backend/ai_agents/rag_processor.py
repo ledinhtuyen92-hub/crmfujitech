@@ -244,20 +244,13 @@ def search_knowledge(agent, query: str, limit: int = 4):
                             if img_url not in seen_img_urls:
                                 seen_img_urls.add(img_url)
 
-                    # ── Ảnh nhúng trong chunk content gốc (Q&A với ảnh inline) ──
+                    # ── Ảnh nhúng trong chunk content đúng topic đã match ──
+                    # CHỈ lấy ảnh từ chunk cụ thể match query, KHÔNG scan toàn bộ document
+                    # (tránh trường hợp chunk "cửa có loại nào" match nhưng lại lấy ảnh nhà máy)
                     chunk_img_urls = re.findall(r'!\[.*?\]\((https?://[^\)]+)\)', c.content)
                     for img_url in chunk_img_urls:
                         if img_url not in seen_img_urls:
                             seen_img_urls.add(img_url)
-
-
-                    # ── Nếu chunk không chứa ảnh nhưng document gốc Q&A có ảnh,
-                    #    tìm thêm từ full content của document để không bỏ sót ──
-                    if c.document.doc_type == 'qa' and c.document.content:
-                        doc_img_urls = re.findall(r'!\[.*?\]\((https?://[^\)]+)\)', c.document.content)
-                        for img_url in doc_img_urls:
-                            if img_url not in seen_img_urls:
-                                seen_img_urls.add(img_url)
 
                     knowledge_texts.append(text_to_append)
 
