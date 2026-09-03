@@ -736,8 +736,9 @@ function CustomerList() {
                 color: canNavigate ? '#1677ff' : 'inherit',
                 transition: 'all 0.2s',
               }}
-              onClick={() => {
+              onClick={(e) => {
                 if (canNavigate) {
+                  e.stopPropagation()
                   navigate(`/${record.source}/inbox`, { state: { selectedLeadId: record.social_lead_id } })
                 }
               }}
