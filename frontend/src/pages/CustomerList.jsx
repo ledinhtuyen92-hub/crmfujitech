@@ -1112,6 +1112,9 @@ function CustomerList() {
             return (
               <List.Item
                 actions={[
+                  hasPermission('crm.assign') ? (
+                    <Button key="assign" type="text" size="small" icon={<UserSwitchOutlined style={{color:'#1890ff'}} />} onClick={(e) => handleOpenAssignModal(record, e)} />
+                  ) : null,
                   hasPermission('crm.edit') ? <Button key="edit" type="text" size="small" icon={<EditOutlined style={{color:'#faad14'}}/>} onClick={(e) => handleOpenEditModal(record, e)} /> : null,
                   hasPermission('crm.delete') ? (
                     <Popconfirm key="del" title="Xóa khách hàng này?" onConfirm={(e) => handleDeleteCustomer(record.id, e)} onCancel={(e) => e?.stopPropagation()}>
