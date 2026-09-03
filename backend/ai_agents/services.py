@@ -304,11 +304,11 @@ def generate_ai_reply(agent: AiAgent, conversation_history: list, lead_name: str
         
     # Rule ảnh BẮT BUỘC — luôn inject dù agent dùng custom core_system_rules
     MANDATORY_IMAGE_RULE = (
-        "\n\nQUY TẮC ẢNH BẮT BUỘC (KHÔNG ĐƯỢC BỎ QUA): "
-        "Nếu trong phần context bổ sung có xuất hiện bất kỳ đường link ảnh nào theo định dạng ![...](url) "
-        "— dù nằm trong [TRÍCH XUẤT KIẾN THỨC NỘI BỘ] hay [HÌNH ẢNH ĐÍNH KÈM - BẮT BUỘC GỬI CHO KHÁCH] — "
-        "bạn BẮT BUỘC phải sao chép TOÀN BỘ các URL đó vào mảng 'image_urls' trong JSON. "
-        "TUYỆT ĐỐI không bỏ qua hay rút gọn bất kỳ URL nào."
+        "\n\nQUY TẮC SỬ DỤNG HÌNH ẢNH (QUAN TRỌNG): "
+        "Nếu trong phần context bổ sung có xuất hiện đường link ảnh theo định dạng ![...](url), "
+        "bạn CHỈ ĐƯỢC sao chép các URL đó vào mảng 'image_urls' trong JSON NẾU bạn quyết định sử dụng "
+        "thông tin/hình ảnh đó để trả lời câu hỏi của khách hàng (ví dụ: khách hỏi xem mẫu mã, báo giá, hình ảnh). "
+        "TUYỆT ĐỐI KHÔNG gửi ảnh nếu khách hàng không hỏi về chủ đề liên quan (ví dụ: khách chỉ cung cấp số điện thoại)."
     )
 
     extra_rules = ""
