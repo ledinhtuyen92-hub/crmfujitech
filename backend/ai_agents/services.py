@@ -40,7 +40,8 @@ NGUYÊN TẮC QUAN TRỌNG:
 6. QUY TẮC DỪNG HỘI THOẠI [STOP]: 
 - NẾU CHƯA LẤY ĐƯỢC SỐ ĐIỆN THOẠI CỦA KHÁCH: TUYỆT ĐỐI KHÔNG ĐƯỢC DỪNG (không được xuất [STOP]). Dù khách chỉ nhắn "ok", "vâng", gửi icon 👍, thả tim... bạn VẪN PHẢI tiếp tục trả lời, chủ động khơi gợi nhu cầu, mời chào hoặc nhắc khéo lại lời đề nghị xin số điện thoại/hẹn lịch.
 - CHỈ ĐƯỢC PHÉP điền "[STOP]" vào trường "reply" (để giữ im lặng) KHI VÀ CHỈ KHI: Bạn ĐÃ CÓ số điện thoại của khách, hoặc cuộc tư vấn đã hoàn toàn kết thúc (bạn đã chào tạm biệt) VÀ tin nhắn cuối cùng của khách chỉ là xác nhận ngắn gọn ("ok", "cảm ơn", thả tim 👍).
-7. QUY TẮC GỬI ẢNH: NẾU TRONG PHẦN CONTEXT CÓ CHỨA HÌNH ẢNH (định dạng ![...](url)) TRONG BẤT KỲ SECTION NÀO — bao gồm [TRÍCH XUẤT KIẾN THỨC NỘI BỘ] hoặc [HÌNH ẢNH ĐÍNH KÈM - BẮT BUỘC GỬI CHO KHÁCH] — BẠN BẮT BUỘC PHẢI SAO CHÉP Y NGUYÊN TẤT CẢ CÁC ĐƯỜNG LINK URL ĐÓ vào mảng 'image_urls' trong JSON để hệ thống gửi ảnh cho khách. Tuyệt đối không được tự ý bỏ bớt bất kỳ ảnh nào liên quan đến câu trả lời."""
+7. QUY TẮC SỬ DỤNG HÌNH ẢNH (QUAN TRỌNG): Nếu trong phần context bổ sung có xuất hiện đường link ảnh theo định dạng ![...](url), bạn CHỈ ĐƯỢC sao chép các URL đó vào mảng 'image_urls' trong JSON NẾU bạn quyết định sử dụng thông tin/hình ảnh đó để trả lời câu hỏi của khách hàng (ví dụ: khách hỏi xem mẫu mã, báo giá, hình ảnh). TUYỆT ĐỐI KHÔNG gửi ảnh nếu khách hàng không hỏi về chủ đề liên quan (ví dụ: khách chỉ cung cấp số điện thoại).
+8. KẾT NỐI SẢN PHẨM: Nếu khách hàng muốn xem mẫu/ảnh, HÃY SỬ DỤNG trường `product_search_keyword` để tìm và gửi ảnh, đồng thời báo với khách trong câu trả lời là bạn đang gửi ảnh mẫu cho họ xem. Tuy nhiên, nếu bạn nhận thấy tính năng tự động tìm kiếm Sản phẩm đang tắt hoặc bị cấm, tuyệt đối ĐỂ TRỐNG trường này."""
 
 def get_provider_for_model(model_name: str) -> str:
     if not model_name:
@@ -297,32 +298,9 @@ def generate_ai_reply(agent: AiAgent, conversation_history: list, lead_name: str
     json_template = agent.core_prompt_template.strip() if agent.core_prompt_template else DEFAULT_JSON_TEMPLATE
     core_rules = agent.core_system_rules.strip() if agent.core_system_rules else DEFAULT_SYSTEM_RULES
 
-    try:
-        auto_sync = agent.company.ai_settings.auto_sync_products
-    except Exception:
-        auto_sync = True
-        
-    # Rule ảnh BẮT BUỘC — luôn inject dù agent dùng custom core_system_rules
-    MANDATORY_IMAGE_RULE = (
-        "\n\nQUY TẮC SỬ DỤNG HÌNH ẢNH (QUAN TRỌNG): "
-        "Nếu trong phần context bổ sung có xuất hiện đường link ảnh theo định dạng ![...](url), "
-        "bạn CHỈ ĐƯỢC sao chép các URL đó vào mảng 'image_urls' trong JSON NẾU bạn quyết định sử dụng "
-        "thông tin/hình ảnh đó để trả lời câu hỏi của khách hàng (ví dụ: khách hỏi xem mẫu mã, báo giá, hình ảnh). "
-        "TUYỆT ĐỐI KHÔNG gửi ảnh nếu khách hàng không hỏi về chủ đề liên quan (ví dụ: khách chỉ cung cấp số điện thoại)."
-    )
-
-    extra_rules = ""
-    # Ép AI không dùng product_search_keyword nếu tính năng bị tắt
-    if not auto_sync:
-        extra_rules = "\nLƯU Ý: Tính năng tự động tìm kiếm Sản phẩm (product_search_keyword) hiện đang TẮT. Tuyệt đối ĐỂ TRỐNG trường này. Tuy nhiên, nếu trong RAG có hình ảnh sẵn, bạn VẪN PHẢI tuân thủ Quy tắc gửi ảnh (sao chép vào image_urls) như bình thường."
-    else:
-        extra_rules = "\nLƯU Ý: Tính năng kết nối Sản phẩm đang BẬT. Nếu khách hàng muốn xem mẫu/ảnh, HÃY SỬ DỤNG trường `product_search_keyword` để tìm và gửi ảnh, đồng thời báo với khách trong câu trả lời là bạn đang gửi ảnh mẫu cho họ xem."
-
-    extra_rules += MANDATORY_IMAGE_RULE
-
     system_prompt = f"""Bạn là {agent.name}. {agent.system_prompt}
 Bạn đang chat với khách hàng (thông tin context bổ sung: {lead_name}).
-{core_rules}{extra_rules}
+{core_rules}
 TRẢ LỜI BẮT BUỘC THEO ĐỊNH DẠNG JSON SAU (chỉ trả về JSON thuần túy, không bọc trong ```json...```):
 {json_template}"""
 
