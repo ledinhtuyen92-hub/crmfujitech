@@ -21,6 +21,7 @@ export default function AiKnowledgeBase() {
   const [imageDetails, setImageDetails] = useState({})
   const [selectedImageIds, setSelectedImageIds] = useState([])
   const [bulkInput, setBulkInput] = useState({ title: '', content: '' })
+  const [editDeletedImageIds, setEditDeletedImageIds] = useState([])
   const [submitting, setSubmitting] = useState(false)
   const [manualSyncing, setManualSyncing] = useState(false)
   const [companySettings, setCompanySettings] = useState(null)
@@ -357,6 +358,31 @@ export default function AiKnowledgeBase() {
 
   const handleEdit = (record) => {
     setCurrentDoc(record)
+
+    if (record.doc_type === 'image') {
+      const children = record.isGroup ? record.children : [record]
+      const initialFileList = children.map(child => ({
+        uid: child.id,
+        name: child.title || 'image.jpg',
+        status: 'done',
+        url: child.file_attachment || child.file_url,
+        isExisting: true,
+        originDoc: child
+      }))
+      setFileList(initialFileList)
+
+      const initialDetails = {}
+      children.forEach(child => {
+        initialDetails[child.id] = {
+          title: child.title,
+          content: child.content
+        }
+      })
+      setImageDetails(initialDetails)
+      setEditDeletedImageIds([])
+      setSelectedImageIds([])
+      setBulkInput({ title: '', content: '' })
+    }
     
     let qa_list = [];
     if (record.doc_type === 'qa') {
@@ -414,7 +440,37 @@ export default function AiKnowledgeBase() {
   const handleSaveEdit = async (values) => {
     setEditSubmitting(true)
     try {
-      if (currentDoc.doc_type === 'qa' && values.qa_list) {
+      if (currentDoc.doc_type === 'image') {
+        if (editDeletedImageIds.length > 0) {
+          await Promise.all(editDeletedImageIds.map(id => api.delete(`/ai_agents/knowledge/${id}/`)))
+        }
+
+        const promises = fileList.map(file => {
+          const details = imageDetails[file.uid] || {}
+          if (!details.title) {
+            throw new Error(`Vui lòng nhập tên/tiêu đề cho ảnh: ${file.name}`)
+          }
+
+          if (file.isExisting) {
+            return api.patch(`/ai_agents/knowledge/${file.originDoc.id}/`, {
+              title: details.title,
+              content: details.content || '',
+              agent: values.agent
+            })
+          } else {
+            const formData = new FormData()
+            formData.append('title', details.title)
+            formData.append('agent', values.agent)
+            formData.append('doc_type', 'image')
+            formData.append('file_attachment', file.originFileObj || file)
+            if (details.content) {
+              formData.append('content', details.content)
+            }
+            return api.postForm('/ai_agents/knowledge/', formData)
+          }
+        })
+        await Promise.all(promises)
+      } else if (currentDoc.doc_type === 'qa' && values.qa_list) {
         let uploadedQaList = [];
         for (const qa of (values.qa_list || [])) {
           let answerText = qa.answer || '';
@@ -1434,13 +1490,15 @@ export default function AiKnowledgeBase() {
           layout="vertical"
           onFinish={handleSaveEdit}
         >
-          <Form.Item
-            name="title"
-            label="Tiêu đề tài liệu"
-            rules={[{ required: true, message: 'Vui lòng nhập tiêu đề' }]}
-          >
-            <Input disabled={currentDoc?.title?.endsWith('(Auto)')} />
-          </Form.Item>
+          {currentDoc?.doc_type !== 'image' && (
+            <Form.Item
+              name="title"
+              label="Tiêu đề tài liệu"
+              rules={[{ required: true, message: 'Vui lòng nhập tiêu đề' }]}
+            >
+              <Input disabled={currentDoc?.title?.endsWith('(Auto)')} />
+            </Form.Item>
+          )}
 
           <Form.Item
             name="agent"
@@ -1522,13 +1580,138 @@ export default function AiKnowledgeBase() {
               )}
             </Form.List>
           ) : (currentDoc?.doc_type === 'image') ? (
-            <Form.Item
-              name="content"
-              label="Nội dung / Mô tả Kiến thức"
-              extra="Lưu ý: Thay đổi nội dung sẽ yêu cầu AI phải học lại từ đầu."
-            >
-              <Input.TextArea rows={6} />
-            </Form.Item>
+            <>
+              <Form.Item label={
+                <span>
+                  📷 Ảnh mẫu cần học&nbsp;
+                  <Text type="secondary" style={{ fontSize: 12 }}>(.jpg, .jpeg, .png, .webp)</Text>
+                </span>
+              }>
+                <Upload
+                  multiple={true}
+                  beforeUpload={(file) => {
+                    const newFileList = [...fileList, file]
+                    setFileList(newFileList)
+                    const newDetails = { ...imageDetails }
+                    newFileList.forEach(f => {
+                      if (!newDetails[f.uid]) {
+                        newDetails[f.uid] = { title: '', content: '' }
+                      }
+                    })
+                    setImageDetails(newDetails)
+                    return false
+                  }}
+                  showUploadList={false}
+                  onChange={({ fileList: newFileList }) => setFileList(newFileList)}
+                  fileList={fileList}
+                  accept=".jpg,.jpeg,.png,.webp"
+                >
+                  <Button icon={<UploadOutlined />}>Thêm ảnh tải lên</Button>
+                </Upload>
+              </Form.Item>
+
+              {fileList.length > 0 && (
+                <div style={{ marginTop: 16, maxHeight: 400, overflowY: 'auto', paddingRight: 8 }}>
+                     {fileList.length > 1 && (
+                       <div style={{ marginBottom: 12, padding: 12, background: '#e6f7ff', borderRadius: 8, border: '1px solid #91d5ff' }}>
+                         <div style={{ marginBottom: 8 }}>
+                           <Text strong style={{ color: '#096dd9' }}>💡 Nhập nhanh chung cho nhiều góc chụp của 1 sản phẩm:</Text>
+                         </div>
+                         <div style={{ display: 'flex', gap: 8, alignItems: 'flex-start' }}>
+                           <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 8 }}>
+                             <Input 
+                               placeholder="Tiêu đề chung..." 
+                               value={bulkInput.title}
+                               onChange={e => setBulkInput({...bulkInput, title: e.target.value})}
+                             />
+                             <Input.TextArea 
+                               rows={2} 
+                               placeholder="Mô tả / Kịch bản tư vấn chung..." 
+                               value={bulkInput.content}
+                               onChange={e => setBulkInput({...bulkInput, content: e.target.value})}
+                             />
+                           </div>
+                           <Button 
+                             type="primary" 
+                             style={{ height: 'auto', padding: '24px 16px' }}
+                             onClick={() => {
+                               const targetIds = selectedImageIds.length > 0 ? selectedImageIds : fileList.map(f => f.uid);
+                               const newDetails = { ...imageDetails };
+                               targetIds.forEach(uid => {
+                                 newDetails[uid] = { 
+                                   title: bulkInput.title || newDetails[uid]?.title || '', 
+                                   content: bulkInput.content || newDetails[uid]?.content || '' 
+                                 };
+                               });
+                               setImageDetails(newDetails);
+                               setSelectedImageIds([]);
+                               message.success(selectedImageIds.length > 0 ? `Đã áp dụng chung cho ${selectedImageIds.length} ảnh được chọn!` : 'Đã áp dụng chung cho tất cả ảnh!');
+                             }}
+                           >
+                             {selectedImageIds.length > 0 ? `Áp dụng cho ${selectedImageIds.length} ảnh đang chọn` : 'Áp dụng tất cả'}
+                           </Button>
+                         </div>
+                       </div>
+                     )}
+                     {fileList.map((file) => {
+                       let src = '';
+                       if (file.originFileObj) {
+                         src = URL.createObjectURL(file.originFileObj);
+                       } else if (file.url) {
+                         src = file.url;
+                       }
+                       
+                       return (
+                         <Card key={file.uid} size="small" style={{ marginBottom: 12, background: selectedImageIds.includes(file.uid) ? '#f0f5ff' : '#fafafa', border: selectedImageIds.includes(file.uid) ? '1px solid #1890ff' : '1px solid #e8e8e8' }}>
+                           <div style={{ display: 'flex', gap: 16 }}>
+                             <div style={{ display: 'flex', alignItems: 'center' }}>
+                               <Checkbox 
+                                 checked={selectedImageIds.includes(file.uid)} 
+                                 onChange={(e) => {
+                                   if (e.target.checked) {
+                                     setSelectedImageIds([...selectedImageIds, file.uid])
+                                   } else {
+                                     setSelectedImageIds(selectedImageIds.filter(id => id !== file.uid))
+                                   }
+                                 }}
+                               />
+                             </div>
+                             <div style={{ width: 100, height: 100, flexShrink: 0, overflow: 'hidden', borderRadius: 6, border: '1px solid #d9d9d9', position: 'relative' }}>
+                               <img src={src.startsWith('http') || src.startsWith('blob') ? src : `${(import.meta.env.VITE_API_URL || 'http://localhost:8000/api/').replace('/api', '')}${src}`} alt="thumb" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                               <Button 
+                                 type="primary" 
+                                 danger 
+                                 size="small" 
+                                 icon={<DeleteOutlined />} 
+                                 style={{ position: 'absolute', top: 4, right: 4 }}
+                                 onClick={() => {
+                                   setFileList(fileList.filter(f => f.uid !== file.uid));
+                                   if (file.isExisting) {
+                                     setEditDeletedImageIds(prev => [...prev, file.uid]);
+                                   }
+                                 }}
+                               />
+                             </div>
+                             <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 8 }}>
+                               <Input 
+                                 placeholder="* Tên sản phẩm / Tiêu đề ảnh (Bắt buộc)..." 
+                                 value={imageDetails[file.uid]?.title}
+                                 onChange={e => setImageDetails({...imageDetails, [file.uid]: {...imageDetails[file.uid], title: e.target.value}})}
+                               />
+                               <Input.TextArea 
+                                 rows={2}
+                                 placeholder="Mô tả / Kịch bản tư vấn..." 
+                                 value={imageDetails[file.uid]?.content}
+                                 onChange={e => setImageDetails({...imageDetails, [file.uid]: {...imageDetails[file.uid], content: e.target.value}})}
+                               />
+                             </div>
+                           </div>
+                         </Card>
+                       )
+                     })}
+                   </div>
+                 )}
+            </>
           ) : null}
 
           <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 24 }}>
