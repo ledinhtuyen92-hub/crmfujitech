@@ -728,7 +728,10 @@ export default function FacebookInboxPage() {
             setSelectedLead(res.data)
             fetchMessages(res.data)
           }
-        }).catch(err => console.error(err))
+        }).catch(err => {
+          console.error(err)
+          message.error('Bạn không có quyền hoặc hội thoại không tồn tại!')
+        })
     }
   }, [location.state?.selectedLeadId])
 

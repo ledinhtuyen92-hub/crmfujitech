@@ -467,7 +467,10 @@ export default function ZaloInboxPage() {
           if (res.data) {
             setSelectedLead(res.data)
           }
-        }).catch(err => console.error(err))
+        }).catch(err => {
+          console.error(err)
+          message.error('Bạn không có quyền hoặc hội thoại không tồn tại!')
+        })
     }
   }, [location.state?.selectedLeadId])
 
