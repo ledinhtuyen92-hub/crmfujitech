@@ -269,11 +269,18 @@ def smart_extract_address(text: str):
                         CHAT_EXCLUSIONS = [
                             'ko ak', 'được ko', 'khi nào', 'hay sao vậy', 'muốn mua', 'hết hàng',
                             'giá bao nhiêu', 'bán cho', 'lít mật ong', 'kg ', 'gram ',
-                            # Thêm các câu hỏi phổ biến về sản phẩm hay vận chuyển
+                            # Câu vận chuyển / hỏi ship
                             'ship đi', 'ship tới', 'giao đi', 'giao tới', 'giao tỉnh', 'ship tỉnh',
                             'bao nhiêu tiền', 'giá bộ', 'giá sản phẩm', 'giá sp',
                             'có giao không', 'có ship không', 'freeship', 'free ship',
-                            'bao tiền', 'giá bao', 'tư vấn', 'hỏi thăm', 'cần tư vấn'
+                            'bao tiền', 'giá bao', 'tư vấn', 'hỏi thăm', 'cần tư vấn',
+                            # Câu cảm ơn / hội thoại xã giao (AI/page hay gửi, match nhầm 'ấp ')
+                            'cảm ơn', 'xin chào', 'chào anh', 'chào chị', 'chào bạn',
+                            'đã cung cấp', 'đã nhận', 'đã tiếp nhận', 'đã ghi nhận',
+                            'sẽ liên hệ', 'sẽ tư vấn', 'sẽ hỗ trợ',
+                            'chuyển cho bộ phận', 'bộ phận kinh doanh', 'nhân viên',
+                            'vui lòng', 'anh ơi', 'chị ơi', 'bạn ơi',
+                            'thông tin', 'nhanh nhất',
                         ]
                         if not any(w in sent_low for w in CHAT_EXCLUSIONS):
                             extracted_segments.append(clean_addr)
