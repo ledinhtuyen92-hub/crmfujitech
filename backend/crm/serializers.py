@@ -59,6 +59,7 @@ class AssignedUserSerializer(serializers.Serializer):
 
 class CustomerSerializer(serializers.ModelSerializer):
     source = serializers.CharField(max_length=100, required=False, allow_blank=True, allow_null=True)
+    social_lead_id = serializers.IntegerField(source="social_lead.id", read_only=True, allow_null=True)
     contacts = CustomerContactSerializer(many=True, read_only=True)
     interactions = CustomerInteractionSerializer(many=True, read_only=True)
     tags = CustomerTagSerializer(many=True, read_only=True)
@@ -104,6 +105,7 @@ class CustomerSerializer(serializers.ModelSerializer):
             "expected_quantity",
             "source",
             "source_display",
+            "social_lead_id",
             "status",
             "status_display",
             "priority_level",
@@ -127,7 +129,7 @@ class CustomerSerializer(serializers.ModelSerializer):
         read_only_fields = [
             "id", "company", "contacts", "interactions", "tags",
             "assigned_to", "assigned_to_name", "created_by", "created_by_name",
-            "status_display", "source_display",
+            "status_display", "source_display", "social_lead_id",
             "created_at", "updated_at",
         ]
 

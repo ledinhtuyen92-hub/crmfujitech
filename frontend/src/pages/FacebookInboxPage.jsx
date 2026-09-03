@@ -68,6 +68,8 @@ import { useEffect, useRef, useState } from 'react'
 import { useAuth } from '../contexts/AuthContext'
 import api from '../utils/api'
 
+import { useLocation } from 'react-router-dom'
+
 const cleanUrl = (url) => {
   if (!url) return '';
   try {
@@ -451,6 +453,7 @@ function MessageBubble({ msg, lead, showAvatar = true }) {
 }
 
 export default function FacebookInboxPage() {
+  const location = useLocation()
   const { token } = theme.useToken()
   const { user, maintenanceMode, hasPermission, isCompanyAdmin } = useAuth()
   const { isMobile } = useResponsive()
@@ -716,6 +719,18 @@ export default function FacebookInboxPage() {
     const interval = setInterval(() => { fetchLeads(true) }, 3000)
     return () => clearInterval(interval)
   }, [selectedPage, hasPhoneOnly, phoneFilterMode, statusFilter, hasUnreadOnly, isArchivedOnly, replyFilter, sortBy, isStarredOnly, tagFilter, assignedToFilter])
+
+  useEffect(() => {
+    if (location.state?.selectedLeadId) {
+      api.get(`/facebook/leads/${location.state.selectedLeadId}/`)
+        .then(res => {
+          if (res.data) {
+            setSelectedLead(res.data)
+            fetchMessages(res.data)
+          }
+        }).catch(err => console.error(err))
+    }
+  }, [location.state?.selectedLeadId])
 
   useEffect(() => {
     if (selectedLead?.id) {

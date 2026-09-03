@@ -725,9 +725,24 @@ function CustomerList() {
         const sourceLabel = SOURCE_MAP[record.source] || record.source || '—'
         const sourceIcon = SOURCE_ICON[record.source] || '✏️'
         const creator = record.created_by?.full_name || record.created_by?.username
+        const isSocial = record.source === 'facebook' || record.source === 'zalo'
+        const canNavigate = isSocial && record.social_lead_id
+        
         return (
           <Space direction="vertical" size={0}>
-            <Text>
+            <Text 
+              style={{
+                cursor: canNavigate ? 'pointer' : 'default',
+                color: canNavigate ? '#1677ff' : 'inherit',
+                transition: 'all 0.2s',
+              }}
+              onClick={() => {
+                if (canNavigate) {
+                  navigate(`/${record.source}/inbox`, { state: { selectedLeadId: record.social_lead_id } })
+                }
+              }}
+              className={canNavigate ? "hover-underline" : ""}
+            >
               <span style={{ marginRight: 5 }}>{sourceIcon}</span>
               {sourceLabel}
             </Text>

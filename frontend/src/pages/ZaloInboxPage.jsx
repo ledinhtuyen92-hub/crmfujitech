@@ -4,6 +4,7 @@ import {
   Row, Select, Space, Spin, Switch, Tag, Tooltip, Typography, Form, message, Upload,
   Tabs, Radio, Popover, theme
 } from 'antd'
+import { useLocation } from 'react-router-dom'
 import {
   CheckCircleOutlined, CloseOutlined, MessageOutlined,
   PhoneOutlined, ReloadOutlined, SearchOutlined,
@@ -210,6 +211,7 @@ function LeadListItem({ lead, selected, onClick }) {
 
 // ── Main Page Component ───────────────────────────────────────────────────────
 export default function ZaloInboxPage() {
+  const location = useLocation()
   const { token } = theme.useToken()
   const { user, isCompanyAdmin, maintenanceMode, hasPermission } = useAuth()
   const { isMobile } = useResponsive()
@@ -457,6 +459,17 @@ export default function ZaloInboxPage() {
     const interval = setInterval(() => { fetchLeads(true) }, 3000)
     return () => clearInterval(interval)
   }, [fetchLeads])
+
+  useEffect(() => {
+    if (location.state?.selectedLeadId) {
+      api.get(`/zalo/social-leads/${location.state.selectedLeadId}/`)
+        .then(res => {
+          if (res.data) {
+            setSelectedLead(res.data)
+          }
+        }).catch(err => console.error(err))
+    }
+  }, [location.state?.selectedLeadId])
 
   useEffect(() => {
     if (selectedLead?.id) {
