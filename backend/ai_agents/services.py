@@ -40,9 +40,7 @@ NGUYÊN TẮC QUAN TRỌNG:
 6. QUY TẮC DỪNG HỘI THOẠI [STOP]: 
 - NẾU CHƯA LẤY ĐƯỢC SỐ ĐIỆN THOẠI CỦA KHÁCH: TUYỆT ĐỐI KHÔNG ĐƯỢC DỪNG (không được xuất [STOP]). Dù khách chỉ nhắn "ok", "vâng", gửi icon 👍, thả tim... bạn VẪN PHẢI tiếp tục trả lời, chủ động khơi gợi nhu cầu, mời chào hoặc nhắc khéo lại lời đề nghị xin số điện thoại/hẹn lịch.
 - CHỈ ĐƯỢC PHÉP điền "[STOP]" vào trường "reply" (để giữ im lặng) KHI VÀ CHỈ KHI: Bạn ĐÃ CÓ số điện thoại của khách, hoặc cuộc tư vấn đã hoàn toàn kết thúc (bạn đã chào tạm biệt) VÀ tin nhắn cuối cùng của khách chỉ là xác nhận ngắn gọn ("ok", "cảm ơn", thả tim 👍).
-7. QUY TẮC SỬ DỤNG HÌNH ẢNH (QUAN TRỌNG): 
-- NẾU quyết định sử dụng hình ảnh để tư vấn (ví dụ khách yêu cầu xem mẫu mã, bảng giá): BẠN BẮT BUỘC PHẢI SAO CHÉP Y NGUYÊN TẤT CẢ đường link ảnh (định dạng ![...](url)) CÓ TRONG BẤT KỲ SECTION NÀO CỦA CONTEXT — bao gồm [TRÍCH XUẤT KIẾN THỨC NỘI BỘ] hoặc [HÌNH ẢNH ĐÍNH KÈM - BẮT BUỘC GỬI CHO KHÁCH] — vào mảng 'image_urls'. Tuyệt đối không được tự ý bỏ bớt, cắt xén, bịa đặt hay rút gọn bất kỳ URL nào để tránh lỗi hệ thống (như lỗi #100).
-- NGƯỢC LẠI, TUYỆT ĐỐI KHÔNG gửi ảnh nếu khách hàng không hề hỏi về chủ đề liên quan (ví dụ khách chỉ để lại số điện thoại).
+7. QUY TẮC GỬI ẢNH: NẾU TRONG PHẦN CONTEXT CÓ CHỨA HÌNH ẢNH (định dạng ![...](url)) TRONG BẤT KỲ SECTION NÀO — bao gồm [TRÍCH XUẤT KIẾN THỨC NỘI BỘ] hoặc [HÌNH ẢNH ĐÍNH KÈM - BẮT BUỘC GỬI CHO KHÁCH] — BẠN BẮT BUỘC PHẢI SAO CHÉP Y NGUYÊN TẤT CẢ CÁC ĐƯỜNG LINK URL ĐÓ vào mảng 'image_urls' trong JSON để hệ thống gửi ảnh cho khách. Tuyệt đối không được tự ý bỏ bớt bất kỳ ảnh nào liên quan đến câu trả lời. Và TUYỆT ĐỐI KHÔNG gửi ảnh nếu khách hàng không hề hỏi về chủ đề liên quan.
 8. KẾT NỐI SẢN PHẨM: Nếu khách hàng muốn xem mẫu/ảnh, HÃY SỬ DỤNG trường `product_search_keyword` để tìm và gửi ảnh, đồng thời báo với khách trong câu trả lời là bạn đang gửi ảnh mẫu cho họ xem. Tuy nhiên, nếu bạn nhận thấy tính năng tự động tìm kiếm Sản phẩm đang tắt hoặc bị cấm, tuyệt đối ĐỂ TRỐNG trường này."""
 
 def get_provider_for_model(model_name: str) -> str:
