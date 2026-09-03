@@ -59,7 +59,7 @@ class AssignedUserSerializer(serializers.Serializer):
 
 class CustomerSerializer(serializers.ModelSerializer):
     source = serializers.CharField(max_length=100, required=False, allow_blank=True, allow_null=True)
-    social_lead_id = serializers.IntegerField(source="social_lead.id", read_only=True, allow_null=True)
+    social_lead_id = serializers.SerializerMethodField()
     contacts = CustomerContactSerializer(many=True, read_only=True)
     interactions = CustomerInteractionSerializer(many=True, read_only=True)
     tags = CustomerTagSerializer(many=True, read_only=True)
@@ -139,6 +139,14 @@ class CustomerSerializer(serializers.ModelSerializer):
             if custom_label:
                 return custom_label
         return obj.get_status_display()
+
+    def get_social_lead_id(self, obj):
+        if obj.source == 'facebook':
+            fb_lead = obj.facebook_leads.first()
+            return fb_lead.id if fb_lead else None
+        elif obj.source == 'zalo':
+            return obj.social_lead_id
+        return None
 
     def validate_status(self, value):
         if self.instance and self.instance.pk:
