@@ -22,8 +22,8 @@ DEFAULT_JSON_TEMPLATE = """{
     "product_search_keyword": "BẮT BUỘC ĐIỀN TỪ KHÓA NẾU KHÁCH YÊU CẦU 'gửi ảnh', 'cho xem VÀI MẪU'. LƯU Ý: Phải điền CHÍNH XÁC và ĐẦY ĐỦ tên dòng sản phẩm (VD: 'Cửa composite 1 cánh', 'Tủ lạnh Samsung Inverter') thay vì điền chung chung ('Cửa', 'Tủ lạnh') để tránh hệ thống gửi nhầm sang các phụ kiện. Nếu không cần tìm ảnh thì ĐỂ TRỐNG.",
     "image_urls": ["Điền danh sách CÁC ĐƯỜNG LINK ẢNH (được cung cấp trong RAG dưới dạng ![...](url)) mà bạn muốn gửi cho khách. NẾU KHÔNG CÓ THÌ ĐỂ RỖNG []"],
     "extracted_info": {
-        "phone": "Trích xuất SĐT nếu có (nếu không có thì để rỗng)",
-        "address": "Trích xuất địa chỉ nếu có (nếu không có thì để rỗng)",
+        "phone": "Trích xuất SĐT nếu KHÁCH cung cấp (nếu không có thì để rỗng)",
+        "address": "Trích xuất địa chỉ giao hàng/nhà riêng nếu KHÁCH cung cấp. CHỈ điền khi là địa chỉ THỰC SỰ (có số nhà, tên đường, phường/quận...). TUYỆT ĐỐI không điền câu hội thoại, câu cảm ơn hay câu hỏi vào đây. Nếu không rõ ràng là địa chỉ thì để rỗng",
         "notes": "Ghi chú (size, màu sắc, mã sản phẩm cần tư vấn...)"
     },
     "tags": ["Hỏi giá", "Khách VIP", "Đã chốt"...],

@@ -1256,8 +1256,9 @@ def async_extract_contact_info_hybrid(lead_id, text, platform, company_id):
             raise Exception("No active AI agent found for company")
             
         prompt = (
-            "Bạn là trợ lý ảo bóc tách dữ liệu. Hãy đọc đoạn tin nhắn sau do khách hàng gửi và trích xuất "
-            "Ra Số điện thoại và Địa chỉ giao hàng/nhà riêng nếu có.\n"
+            "Bạn là trợ lý ảo bóc tách dữ liệu. Hãy đọc đoạn tin nhắn sau do KHÁCH HÀNG gửi và trích xuất:\n"
+            "- Số điện thoại Việt Nam (nếu có)\n"
+            "- Địa chỉ giao hàng / nhà riêng của khách (nếu có). CHỄ điền nếu là địa chỉ THỰC SỰ (có số nhà, tên đường, phường/xã, quậnhuyện, thành phố/tỉnh). TUYETN ĐỐI KHNG điền các câu hội thoại, câu hỏi, câu cảm ơn hay cụm từ không phải địa chỉ vào trường address.\n"
             "Chỉ trả về 1 chuỗi JSON hợp lệ với định dạng chính xác sau (không thêm bất kỳ ký tự hay dấu markdown nào khác):\n"
             '{"phone": "...", "address": "..."}\n'
             "Nếu không có thông tin thì để giá trị là chuỗi rỗng \"\".\n\n"
@@ -1315,6 +1316,41 @@ def async_extract_contact_info_hybrid(lead_id, text, platform, company_id):
             except:
                 pass
 
+def _is_valid_extracted_address(address: str) -> bool:
+    """
+    Kiểm tra xem chuỗi AI trả về có thực sự là một địa chỉ không.
+    Loại bỏ các câu hội thoại, câu cảm ơn, câu hỏi bị AI trích nhầm.
+    """
+    if not address or len(address) < 6:
+        return False
+    addr_lower = address.lower()
+
+    # Phải chứa ít nhất 1 từ khóa địa lý rõ ràng
+    geo_keywords = [
+        'số ', 'ngõ', 'ngách', 'hẻm', 'đường ', 'phố ', 'phường', 'p.',
+        'quận', 'q.', 'huyện', 'h.', 'xã', 'tỉnh ', 'thành phố', 'tp.',
+        'khu ', 'chung cư', 'tòa ', 'tầng ', 'block', 'hà nội', 'tphcm',
+        'tp hcm', 'hồ chí minh', 'sài gòn', 'đà nẵng', 'cần thơ',
+        'hải phòng', 'bình dương', 'đồng nai', 'thôn ', 'xóm ', 'ấp ',
+        'địa chỉ', 'đ/c', 'd/c', 'đc:', 'dc:',
+    ]
+
+    # Loại bỏ các câu hội thoại bị AI trích nhầm
+    chat_exclusions = [
+        'cảm ơn', 'xin chào', 'chào bạn', 'chào anh', 'chào chị',
+        'đã nhận', 'đã cung cấp', 'đã có', 'sẽ tư vấn', 'sẽ liên hệ',
+        'vui lòng', 'bạn ơi', 'anh ơi', 'chị ơi', 'em xin', 'em sẽ',
+        'tôi muốn', 'cần tư vấn', 'hỏi thăm', 'không có', 'chưa có',
+        'bao nhiêu', 'giá cả', 'cho hỏi', 'muốn mua', 'cơ sở bạn',
+        'cơ sở ở', 'ở đâu', 'bên mình', 'shop ở', 'liên hệ ngay',
+        'chuyển cho bộ phận', 'kiệm doanh', 'nhanh nhất',
+    ]
+
+    has_geo = any(kw in addr_lower for kw in geo_keywords)
+    has_chat = any(exc in addr_lower for exc in chat_exclusions)
+    return has_geo and not has_chat
+
+
 def _apply_extracted_info(lead, phone, email, address, platform):
     """ Hàm dùng chung để apply kết quả AI vào Lead và tạo Customer """
     updated = False
@@ -1323,7 +1359,7 @@ def _apply_extracted_info(lead, phone, email, address, platform):
         lead.detected_email = email
         updated = True
 
-    if address and isinstance(address, str) and (lead.detected_address != address) and len(address) > 5:
+    if address and isinstance(address, str) and (lead.detected_address != address) and _is_valid_extracted_address(address):
         lead.detected_address = address
         updated = True
 
