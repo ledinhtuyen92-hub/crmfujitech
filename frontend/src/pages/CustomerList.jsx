@@ -158,7 +158,15 @@ function CustomerList() {
   const DEFAULT_COLUMNS = ['name', 'contact', 'source', 'address', 'status', 'priority_level', 'expected_quantity', 'tags', 'assigned_to', 'actions']
   const [visibleColumns, setVisibleColumns] = useState(() => {
     const saved = localStorage.getItem('customerListVisibleColumns')
-    return saved ? JSON.parse(saved) : DEFAULT_COLUMNS
+    if (saved) {
+      const parsed = JSON.parse(saved)
+      // Migration: ensure expected_quantity is present if not previously saved
+      if (!parsed.includes('expected_quantity')) {
+        return [...parsed.filter(c => c !== 'actions'), 'expected_quantity', 'actions']
+      }
+      return parsed
+    }
+    return DEFAULT_COLUMNS
   })
 
   useEffect(() => {
@@ -770,14 +778,14 @@ function CustomerList() {
         )
       }
     },
-    ...(globalHasExpectedQuantity ? [{
+    {
       title: 'Số lượng SP dự kiến',
       dataIndex: 'expected_quantity',
       key: 'expected_quantity',
       sorter: true,
       align: 'center',
-      render: (val) => val ? <Text strong>{val} SP</Text> : null
-    }] : []),
+      render: (val) => val ? <Text strong>{val} SP</Text> : <Text type="secondary">—</Text>
+    },
     ...(allTags.length > 0 ? [{
       title: 'Tags',
       key: 'tags',
@@ -1057,7 +1065,7 @@ function CustomerList() {
                       { label: 'Địa chỉ', value: 'address' },
                       { label: 'Trạng thái', value: 'status' },
                       { label: 'Mức độ ưu tiên', value: 'priority_level' },
-                      ...(globalHasExpectedQuantity ? [{ label: 'Số lượng SP dự kiến', value: 'expected_quantity' }] : []),
+                      { label: 'Số lượng SP dự kiến', value: 'expected_quantity' },
                       ...(allTags.length > 0 ? [{ label: 'Tags', value: 'tags' }] : []),
                       { label: 'Phụ trách (Sale)', value: 'assigned_to' },
                       { label: 'Thao tác', value: 'actions' },
