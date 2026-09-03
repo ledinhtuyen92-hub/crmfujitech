@@ -538,6 +538,9 @@ def get_fb_user_profile(page_access_token: str, psid: str) -> dict:
                 import time
                 time.sleep(1)
                 continue
+            else:
+                logger.error(f"[Facebook] Graph API Error getting profile for {psid}: {data.get('error')}")
+                break
         except Exception as e:
             logger.error(f"[Facebook] Error getting user profile for {psid} (attempt {attempt+1}): {e}")
             if attempt < max_retries - 1:
@@ -1180,7 +1183,7 @@ def sync_lead_messages(lead, limit_messages: int = 100) -> dict:
     conv_url = f"{FB_GRAPH_API_BASE}/{page_id}/conversations"
     conv_params = {
         "user_id": psid,
-        "fields": "id,updated_time,snippet,unread_count",
+        "fields": "id,updated_time,snippet,unread_count,participants",
         "access_token": token,
         "limit": 1,
     }
@@ -1190,19 +1193,37 @@ def sync_lead_messages(lead, limit_messages: int = 100) -> dict:
         resp_data = resp.json()
         convs = resp_data.get("data", [])
         if convs:
-            conv_id = convs[0].get("id")
+            conv = convs[0]
+            conv_id = conv.get("id")
+            
+            # Khôi phục Tên nếu bị thiếu
+            if lead.fb_user_name and lead.fb_user_name.startswith("FB "):
+                participants = conv.get("participants", {}).get("data", [])
+                for p in participants:
+                    if str(p.get("id")) == str(psid) and p.get("name"):
+                        lead.fb_user_name = p.get("name")
+                        break
+
             # Cập nhật metadata hội thoại nếu có
-            upd_str = convs[0].get("updated_time")
-            snippet = convs[0].get("snippet", "")
-            unread_cnt = int(convs[0].get("unread_count", 0) or 0)
+            upd_str = conv.get("updated_time")
+            snippet = conv.get("snippet", "")
+            unread_cnt = int(conv.get("unread_count", 0) or 0)
             upd_dt = parse_datetime(upd_str) if upd_str else None
+            
+            update_fields = []
+            if lead.fb_user_name and lead.fb_user_name.startswith("FB ") == False:
+                update_fields.append("fb_user_name")
+                
             if upd_dt and (not lead.last_message_at or upd_dt > lead.last_message_at):
                 lead.last_message_at = upd_dt
                 if snippet:
                     lead.last_message_preview = snippet[:255]
                 lead.has_unread_message = (unread_cnt > 0)
                 lead.unread_count = unread_cnt
-                lead.save(update_fields=["last_message_at", "last_message_preview", "has_unread_message", "unread_count"])
+                update_fields.extend(["last_message_at", "last_message_preview", "has_unread_message", "unread_count"])
+            
+            if update_fields:
+                lead.save(update_fields=update_fields)
         else:
             logger.warning(f"[SyncLeadMessages] Không tìm thấy conversation_id cho PSID={psid}")
     except Exception as e:
@@ -1242,6 +1263,12 @@ def sync_lead_messages(lead, limit_messages: int = 100) -> dict:
             from_id = str(m_from.get("id", ""))
             s_type = "customer" if (from_id and str(from_id) == str(psid)) else "page"
             m_text = m_item.get("message", "")
+            
+            # Cập nhật tên nếu vẫn thiếu
+            if s_type == "customer" and lead.fb_user_name.startswith("FB "):
+                if m_from.get("name"):
+                    lead.fb_user_name = m_from.get("name")
+                    lead.save(update_fields=["fb_user_name"])
 
             # Xử lý đính kèm
             att_url = None
