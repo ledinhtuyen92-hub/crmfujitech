@@ -338,6 +338,9 @@ def process_ai_reply_zalo(lead_id, is_followup=False, trigger_msg_id=None):
 
         if not reply_text and not unique_images and result.get('reply') == '[STOP]':
             logger.info(f"[AI Zalo] AI decided to stop conversing for lead {lead.id}")
+            if is_followup:
+                lead.has_ai_followed_up = True
+                lead.save(update_fields=['has_ai_followed_up'])
             return
             
         # Check for function calling (product search)
@@ -449,11 +452,13 @@ def process_ai_reply_zalo(lead_id, is_followup=False, trigger_msg_id=None):
                 lead.unread_count = 0
                 update_fields.extend(['has_unread_message', 'unread_count'])
                 
-            if is_followup:
-                lead.has_ai_followed_up = True
-                update_fields.append('has_ai_followed_up')
             if update_fields:
                 lead.save(update_fields=update_fields)
+                
+        # Đánh dấu đã gửi follow-up (cho cả trường hợp thành công hoặc lỗi)
+        if is_followup:
+            lead.has_ai_followed_up = True
+            lead.save(update_fields=['has_ai_followed_up'])
     except Exception as e:
         logger.error(f'Zalo AI Task Error: {e}')
 
@@ -647,6 +652,9 @@ def process_ai_reply_facebook(lead_id, is_followup=False, trigger_msg_id=None):
 
         if not reply_text and not unique_images and result.get('reply') == '[STOP]':
             logger.info(f"[AI Facebook] AI decided to stop conversing for lead {lead.id}")
+            if is_followup:
+                lead.has_ai_followed_up = True
+                lead.save(update_fields=['has_ai_followed_up'])
             return
             
         if reply_text or unique_images:
@@ -690,6 +698,9 @@ def process_ai_reply_facebook(lead_id, is_followup=False, trigger_msg_id=None):
                 sender_role="ai",
                 sender_name="Trợ lý AI",
             )
+            if is_followup:
+                lead.has_ai_followed_up = True
+                lead.save(update_fields=['has_ai_followed_up'])
             return
 
         update_fields = []
@@ -782,11 +793,13 @@ def process_ai_reply_facebook(lead_id, is_followup=False, trigger_msg_id=None):
                 lead.unread_count = 0
                 update_fields.extend(['has_unread_message', 'unread_count'])
                 
-            if is_followup:
-                lead.has_ai_followed_up = True
-                update_fields.append('has_ai_followed_up')
             if update_fields:
                 lead.save(update_fields=update_fields)
+                
+        # Đánh dấu đã gửi follow-up (cho cả trường hợp thành công hoặc lỗi)
+        if is_followup:
+            lead.has_ai_followed_up = True
+            lead.save(update_fields=['has_ai_followed_up'])
     except Exception as e:
         logger.error(f'Facebook AI Task Error: {e}')
 
@@ -841,6 +854,8 @@ def ai_drip_followup():
             if not last_msg or last_msg.direction != ZaloMessage.DIRECTION_OUTBOUND:
                 logger.info(f"[AI FollowUp] Bỏ qua Zalo {lead.social_id}: tin cuối là của khách, không phải OA")
                 continue
+            if getattr(last_msg, 'sender_role', '') == 'sale':
+                pass # Vẫn cho phép follow-up kể cả khi Sale nhắn tin cuối cùng
             logger.info(f"[AI FollowUp] Trigger Zalo Follow-up cho {lead.social_id} sau {hours}h")
             trigger_zalo_ai(lead.id, is_followup=True)
 
@@ -862,6 +877,8 @@ def ai_drip_followup():
             if not last_msg or last_msg.sender_type == 'customer':
                 logger.info(f"[AI FollowUp] Bỏ qua Facebook {lead.fb_user_id}: tin cuối là của khách, không phải Page")
                 continue
+            if getattr(last_msg, 'sender_role', '') == 'sale':
+                pass # Vẫn cho phép follow-up kể cả khi Sale nhắn tin cuối cùng
             logger.info(f"[AI FollowUp] Trigger Facebook Follow-up cho {lead.fb_user_id} sau {hours}h")
             trigger_facebook_ai(lead.id, is_followup=True)
             
