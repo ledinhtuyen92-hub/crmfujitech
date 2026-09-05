@@ -61,7 +61,18 @@ fi
 
 echo "VITE_API_URL=$PROTOCOL://$DOMAIN/api/" > frontend/.env.production
 
-# Tu dong cau hinh .env cho VPS (khong xoa cac bien khac)
+# Tu dong cau hinh .env cho VPS
+if [ ! -f .env ]; then
+    echo "=> Khong tim thay file .env, dang khoi tao tu .env.example..."
+    cp .env.example .env
+fi
+
+# Tu dong tao random SECRET_KEY va DB_PASSWORD an toan neu chua duoc set (hoac dang la mac dinh)
+RANDOM_SECRET=$(cat /dev/urandom | tr -dc 'a-zA-Z0-9' | fold -w 50 | head -n 1)
+RANDOM_DB_PASS=$(cat /dev/urandom | tr -dc 'a-zA-Z0-9' | fold -w 16 | head -n 1)
+sed -i "s|^SECRET_KEY=your_secret_key_here_change_in_production|SECRET_KEY=$RANDOM_SECRET|g" .env
+sed -i "s|^DB_PASSWORD=secure_password_change_me|DB_PASSWORD=$RANDOM_DB_PASS|g" .env
+
 sed -i "s|^SITE_URL=.*|SITE_URL=$PROTOCOL://$DOMAIN|g" .env
 sed -i "s|^VITE_API_URL=.*|VITE_API_URL=$PROTOCOL://$DOMAIN|g" .env
 sed -i "s|^ALLOWED_HOSTS=.*|ALLOWED_HOSTS=$DOMAIN,localhost,127.0.0.1|g" .env
