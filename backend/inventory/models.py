@@ -1,4 +1,5 @@
 from django.db import models
+from django_cleanup import cleanup
 
 class ProductCategory(models.Model):
     """Loại sản phẩm — cô lập theo từng công ty."""
@@ -44,6 +45,7 @@ class ProductCategory(models.Model):
         return f"{self.name} ({self.company.name})"
 
 
+@cleanup.ignore
 class ProductTemplate(models.Model):
     """Mẫu sản phẩm gốc (chứa các thông tin chung của các biến thể)."""
 
@@ -162,6 +164,7 @@ class ProductAttributeValue(models.Model):
         return f"{self.attribute.name}: {self.value}"
 
 
+@cleanup.ignore
 class Product(models.Model):
     """Sản phẩm (Biến thể) — cô lập theo từng công ty."""
 
