@@ -15,7 +15,7 @@ const DEFAULT_LAYOUT_BLOCKS = [
   { id: 'signature_1', type: BLOCK_TYPES.SIGNATURES, props: { ...DEFAULT_BLOCK_PROPS[BLOCK_TYPES.SIGNATURES], columns: 2 } },
 ];
 
-export default function QuotationPrintView({ quotation, type = 'quotation', documentType = 'quotation', effectiveTemplate, hidePricing = false, hideCustomerInfo = false, renderCustomerSignature }) {
+export default function QuotationPrintView({ quotation, type = 'quotation', documentType = 'quotation', effectiveTemplate, hidePricing = false, hideCustomerInfo = false, renderCustomerSignature, products = [] }) {
   const [scale, setScale] = useState(1);
   const [showPageBreaks, setShowPageBreaks] = useState(true);
   const [zoomedHeight, setZoomedHeight] = useState(0);
@@ -69,7 +69,16 @@ export default function QuotationPrintView({ quotation, type = 'quotation', docu
   const quotationData = {
     ...quotation,
     // Items (sản phẩm)
-    items: (quotation.items || []).sort((a, b) => a.id - b.id),
+    items: (quotation.items || []).sort((a, b) => a.id - b.id).map(item => {
+      const prodObj = products.find(p => p.id === item.product);
+      return {
+        ...item,
+        product_name: item.product_name || (prodObj ? prodObj.name : ''),
+        product_image: item.product_image || (prodObj ? (prodObj.image_url || prodObj.image) : ''),
+        spec: item.spec || (prodObj ? prodObj.description : ''),
+        unit: item.unit || (prodObj ? prodObj.unit : 'cái')
+      };
+    }),
     // Totals
     totals: {
       subtotal: Number(quotation.subtotal || quotation.sub_total || 0),
