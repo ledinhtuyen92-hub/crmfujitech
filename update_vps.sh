@@ -34,7 +34,27 @@ else
     REQUIREMENTS_CHANGED=0
 fi
 
+# ⚠  QUAN TRONG: .env khong con duoc git track (chua SECRET_KEY, DB_PASSWORD).
+# Lenh "git reset --hard" ben duoi SE XOA .env neu no da tung duoc track.
+# => Sao luu .env truoc, khoi phuc lai ngay sau khi reset.
+if [ -f .env ]; then
+    cp .env /tmp/.env.crm_backup
+    echo "🔒 Da sao luu .env vao /tmp/.env.crm_backup"
+fi
+
 git reset --hard origin/main
+
+# Khoi phuc .env sau khi reset
+if [ -f /tmp/.env.crm_backup ]; then
+    cp /tmp/.env.crm_backup .env
+    echo "🔒 Da khoi phuc .env tu ban sao luu"
+elif [ ! -f .env ]; then
+    # Lan dau chay sau khi .env bi bo track ma khong co ban sao luu
+    cp .env.example .env
+    echo "⚠  KHONG tim thay .env! Da tao tu .env.example."
+    echo "⚠  BAT BUOC sua lai SECRET_KEY va DB_PASSWORD trong .env roi chay lai script!"
+    exit 1
+fi
 echo "✅ Code da duoc cap nhat thanh cong!"
 
 # Xoa volume media_data cu (neu con ton tai tu lan chay truoc bi loi)
