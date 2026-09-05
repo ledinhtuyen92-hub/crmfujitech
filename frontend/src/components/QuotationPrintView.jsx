@@ -71,10 +71,13 @@ export default function QuotationPrintView({ quotation, type = 'quotation', docu
     // Items (sản phẩm)
     items: (quotation.items || []).sort((a, b) => a.id - b.id).map(item => {
       const prodObj = products.find(p => p.id === item.product);
+      const catalogImage = prodObj ? (prodObj.image_url || prodObj.image || '') : '';
       return {
         ...item,
         product_name: item.product_name || (prodObj ? prodObj.name : ''),
-        product_image: item.product_image || (prodObj ? (prodObj.image_url || prodObj.image) : ''),
+        // Giữ nguyên ảnh snapshot - nếu snapshot bị lỗi (URL hết hạn), fallback sang ảnh catalog hiện tại
+        product_image: item.product_image || catalogImage,
+        fallback_product_image: catalogImage,
         spec: item.spec || (prodObj ? prodObj.description : ''),
         unit: item.unit || (prodObj ? prodObj.unit : 'cái')
       };

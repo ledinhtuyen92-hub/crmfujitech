@@ -450,7 +450,21 @@ export default function QuotationRenderer({ layoutConfig, layoutStyle, data, ren
                               <div style={{ height: '100%', display: 'flex', flexDirection: 'column', minHeight: (enableProductImage && item.product_image) ? 80 : 'auto' }}>
                                 {enableProductImage && item.product_image && (
                                   <div style={{ flex: 1, position: 'relative', width: '100%', minHeight: 0, marginBottom: 4 }}>
-                                    <img src={item.product_image} alt="" style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', borderRadius: 4, objectFit: 'contain' }} />
+                                    <img
+                                      src={item.product_image}
+                                      alt=""
+                                      style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', borderRadius: 4, objectFit: 'contain' }}
+                                      onError={(e) => {
+                                        // Nếu ảnh snapshot bị lỗi (URL hết hạn/bị xóa), thử dùng ảnh catalog hiện tại
+                                        if (item.fallback_product_image && e.target.src !== item.fallback_product_image) {
+                                          e.target.src = item.fallback_product_image;
+                                        } else {
+                                          // Ẩn luôn nếu cả fallback cũng lỗi
+                                          e.target.style.display = 'none';
+                                          e.target.parentElement.style.display = 'none';
+                                        }
+                                      }}
+                                    />
                                   </div>
                                 )}
                                 <div style={{ flexShrink: 0 }}>
