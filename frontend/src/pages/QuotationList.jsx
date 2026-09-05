@@ -842,6 +842,10 @@ export default function QuotationList() {
       const validApprovers = userList.filter(u => {
         if (u.is_company_admin || u.is_superuser) return true
         if (u.permissions && u.permissions.includes('sales.approve')) return true
+        
+        if (myDeptId && u.managed_department_ids && u.managed_department_ids.includes(myDeptId)) return true
+        if (myDeptId && u.department === myDeptId && u.id !== user?.id && u.role_name && u.role_name.toLowerCase().includes('trưởng')) return true
+        
         return false
       })
       setApprovers(validApprovers.length > 0 ? validApprovers : userList.filter(u => u.is_company_admin || u.is_superuser))
@@ -1067,6 +1071,10 @@ export default function QuotationList() {
       const validApprovers = userList.filter(u => {
         if (u.is_company_admin || u.is_superuser) return true
         if (u.permissions && u.permissions.includes('orders.approve')) return true
+        
+        if (myDeptId && u.managed_department_ids && u.managed_department_ids.includes(myDeptId)) return true
+        if (myDeptId && u.department === myDeptId && u.id !== user?.id && u.role_name && u.role_name.toLowerCase().includes('trưởng')) return true
+        
         return false
       })
       setOrderApprovers(validApprovers.length > 0 ? validApprovers : userList.filter(u => u.is_company_admin || u.is_superuser))
