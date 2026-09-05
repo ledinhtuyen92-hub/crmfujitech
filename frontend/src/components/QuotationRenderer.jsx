@@ -147,10 +147,12 @@ export default function QuotationRenderer({ layoutConfig, layoutStyle, data, ren
     const clr = block.props.themeColor || layoutConfig.theme_color || '#1649c9';
     const isNoBorder = layoutConfig.table_style === 'modern_navy';
     const hideAllBorders = block.props.showBorder === false;
-    const thStyle = { 
-      border: hideAllBorders || isNoBorder ? 'none' : '1px solid #e2e8f0', 
+    const thStyle = {
+      border: hideAllBorders || isNoBorder ? 'none' : '1px solid #e2e8f0',
       borderBottom: hideAllBorders ? 'none' : '1px solid #e2e8f0',
-      padding: '8px 4px' 
+      padding: '8px 4px',
+      textAlign: 'center',
+      verticalAlign: 'middle',
     };
     const tdStyle = { 
       border: hideAllBorders || isNoBorder ? 'none' : '1px solid #e2e8f0',
@@ -362,9 +364,9 @@ export default function QuotationRenderer({ layoutConfig, layoutStyle, data, ren
                     const colId = typeof col === 'object' ? col.id : col;
                     const colTitle = typeof col === 'object' ? col.title : null;
                     if (colId === 'stt') return <th key="stt" style={{ ...thStyle, color: clr, width: 40 }}>{colTitle || 'STT'}</th>;
-                    if (colId === 'name') return <th key="name" style={{...thStyle, width: 200, textAlign: 'left'}}>{colTitle || (isService ? 'Tên dịch vụ / chi phí' : 'Tên hàng hóa / Dịch vụ')}</th>;
+                    if (colId === 'name') return <th key="name" style={{...thStyle, width: 200}}>{colTitle || (isService ? 'Tên dịch vụ / chi phí' : 'Tên hàng hóa / Dịch vụ')}</th>;
                     if (colId === 'symbol') return <th key="symbol" style={{...thStyle, width: 80}}>{colTitle || 'Ký hiệu'}</th>;
-                    if (colId === 'specs') return <th key="specs" style={{...thStyle, width: 150, textAlign: 'left'}}>{colTitle || (isService ? 'Ghi chú kỹ thuật' : 'Quy cách kỹ thuật')}</th>;
+                    if (colId === 'specs') return <th key="specs" style={{...thStyle, width: 150}}>{colTitle || (isService ? 'Ghi chú kỹ thuật' : 'Quy cách kỹ thuật')}</th>;
                     if (colId === 'dimensions') return (
                       <th key="dimensions" style={{...thStyle, padding: 0, width: 180}}>
                         <div style={{ borderBottom: useComplexDimensions ? '1px solid #e2e8f0' : 'none', padding: '4px 6px' }}>{colTitle || 'Kích thước (mm)'}</div>
@@ -377,11 +379,11 @@ export default function QuotationRenderer({ layoutConfig, layoutStyle, data, ren
                         )}
                       </th>
                     );
-                    if (colId === 'note') return <th key="note" style={{...thStyle, width: 120, textAlign: 'left'}}>{colTitle || 'Ghi chú'}</th>;
+                    if (colId === 'note') return <th key="note" style={{...thStyle, width: 120}}>{colTitle || 'Ghi chú'}</th>;
                     if (colId === 'unit') return <th key="unit" style={{...thStyle, width: 50}}>{colTitle || 'ĐVT'}</th>;
                     if (colId === 'qty') return <th key="qty" style={{...thStyle, width: 50}}>{colTitle || 'SL'}</th>;
-                    if (colId === 'price') return <th key="price" style={{...thStyle, width: 90, textAlign: 'right'}}>{colTitle || 'Đơn giá'}</th>;
-                    if (colId === 'total') return <th key="total" style={{...thStyle, width: 100, textAlign: 'right'}}>{colTitle || 'Thành tiền'}</th>;
+                    if (colId === 'price') return <th key="price" style={{...thStyle, width: 90}}>{colTitle || 'Đơn giá'}</th>;
+                    if (colId === 'total') return <th key="total" style={{...thStyle, width: 100}}>{colTitle || 'Thành tiền'}</th>;
                     
                     // Xử lý Custom Column
                     if (colId.startsWith('custom_')) {

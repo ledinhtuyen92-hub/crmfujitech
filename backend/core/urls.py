@@ -10,6 +10,8 @@ from .views import UploadAPIView
 admin.site.login_url = '/login'
 
 urlpatterns = [
+    # Docker healthcheck — không trả về dữ liệu, không yêu cầu auth
+    path('health/', lambda r: HttpResponse('ok', content_type='text/plain'), name='health'),
     path('admin/', admin.site.urls),
     path('api/core/upload/', UploadAPIView.as_view(), name='core-upload'),
     # ── Auth & Users ──────────────────────────────────────────────────
