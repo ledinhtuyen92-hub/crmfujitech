@@ -50,10 +50,20 @@ if [ -f /tmp/.env.crm_backup ]; then
     echo "🔒 Da khoi phuc .env tu ban sao luu"
 elif [ ! -f .env ]; then
     # Lan dau chay sau khi .env bi bo track ma khong co ban sao luu
+    # => Tu dong tao .env va sinh mat khau ngau nhien an toan
     cp .env.example .env
-    echo "⚠  KHONG tim thay .env! Da tao tu .env.example."
-    echo "⚠  BAT BUOC sua lai SECRET_KEY va DB_PASSWORD trong .env roi chay lai script!"
-    exit 1
+    RANDOM_SECRET=$(cat /dev/urandom | tr -dc 'a-zA-Z0-9' | fold -w 50 | head -n 1)
+    RANDOM_DB_PASS=$(cat /dev/urandom | tr -dc 'a-zA-Z0-9' | fold -w 16 | head -n 1)
+    sed -i "s|^SECRET_KEY=your_secret_key_here_change_in_production|SECRET_KEY=$RANDOM_SECRET|g" .env
+    sed -i "s|^DB_PASSWORD=secure_password_change_me|DB_PASSWORD=$RANDOM_DB_PASS|g" .env
+    echo "🔑 Da tao .env moi voi SECRET_KEY va DB_PASSWORD ngau nhien!"
+
+    # Doi container db khoi dong (neu chua chay thi khoi dong truoc)
+    docker compose up -d db
+    sleep 5
+    # Ep doi mat khau trong Database cho khop voi mat khau vua sinh
+    docker exec crm_db psql -U postgres -c "ALTER USER postgres WITH PASSWORD '$RANDOM_DB_PASS';"
+    echo "🔒 Da dong bo mat khau moi vao Database!"
 fi
 echo "✅ Code da duoc cap nhat thanh cong!"
 
