@@ -148,8 +148,21 @@ class QuotationViewSet(TenantQuerySetMixin, viewsets.ModelViewSet):
 
         quotation = self.get_object()
         
+        approver_id = request.data.get("approver_id")
+        description = request.data.get("description", f"Phê duyệt Đơn hàng tạo từ báo giá {quotation.quotation_number}")
+        
+        approver = None
+        if approver_id:
+            from users.models import User
+            try:
+                approver = User.objects.get(id=approver_id, company=request.user.company)
+            except User.DoesNotExist:
+                return Response({"detail": "Người duyệt không hợp lệ."}, status=status.HTTP_400_BAD_REQUEST)
+        
+        # Nếu không có quyền "sales.require_customer_signature" (Bắt buộc khách ký xác nhận) thì bỏ qua chữ ký
+        # Superuser và Company Admin luôn có quyền tạo đơn trực tiếp
         bypass_signature = request.user.is_superuser or request.user.is_company_admin or (
-            request.user.role and request.user.role.permissions.filter(code="sales.bypass_customer_signature").exists()
+            request.user.role and not request.user.role.permissions.filter(code="sales.require_customer_signature").exists()
         )
 
         if not bypass_signature and quotation.status != Quotation.STATUS_ACCEPTED:
@@ -188,7 +201,7 @@ class QuotationViewSet(TenantQuerySetMixin, viewsets.ModelViewSet):
                 custom_data=quotation.custom_data,
                 status=Order.STATUS_PENDING,
             )
-            for item in quotation.items.all():
+            for item in quotation.items.all().order_by('id'):
                 OrderItem.objects.create(
                     order=order,
                     product=item.product,
@@ -220,11 +233,12 @@ class QuotationViewSet(TenantQuerySetMixin, viewsets.ModelViewSet):
                     object_id=order.id,
                     requester=request.user,
                     title=f"Phê duyệt Đơn hàng {order.order_number}",
-                    description=f"Đơn hàng {order.order_number} — Khách hàng: {order.customer.name if order.customer else 'Khách lẻ'}",
+                    description=description,
                     status=ApprovalRequest.STATUS_PENDING,
                 )
                 ApprovalStep.objects.create(
                     request=req,
+                    approver=approver,
                     step_order=1,
                     status=ApprovalStep.STATUS_PENDING,
                 )

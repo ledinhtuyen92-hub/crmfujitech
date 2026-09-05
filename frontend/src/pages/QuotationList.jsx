@@ -154,6 +154,12 @@ export default function QuotationList() {
   const [submittingApproval, setSubmittingApproval] = useState(false)
   const [approvalForm] = Form.useForm()
 
+  // Order Approval Modal
+  const [orderModalVisible, setOrderModalVisible] = useState(false)
+  const [orderApprovers, setOrderApprovers] = useState([])
+  const [submittingOrder, setSubmittingOrder] = useState(false)
+  const [orderForm] = Form.useForm()
+
   // Permissions
   const canCreate = hasPermission('sales.create')
   const canEdit = hasPermission('sales.edit')
@@ -835,11 +841,7 @@ export default function QuotationList() {
       // Chỉ chọn Giám đốc (admin công ty) hoặc Trưởng phòng phụ trách trực tiếp CÓ QUYỀN DUYỆT BÁO GIÁ
       const validApprovers = userList.filter(u => {
         if (u.is_company_admin || u.is_superuser) return true
-        const hasApprovePerm = u.permissions && u.permissions.includes('sales.approve')
-        if (!hasApprovePerm) return false
-
-        if (myDeptId && u.managed_department_ids && u.managed_department_ids.includes(myDeptId)) return true
-        if (myDeptId && u.department === myDeptId && u.id !== user?.id && u.role_name && u.role_name.toLowerCase().includes('trưởng')) return true
+        if (u.permissions && u.permissions.includes('sales.approve')) return true
         return false
       })
       setApprovers(validApprovers.length > 0 ? validApprovers : userList.filter(u => u.is_company_admin || u.is_superuser))
@@ -1038,15 +1040,59 @@ export default function QuotationList() {
   }
 
   // ── Convert Quotation to Order ────────────────────────────────────────
-  const handleConvertToOrder = async (id) => {
+  const openOrderModal = async (record) => {
+    if (checkMaintenance()) return
+    setSelectedQuotation(record)
+    
+    // Check if bypass is used but status is not accepted (for warning alert if needed)
+    const requireSignature = hasPermission('sales.require_customer_signature');
+    const hasBypass = isCompanyAdmin || !requireSignature;
+    const isBypassingSignature = hasBypass && record.status !== 'accepted';
+    
+    setOrderModalVisible(true)
+    orderForm.resetFields()
+    
+    // Default description
+    orderForm.setFieldsValue({
+        description: isBypassingSignature 
+            ? `Tạo đơn hàng (Bỏ qua chữ ký khách hàng)`
+            : `Đề xuất phê duyệt đơn hàng`
+    })
+
+    try {
+      const res = await api.get('/users/users/')
+      const userList = Array.isArray(res.data) ? res.data : (res.data?.results || [])
+      const myDeptId = user?.department
+      
+      const validApprovers = userList.filter(u => {
+        if (u.is_company_admin || u.is_superuser) return true
+        if (u.permissions && u.permissions.includes('orders.approve')) return true
+        return false
+      })
+      setOrderApprovers(validApprovers.length > 0 ? validApprovers : userList.filter(u => u.is_company_admin || u.is_superuser))
+    } catch {
+      messageApi.error('Lỗi tải danh sách người duyệt đơn hàng.')
+    }
+  }
+
+  const handleSubmitOrder = async () => {
     if (checkMaintenance()) return
     try {
-      await api.post(`/sales/quotations/${id}/create-order/`)
-      messageApi.success('🎉 Đã chuyển báo giá thành Đơn hàng chính thức!')
+      const values = await orderForm.validateFields()
+      setSubmittingOrder(true)
+      await api.post(`/sales/quotations/${selectedQuotation.id}/create-order/`, {
+        approver_id: values.approver_id,
+        description: values.description
+      })
+      messageApi.success('✅ Đã tạo đơn hàng và gửi yêu cầu phê duyệt thành công!')
+      setOrderModalVisible(false)
       fetchQuotations()
     } catch (error) {
+      if (error.errorFields) return
       const msg = error.response?.data?.detail || 'Không thể tạo đơn hàng từ báo giá này.'
       messageApi.error(msg)
+    } finally {
+      setSubmittingOrder(false)
     }
   }
 
@@ -1090,9 +1136,9 @@ export default function QuotationList() {
   const renderQuotationActions = (record) => (
     <Space wrap size={8}>
       {(() => {
-        const hasBypass = hasPermission('sales.bypass_customer_signature');
+        const requireSignature = hasPermission('sales.require_customer_signature');
+        const hasBypass = isCompanyAdmin || !requireSignature;
         
-        const requireApproval = companySettings?.require_quotation_approval ?? true;
         const canCreateOrder = record.status === 'accepted' || 
           (hasBypass && ['approved', 'sent'].includes(record.status)) ||
           (hasBypass && record.status === 'draft' && !requireApproval);
@@ -1127,24 +1173,15 @@ export default function QuotationList() {
           )
         }
         return (
-          <Popconfirm
-            title="Xác nhận tạo đơn hàng?"
-            description={hasBypass && record.status !== 'accepted' 
-              ? "Khách hàng chưa ký xác nhận nhưng bạn có quyền Bỏ qua. Xác nhận tạo Đơn hàng?" 
-              : "Bạn có chắc chắn muốn chuyển đổi báo giá này thành Đơn hàng chính thức không?"}
-            onConfirm={() => handleConvertToOrder(record.id)}
-            okText="Đồng ý tạo"
-            cancelText="Hủy"
+          <Button
+            type="primary"
+            size="small"
+            icon={<FileDoneOutlined />}
+            style={{ background: '#16a34a', borderColor: '#16a34a' }}
+            onClick={() => openOrderModal(record)}
           >
-            <Button
-              type="primary"
-              size="small"
-              icon={<FileDoneOutlined />}
-              style={{ background: '#16a34a', borderColor: '#16a34a' }}
-            >
-              Tạo Đơn Hàng
-            </Button>
-          </Popconfirm>
+            Tạo Đơn Hàng
+          </Button>
         )
       })()}
       <Tooltip title="Xem chi tiết & In PDF">
@@ -3088,6 +3125,41 @@ export default function QuotationList() {
         </Form>
       </Modal>
 
+      {/* Modal Chọn Người Duyệt Đơn Hàng */}
+      <Modal
+        title="Tạo đơn hàng & Chọn người duyệt"
+        open={orderModalVisible}
+        onCancel={() => setOrderModalVisible(false)}
+        onOk={handleSubmitOrder}
+        confirmLoading={submittingOrder}
+        okText="Tạo đơn hàng"
+        cancelText="Hủy"
+      >
+        <div style={{ marginBottom: 16 }}>
+            <Text type="secondary">
+                Báo giá sẽ được chuyển thành Đơn hàng và gửi phê duyệt. Bạn không thể chỉnh sửa báo giá sau khi đã tạo đơn.
+            </Text>
+        </div>
+        <Form form={orderForm} layout="vertical">
+          <Form.Item
+            name="approver_id"
+            label="Chọn người duyệt đơn hàng"
+            rules={[{ required: true, message: 'Vui lòng chọn người duyệt' }]}
+          >
+            <Select placeholder="Chọn quản lý / giám đốc..." showSearch optionFilterProp="children">
+              {orderApprovers.map(a => (
+                <Option key={a.id} value={a.id}>
+                  {a.full_name || a.username} ({a.username}) {a.is_company_admin ? ' - Giám đốc' : ''}
+                </Option>
+              ))}
+            </Select>
+          </Form.Item>
+          <Form.Item name="description" label="Ghi chú thêm cho người duyệt (nếu có)">
+            <TextArea rows={3} placeholder="VD: Xin sếp duyệt gấp đơn hàng này..." />
+          </Form.Item>
+        </Form>
+      </Modal>
+
       {/* ── Drawer View Quotation Details ──────────────────────────────── */}
       <Drawer
         title={(() => {
@@ -3124,7 +3196,7 @@ export default function QuotationList() {
               </Space>
 
               <Space wrap>
-                {selectedQuotation?.public_token && (isCompanyAdmin || !hasPermission('sales.bypass_customer_signature')) && selectedQuotation?.status !== 'pending_approval' && (!requireApproval || ['approved', 'sent', 'accepted'].includes(selectedQuotation?.status)) && (() => {
+                {selectedQuotation?.public_token && (isCompanyAdmin || hasPermission('sales.require_customer_signature')) && selectedQuotation?.status !== 'pending_approval' && (!requireApproval || ['approved', 'sent', 'accepted'].includes(selectedQuotation?.status)) && (() => {
                   if (isExpired) {
                     return (
                       <Button

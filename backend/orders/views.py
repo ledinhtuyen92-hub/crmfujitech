@@ -396,6 +396,17 @@ class OrderViewSet(TenantQuerySetMixin, viewsets.ModelViewSet):
         order.approved_by = None
         order.save(update_fields=["status", "approved_by", "updated_at"])
 
+        approver_id = request.data.get("approver_id")
+        description = request.data.get("description", f"Phê duyệt lại Đơn hàng {order.order_number}")
+        
+        approver = None
+        if approver_id:
+            from users.models import User
+            try:
+                approver = User.objects.get(id=approver_id, company=order.company)
+            except User.DoesNotExist:
+                return Response({"detail": "Người duyệt không hợp lệ."}, status=status.HTTP_400_BAD_REQUEST)
+
         try:
             from approvals.models import ApprovalRequest, ApprovalStep
             from django.contrib.contenttypes.models import ContentType
@@ -407,11 +418,12 @@ class OrderViewSet(TenantQuerySetMixin, viewsets.ModelViewSet):
                 object_id=order.id,
                 requester=request.user,
                 title=f"Phê duyệt lại Đơn hàng {order.order_number}",
-                description=f"Đơn hàng {order.order_number} — Khách hàng: {order.customer.name if order.customer else 'Khách lẻ'}",
+                description=description,
                 status=ApprovalRequest.STATUS_PENDING,
             )
             ApprovalStep.objects.create(
                 request=req,
+                approver=approver,
                 step_order=1,
                 status=ApprovalStep.STATUS_PENDING,
             )

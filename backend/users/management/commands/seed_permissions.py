@@ -33,7 +33,7 @@ PERMISSIONS = [
     {"code": "sales.delete", "name": "Xóa báo giá", "module": "sales"},
     {"code": "sales.approve", "name": "Duyệt báo giá", "module": "sales"},
     {"code": "sales.require_approval", "name": "Bắt buộc trình duyệt (không cho gửi trực tiếp)", "module": "sales"},
-    {"code": "sales.bypass_customer_signature", "name": "Bỏ qua yêu cầu khách ký xác nhận (cho phép tạo đơn ngay)", "module": "sales"},
+    {"code": "sales.require_customer_signature", "name": "Bắt buộc khách ký xác nhận", "module": "sales"},
     {"code": "sales.export_pdf", "name": "Xuất PDF báo giá", "module": "sales"},
     {"code": "sales.view_all", "name": "Xem tất cả báo giá (không giới hạn bởi phòng ban/người tạo)", "module": "sales"},
 

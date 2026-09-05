@@ -211,6 +211,11 @@ export default function OrderList() {
   const [approverModalVisible, setApproverModalVisible] = useState(false)
   const [approverForm] = Form.useForm()
 
+  const [resubmitModalVisible, setResubmitModalVisible] = useState(false)
+  const [resubmitApprovers, setResubmitApprovers] = useState([])
+  const [submittingResubmit, setSubmittingResubmit] = useState(false)
+  const [resubmitForm] = Form.useForm()
+
   const [selectedReceiptForPrint, setSelectedReceiptForPrint] = useState(null)
   const receiptPrintRef = useRef(null)
 
@@ -2466,15 +2471,45 @@ export default function OrderList() {
     }
   }
 
-  const handleResubmit = async (id) => {
+  const openResubmitModal = async (record) => {
+    if (checkMaintenance()) return
+    setSelectedOrder(record)
+    setResubmitModalVisible(true)
+    resubmitForm.resetFields()
+    try {
+      const res = await api.get('/users/users/')
+      const userList = Array.isArray(res.data) ? res.data : (res.data?.results || [])
+      const myDeptId = user?.department
+      
+      const validApprovers = userList.filter(u => {
+        if (u.is_company_admin || u.is_superuser) return true
+        if (u.permissions && u.permissions.includes('orders.approve')) return true
+        return false
+      })
+      setResubmitApprovers(validApprovers.length > 0 ? validApprovers : userList.filter(u => u.is_company_admin || u.is_superuser))
+    } catch {
+      messageApi.error('Lỗi tải danh sách người duyệt đơn hàng.')
+    }
+  }
+
+  const handleSubmitResubmit = async () => {
     if (checkMaintenance()) return
     try {
-      await api.post(`/orders/orders/${id}/resubmit/`)
+      const values = await resubmitForm.validateFields()
+      setSubmittingResubmit(true)
+      await api.post(`/orders/orders/${selectedOrder.id}/resubmit/`, {
+        approver_id: values.approver_id,
+        description: values.description
+      })
       messageApi.success('Đã trình duyệt lại đơn hàng.')
+      setResubmitModalVisible(false)
       fetchOrders()
     } catch (error) {
+      if (error.errorFields) return
       const msg = error.response?.data?.detail || 'Không thể trình duyệt lại đơn hàng này.'
       messageApi.error(msg)
+    } finally {
+      setSubmittingResubmit(false)
     }
   }
 
@@ -2550,16 +2585,18 @@ export default function OrderList() {
         </Tooltip>
       )}
 
-      {canEdit && record.status === 'rejected' && (
-        <Popconfirm
-          title="Trình duyệt lại?"
-          description="Bạn muốn gửi đơn hàng này để giám đốc duyệt lại?"
-          onConfirm={() => handleResubmit(record.id)}
-          okText="Trình duyệt"
-          cancelText="Hủy"
-        >
-          <Tooltip title="Trình duyệt lại"><Button type="text" shape="circle" icon={<CheckCircleOutlined style={{ color: '#0284c7' }} />} /></Tooltip>
-        </Popconfirm>
+      {(canEdit || record.created_by === user?.id) && record.status === 'rejected' && (
+        <Tooltip title="Trình duyệt lại">
+          <Button 
+            type="text" 
+            shape="circle" 
+            icon={<CheckCircleOutlined style={{ color: '#0284c7' }} />} 
+            onClick={(e) => {
+              e.stopPropagation()
+              openResubmitModal(record)
+            }}
+          />
+        </Tooltip>
       )}
 
       {canCancel && record.status !== 'cancelled' && record.status !== 'completed' && (
@@ -3694,6 +3731,42 @@ export default function OrderList() {
           }}
         />
       )}
+
+      {/* Modal Trình Duyệt Lại */}
+      <Modal
+        title="Trình duyệt lại Đơn hàng"
+        open={resubmitModalVisible}
+        onCancel={() => setResubmitModalVisible(false)}
+        onOk={handleSubmitResubmit}
+        confirmLoading={submittingResubmit}
+        okText="Trình duyệt lại"
+        cancelText="Hủy"
+      >
+        <div style={{ marginBottom: 16 }}>
+            <Text type="secondary">
+                Đơn hàng sẽ được chuyển lại trạng thái Chờ duyệt.
+            </Text>
+        </div>
+        <Form form={resubmitForm} layout="vertical">
+          <Form.Item
+            name="approver_id"
+            label="Chọn người duyệt đơn hàng"
+            rules={[{ required: true, message: 'Vui lòng chọn người duyệt' }]}
+          >
+            <Select placeholder="Chọn quản lý / giám đốc..." showSearch optionFilterProp="children">
+              {resubmitApprovers.map(a => (
+                <Select.Option key={a.id} value={a.id}>
+                  {a.full_name || a.username} ({a.username}) {a.is_company_admin ? ' - Giám đốc' : ''}
+                </Select.Option>
+              ))}
+            </Select>
+          </Form.Item>
+          <Form.Item name="description" label="Ghi chú trình duyệt lại (nếu có)">
+            <Input.TextArea rows={3} placeholder="Ghi chú thêm khắc phục lỗi..." />
+          </Form.Item>
+        </Form>
+      </Modal>
+
     </section>
   )
 }
