@@ -3124,7 +3124,7 @@ export default function OrderList() {
             </Col>
             <Col xs={24} md={6}>
               <Form.Item name="status" label="Trạng thái">
-                <Select disabled={!canApprove || ['pending', 'rejected'].includes(selectedOrder?.status)}>
+                <Select disabled={!canApprove || ['pending', 'rejected'].includes(editingOrder?.status)}>
                   <Option value="pending">Chờ duyệt</Option>
                   <Option value="approved">Đã được duyệt</Option>
                   <Option value="rejected">Đã từ chối</Option>
