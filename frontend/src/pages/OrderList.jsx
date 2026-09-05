@@ -3148,14 +3148,19 @@ export default function OrderList() {
           </Divider>
 
           <div style={{ marginBottom: 16, border: '1px solid #e2e8f0', borderRadius: 8, overflow: 'hidden' }}>
-            <Table
-              dataSource={formItems}
-              columns={getItemColumns()}
-              rowKey="key"
-              pagination={false}
-              size="small"
-              scroll={{ x: 'max-content' }}
-            />
+            <DndContext sensors={sensors} modifiers={[restrictToVerticalAxis]} onDragEnd={(e) => handleDragEnd(e, formItems, setFormItems)}>
+              <SortableContext items={formItems.map(i => i.key)} strategy={verticalListSortingStrategy}>
+                <Table
+                  components={{ body: { row: DraggableBodyRow } }}
+                  dataSource={formItems}
+                  columns={getItemColumns()}
+                  rowKey="key"
+                  pagination={false}
+                  size="small"
+                  scroll={{ x: 'max-content' }}
+                />
+              </SortableContext>
+            </DndContext>
           </div>
 
 
@@ -3171,14 +3176,19 @@ export default function OrderList() {
           </Divider>
 
           <div style={{ marginBottom: 16, border: '1px solid #e2e8f0', borderRadius: 8, overflow: 'hidden' }}>
-            <Table
-              dataSource={serviceItems}
-              columns={getServiceItemColumns()}
-              rowKey="key"
-              pagination={false}
-              size="small"
-              scroll={{ x: 'max-content' }}
-            />
+            <DndContext sensors={sensors} modifiers={[restrictToVerticalAxis]} onDragEnd={(e) => handleDragEnd(e, serviceItems, setServiceItems)}>
+              <SortableContext items={serviceItems.map(i => i.key)} strategy={verticalListSortingStrategy}>
+                <Table
+                  components={{ body: { row: DraggableBodyRow } }}
+                  dataSource={serviceItems}
+                  columns={getServiceItemColumns()}
+                  rowKey="key"
+                  pagination={false}
+                  size="small"
+                  scroll={{ x: 'max-content' }}
+                />
+              </SortableContext>
+            </DndContext>
           </div>
 
           <Button type="dashed" onClick={handleAddServiceLine} block icon={<PlusOutlined />} style={{ marginBottom: 20 }}>
