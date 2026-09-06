@@ -212,35 +212,47 @@ def search_knowledge(agent, query: str, limit: int = 4):
         if query_vector is None:
             return ""
             
-        if provider == 'gemini':
-            chunks = AiKnowledgeChunk.objects.filter(
-                document__agent=agent,
-                document__status='completed',
-                embedding_gemini__isnull=False
-            ).annotate(distance=CosineDistance('embedding_gemini', query_vector)).order_by('distance')[:limit]
-        else:
-            chunks = AiKnowledgeChunk.objects.filter(
-                document__agent=agent,
-                document__status='completed',
-                embedding__isnull=False
-            ).annotate(distance=CosineDistance('embedding', query_vector)).order_by('distance')[:limit]
-
         logger = logging.getLogger(__name__)
-        logger.info(f"[RAG Debug] Agent={agent.id}, Query='{query[:60]}', Provider={provider}, Chunks found={len(list(chunks))}")
-        # Re-fetch since queryset was consumed
-        if provider == 'gemini':
-            chunks = AiKnowledgeChunk.objects.filter(
+
+        def _query_chunks(extra_filter=None):
+            f = dict(
                 document__agent=agent,
                 document__status='completed',
-                embedding_gemini__isnull=False
-            ).annotate(distance=CosineDistance('embedding_gemini', query_vector)).order_by('distance')[:limit]
-        else:
-            chunks = AiKnowledgeChunk.objects.filter(
-                document__agent=agent,
-                document__status='completed',
-                embedding__isnull=False
-            ).annotate(distance=CosineDistance('embedding', query_vector)).order_by('distance')[:limit]
-            
+            )
+            if extra_filter:
+                f.update(extra_filter)
+            if provider == 'gemini':
+                f['embedding_gemini__isnull'] = False
+                return list(AiKnowledgeChunk.objects.filter(**f)
+                    .annotate(distance=CosineDistance('embedding_gemini', query_vector))
+                    .order_by('distance')[:limit])
+            else:
+                f['embedding__isnull'] = False
+                return list(AiKnowledgeChunk.objects.filter(**f)
+                    .annotate(distance=CosineDistance('embedding', query_vector))
+                    .order_by('distance')[:limit])
+
+        # Search 1: Top chunks tổng quát (mọi loại tài liệu)
+        general_chunks = _query_chunks()
+        # Search 2: Riêng Q&A — đảm bảo Q&A luôn có mặt trong context
+        qa_chunks = _query_chunks(extra_filter={
+            'document__title__icontains': 'Q&A',
+        }) or _query_chunks(extra_filter={
+            'document__title__icontains': 'Hội thoại',
+        })
+
+        # Gộp: Q&A trước, sau đó general (loại bỏ trùng ID)
+        seen_ids = set()
+        chunks = []
+        for c in list(qa_chunks) + list(general_chunks):
+            if c.id not in seen_ids:
+                seen_ids.add(c.id)
+                chunks.append(c)
+
+        logger.info(f"[RAG Debug] Agent={agent.id}, Query='{query[:60]}', Provider={provider}, "
+                    f"General={len(general_chunks)} QA={len(qa_chunks)} Total_unique={len(chunks)}")
+
+
         if chunks:
             knowledge_texts = []
             import re
