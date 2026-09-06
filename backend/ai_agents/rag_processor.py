@@ -269,12 +269,17 @@ def search_knowledge(agent, query: str, limit: int = 4):
                                 img_url = f"{site_url}{img_url}"
                             text_to_append += f"\n![Hình ảnh đính kèm]({img_url})"
 
-                    knowledge_texts.append(text_to_append)
+                    knowledge_texts.append((c.document.title, text_to_append))
 
             if knowledge_texts:
+                # Sắp xếp: nguồn Q&A (📚 Tổng hợp Q&A) lên TRƯỚC để AI ưu tiên dùng
+                qa_texts = [t for title, t in knowledge_texts if 'Q&A' in title or 'Hội thoại' in title]
+                other_texts = [t for title, t in knowledge_texts if 'Q&A' not in title and 'Hội thoại' not in title]
+                sorted_texts = qa_texts + other_texts
                 return (
                     "\n\n[TRÍCH XUẤT KIẾN THỨC NỘI BỘ TỪ CÔNG TY (RAG)]:\n"
-                    + "\n".join(knowledge_texts)
+                    "⚠️ NGUYÊN TẮC SỬ DỤNG: Nếu có nguồn Q&A (Hội thoại, Q&A) trực tiếp trả lời câu hỏi của khách, BẮT BUỘC ưu tiên dùng câu trả lời đó (kể cả hình ảnh đính kèm). Tài liệu đào tạo chỉ dùng khi không có Q&A phù hợp.\n"
+                    + "\n".join(sorted_texts)
                     + "\n(Hãy ưu tiên sử dụng những kiến thức trên để trả lời khách hàng một cách chính xác nhất)."
                 )
 
