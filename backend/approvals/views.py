@@ -26,27 +26,14 @@ class ApprovalRequestViewSet(TenantQuerySetMixin, viewsets.ModelViewSet):
             qs = qs.filter(requester=user)
         elif mode == "to_approve":
             if user.is_superuser or user.is_company_admin:
+                # Admin/superuser thấy tất cả đang chờ duyệt
                 qs = qs.filter(status="pending")
             else:
+                # Người dùng thường chỉ thấy yêu cầu mà họ được chỉ định trực tiếp
+                # hoặc được chỉ định qua role — không phụ thuộc vào quyền has_perm
                 q_filter = Q(steps__approver_user=user)
                 if user.role:
                     q_filter |= Q(steps__approver_role=user.role)
-                    
-                from django.contrib.contenttypes.models import ContentType
-                if hasattr(user, 'has_perm_code'):
-                    if user.has_perm_code('orders.approve'):
-                        from orders.models import Order
-                        q_filter |= Q(content_type=ContentType.objects.get_for_model(Order))
-                    if user.has_perm_code('sales.approve'):
-                        from sales.models import Quotation
-                        q_filter |= Q(content_type=ContentType.objects.get_for_model(Quotation))
-                    if user.has_perm_code('approvals.approve'):
-                        from orders.models import Order
-                        from sales.models import Quotation
-                        order_ct = ContentType.objects.get_for_model(Order)
-                        quote_ct = ContentType.objects.get_for_model(Quotation)
-                        q_filter |= ~Q(content_type__in=[order_ct, quote_ct])
-                
                 qs = qs.filter(q_filter).distinct()
 
         req_status = self.request.query_params.get("status")

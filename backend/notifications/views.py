@@ -130,22 +130,10 @@ def unread_count(request):
     qs = ApprovalRequest.objects.filter(company=request.user.company, status=ApprovalRequest.STATUS_PENDING)
     
     if not (request.user.is_superuser or request.user.is_company_admin):
+        # Chỉ hiển thị yêu cầu mà user được chỉ định trực tiếp hoặc qua role
         q_filter = Q(steps__approver_user=request.user)
         if request.user.role:
             q_filter |= Q(steps__approver_role=request.user.role)
-            perms = request.user.role.permissions.values_list('code', flat=True)
-            if 'orders.approve' in perms:
-                from orders.models import Order
-                q_filter |= Q(content_type=ContentType.objects.get_for_model(Order))
-            if 'sales.approve' in perms:
-                from sales.models import Quotation
-                q_filter |= Q(content_type=ContentType.objects.get_for_model(Quotation))
-            if 'approvals.approve' in perms:
-                from orders.models import Order
-                from sales.models import Quotation
-                order_ct = ContentType.objects.get_for_model(Order)
-                quote_ct = ContentType.objects.get_for_model(Quotation)
-                q_filter |= ~Q(content_type__in=[order_ct, quote_ct])
         qs = qs.filter(q_filter).distinct()
     
     base_approval_qs = qs
