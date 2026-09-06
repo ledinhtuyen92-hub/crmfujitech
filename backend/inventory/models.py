@@ -29,6 +29,11 @@ class ProductCategory(models.Model):
         default=TYPE_PRODUCT,
         verbose_name="Phân loại",
     )
+    is_inventory_tracked = models.BooleanField(
+        default=True,
+        verbose_name="Kiểm soát kho vận",
+        help_text="Nếu tắt, các sản phẩm trong danh mục này sẽ không bị trừ kho khi đơn hàng được duyệt."
+    )
 
     class Meta:
         verbose_name = "Loại sản phẩm"

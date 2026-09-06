@@ -246,9 +246,10 @@ export default function Products() {
     if (checkMaintenance()) return
     setEditingCategory(cat)
     if (cat) {
-      categoryForm.setFieldsValue({ name: cat.name, description: cat.description || '' })
+      categoryForm.setFieldsValue({ name: cat.name, description: cat.description || '', is_inventory_tracked: cat.is_inventory_tracked !== false })
     } else {
       categoryForm.resetFields()
+      categoryForm.setFieldsValue({ is_inventory_tracked: true })
     }
     setCategoryModalVisible(true)
   }
@@ -574,7 +575,10 @@ export default function Products() {
                     icon: categoryFilter && categoryFilter.toString() === c.id.toString() ? <FolderOpenOutlined style={{ color: '#f59e0b' }} /> : <FolderOutlined style={{ color: '#f59e0b' }} />,
                     label: (
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%' }}>
-                        <span style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>{c.name}</span>
+                        <div style={{ display: 'flex', alignItems: 'center', flex: 1, minWidth: 0, paddingRight: 8 }}>
+                          <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{c.name}</span>
+                          {c.is_inventory_tracked !== false && <span title="Có kiểm soát kho vận" style={{ fontSize: 12, marginLeft: 4, flexShrink: 0 }}>📦</span>}
+                        </div>
                         {categoryFilter === c.id.toString() && (
                           <Space size={0} onClick={(e) => e.stopPropagation()}>
                             <Button type="text" size="small" icon={<EditOutlined style={{ fontSize: 12, color: '#d97706' }} />} onClick={(e) => { e.stopPropagation(); openCategoryModal(c); }} />
@@ -633,6 +637,7 @@ export default function Products() {
                   >
                     {categoryFilter === c.id.toString() ? <FolderOpenOutlined style={{ color: '#f59e0b' }} /> : <FolderOutlined style={{ color: '#94a3b8' }} />} 
                     {c.name}
+                    {c.is_inventory_tracked !== false && <span title="Có kiểm soát kho vận" style={{ fontSize: 12 }}>📦</span>}
                   </div>
                 ))}
                 <div 
@@ -711,7 +716,10 @@ export default function Products() {
                     icon: categoryFilter && categoryFilter.toString() === c.id.toString() ? <FolderOpenOutlined style={{ color: '#f59e0b' }} /> : <FolderOutlined style={{ color: '#f59e0b' }} />,
                     label: (
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%' }}>
-                        <span style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>{c.name}</span>
+                        <div style={{ display: 'flex', alignItems: 'center', flex: 1, minWidth: 0, paddingRight: 8 }}>
+                          <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{c.name}</span>
+                          {c.is_inventory_tracked !== false && <span title="Có kiểm soát kho vận" style={{ fontSize: 12, marginLeft: 4, flexShrink: 0 }}>📦</span>}
+                        </div>
                         {categoryFilter === c.id.toString() && (
                           <Space size={0} onClick={(e) => e.stopPropagation()}>
                             <Button type="text" size="small" icon={<EditOutlined style={{ fontSize: 12, color: '#d97706' }} />} onClick={(e) => { e.stopPropagation(); openCategoryModal(c); }} />
@@ -770,6 +778,7 @@ export default function Products() {
                   >
                     {categoryFilter === c.id.toString() ? <FolderOpenOutlined style={{ color: '#f59e0b' }} /> : <FolderOutlined style={{ color: '#94a3b8' }} />} 
                     {c.name}
+                    {c.is_inventory_tracked !== false && <span title="Có kiểm soát kho vận" style={{ fontSize: 12 }}>📦</span>}
                   </div>
                 ))}
                 <div 
@@ -1119,6 +1128,9 @@ export default function Products() {
           </Form.Item>
           <Form.Item name="description" label="Mô tả">
             <TextArea rows={2} placeholder="Mô tả ngắn gọn..." />
+          </Form.Item>
+          <Form.Item name="is_inventory_tracked" valuePropName="checked" tooltip="Nếu tắt, các sản phẩm trong danh mục này sẽ không bị trừ kho tự động khi duyệt đơn hàng.">
+            <Switch checkedChildren="Có kiểm soát" unCheckedChildren="Không kiểm soát" />
           </Form.Item>
         </Form>
       </Modal>

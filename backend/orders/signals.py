@@ -166,7 +166,8 @@ def check_and_trigger_mo_gate(order):
     if order.financial_status in allowed_statuses:
         # Nhạc trưởng Workflow sẽ tự động kiểm tra xem module nào được bật tiếp theo
         from orders.workflow import OrderWorkflowEngine
-        OrderWorkflowEngine.trigger_next_step(order, current_step=None)
+        factory_id = getattr(order, '_factory_id', None)
+        OrderWorkflowEngine.trigger_next_step(order, current_step=None, factory_id=factory_id)
     else:
         logger.info("Order %s approved but waiting for deposit payment to open Workflow Gate.", order.order_number)
 
@@ -234,21 +235,25 @@ def _create_pending_inventory_export(order):
         # VD: FUJI-DH-21072026-001 → FUJI-EXP-21072026-001
         txn_code = derive_code_from_order(order.order_number, order.company, "export")
 
-        for item in order.items.select_related("product").all():
+        for item in order.items.select_related("product", "product__category").all():
             # Skip services as they don't require physical stock outward
             if item.item_type == 'service' or (item.product and item.product.product_type == 'service'):
                 continue
-                
+            
             actual_product_id = item.custom_data.get('actual_product_id') if isinstance(item.custom_data, dict) else None
             
             if actual_product_id:
                 from inventory.models import Product
-                real_product = Product.objects.filter(id=actual_product_id).first()
+                real_product = Product.objects.select_related('category').filter(id=actual_product_id).first()
                 txn_product = real_product if real_product else item.product
                 custom_name = real_product.name if real_product else (item.product.name if item.product else item.product_name)
             else:
                 txn_product = item.product
                 custom_name = item.product.name if item.product else item.product_name
+
+            # Bỏ qua nếu sản phẩm thực tế thuộc danh mục không quản lý kho vận
+            if txn_product and txn_product.category and not txn_product.category.is_inventory_tracked:
+                continue
 
             dims = []
             

@@ -1,4 +1,4 @@
-import { AlertOutlined, CheckCircleOutlined, ClockCircleOutlined, CloseCircleOutlined, DeleteOutlined, EditOutlined, FileDoneOutlined, FileTextOutlined, MessageOutlined, MinusCircleOutlined, PlusOutlined, PrinterOutlined, SearchOutlined, UploadOutlined, PictureOutlined, CameraOutlined, TableOutlined } from '@ant-design/icons'
+import { AlertOutlined, CheckCircleOutlined, ClockCircleOutlined, CloseCircleOutlined, DeleteOutlined, EditOutlined, FileDoneOutlined, FileTextOutlined, MessageOutlined, MinusCircleOutlined, PlusOutlined, PrinterOutlined, SearchOutlined, UploadOutlined, PictureOutlined, CameraOutlined, TableOutlined, ToolOutlined } from '@ant-design/icons'
 import {
   AutoComplete,
   Badge,
@@ -149,6 +149,9 @@ export default function OrderList() {
   const [loading, setLoading] = useState(false)
   const [templates, setTemplates] = useState([])
   const [companyTemplate, setCompanyTemplate] = useState(null)
+  const [approveFactoryModalVisible, setApproveFactoryModalVisible] = useState(false)
+  const [approveOrderData, setApproveOrderData] = useState(null)
+  const [factories, setFactories] = useState([])
 
   // Column Visibility
   const DEFAULT_COLUMNS = ['order_number', 'customer_name', 'status', 'financial_status', 'payment_target', 'people', 'total_amount', 'action']
@@ -2449,9 +2452,44 @@ export default function OrderList() {
   // ── Approve & Reject Order ────────────────────────────────────────────
   const handleApprove = async (id) => {
     if (checkMaintenance()) return
+
+    const order = orders.find(o => o.id === id)
+    if (order && order.requires_inventory_export === false) {
+      // Đơn hàng không có vật tư qua kho -> Cần chọn nhà máy trực tiếp
+      if (factories.length === 0) {
+        try {
+          const res = await api.get('/production/factories/')
+          setFactories(res.data)
+        } catch (e) {
+          messageApi.error('Lỗi khi tải danh sách nhà máy.')
+        }
+      }
+      setApproveOrderData({ id, factory_id: null })
+      setApproveFactoryModalVisible(true)
+      return
+    }
+
     try {
       await api.post(`/orders/orders/${id}/approve/`)
       messageApi.success('✅ Đã duyệt đơn hàng! Hệ thống đã tự động xuất kho & tạo lệnh sản xuất.')
+      fetchOrders()
+    } catch (error) {
+      const msg = error.response?.data?.detail || 'Không thể duyệt đơn hàng này.'
+      messageApi.error(msg)
+    }
+  }
+
+  const submitApproveWithFactory = async () => {
+    if (!approveOrderData?.factory_id) {
+      messageApi.error('Vui lòng chọn nhà máy sản xuất.')
+      return
+    }
+    try {
+      await api.post(`/orders/orders/${approveOrderData.id}/approve/`, {
+        factory_id: approveOrderData.factory_id
+      })
+      messageApi.success('✅ Đã duyệt đơn hàng và chuyển thẳng sang Lệnh sản xuất.')
+      setApproveFactoryModalVisible(false)
       fetchOrders()
     } catch (error) {
       const msg = error.response?.data?.detail || 'Không thể duyệt đơn hàng này.'
@@ -3781,7 +3819,30 @@ export default function OrderList() {
         </Form>
       </Modal>
 
-    </section>
+        <Modal
+          title={<><ToolOutlined style={{ color: '#ea580c', marginRight: 8 }} /> Chọn Nhà máy sản xuất</>}
+          open={approveFactoryModalVisible}
+          onOk={submitApproveWithFactory}
+          onCancel={() => setApproveFactoryModalVisible(false)}
+          okText="Xác nhận Duyệt & Chuyển Sản Xuất"
+          cancelText="Hủy"
+        >
+          <div style={{ marginBottom: 16 }}>
+            <Text type="secondary">
+              Đơn hàng này không có vật tư qua kho nên sẽ chuyển thẳng sang Lệnh Sản Xuất. 
+              Vui lòng chọn Nhà máy để gán cho Lệnh Sản Xuất này.
+            </Text>
+          </div>
+          <Select
+            style={{ width: '100%' }}
+            placeholder="--- Chọn nhà máy sản xuất ---"
+            options={factories.map(f => ({ label: f.name, value: f.id }))}
+            value={approveOrderData?.factory_id}
+            onChange={(val) => setApproveOrderData(prev => ({ ...prev, factory_id: val }))}
+          />
+        </Modal>
+
+      </section>
   )
 }
 

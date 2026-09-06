@@ -1200,6 +1200,17 @@ export default function Inventory() {
       key: 'quantity',
       align: 'center',
       render: (_, r) => {
+        if (r.items && r.items.length > 1) {
+          const units = new Set()
+          r.items.forEach(i => {
+            const p = products.find((item) => item.id === i.product)
+            if (p?.unit) units.add(p.unit)
+          })
+          if (units.size > 1) {
+            return <Text type="secondary" style={{ fontStyle: 'italic', fontSize: 13 }}>Chi tiết</Text>
+          }
+        }
+        
         const totalQty = r.items ? r.items.reduce((sum, item) => sum + item.quantity, 0) : r.quantity
         return (
           <Text strong style={{ color: r.type === 'export' ? '#dc2626' : '#16a34a', fontSize: 15 }}>
@@ -1220,7 +1231,7 @@ export default function Inventory() {
             if (p?.unit) units.add(p.unit)
           })
           if (units.size === 1) return <Text>{[...units][0]}</Text>
-          return <Text type="secondary">—</Text>
+          return <Text type="secondary" style={{ fontStyle: 'italic', fontSize: 13 }}>Nhiều loại</Text>
         }
         const id = r.items ? r.items[0].product : r.product
         const p = products.find((item) => item.id === id)
@@ -1460,11 +1471,24 @@ export default function Inventory() {
                         else typeTag = <Tag color="warning">Điều chỉnh</Tag>
 
                         let qtyDisplay
-                        const totalQty = r.items ? r.items.reduce((sum, item) => sum + item.quantity, 0) : r.quantity
-                        if (r.type === 'export') {
-                          qtyDisplay = <Text strong style={{ color: '#dc2626', fontSize: 15 }}>-{totalQty}</Text>
-                        } else {
-                          qtyDisplay = <Text strong style={{ color: '#16a34a', fontSize: 15 }}>+{totalQty}</Text>
+                        if (r.items && r.items.length > 1) {
+                          const units = new Set()
+                          r.items.forEach(i => {
+                            const p = products.find((item) => item.id === i.product)
+                            if (p?.unit) units.add(p.unit)
+                          })
+                          if (units.size > 1) {
+                            qtyDisplay = <Text type="secondary" style={{ fontStyle: 'italic', fontSize: 13 }}>Chi tiết (Nhiều loại ĐVT)</Text>
+                          }
+                        }
+                        
+                        if (!qtyDisplay) {
+                          const totalQty = r.items ? r.items.reduce((sum, item) => sum + item.quantity, 0) : r.quantity
+                          if (r.type === 'export') {
+                            qtyDisplay = <Text strong style={{ color: '#dc2626', fontSize: 15 }}>-{totalQty}</Text>
+                          } else {
+                            qtyDisplay = <Text strong style={{ color: '#16a34a', fontSize: 15 }}>+{totalQty}</Text>
+                          }
                         }
 
                         let prodDisplay = ''
@@ -1534,6 +1558,14 @@ export default function Inventory() {
                                   title: 'Số lượng', 
                                   dataIndex: 'quantity', 
                                   render: (qty) => <Text strong>{qty}</Text> 
+                                },
+                                { 
+                                  title: 'Đơn vị tính', 
+                                  dataIndex: 'product', 
+                                  render: (id) => {
+                                    const p = products.find((item) => item.id === id)
+                                    return <Text>{p?.unit || '—'}</Text>
+                                  } 
                                 },
                                 { 
                                   title: 'Đơn giá', 

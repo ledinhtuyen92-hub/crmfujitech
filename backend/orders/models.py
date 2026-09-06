@@ -235,6 +235,30 @@ class Order(models.Model):
     def remaining_debt(self):
         return max(0.0, float(self.total_amount or 0) - self.paid_amount)
 
+    @property
+    def requires_inventory_export(self):
+        """
+        Kiểm tra xem đơn hàng có bất kỳ sản phẩm nào cần quản lý kho vận hay không.
+        Nếu không có (VD: toàn dịch vụ hoặc sản phẩm tùy chỉnh không theo dõi kho), 
+        thì đơn hàng không cần xuất kho.
+        """
+        from inventory.models import Product
+        for item in self.items.select_related("product", "product__category").all():
+            if item.item_type == 'service' or (item.product and item.product.product_type == 'service'):
+                continue
+            
+            actual_product_id = item.custom_data.get('actual_product_id') if isinstance(item.custom_data, dict) else None
+            
+            if actual_product_id:
+                real_product = Product.objects.select_related('category').filter(id=actual_product_id).first()
+                txn_product = real_product if real_product else item.product
+            else:
+                txn_product = item.product
+
+            if txn_product and txn_product.category and txn_product.category.is_inventory_tracked:
+                return True
+        return False
+
     def approve(self, approved_by_user):
         """
         Duyệt đơn hàng — chỉ gọi từ API view sau khi kiểm tra quyền.

@@ -65,6 +65,7 @@ class OrderSerializer(serializers.ModelSerializer):
     needs_export_request = serializers.SerializerMethodField()
     has_production_order = serializers.SerializerMethodField()
     has_pending_export = serializers.SerializerMethodField()
+    requires_inventory_export = serializers.ReadOnlyField()
 
     class Meta:
         model = Order
@@ -116,6 +117,7 @@ class OrderSerializer(serializers.ModelSerializer):
             "payment_milestones",
             "has_production_order",
             "has_pending_export",
+            "requires_inventory_export",
         ]
         read_only_fields = [
             "id", "company", "order_number", "status_display", "financial_status_display",
@@ -128,6 +130,7 @@ class OrderSerializer(serializers.ModelSerializer):
             "needs_export_request",
             "has_production_order",
             "has_pending_export",
+            "requires_inventory_export",
         ]
 
     def get_company_info(self, obj):

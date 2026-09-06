@@ -256,6 +256,10 @@ class OrderViewSet(TenantQuerySetMixin, viewsets.ModelViewSet):
             )
 
         try:
+            factory_id = request.data.get("factory_id")
+            if factory_id:
+                order._factory_id = factory_id
+                
             order.approve(approved_by_user=request.user)
             from approvals.models import ApprovalRequest, ApprovalStep
             from django.contrib.contenttypes.models import ContentType
