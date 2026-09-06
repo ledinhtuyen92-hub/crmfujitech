@@ -36,10 +36,11 @@ def parse_document(file_path, doc_type):
 def chunk_text(text):
     """
     Băm nhỏ text theo Semantic (ngữ nghĩa) hoặc Recursive (kích thước).
+    chunk_size=800 để mỗi Q&A pair là 1 chunk riêng → khớp semantic tốt hơn.
     """
     splitter = RecursiveCharacterTextSplitter(
-        chunk_size=2500,
-        chunk_overlap=250,
+        chunk_size=800,
+        chunk_overlap=80,
         length_function=len,
         is_separator_regex=False,
     )
