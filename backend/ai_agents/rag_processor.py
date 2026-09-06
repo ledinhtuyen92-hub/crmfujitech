@@ -38,8 +38,8 @@ def chunk_text(text):
     Băm nhỏ text theo Semantic (ngữ nghĩa) hoặc Recursive (kích thước).
     """
     splitter = RecursiveCharacterTextSplitter(
-        chunk_size=500,
-        chunk_overlap=50,
+        chunk_size=2500,
+        chunk_overlap=250,
         length_function=len,
         is_separator_regex=False,
     )
