@@ -235,11 +235,9 @@ def search_knowledge(agent, query: str, limit: int = 4):
 
         # Search 1: Top chunks tổng quát (mọi loại tài liệu)
         general_chunks = _query_chunks()
-        # Search 2: Riêng Q&A — đảm bảo Q&A luôn có mặt trong context
+        # Search 2: Riêng doc_type='qa' — đảm bảo Q&A luôn có mặt dù bị PDF đánh bật
         qa_chunks = _query_chunks(extra_filter={
-            'document__title__icontains': 'Q&A',
-        }) or _query_chunks(extra_filter={
-            'document__title__icontains': 'Hội thoại',
+            'document__doc_type': 'qa',
         })
 
         # Gộp: Q&A trước, sau đó general (loại bỏ trùng ID)
@@ -264,7 +262,7 @@ def search_knowledge(agent, query: str, limit: int = 4):
 
             for c in chunks:
                 dist = getattr(c, 'distance', 1)
-                is_qa = 'Q&A' in c.document.title or 'Hội thoại' in c.document.title
+                is_qa = getattr(c.document, 'doc_type', '') == 'qa'
                 logger.info(f"[RAG Debug] Chunk '{c.document.title}' distance={dist:.4f} is_qa={is_qa}")
                 logger.info(f"[RAG Debug] Content preview: {c.content[:200]}")
                 if dist < 0.85:
@@ -296,14 +294,14 @@ def search_knowledge(agent, query: str, limit: int = 4):
                                 img_url = f"{_cached_base}{img_url}"
                             text_to_append += f"\n![Hình ảnh đính kèm]({img_url})"
 
-                    knowledge_texts.append((c.document.title, text_to_append))
+                    knowledge_texts.append((is_qa, c.document.title, text_to_append))
 
 
 
             if knowledge_texts:
-                # Sắp xếp: Q&A lên TRƯỚC, PDF xuống cuối
-                qa_texts = [t for title, t in knowledge_texts if 'Q&A' in title or 'Hội thoại' in title]
-                other_texts = [t for title, t in knowledge_texts if 'Q&A' not in title and 'Hội thoại' not in title]
+                # Sắp xếp: Q&A (doc_type='qa') lên TRƯỚC, PDF/file xuống cuối
+                qa_texts = [t for is_q, title, t in knowledge_texts if is_q]
+                other_texts = [t for is_q, title, t in knowledge_texts if not is_q]
                 sorted_texts = qa_texts + other_texts
                 return (
                     "\n\n[TRÍCH XUẤT KIẾN THỨC NỘI BỘ TỪ CÔNG TY (RAG)]:\n"
