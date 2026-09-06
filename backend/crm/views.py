@@ -80,7 +80,10 @@ class CustomerViewSet(TenantQuerySetMixin, viewsets.ModelViewSet):
         # Filter theo assigned_to nếu có query param (dành cho manager)
         assigned_to = self.request.query_params.get("assigned_to")
         if assigned_to:
-            qs = qs.filter(assigned_to_id=assigned_to)
+            if assigned_to == "unassigned":
+                qs = qs.filter(assigned_to__isnull=True)
+            else:
+                qs = qs.filter(assigned_to_id=assigned_to)
         # Tìm kiếm theo tên hoặc SĐT
         search = self.request.query_params.get("search")
         if search:

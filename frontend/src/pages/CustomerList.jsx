@@ -1048,6 +1048,7 @@ function CustomerList() {
                 optionFilterProp="children"
               >
                 <Option value="">Tất cả nhân viên</Option>
+                <Option value="unassigned" style={{ color: '#ef4444', fontWeight: 500 }}>Chưa phân công</Option>
                 {salesUsers.map((u) => (
                   <Option key={u.id} value={u.id}>
                     {u.full_name || u.username}
