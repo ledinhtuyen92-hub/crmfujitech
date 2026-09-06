@@ -224,11 +224,29 @@ def search_knowledge(agent, query: str, limit: int = 4):
                 document__status='completed',
                 embedding__isnull=False
             ).annotate(distance=CosineDistance('embedding', query_vector)).order_by('distance')[:limit]
+
+        logger = logging.getLogger(__name__)
+        logger.info(f"[RAG Debug] Agent={agent.id}, Query='{query[:60]}', Provider={provider}, Chunks found={len(list(chunks))}")
+        # Re-fetch since queryset was consumed
+        if provider == 'gemini':
+            chunks = AiKnowledgeChunk.objects.filter(
+                document__agent=agent,
+                document__status='completed',
+                embedding_gemini__isnull=False
+            ).annotate(distance=CosineDistance('embedding_gemini', query_vector)).order_by('distance')[:limit]
+        else:
+            chunks = AiKnowledgeChunk.objects.filter(
+                document__agent=agent,
+                document__status='completed',
+                embedding__isnull=False
+            ).annotate(distance=CosineDistance('embedding', query_vector)).order_by('distance')[:limit]
             
         if chunks:
             knowledge_texts = []
             for c in chunks:
-                if getattr(c, 'distance', 1) < 0.7:  # Threshold
+                dist = getattr(c, 'distance', 1)
+                logger.info(f"[RAG Debug] Chunk '{c.document.title}' distance={dist:.4f}")
+                if dist < 0.85:  # Tăng threshold từ 0.7 → 0.85 để khớp chunk lớn hơn
                     text_to_append = f"- (Nguồn: {c.document.title})\n{c.content.strip()}"
 
                     # ── Ảnh từ file_attachment của document (doc_type == 'image') ──
@@ -249,4 +267,5 @@ def search_knowledge(agent, query: str, limit: int = 4):
     except Exception as e:
         logging.getLogger(__name__).error(f"RAG Search Error: {e}")
         
-    return ""
+    return ""
+
