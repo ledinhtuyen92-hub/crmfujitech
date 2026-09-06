@@ -249,8 +249,10 @@ def search_knowledge(agent, query: str, limit: int = 4):
 
             for c in chunks:
                 dist = getattr(c, 'distance', 1)
-                logger.info(f"[RAG Debug] Chunk '{c.document.title}' distance={dist:.4f}")
-                if dist < 0.85:  # Tăng threshold từ 0.7 → 0.85 để khớp chunk lớn hơn
+                is_qa = 'Q&A' in c.document.title or 'Hội thoại' in c.document.title
+                logger.info(f"[RAG Debug] Chunk '{c.document.title}' distance={dist:.4f} is_qa={is_qa}")
+                logger.info(f"[RAG Debug] Content preview: {c.content[:200]}")
+                if dist < 0.85:
                     # Convert URL ảnh tương đối → tuyệt đối để tasks.py có thể download được
                     content = c.content.strip()
                     if site_url:
@@ -259,7 +261,19 @@ def search_knowledge(agent, query: str, limit: int = 4):
                             lambda m: f'![{m.group(1)}]({site_url}{m.group(2)})',
                             content
                         )
-                    text_to_append = f"- (Nguồn: {c.document.title})\n{content}"
+
+                    if is_qa:
+                        # Q&A: đánh dấu BẮT BUỘC để AI không được bỏ qua
+                        text_to_append = (
+                            f"[CÂU TRẢ LỜI Q&A - BẮT BUỘC TUÂN THEO - NGUỒN: {c.document.title}]\n"
+                            f"{content}"
+                        )
+                    else:
+                        # Tài liệu đào tạo: chỉ là kiến thức nền
+                        text_to_append = (
+                            f"[TÀI LIỆU ĐÀO TẠO - CHỈ THAM KHẢO KHI KHÔNG CÓ Q&A - NGUỒN: {c.document.title}]\n"
+                            f"{content}"
+                        )
 
                     # ── Ảnh từ file_attachment của document (doc_type == 'image') ──
                     if getattr(c.document, 'file_attachment', None) and getattr(c.document.file_attachment, 'name', None):
@@ -272,16 +286,19 @@ def search_knowledge(agent, query: str, limit: int = 4):
                     knowledge_texts.append((c.document.title, text_to_append))
 
             if knowledge_texts:
-                # Sắp xếp: nguồn Q&A (📚 Tổng hợp Q&A) lên TRƯỚC để AI ưu tiên dùng
+                # Sắp xếp: Q&A lên TRƯỚC, PDF xuống cuối
                 qa_texts = [t for title, t in knowledge_texts if 'Q&A' in title or 'Hội thoại' in title]
                 other_texts = [t for title, t in knowledge_texts if 'Q&A' not in title and 'Hội thoại' not in title]
                 sorted_texts = qa_texts + other_texts
                 return (
                     "\n\n[TRÍCH XUẤT KIẾN THỨC NỘI BỘ TỪ CÔNG TY (RAG)]:\n"
-                    "⚠️ NGUYÊN TẮC SỬ DỤNG: Nếu có nguồn Q&A (Hội thoại, Q&A) trực tiếp trả lời câu hỏi của khách, BẮT BUỘC ưu tiên dùng câu trả lời đó (kể cả hình ảnh đính kèm). Tài liệu đào tạo chỉ dùng khi không có Q&A phù hợp.\n"
-                    + "\n".join(sorted_texts)
+                    "⚠️ QUY TẮC TUYỆT ĐỐI: Phần [CÂU TRẢ LỜI Q&A - BẮT BUỘC TUÂN THEO] là câu trả lời chính xác đã được duyệt sẵn. "
+                    "Bạn PHẢI trả lời theo đúng nội dung đó, KHÔNG được tự ý thay đổi hay từ chối dựa trên tài liệu đào tạo. "
+                    "Phần [TÀI LIỆU ĐÀO TẠO] chỉ dùng khi không có Q&A phù hợp.\n"
+                    + "\n\n".join(sorted_texts)
                     + "\n(Hãy ưu tiên sử dụng những kiến thức trên để trả lời khách hàng một cách chính xác nhất)."
                 )
+
 
                 
     except Exception as e:
