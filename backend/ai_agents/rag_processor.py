@@ -243,16 +243,30 @@ def search_knowledge(agent, query: str, limit: int = 4):
             
         if chunks:
             knowledge_texts = []
+            import re
+            from django.conf import settings
+            site_url = getattr(settings, 'SITE_URL', '').rstrip('/')
+
             for c in chunks:
                 dist = getattr(c, 'distance', 1)
                 logger.info(f"[RAG Debug] Chunk '{c.document.title}' distance={dist:.4f}")
                 if dist < 0.85:  # Tăng threshold từ 0.7 → 0.85 để khớp chunk lớn hơn
-                    text_to_append = f"- (Nguồn: {c.document.title})\n{c.content.strip()}"
+                    # Convert URL ảnh tương đối → tuyệt đối để tasks.py có thể download được
+                    content = c.content.strip()
+                    if site_url:
+                        content = re.sub(
+                            r'!\[([^\]]*)\]\((/media/[^\)]+)\)',
+                            lambda m: f'![{m.group(1)}]({site_url}{m.group(2)})',
+                            content
+                        )
+                    text_to_append = f"- (Nguồn: {c.document.title})\n{content}"
 
                     # ── Ảnh từ file_attachment của document (doc_type == 'image') ──
                     if getattr(c.document, 'file_attachment', None) and getattr(c.document.file_attachment, 'name', None):
                         if c.document.doc_type == 'image':
                             img_url = c.document.file_attachment.url
+                            if img_url.startswith('/') and site_url:
+                                img_url = f"{site_url}{img_url}"
                             text_to_append += f"\n![Hình ảnh đính kèm]({img_url})"
 
                     knowledge_texts.append(text_to_append)
@@ -263,6 +277,7 @@ def search_knowledge(agent, query: str, limit: int = 4):
                     + "\n".join(knowledge_texts)
                     + "\n(Hãy ưu tiên sử dụng những kiến thức trên để trả lời khách hàng một cách chính xác nhất)."
                 )
+
                 
     except Exception as e:
         logging.getLogger(__name__).error(f"RAG Search Error: {e}")
