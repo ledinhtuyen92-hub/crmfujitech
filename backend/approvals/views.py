@@ -29,11 +29,12 @@ class ApprovalRequestViewSet(TenantQuerySetMixin, viewsets.ModelViewSet):
                 # Admin/superuser thấy tất cả đang chờ duyệt
                 qs = qs.filter(status="pending")
             else:
-                # Người dùng thường chỉ thấy yêu cầu mà họ được chỉ định trực tiếp
-                # hoặc được chỉ định qua role — không phụ thuộc vào quyền has_perm
+                # Chỉ thấy yêu cầu được chỉ định đích danh cho mình
+                # Hoặc chỉ định theo role (khi không có người cụ thể nào được chọn)
                 q_filter = Q(steps__approver_user=user)
                 if user.role:
-                    q_filter |= Q(steps__approver_role=user.role)
+                    # Fallback theo role chỉ khi step đó chưa có approver_user cụ thể
+                    q_filter |= Q(steps__approver_user__isnull=True, steps__approver_role=user.role)
                 qs = qs.filter(q_filter).distinct()
 
         req_status = self.request.query_params.get("status")

@@ -130,10 +130,11 @@ def unread_count(request):
     qs = ApprovalRequest.objects.filter(company=request.user.company, status=ApprovalRequest.STATUS_PENDING)
     
     if not (request.user.is_superuser or request.user.is_company_admin):
-        # Chỉ hiển thị yêu cầu mà user được chỉ định trực tiếp hoặc qua role
+        # Chỉ hiển thị yêu cầu được chỉ định đích danh cho user
+        # Hoặc qua role khi step chưa có người cụ thể nào được chọn
         q_filter = Q(steps__approver_user=request.user)
         if request.user.role:
-            q_filter |= Q(steps__approver_role=request.user.role)
+            q_filter |= Q(steps__approver_user__isnull=True, steps__approver_role=request.user.role)
         qs = qs.filter(q_filter).distinct()
     
     base_approval_qs = qs
