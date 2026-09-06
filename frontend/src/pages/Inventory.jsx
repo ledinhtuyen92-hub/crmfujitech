@@ -1003,11 +1003,16 @@ export default function Inventory() {
       dataIndex: 'quantity',
       key: 'quantity',
       align: 'center',
-      render: (v, r) => (
-        <Text strong style={{ color: '#0f172a' }}>
-          {v} {products.find(p => p.id === r.product)?.unit || 'cái'}
-        </Text>
-      ),
+      render: (v) => <Text strong style={{ color: '#0f172a' }}>{v}</Text>,
+    },
+    {
+      title: 'Đơn vị tính',
+      key: 'unit',
+      align: 'center',
+      render: (_, r) => {
+        const p = products.find((item) => item.id === r.product)
+        return <Text>{p?.unit || '—'}</Text>
+      }
     },
     {
       title: 'Ghi chú',
@@ -1202,6 +1207,25 @@ export default function Inventory() {
           </Text>
         )
       },
+    },
+    {
+      title: 'Đơn vị tính',
+      key: 'unit',
+      align: 'center',
+      render: (_, r) => {
+        if (r.items && r.items.length > 1) {
+          const units = new Set()
+          r.items.forEach(i => {
+            const p = products.find((item) => item.id === i.product)
+            if (p?.unit) units.add(p.unit)
+          })
+          if (units.size === 1) return <Text>{[...units][0]}</Text>
+          return <Text type="secondary">—</Text>
+        }
+        const id = r.items ? r.items[0].product : r.product
+        const p = products.find((item) => item.id === id)
+        return <Text>{p?.unit || '—'}</Text>
+      }
     },
     {
       title: 'Ghi chú',
