@@ -259,19 +259,23 @@ def search_knowledge(agent, query: str, limit: int = 4):
             import re
             from .services import get_public_media_url
 
+            # Lấy public base URL 1 lần duy nhất (tránh timeout ngrok nhiều lần)
+            _cached_base = get_public_media_url('').rstrip('/')
+
             for c in chunks:
                 dist = getattr(c, 'distance', 1)
                 is_qa = 'Q&A' in c.document.title or 'Hội thoại' in c.document.title
                 logger.info(f"[RAG Debug] Chunk '{c.document.title}' distance={dist:.4f} is_qa={is_qa}")
                 logger.info(f"[RAG Debug] Content preview: {c.content[:200]}")
                 if dist < 0.85:
-                    # Convert URL ảnh tương đối → tuyệt đối công khai (ngrok trên localhost, SITE_URL trên VPS)
+                    # Convert URL ảnh tương đối → tuyệt đối (dùng base đã cache)
                     content = c.content.strip()
-                    content = re.sub(
-                        r'!\[([^\]]*)\]\((/media/[^\)]+)\)',
-                        lambda m: f'![{m.group(1)}]({get_public_media_url(m.group(2))})',
-                        content
-                    )
+                    if _cached_base:
+                        content = re.sub(
+                            r'!\[([^\]]*)\]\((/media/[^\)]+)\)',
+                            lambda m: f'![{m.group(1)}]({_cached_base}{m.group(2)})',
+                            content
+                        )
 
                     if is_qa:
                         text_to_append = (
@@ -288,11 +292,12 @@ def search_knowledge(agent, query: str, limit: int = 4):
                     if getattr(c.document, 'file_attachment', None) and getattr(c.document.file_attachment, 'name', None):
                         if c.document.doc_type == 'image':
                             img_url = c.document.file_attachment.url
-                            if img_url.startswith('/media/'):
-                                img_url = get_public_media_url(img_url)
+                            if img_url.startswith('/media/') and _cached_base:
+                                img_url = f"{_cached_base}{img_url}"
                             text_to_append += f"\n![Hình ảnh đính kèm]({img_url})"
 
                     knowledge_texts.append((c.document.title, text_to_append))
+
 
 
             if knowledge_texts:
