@@ -35,6 +35,29 @@ class ApprovalRequestViewSet(TenantQuerySetMixin, viewsets.ModelViewSet):
                 if user.role:
                     # Fallback theo role chỉ khi step đó chưa có approver_user cụ thể
                     q_filter |= Q(steps__approver_user__isnull=True, steps__approver_role=user.role)
+                
+                # NẾU không có đích danh AI và CŨNG không có ROLE nào được chọn,
+                # thì rơi vào trường hợp "Duyệt chung" -> ai có quyền (has_perm) thì được duyệt
+                fallback_q = Q(steps__approver_user__isnull=True, steps__approver_role__isnull=True)
+                perm_q = Q()
+                from django.contrib.contenttypes.models import ContentType
+                if hasattr(user, 'has_perm_code'):
+                    if user.has_perm_code('orders.approve'):
+                        from orders.models import Order
+                        perm_q |= Q(content_type=ContentType.objects.get_for_model(Order))
+                    if user.has_perm_code('sales.approve'):
+                        from sales.models import Quotation
+                        perm_q |= Q(content_type=ContentType.objects.get_for_model(Quotation))
+                    if user.has_perm_code('approvals.approve'):
+                        from orders.models import Order
+                        from sales.models import Quotation
+                        order_ct = ContentType.objects.get_for_model(Order)
+                        quote_ct = ContentType.objects.get_for_model(Quotation)
+                        perm_q |= ~Q(content_type__in=[order_ct, quote_ct])
+                
+                if perm_q != Q():
+                    q_filter |= (fallback_q & perm_q)
+
                 qs = qs.filter(q_filter).distinct()
 
         req_status = self.request.query_params.get("status")
@@ -128,13 +151,15 @@ class ApprovalRequestViewSet(TenantQuerySetMixin, viewsets.ModelViewSet):
             can_approve = True # Admin có thể duyệt thay
 
         if not can_approve and hasattr(user, 'has_perm_code'):
-            ct_model = approval_req.content_type.model
-            if ct_model == 'order' and user.has_perm_code('orders.approve'):
-                can_approve = True
-            elif ct_model == 'quotation' and user.has_perm_code('sales.approve'):
-                can_approve = True
-            elif ct_model not in ['order', 'quotation'] and user.has_perm_code('approvals.approve'):
-                can_approve = True
+            # Chỉ cho phép duyệt theo quyền chung NẾU step này không gán đích danh ai
+            if not step.approver_user and not step.approver_role:
+                ct_model = approval_req.content_type.model
+                if ct_model == 'order' and user.has_perm_code('orders.approve'):
+                    can_approve = True
+                elif ct_model == 'quotation' and user.has_perm_code('sales.approve'):
+                    can_approve = True
+                elif ct_model not in ['order', 'quotation'] and user.has_perm_code('approvals.approve'):
+                    can_approve = True
 
         if not can_approve:
             return Response({"detail": "Bạn không có quyền duyệt bước này."}, status=status.HTTP_403_FORBIDDEN)
@@ -196,13 +221,15 @@ class ApprovalRequestViewSet(TenantQuerySetMixin, viewsets.ModelViewSet):
             can_approve = True
 
         if not can_approve and hasattr(user, 'has_perm_code'):
-            ct_model = approval_req.content_type.model
-            if ct_model == 'order' and user.has_perm_code('orders.approve'):
-                can_approve = True
-            elif ct_model == 'quotation' and user.has_perm_code('sales.approve'):
-                can_approve = True
-            elif ct_model not in ['order', 'quotation'] and user.has_perm_code('approvals.approve'):
-                can_approve = True
+            # Chỉ cho phép duyệt theo quyền chung NẾU step này không gán đích danh ai
+            if not step.approver_user and not step.approver_role:
+                ct_model = approval_req.content_type.model
+                if ct_model == 'order' and user.has_perm_code('orders.approve'):
+                    can_approve = True
+                elif ct_model == 'quotation' and user.has_perm_code('sales.approve'):
+                    can_approve = True
+                elif ct_model not in ['order', 'quotation'] and user.has_perm_code('approvals.approve'):
+                    can_approve = True
 
         if not can_approve:
             return Response({"detail": "Bạn không có quyền từ chối bước này."}, status=status.HTTP_403_FORBIDDEN)

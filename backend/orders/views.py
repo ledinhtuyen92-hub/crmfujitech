@@ -423,7 +423,7 @@ class OrderViewSet(TenantQuerySetMixin, viewsets.ModelViewSet):
             )
             ApprovalStep.objects.create(
                 request=req,
-                approver=approver,
+                approver_user=approver,
                 step_order=1,
                 status=ApprovalStep.STATUS_PENDING,
             )

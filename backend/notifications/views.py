@@ -135,6 +135,28 @@ def unread_count(request):
         q_filter = Q(steps__approver_user=request.user)
         if request.user.role:
             q_filter |= Q(steps__approver_user__isnull=True, steps__approver_role=request.user.role)
+            
+        fallback_q = Q(steps__approver_user__isnull=True, steps__approver_role__isnull=True)
+        perm_q = Q()
+        perms = getattr(request.user.role, 'permissions', None)
+        if perms:
+            perm_list = perms.values_list('code', flat=True)
+            if 'orders.approve' in perm_list:
+                from orders.models import Order
+                perm_q |= Q(content_type=ContentType.objects.get_for_model(Order))
+            if 'sales.approve' in perm_list:
+                from sales.models import Quotation
+                perm_q |= Q(content_type=ContentType.objects.get_for_model(Quotation))
+            if 'approvals.approve' in perm_list:
+                from orders.models import Order
+                from sales.models import Quotation
+                order_ct = ContentType.objects.get_for_model(Order)
+                quote_ct = ContentType.objects.get_for_model(Quotation)
+                perm_q |= ~Q(content_type__in=[order_ct, quote_ct])
+                
+        if perm_q != Q():
+            q_filter |= (fallback_q & perm_q)
+            
         qs = qs.filter(q_filter).distinct()
     
     base_approval_qs = qs
