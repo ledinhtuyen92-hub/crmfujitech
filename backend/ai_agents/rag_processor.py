@@ -215,30 +215,30 @@ def search_knowledge(agent, query: str, limit: int = 4):
             
         logger = logging.getLogger(__name__)
 
-        def _query_chunks(extra_filter=None):
+        def _query_chunks(extra_filter=None, limit_override=None):
             f = dict(
                 document__agent=agent,
                 document__status='completed',
             )
             if extra_filter:
                 f.update(extra_filter)
+            n = limit_override or limit
             if provider == 'gemini':
                 f['embedding_gemini__isnull'] = False
                 return list(AiKnowledgeChunk.objects.filter(**f)
                     .annotate(distance=CosineDistance('embedding_gemini', query_vector))
-                    .order_by('distance')[:limit])
+                    .order_by('distance')[:n])
             else:
                 f['embedding__isnull'] = False
                 return list(AiKnowledgeChunk.objects.filter(**f)
                     .annotate(distance=CosineDistance('embedding', query_vector))
-                    .order_by('distance')[:limit])
+                    .order_by('distance')[:n])
 
         # Search 1: Top chunks tổng quát (mọi loại tài liệu)
         general_chunks = _query_chunks()
-        # Search 2: Riêng doc_type='qa' — đảm bảo Q&A luôn có mặt dù bị PDF đánh bật
-        qa_chunks = _query_chunks(extra_filter={
-            'document__doc_type': 'qa',
-        })
+        # Search 2: Riêng doc_type='qa' với limit gấp đôi — đảm bảo lấy đủ chunk từ tất cả file Q&A
+        qa_limit = limit * 2  # lấy nhiều hơn để không bỏ sót chunk có ảnh nằm xa
+        qa_chunks = _query_chunks(extra_filter={'document__doc_type': 'qa'}, limit_override=qa_limit)
 
         # Gộp: Q&A trước, sau đó general (loại bỏ trùng ID)
         seen_ids = set()
