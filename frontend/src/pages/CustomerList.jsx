@@ -1028,7 +1028,7 @@ function CustomerList() {
               })}
             </Select>
           </Col>
-          <Col xs={24} sm={12} md={4} style={{ marginBottom: 8, display: 'flex', alignItems: 'center' }}>
+          <Col xs={24} sm={12} md={3} style={{ marginBottom: 8, display: 'flex', alignItems: 'center' }}>
             <Checkbox 
               checked={isInactiveFilter} 
               onChange={(e) => setIsInactiveFilter(e.target.checked)}
@@ -1037,7 +1037,7 @@ function CustomerList() {
             </Checkbox>
           </Col>
           {(hasPermission('crm.assign') || hasPermission('crm.auto_assign') || hasPermission('crm.view_all')) && (
-            <Col xs={24} sm={12} md={5} style={{ marginBottom: 8 }}>
+            <Col xs={24} sm={12} md={4} style={{ marginBottom: 8 }}>
               <Select
                 placeholder="Lọc theo Sale phụ trách"
                 style={{ width: '100%' }}
@@ -1057,7 +1057,7 @@ function CustomerList() {
               </Select>
             </Col>
           )}
-          <Col xs={24} sm={12} md={(hasPermission('crm.assign') || hasPermission('crm.auto_assign') || hasPermission('crm.view_all')) ? 6 : 8} style={{ textAlign: isMobile ? 'left' : 'right', marginBottom: 8 }}>
+          <Col xs={24} sm={12} md={(hasPermission('crm.assign') || hasPermission('crm.auto_assign') || hasPermission('crm.view_all')) ? 8 : 12} style={{ textAlign: isMobile ? 'left' : 'right', marginBottom: 8 }}>
             <Space wrap>
               <Button 
                 type={isNewUnattendedFilter ? "primary" : "default"}
