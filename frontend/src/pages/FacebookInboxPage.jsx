@@ -366,7 +366,7 @@ function MessageBubble({ msg, lead, showAvatar = true }) {
           <div style={{ marginTop: msg.text ? 8 : 0 }}>
             {isImage ? (
               <Image
-                src={msg.attachment_url}
+                src={cleanUrl(msg.attachment_url)}
                 alt="attachment"
                 style={{ maxWidth: 260, maxHeight: 260, borderRadius: 12, objectFit: 'cover', display: 'block' }}
               />
@@ -374,7 +374,7 @@ function MessageBubble({ msg, lead, showAvatar = true }) {
               <div style={{ maxWidth: 280 }}>
                 <video
                   controls
-                  src={msg.attachment_url}
+                  src={cleanUrl(msg.attachment_url)}
                   style={{ maxWidth: '100%', maxHeight: 260, borderRadius: 12, display: 'block', background: '#000' }}
                   onError={(e) => {
                     // Nếu video không load được (URL hết hạn), hiển thị nút tải thay thế
@@ -383,7 +383,7 @@ function MessageBubble({ msg, lead, showAvatar = true }) {
                   }}
                 />
                 <a
-                  href={msg.attachment_url}
+                  href={cleanUrl(msg.attachment_url)}
                   target="_blank"
                   rel="noreferrer"
                   style={{
@@ -405,10 +405,10 @@ function MessageBubble({ msg, lead, showAvatar = true }) {
                 </a>
               </div>
             ) : isAudio ? (
-              <audio controls src={msg.attachment_url} style={{ maxWidth: 240 }} />
+              <audio controls src={cleanUrl(msg.attachment_url)} style={{ maxWidth: 240 }} />
             ) : (
               <a
-                href={msg.attachment_url}
+                href={cleanUrl(msg.attachment_url)}
                 target="_blank"
                 rel="noreferrer"
                 style={{

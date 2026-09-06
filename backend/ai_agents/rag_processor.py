@@ -227,48 +227,23 @@ def search_knowledge(agent, query: str, limit: int = 4):
             
         if chunks:
             knowledge_texts = []
-            import re
-            seen_img_urls = set()
             for c in chunks:
                 if getattr(c, 'distance', 1) < 0.7:  # Threshold
-
-                    # Strip ảnh markdown khỏi text chunk trước khi hiển thị cho AI
-                    # (ảnh sẽ được gom vào [HÌNH ẢNH ĐÍNH KÈM] ở cuối — chỉ 1 nơi duy nhất)
-                    clean_content = re.sub(r'\n*!\[.*?\]\(https?://[^\)]+\)\n*', ' ', c.content).strip()
-                    text_to_append = f"- (Nguồn: {c.document.title}) {clean_content}"
+                    text_to_append = f"- (Nguồn: {c.document.title})\n{c.content.strip()}"
 
                     # ── Ảnh từ file_attachment của document (doc_type == 'image') ──
                     if getattr(c.document, 'file_attachment', None) and getattr(c.document.file_attachment, 'name', None):
                         if c.document.doc_type == 'image':
                             img_url = c.document.file_attachment.url
-                            if img_url not in seen_img_urls:
-                                seen_img_urls.add(img_url)
-
-                    # ── Ảnh nhúng trong chunk content đúng topic đã match ──
-                    # CHỈ lấy ảnh từ chunk cụ thể match query, KHÔNG scan toàn bộ document
-                    # (tránh trường hợp chunk "cửa có loại nào" match nhưng lại lấy ảnh nhà máy)
-                    chunk_img_urls = re.findall(r'!\[.*?\]\((https?://[^\)]+)\)', c.content)
-                    for img_url in chunk_img_urls:
-                        if img_url not in seen_img_urls:
-                            seen_img_urls.add(img_url)
+                            text_to_append += f"\n![Hình ảnh đính kèm]({img_url})"
 
                     knowledge_texts.append(text_to_append)
-
-            # Nếu có ảnh tìm được, ghép vào cuối context để AI chắc chắn nhận diện
-            img_instruction = ""
-            if seen_img_urls:
-                img_list = "\n".join(f"  ![ảnh]({u})" for u in seen_img_urls)
-                img_instruction = (
-                    f"\n\n[HÌNH ẢNH ĐÍNH KÈM - BẮT BUỘC GỬI CHO KHÁCH]:\n{img_list}\n"
-                    "(Sao chép TOÀN BỘ URL ảnh trên vào mảng 'image_urls' trong JSON phản hồi của bạn.)"
-                )
 
             if knowledge_texts:
                 return (
                     "\n\n[TRÍCH XUẤT KIẾN THỨC NỘI BỘ TỪ CÔNG TY (RAG)]:\n"
                     + "\n".join(knowledge_texts)
                     + "\n(Hãy ưu tiên sử dụng những kiến thức trên để trả lời khách hàng một cách chính xác nhất)."
-                    + img_instruction
                 )
                 
     except Exception as e:

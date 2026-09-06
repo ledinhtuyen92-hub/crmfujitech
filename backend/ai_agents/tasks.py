@@ -719,14 +719,23 @@ def process_ai_reply_facebook(lead_id, is_followup=False, trigger_msg_id=None):
                 try:
                     import urllib.request, urllib.parse, io
                     encoded_url = urllib.parse.quote(img_url, safe=":/")
-                    req = urllib.request.Request(encoded_url, headers={'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)'})
+                    req = urllib.request.Request(encoded_url, headers={
+                        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)',
+                        # Bỏ qua trang cảnh báo interstitial của ngrok free tier (trả về HTML 200
+                        # thay vì ảnh thật nếu thiếu header này) — nếu không kiểm tra, ảnh "tải được"
+                        # thực chất là trang HTML rác, khiến Facebook trả lỗi #100 khi upload.
+                        'ngrok-skip-browser-warning': 'true',
+                    })
                     resp_dl = urllib.request.urlopen(req, timeout=10)
-                    if resp_dl.getcode() == 200:
+                    content_type = resp_dl.headers.get('Content-Type', '')
+                    if resp_dl.getcode() == 200 and content_type.startswith('image/'):
                         file_bytes = resp_dl.read()
                         file_obj = io.BytesIO(file_bytes)
                         file_obj.name = "attachment.jpg"
                         if ".png" in img_url.lower(): file_obj.name = "attachment.png"
                         file_obj.content_type = "image/jpeg" if ".jpg" in file_obj.name else "image/png"
+                    elif resp_dl.getcode() == 200:
+                        logger.warning(f"[AI Facebook] URL {img_url} không trả về ảnh (Content-Type={content_type}), sẽ gửi qua attachment_url thay thế.")
                 except Exception as e:
                     logger.warning(f"[AI Facebook] Failed to download image {img_url} locally: {e}")
                 
