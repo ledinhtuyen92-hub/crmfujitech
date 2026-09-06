@@ -11,6 +11,30 @@ import anthropic
 
 logger = logging.getLogger(__name__)
 
+def get_public_media_url(relative_path: str) -> str:
+    """
+    Chuyển đường dẫn tương đối /media/... thành URL tuyệt đối công khai.
+    - Trên localhost: dùng ngrok URL (nếu có) để Facebook tải được.
+    - Trên VPS: dùng SITE_URL.
+    """
+    import os
+    # Thử lấy ngrok URL (chỉ có trên localhost dev)
+    public_base = None
+    try:
+        import requests as _req
+        res = _req.get("http://host.docker.internal:4040/api/tunnels",
+                       headers={"Host": "localhost"}, timeout=2)
+        if res.status_code == 200:
+            tunnels = res.json().get('tunnels', [])
+            if tunnels:
+                public_base = tunnels[0]['public_url'].rstrip('/')
+    except Exception:
+        pass
+    if not public_base:
+        public_base = getattr(settings, 'SITE_URL', os.environ.get('SITE_URL', '')).rstrip('/')
+    return f"{public_base}{relative_path}"
+
+
 # ========================================================
 # ► HẰNG DẪN JSON CHO AI: Điều chỉnh ở đây hoặc trực tiếp trên Giao diện
 # (Khi để trống trường Core Prompt trên UI, hệ thống sẽ dùng mẫu dưới đây)

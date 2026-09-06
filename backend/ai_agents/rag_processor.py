@@ -257,8 +257,7 @@ def search_knowledge(agent, query: str, limit: int = 4):
         if chunks:
             knowledge_texts = []
             import re
-            from django.conf import settings
-            site_url = getattr(settings, 'SITE_URL', '').rstrip('/')
+            from .services import get_public_media_url
 
             for c in chunks:
                 dist = getattr(c, 'distance', 1)
@@ -266,23 +265,20 @@ def search_knowledge(agent, query: str, limit: int = 4):
                 logger.info(f"[RAG Debug] Chunk '{c.document.title}' distance={dist:.4f} is_qa={is_qa}")
                 logger.info(f"[RAG Debug] Content preview: {c.content[:200]}")
                 if dist < 0.85:
-                    # Convert URL ảnh tương đối → tuyệt đối để tasks.py có thể download được
+                    # Convert URL ảnh tương đối → tuyệt đối công khai (ngrok trên localhost, SITE_URL trên VPS)
                     content = c.content.strip()
-                    if site_url:
-                        content = re.sub(
-                            r'!\[([^\]]*)\]\((/media/[^\)]+)\)',
-                            lambda m: f'![{m.group(1)}]({site_url}{m.group(2)})',
-                            content
-                        )
+                    content = re.sub(
+                        r'!\[([^\]]*)\]\((/media/[^\)]+)\)',
+                        lambda m: f'![{m.group(1)}]({get_public_media_url(m.group(2))})',
+                        content
+                    )
 
                     if is_qa:
-                        # Q&A: đánh dấu BẮT BUỘC để AI không được bỏ qua
                         text_to_append = (
                             f"[CÂU TRẢ LỜI Q&A - BẮT BUỘC TUÂN THEO - NGUỒN: {c.document.title}]\n"
                             f"{content}"
                         )
                     else:
-                        # Tài liệu đào tạo: chỉ là kiến thức nền
                         text_to_append = (
                             f"[TÀI LIỆU ĐÀO TẠO - CHỈ THAM KHẢO KHI KHÔNG CÓ Q&A - NGUỒN: {c.document.title}]\n"
                             f"{content}"
@@ -292,11 +288,12 @@ def search_knowledge(agent, query: str, limit: int = 4):
                     if getattr(c.document, 'file_attachment', None) and getattr(c.document.file_attachment, 'name', None):
                         if c.document.doc_type == 'image':
                             img_url = c.document.file_attachment.url
-                            if img_url.startswith('/') and site_url:
-                                img_url = f"{site_url}{img_url}"
+                            if img_url.startswith('/media/'):
+                                img_url = get_public_media_url(img_url)
                             text_to_append += f"\n![Hình ảnh đính kèm]({img_url})"
 
                     knowledge_texts.append((c.document.title, text_to_append))
+
 
             if knowledge_texts:
                 # Sắp xếp: Q&A lên TRƯỚC, PDF xuống cuối
