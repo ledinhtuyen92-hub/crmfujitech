@@ -149,9 +149,15 @@ export default function OrderList() {
   const [loading, setLoading] = useState(false)
   const [templates, setTemplates] = useState([])
   const [companyTemplate, setCompanyTemplate] = useState(null)
+  const [triggerProductionMode, setTriggerProductionMode] = useState(false)
   const [approveFactoryModalVisible, setApproveFactoryModalVisible] = useState(false)
   const [approveOrderData, setApproveOrderData] = useState(null)
   const [factories, setFactories] = useState([])
+
+  // Delete order security modal
+  const [deleteSecurityModalVisible, setDeleteSecurityModalVisible] = useState(false)
+  const [orderToDelete, setOrderToDelete] = useState(null)
+  const [deleteConfirmText, setDeleteConfirmText] = useState('')
 
   // Column Visibility
   const DEFAULT_COLUMNS = ['order_number', 'customer_name', 'status', 'financial_status', 'payment_target', 'people', 'total_amount', 'action']
@@ -2431,11 +2437,22 @@ export default function OrderList() {
   }
 
   // ── Delete Order ──────────────────────────────────────────────────────
-  const handleDelete = async (id) => {
+  const openDeleteModal = (record) => {
+    setOrderToDelete(record)
+    setDeleteConfirmText('')
+    setDeleteSecurityModalVisible(true)
+  }
+
+  const handleDelete = async () => {
     if (checkMaintenance()) return
+    if (deleteConfirmText !== 'XOA DON HANG') {
+      messageApi.error('Vui lòng nhập đúng chữ "XOA DON HANG" để xác nhận xoá.')
+      return
+    }
     try {
-      await api.delete(`/orders/orders/${id}/`)
+      await api.delete(`/orders/orders/${orderToDelete.id}/`)
       messageApi.success('Đã xoá đơn hàng.')
+      setDeleteSecurityModalVisible(false)
       fetchOrders()
     } catch (err) {
       let msg = 'Không thể xoá đơn hàng này.'
@@ -2459,12 +2476,13 @@ export default function OrderList() {
       if (factories.length === 0) {
         try {
           const res = await api.get('/production/factories/')
-          setFactories(res.data)
+          setFactories(Array.isArray(res.data) ? res.data : (res.data?.results || []))
         } catch (e) {
           messageApi.error('Lỗi khi tải danh sách nhà máy.')
         }
       }
-      setApproveOrderData({ id, factory_id: null })
+      setApproveOrderData({ id, factory_id: null, order })
+      setTriggerProductionMode(false)
       setApproveFactoryModalVisible(true)
       return
     }
@@ -2480,6 +2498,10 @@ export default function OrderList() {
   }
 
   const submitApproveWithFactory = async () => {
+    if (triggerProductionMode) {
+      await submitTriggerProduction()
+      return
+    }
     if (!approveOrderData?.factory_id) {
       messageApi.error('Vui lòng chọn nhà máy sản xuất.')
       return
@@ -2493,6 +2515,30 @@ export default function OrderList() {
       fetchOrders()
     } catch (error) {
       const msg = error.response?.data?.detail || 'Không thể duyệt đơn hàng này.'
+      messageApi.error(msg)
+    }
+  }
+
+  const submitTriggerProduction = async () => {
+    if (!approveOrderData?.factory_id) {
+      messageApi.error('Vui lòng chọn nhà máy sản xuất.')
+      return
+    }
+    try {
+      await api.post(`/orders/orders/${approveOrderData.id}/trigger_production/`, {
+        factory_id: approveOrderData.factory_id
+      })
+      messageApi.success('Đã yêu cầu tạo lệnh sản xuất thành công.')
+      setApproveFactoryModalVisible(false)
+      setTriggerProductionMode(false)
+      fetchOrders()
+      // Refresh selected order in drawer if open
+      if (drawerVisible && selectedOrder && selectedOrder.id === approveOrderData.id) {
+        const res = await api.get(`/orders/orders/${selectedOrder.id}/`)
+        setSelectedOrder(res.data)
+      }
+    } catch (error) {
+      const msg = error.response?.data?.detail || 'Lỗi khi tạo lệnh sản xuất.'
       messageApi.error(msg)
     }
   }
@@ -2655,16 +2701,15 @@ export default function OrderList() {
       )}
 
       {canDelete && (
-        <Popconfirm
-          title="Xoá đơn hàng?"
-          description="Bạn có chắc chắn muốn xoá đơn hàng này không?"
-          onConfirm={() => handleDelete(record.id)}
-          okText="Xoá"
-          cancelText="Hủy"
-          okButtonProps={{ danger: true }}
-        >
-          <Tooltip title="Xoá"><Button type="text" danger shape="circle" icon={<DeleteOutlined />} /></Tooltip>
-        </Popconfirm>
+        <Tooltip title="Xoá">
+          <Button 
+            type="text" 
+            danger 
+            shape="circle" 
+            icon={<DeleteOutlined />} 
+            onClick={() => openDeleteModal(record)}
+          />
+        </Tooltip>
       )}
     </Space>
   )
@@ -2729,7 +2774,7 @@ export default function OrderList() {
         return (
           <Space direction="vertical" size={2}>
             <Tag color={cfg.color} icon={cfg.icon}>{cfg.label}</Tag>
-            {r.needs_export_request && ['fully_paid', 'deposit_paid', 'credit_approved'].includes(r.financial_status) && (
+            {isModuleActive('inventory') && r.needs_export_request && ['fully_paid', 'deposit_paid', 'credit_approved'].includes(r.financial_status) && (
               <Tag color="error" style={{ fontSize: 11, cursor: 'pointer' }} onClick={(e) => {
                 e.stopPropagation()
                 setSelectedOrder(r)
@@ -2738,13 +2783,22 @@ export default function OrderList() {
                 ⚠️ Chưa có lệnh XK
               </Tag>
             )}
-            {r.has_pending_export && (
+            {isModuleActive('inventory') && r.has_pending_export && (
               <Tag color="error" style={{ fontSize: 11, cursor: 'pointer' }} onClick={(e) => {
                 e.stopPropagation()
                 setSelectedOrder(r)
                 setDrawerVisible(true)
               }}>
                 ⚠️ Đang đợi duyệt xuất kho
+              </Tag>
+            )}
+            {isModuleActive('production') && r.requires_inventory_export === false && !r.has_production_order && ['fully_paid', 'deposit_paid', 'credit_approved'].includes(r.financial_status) && ['approved', 'completed'].includes(r.status) && (
+              <Tag color="error" style={{ fontSize: 11, cursor: 'pointer' }} onClick={(e) => {
+                e.stopPropagation()
+                setSelectedOrder(r)
+                setDrawerVisible(true)
+              }}>
+                ⚠️ Chưa có lệnh SX
               </Tag>
             )}
           </Space>
@@ -3557,6 +3611,38 @@ export default function OrderList() {
               </div>
             )}
 
+            {(isCompanyAdmin || selectedOrder.created_by === user?.id) && isModuleActive('production') && selectedOrder.requires_inventory_export === false && !selectedOrder.has_production_order && ['fully_paid', 'deposit_paid', 'credit_approved'].includes(selectedOrder.financial_status) && ['approved', 'completed'].includes(selectedOrder.status) && (
+              <div style={{ padding: '16px', background: '#fef2f2', borderRadius: '12px', border: '1px solid #fca5a5', marginBottom: '16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <Space size={12}>
+                  <AlertOutlined style={{ color: '#ef4444', fontSize: 20 }} />
+                  <Space direction="vertical" size={0}>
+                    <Text strong style={{ color: '#b91c1c' }}>Đơn hàng bị thiếu lệnh sản xuất!</Text>
+                    <Text type="secondary" style={{ color: '#991b1b', fontSize: 13 }}>Dữ liệu lệnh sản xuất đã bị xóa hoặc chưa được tạo. Vui lòng tạo lại.</Text>
+                  </Space>
+                </Space>
+                <Button 
+                  type="primary" 
+                  danger 
+                  onClick={async () => {
+                    if (factories.length === 0) {
+                      try {
+                        const res = await api.get('/production/factories/')
+                        setFactories(Array.isArray(res.data) ? res.data : (res.data?.results || []))
+                      } catch (e) {
+                        messageApi.error('Lỗi khi tải danh sách nhà máy.')
+                      }
+                    }
+                    setApproveOrderData({ id: selectedOrder.id, factory_id: null, order: selectedOrder })
+                    setTriggerProductionMode(true)
+                    setApproveFactoryModalVisible(true)
+                  }}
+                  style={{ fontWeight: 600, borderRadius: '8px', boxShadow: '0 4px 12px rgba(239, 68, 68, 0.3)' }}
+                >
+                  Tạo lệnh SX lại
+                </Button>
+              </div>
+            )}
+
             {/* LỊCH SỬ THU TIỀN */}
             {(selectedOrder.payment_milestones?.flatMap(m => m.receipts || []) || []).length > 0 && (
               <div style={{ marginTop: 16, marginBottom: 16 }}>
@@ -3820,11 +3906,14 @@ export default function OrderList() {
       </Modal>
 
         <Modal
-          title={<><ToolOutlined style={{ color: '#ea580c', marginRight: 8 }} /> Chọn Nhà máy sản xuất</>}
+          title={triggerProductionMode ? <><ToolOutlined style={{ color: '#ea580c', marginRight: 8 }} /> Tạo lệnh sản xuất lại</> : <><ToolOutlined style={{ color: '#ea580c', marginRight: 8 }} /> Chọn Nhà máy sản xuất</>}
           open={approveFactoryModalVisible}
           onOk={submitApproveWithFactory}
-          onCancel={() => setApproveFactoryModalVisible(false)}
-          okText="Xác nhận Duyệt & Chuyển Sản Xuất"
+          onCancel={() => {
+            setApproveFactoryModalVisible(false)
+            setTriggerProductionMode(false)
+          }}
+          okText={triggerProductionMode ? "Xác nhận Tạo Lệnh SX" : "Xác nhận Duyệt & Chuyển Sản Xuất"}
           cancelText="Hủy"
         >
           <div style={{ marginBottom: 16 }}>
@@ -3832,6 +3921,14 @@ export default function OrderList() {
               Đơn hàng này không có vật tư qua kho nên sẽ chuyển thẳng sang Lệnh Sản Xuất. 
               Vui lòng chọn Nhà máy để gán cho Lệnh Sản Xuất này.
             </Text>
+            {approveOrderData?.order?.financial_status === 'unpaid' && (
+              <div style={{ marginTop: 12, padding: '8px 12px', background: '#fffbeb', border: '1px solid #fef08a', borderRadius: 6 }}>
+                <Text style={{ color: '#b45309' }}>
+                  <AlertOutlined style={{ marginRight: 8 }} />
+                  Đơn hàng này đang <strong>chờ thanh toán / chờ cọc</strong>. Việc chọn Nhà máy sẽ được lưu lại, nhưng <strong>Lệnh Sản Xuất chỉ được kích hoạt tạo tự động sau khi đơn hàng đã thanh toán hoặc đặt cọc</strong> theo quy trình.
+                </Text>
+              </div>
+            )}
           </div>
           <Select
             style={{ width: '100%' }}
@@ -3839,6 +3936,30 @@ export default function OrderList() {
             options={factories.map(f => ({ label: f.name, value: f.id }))}
             value={approveOrderData?.factory_id}
             onChange={(val) => setApproveOrderData(prev => ({ ...prev, factory_id: val }))}
+          />
+        </Modal>
+
+        {/* Delete Order Security Modal */}
+        <Modal
+          title="Xác nhận xoá đơn hàng"
+          open={deleteSecurityModalVisible}
+          onOk={handleDelete}
+          onCancel={() => setDeleteSecurityModalVisible(false)}
+          okText="Xoá Đơn Hàng"
+          cancelText="Hủy"
+          okButtonProps={{ danger: true, disabled: deleteConfirmText !== 'XOA DON HANG' }}
+        >
+          <div style={{ marginBottom: 16 }}>
+            <p>Thao tác này <strong style={{ color: '#dc2626' }}>không thể hoàn tác</strong>. Mọi dữ liệu liên quan đến đơn hàng này sẽ bị xoá vĩnh viễn.</p>
+            <p>Vui lòng nhập <strong style={{ color: '#dc2626' }}>XOA DON HANG</strong> để xác nhận:</p>
+          </div>
+          <Input 
+            placeholder="Nhập XOA DON HANG..." 
+            value={deleteConfirmText}
+            onChange={(e) => setDeleteConfirmText(e.target.value)}
+            onPressEnter={() => {
+              if (deleteConfirmText === 'XOA DON HANG') handleDelete()
+            }}
           />
         </Modal>
 

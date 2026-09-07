@@ -577,7 +577,7 @@ export default function Products() {
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%' }}>
                         <div style={{ display: 'flex', alignItems: 'center', flex: 1, minWidth: 0, paddingRight: 8 }}>
                           <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{c.name}</span>
-                          {c.is_inventory_tracked !== false && <span title="Có kiểm soát kho vận" style={{ fontSize: 12, marginLeft: 4, flexShrink: 0 }}>📦</span>}
+                          {c.is_inventory_tracked !== false && <span title="Có kiểm soát kho vận" style={{ fontSize: 12, marginLeft: 4, flexShrink: 0 }}><DatabaseOutlined style={{ color: '#16a34a' }} /></span>}
                         </div>
                         {categoryFilter === c.id.toString() && (
                           <Space size={0} onClick={(e) => e.stopPropagation()}>
@@ -637,7 +637,7 @@ export default function Products() {
                   >
                     {categoryFilter === c.id.toString() ? <FolderOpenOutlined style={{ color: '#f59e0b' }} /> : <FolderOutlined style={{ color: '#94a3b8' }} />} 
                     {c.name}
-                    {c.is_inventory_tracked !== false && <span title="Có kiểm soát kho vận" style={{ fontSize: 12 }}>📦</span>}
+                    {c.is_inventory_tracked !== false && <span title="Có kiểm soát kho vận" style={{ fontSize: 12 }}><DatabaseOutlined style={{ color: '#16a34a' }} /></span>}
                   </div>
                 ))}
                 <div 
@@ -718,7 +718,7 @@ export default function Products() {
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%' }}>
                         <div style={{ display: 'flex', alignItems: 'center', flex: 1, minWidth: 0, paddingRight: 8 }}>
                           <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{c.name}</span>
-                          {c.is_inventory_tracked !== false && <span title="Có kiểm soát kho vận" style={{ fontSize: 12, marginLeft: 4, flexShrink: 0 }}>📦</span>}
+                          {c.is_inventory_tracked !== false && <span title="Có kiểm soát kho vận" style={{ fontSize: 12, marginLeft: 4, flexShrink: 0 }}><DatabaseOutlined style={{ color: '#16a34a' }} /></span>}
                         </div>
                         {categoryFilter === c.id.toString() && (
                           <Space size={0} onClick={(e) => e.stopPropagation()}>
@@ -778,7 +778,7 @@ export default function Products() {
                   >
                     {categoryFilter === c.id.toString() ? <FolderOpenOutlined style={{ color: '#f59e0b' }} /> : <FolderOutlined style={{ color: '#94a3b8' }} />} 
                     {c.name}
-                    {c.is_inventory_tracked !== false && <span title="Có kiểm soát kho vận" style={{ fontSize: 12 }}>📦</span>}
+                    {c.is_inventory_tracked !== false && <span title="Có kiểm soát kho vận" style={{ fontSize: 12 }}><DatabaseOutlined style={{ color: '#16a34a' }} /></span>}
                   </div>
                 ))}
                 <div 

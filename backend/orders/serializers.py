@@ -54,7 +54,7 @@ class OrderSerializer(serializers.ModelSerializer):
     customer_address = serializers.SerializerMethodField()
     created_by_name = serializers.CharField(source="created_by.full_name", read_only=True)
     approved_by_name = serializers.CharField(source="approved_by.full_name", read_only=True)
-    financial_status_display = serializers.CharField(source="get_financial_status_display", read_only=True)
+    financial_status_display = serializers.SerializerMethodField()
     payment_target_display = serializers.CharField(source="get_payment_target_display", read_only=True)
     paid_amount = serializers.FloatField(read_only=True)
     remaining_debt = serializers.FloatField(read_only=True)
@@ -159,6 +159,12 @@ class OrderSerializer(serializers.ModelSerializer):
             }
         return None
 
+    def get_financial_status_display(self, obj):
+        display = obj.get_financial_status_display()
+        if not getattr(obj, 'requires_inventory_export', True):
+            return display.replace(" (Đủ ĐK xuất kho)", "")
+        return display
+
     def get_has_production_order(self, obj):
         return obj.production_orders.exists()
 
@@ -195,6 +201,8 @@ class OrderSerializer(serializers.ModelSerializer):
             return False
         # Nếu module kho vận không bật, không cần xuất kho
         if not self._is_inventory_active(obj):
+            return False
+        if not getattr(obj, 'requires_inventory_export', True):
             return False
         try:
             from inventory.models import InventoryTransaction

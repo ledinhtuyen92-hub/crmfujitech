@@ -80,6 +80,11 @@ class OrderWorkflowEngine:
 
     @classmethod
     def _trigger_inventory(cls, order, **kwargs):
+        if not getattr(order, 'requires_inventory_export', True):
+            logger.info(f"WorkflowEngine: Order {order.order_number} does not require inventory. Skipping to next step.")
+            cls.trigger_next_step(order, current_step="inventory", **kwargs)
+            return
+
         logger.info(f"WorkflowEngine: Triggering INVENTORY for Order {order.order_number}")
         try:
             from orders.signals import _create_pending_inventory_export

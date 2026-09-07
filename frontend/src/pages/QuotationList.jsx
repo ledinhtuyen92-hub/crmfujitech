@@ -148,6 +148,11 @@ export default function QuotationList() {
   const [drawerVisible, setDrawerVisible] = useState(false)
   const [selectedQuotation, setSelectedQuotation] = useState(null)
 
+  // Create Order Modal
+  const [createOrderModalVisible, setCreateOrderModalVisible] = useState(false)
+  const [selectedQuotationForOrder, setSelectedQuotationForOrder] = useState(null)
+  const [createOrderForm] = Form.useForm()
+
   // Approval Modal
   const [approvalModalVisible, setApprovalModalVisible] = useState(false)
   const [approvers, setApprovers] = useState([])
@@ -785,12 +790,11 @@ export default function QuotationList() {
           thickness: 0,
           area: 0,
           spec: '',
-          warranty: '',
+note: it.note || '',
           product_image: srv.product_image || '',
           custom_data: { unit: 'lần' },
           quantity: Number(srv.quantity || 1),
           discount_percent: Number(srv.discount_percent || 0),
-          note: srv.note || '',
         })
       }
 
@@ -829,11 +833,7 @@ export default function QuotationList() {
     }
   }
 
-  // ── Submit Approval ────────────────────────────────────────────────────
-  const openApprovalModal = async (record) => {
-    setSelectedQuotation(record)
-    setApprovalModalVisible(true)
-    approvalForm.resetFields()
+  const loadApprovers = async () => {
     try {
       const res = await api.get('/users/users/')
       const userList = Array.isArray(res.data) ? res.data : (res.data?.results || [])
@@ -854,6 +854,14 @@ export default function QuotationList() {
     }
   }
 
+  // ── Submit Approval ────────────────────────────────────────────────────
+  const openApprovalModal = async (record) => {
+    setSelectedQuotation(record)
+    setApprovalModalVisible(true)
+    approvalForm.resetFields()
+    await loadApprovers()
+  }
+
   const handleSubmitApproval = async () => {
     try {
       const values = await approvalForm.validateFields()
@@ -870,6 +878,29 @@ export default function QuotationList() {
       messageApi.error(err.response?.data?.detail || 'Lỗi gửi duyệt.')
     } finally {
       setSubmittingApproval(false)
+    }
+  }
+
+  // ── Convert Quotation to Order ────────────────────────────────────────
+  const openCreateOrderModal = async (record) => {
+    setSelectedQuotationForOrder(record)
+    createOrderForm.resetFields()
+    setCreateOrderModalVisible(true)
+    await loadApprovers()
+  }
+
+  const handleConfirmCreateOrder = async () => {
+    if (checkMaintenance()) return
+    try {
+      const values = await createOrderForm.validateFields()
+      await api.post(`/sales/quotations/${selectedQuotationForOrder.id}/create-order/`, values)
+      messageApi.success('🎉 Đã chuyển báo giá thành Đơn hàng chính thức và gửi duyệt!')
+      setCreateOrderModalVisible(false)
+      fetchQuotations()
+    } catch (error) {
+      if (error.name === 'ValidationError') return
+      const msg = error.response?.data?.detail || 'Không thể tạo đơn hàng từ báo giá này.'
+      messageApi.error(msg)
     }
   }
 
@@ -1181,15 +1212,24 @@ export default function QuotationList() {
           )
         }
         return (
-          <Button
-            type="primary"
-            size="small"
-            icon={<FileDoneOutlined />}
-            style={{ background: '#16a34a', borderColor: '#16a34a' }}
-            onClick={() => openOrderModal(record)}
+          <Popconfirm
+            title="Xác nhận tạo đơn hàng?"
+            description={hasBypass && record.status !== 'accepted' 
+              ? "Khách hàng chưa ký xác nhận nhưng bạn có quyền Bỏ qua. Xác nhận tạo Đơn hàng?" 
+              : "Bạn có chắc chắn muốn chuyển đổi báo giá này thành Đơn hàng chính thức không?"}
+            onConfirm={() => openCreateOrderModal(record)}
+            okText="Xác nhận"
+            cancelText="Hủy"
           >
-            Tạo Đơn Hàng
-          </Button>
+            <Button
+              type="primary"
+              size="small"
+              icon={<FileDoneOutlined />}
+              style={{ background: '#16a34a', borderColor: '#16a34a' }}
+            >
+              Tạo Đơn Hàng
+            </Button>
+          </Popconfirm>
         )
       })()}
       <Tooltip title="Xem chi tiết & In PDF">
@@ -3094,6 +3134,40 @@ export default function QuotationList() {
               rows={3}
               placeholder="VD: Báo giá có hiệu lực trong vòng 15 ngày. Chưa bao gồm thuế VAT..."
             />
+          </Form.Item>
+        </Form>
+      </Modal>
+
+      {/* Modal Tạo Đơn Hàng từ Báo giá */}
+      <Modal
+        title={`Tạo đơn hàng từ báo giá ${selectedQuotationForOrder?.quotation_number || ''}`}
+        open={createOrderModalVisible}
+        onCancel={() => setCreateOrderModalVisible(false)}
+        onOk={handleConfirmCreateOrder}
+        okText="Tạo đơn hàng"
+        cancelText="Hủy"
+      >
+        <div style={{ marginBottom: 16 }}>
+          <Text type="secondary">
+            Đơn hàng mới sẽ được tự động gửi trình duyệt. Vui lòng chọn người duyệt cho đơn hàng.
+          </Text>
+        </div>
+        <Form form={createOrderForm} layout="vertical">
+          <Form.Item 
+            name="approver_id" 
+            label="Chọn người duyệt đơn hàng" 
+            rules={[{ required: true, message: 'Vui lòng chọn người duyệt' }]}
+          >
+            <Select placeholder="Chọn quản lý / giám đốc..." showSearch optionFilterProp="children">
+              {approvers.map(u => (
+                <Option key={u.id} value={u.id}>
+                  {u.full_name ? `${u.full_name} (${u.username})` : u.username} {u.role_name ? `- ${u.role_name}` : ''}
+                </Option>
+              ))}
+            </Select>
+          </Form.Item>
+          <Form.Item name="description" label="Ghi chú trình duyệt (nếu có)">
+            <TextArea rows={3} placeholder="VD: Đơn hàng tạo từ báo giá, xin sếp duyệt giúp em..." />
           </Form.Item>
         </Form>
       </Modal>

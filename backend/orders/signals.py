@@ -143,6 +143,7 @@ def _handle_order_approved(order):
 
     # 4. Thông báo cho người tạo đơn
     try:
+        from notifications.utils import notify_order_approved
         notify_order_approved(order)
     except Exception as exc:
         logger.error("Failed to send approved notification for order %s: %s", order.order_number, exc)
@@ -167,6 +168,8 @@ def check_and_trigger_mo_gate(order):
         # Nhạc trưởng Workflow sẽ tự động kiểm tra xem module nào được bật tiếp theo
         from orders.workflow import OrderWorkflowEngine
         factory_id = getattr(order, '_factory_id', None)
+        if not factory_id and isinstance(order.custom_data, dict):
+            factory_id = order.custom_data.get('factory_id')
         OrderWorkflowEngine.trigger_next_step(order, current_step=None, factory_id=factory_id)
     else:
         logger.info("Order %s approved but waiting for deposit payment to open Workflow Gate.", order.order_number)

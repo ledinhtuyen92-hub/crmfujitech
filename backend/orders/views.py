@@ -259,6 +259,7 @@ class OrderViewSet(TenantQuerySetMixin, viewsets.ModelViewSet):
             factory_id = request.data.get("factory_id")
             if factory_id:
                 order._factory_id = factory_id
+                order.custom_data["factory_id"] = factory_id
                 
             order.approve(approved_by_user=request.user)
             from approvals.models import ApprovalRequest, ApprovalStep
@@ -276,6 +277,29 @@ class OrderViewSet(TenantQuerySetMixin, viewsets.ModelViewSet):
             OrderSerializer(order, context={"request": request}).data,
             status=status.HTTP_200_OK,
         )
+
+    @action(detail=True, methods=["post"], url_path="trigger_production")
+    def trigger_production(self, request, pk=None):
+        """POST /api/orders/{id}/trigger_production/ - Tạo lại lệnh sản xuất thủ công"""
+        order = self.get_object()
+
+        if not request.user.is_company_admin and not request.user.has_perm_code("orders.approve"):
+            return Response({"detail": "Bạn không có quyền thực hiện."}, status=status.HTTP_403_FORBIDDEN)
+
+        if order.production_orders.exists():
+            return Response({"detail": "Đơn hàng đã có lệnh sản xuất."}, status=status.HTTP_400_BAD_REQUEST)
+
+        if order.status not in [Order.STATUS_APPROVED, Order.STATUS_COMPLETED]:
+            return Response({"detail": "Chỉ đơn hàng đã duyệt hoặc hoàn thành mới có thể tạo lệnh sản xuất."}, status=status.HTTP_400_BAD_REQUEST)
+
+        factory_id = request.data.get("factory_id")
+        
+        try:
+            from orders.workflow import OrderWorkflowEngine
+            OrderWorkflowEngine._trigger_production(order, factory_id=factory_id)
+            return Response({"detail": "Đã tạo lệnh sản xuất thành công."})
+        except Exception as e:
+            return Response({"detail": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
     @action(detail=True, methods=["post"], url_path="reject")
     def reject(self, request, pk=None):

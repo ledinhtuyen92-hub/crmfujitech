@@ -269,7 +269,7 @@ class Order(models.Model):
         self.status = self.STATUS_APPROVED
         self.approved_by = approved_by_user
         self.approved_at = timezone.now()
-        self.save(update_fields=["status", "approved_by", "approved_at", "updated_at"])
+        self.save(update_fields=["status", "approved_by", "approved_at", "updated_at", "custom_data"])
         
         # Tự động khởi tạo Công nợ / Kỳ thanh toán
         self.generate_payment_milestones()
