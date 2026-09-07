@@ -246,10 +246,10 @@ export default function Products() {
     if (checkMaintenance()) return
     setEditingCategory(cat)
     if (cat) {
-      categoryForm.setFieldsValue({ name: cat.name, description: cat.description || '', is_inventory_tracked: cat.is_inventory_tracked !== false })
+      categoryForm.setFieldsValue({ name: cat.name, description: cat.description || '', is_inventory_tracked: cat.is_inventory_tracked !== false, is_sales_target: cat.is_sales_target !== false })
     } else {
       categoryForm.resetFields()
-      categoryForm.setFieldsValue({ is_inventory_tracked: true })
+      categoryForm.setFieldsValue({ is_inventory_tracked: true, is_sales_target: true })
     }
     setCategoryModalVisible(true)
   }
@@ -1129,8 +1129,11 @@ export default function Products() {
           <Form.Item name="description" label="Mô tả">
             <TextArea rows={2} placeholder="Mô tả ngắn gọn..." />
           </Form.Item>
-          <Form.Item name="is_inventory_tracked" valuePropName="checked" tooltip="Nếu tắt, các sản phẩm trong danh mục này sẽ không bị trừ kho tự động khi duyệt đơn hàng.">
+          <Form.Item name="is_inventory_tracked" label="Kiểm soát xuất kho" valuePropName="checked" tooltip="Nếu tắt, các sản phẩm trong danh mục này sẽ không bị trừ kho tự động khi duyệt đơn hàng (chuyển thẳng sang Lệnh Sản Xuất).">
             <Switch checkedChildren="Có kiểm soát" unCheckedChildren="Không kiểm soát" />
+          </Form.Item>
+          <Form.Item name="is_sales_target" label="Tính vào sản lượng chốt" valuePropName="checked" tooltip="Nếu tắt, các sản phẩm trong danh mục này sẽ KHÔNG được đếm vào số lượng SP chốt trên bảng điều khiển Dashboard (Thường dùng cho phụ kiện, vật tư phụ).">
+            <Switch checkedChildren="Đếm vào báo cáo" unCheckedChildren="Không đếm vào báo cáo" />
           </Form.Item>
         </Form>
       </Modal>

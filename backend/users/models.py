@@ -322,6 +322,18 @@ class CompanySettings(models.Model):
         verbose_name="Số ngày tính là khách ngủ đông",
         help_text="Điền 0 để tắt chức năng tự động đánh dấu khách ngủ đông."
     )
+    code_include_company_prefix = models.BooleanField(
+        default=True,
+        verbose_name="Bao gồm tiền tố công ty trong mã",
+    )
+    code_include_doc_type = models.BooleanField(
+        default=True,
+        verbose_name="Bao gồm loại phiếu trong mã",
+    )
+    code_include_date = models.BooleanField(
+        default=True,
+        verbose_name="Bao gồm ngày tháng trong mã",
+    )
     lead_routing = models.CharField(
         max_length=20,
         choices=ROUTING_CHOICES,

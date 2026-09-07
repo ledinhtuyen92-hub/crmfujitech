@@ -160,7 +160,7 @@ def summary(request):
     )
     order_stats["revenue_in_period"] = float(revenue_in_period)
 
-    order_items_qs = OrderItem.objects.filter(order__in=order_qs, item_type="product").exclude(custom_data__has_key='actual_product_id')
+    order_items_qs = OrderItem.objects.filter(order__in=order_qs, item_type="product", product__category__is_sales_target=True)
     won_products = order_items_qs.filter(
         order__status__in=["approved", "in_production", "completed"]
     ).aggregate(total=Sum("quantity"))["total"] or 0
@@ -379,7 +379,8 @@ def top_sellers(request):
     product_qs = OrderItem.objects.filter(
         order__created_by=OuterRef('pk'),
         order__status__in=["approved", "in_production", "completed"],
-        item_type='product'
+        item_type='product',
+        product__category__is_sales_target=True
     )
     if start_date and end_date:
         product_qs = product_qs.filter(order__created_at__date__gte=start_date, order__created_at__date__lte=end_date)

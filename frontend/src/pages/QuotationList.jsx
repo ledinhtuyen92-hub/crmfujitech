@@ -2511,6 +2511,8 @@ note: it.note || '',
                       handleLineChange(idx, 'custom_data', finalData);
                       
                       if (matched) {
+                        handleLineChange(idx, 'product_id', matched.id);
+                        handleLineChange(idx, 'product_name', matched.name);
                         handleLineChange(idx, 'unit', matched.unit || 'cái');
                         handleLineChange(idx, 'unit_price', Number(matched.price || matched.cost_price || 0));
                         if (!record.quantity || record.quantity === 0) {
@@ -2535,6 +2537,8 @@ note: it.note || '',
                   handleLineChange(idx, 'custom_data', finalData);
                   
                   if (matched) {
+                    handleLineChange(idx, 'product_id', matched.id);
+                    handleLineChange(idx, 'product_name', matched.name);
                     handleLineChange(idx, 'unit', matched.unit || 'cái');
                     handleLineChange(idx, 'unit_price', Number(matched.price || matched.cost_price || 0));
                     if (!record.quantity || record.quantity === 0) {

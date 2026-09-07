@@ -574,7 +574,7 @@ class CompanySettingsSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = CompanySettings
-        fields = ["id", "order_prefix", "lead_routing", "timezone", "active_modules", "pipeline_status_labels", "quotation_template", "default_quotation_terms", "quotation_template_detail", "custom_quotation_title", "custom_order_title", "default_warranty_content", "default_warranty_rules", "inactive_days_threshold", "website_api_key", "is_website_integration_active", "continuous_sequence_numbering", "custom_info_templates"]
+        fields = ["id", "order_prefix", "lead_routing", "timezone", "active_modules", "pipeline_status_labels", "quotation_template", "default_quotation_terms", "quotation_template_detail", "custom_quotation_title", "custom_order_title", "default_warranty_content", "default_warranty_rules", "inactive_days_threshold", "website_api_key", "is_website_integration_active", "continuous_sequence_numbering", "custom_info_templates", "code_include_company_prefix", "code_include_doc_type", "code_include_date"]
 
     def get_quotation_template_detail(self, obj):
         if obj.quotation_template:

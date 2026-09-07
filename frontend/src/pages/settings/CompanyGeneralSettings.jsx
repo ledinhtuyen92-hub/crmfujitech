@@ -38,6 +38,7 @@ import {
   theme,
   Switch,
   Popconfirm,
+  Alert,
 } from 'antd'
 import api from '../../utils/api'
 import { useAuth } from '../../contexts/AuthContext'
@@ -93,6 +94,9 @@ export default function CompanyGeneralSettings() {
       }
       form.setFieldsValue({
         order_prefix: settingsRes.data.order_prefix || 'DH',
+        code_include_company_prefix: settingsRes.data.code_include_company_prefix !== false,
+        code_include_doc_type: settingsRes.data.code_include_doc_type !== false,
+        code_include_date: settingsRes.data.code_include_date !== false,
         continuous_sequence_numbering: settingsRes.data.continuous_sequence_numbering || false,
         lead_routing: settingsRes.data.lead_routing || 'manual',
         timezone: settingsRes.data.timezone || 'Asia/Ho_Chi_Minh',
@@ -400,6 +404,11 @@ export default function CompanyGeneralSettings() {
           layout="vertical"
           onFinish={handleSaveGeneral}
           style={{ maxWidth: 900 }}
+          onValuesChange={(changedValues) => {
+            if (changedValues.code_include_date === false) {
+              form.setFieldsValue({ continuous_sequence_numbering: true });
+            }
+          }}
         >
           <Row gutter={16}>
             <Col xs={24} md={12}>
@@ -411,13 +420,57 @@ export default function CompanyGeneralSettings() {
               >
                 <Input placeholder="VD: ABC hoặc CTY1" maxLength={10} style={{ textTransform: 'uppercase' }} />
               </Form.Item>
-              <Form.Item
-                name="continuous_sequence_numbering"
-                valuePropName="checked"
-                label="Sinh số thứ tự liên tục toàn bộ thời gian"
-                help="Khi bật, số thứ tự (001, 002...) sẽ tăng liên tục qua các ngày và không bị làm mới mỗi ngày."
-              >
-                <Switch checkedChildren="Bật" unCheckedChildren="Tắt" />
+
+              <div style={{ marginBottom: 8, display: 'flex', alignItems: 'center' }}>
+                <Form.Item name="code_include_company_prefix" valuePropName="checked" noStyle>
+                  <Switch size="small" />
+                </Form.Item>
+                <Text style={{ marginLeft: 8 }}>Bao gồm Tiền tố công ty</Text>
+              </div>
+              
+              <div style={{ marginBottom: 8, display: 'flex', alignItems: 'center' }}>
+                <Form.Item name="code_include_doc_type" valuePropName="checked" noStyle>
+                  <Switch size="small" />
+                </Form.Item>
+                <Text style={{ marginLeft: 8 }}>Bao gồm Ký hiệu loại phiếu (DH, BG, LSX...)</Text>
+              </div>
+              
+              <div style={{ marginBottom: 16, display: 'flex', alignItems: 'center' }}>
+                <Form.Item name="code_include_date" valuePropName="checked" noStyle>
+                  <Switch size="small" />
+                </Form.Item>
+                <Text style={{ marginLeft: 8 }}>Bao gồm Ngày tháng tạo phiếu</Text>
+              </div>
+
+              <Form.Item shouldUpdate style={{ marginBottom: 16 }}>
+                {() => {
+                  const vals = form.getFieldsValue();
+                  const parts = [];
+                  if (vals.code_include_company_prefix && vals.order_prefix) parts.push(vals.order_prefix.toUpperCase());
+                  if (vals.code_include_doc_type) parts.push("DH");
+                  if (vals.code_include_date) {
+                    const d = new Date();
+                    parts.push(`${String(d.getDate()).padStart(2,'0')}${String(d.getMonth()+1).padStart(2,'0')}${d.getFullYear()}`);
+                  }
+                  parts.push("001");
+                  return <Alert message={`Mẫu sinh ra (Đơn hàng): ${parts.join("-")}`} type="info" showIcon />;
+                }}
+              </Form.Item>
+
+              <Form.Item shouldUpdate={(prev, curr) => prev.code_include_date !== curr.code_include_date}>
+                {({ getFieldValue }) => {
+                  const includeDate = getFieldValue('code_include_date');
+                  return (
+                    <Form.Item
+                      name="continuous_sequence_numbering"
+                      valuePropName="checked"
+                      label="Sinh số thứ tự liên tục toàn bộ thời gian"
+                      help={!includeDate ? "Cài đặt này bắt buộc BẬT do bạn đã TẮT thành phần Ngày tháng." : "Khi bật, số thứ tự (001, 002...) sẽ tăng liên tục qua các ngày và không bị làm mới mỗi ngày."}
+                    >
+                      <Switch checkedChildren="Bật" unCheckedChildren="Tắt" disabled={!includeDate} />
+                    </Form.Item>
+                  );
+                }}
               </Form.Item>
             </Col>
             <Col xs={24} md={12}>

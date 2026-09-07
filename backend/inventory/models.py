@@ -34,6 +34,11 @@ class ProductCategory(models.Model):
         verbose_name="Kiểm soát kho vận",
         help_text="Nếu tắt, các sản phẩm trong danh mục này sẽ không bị trừ kho khi đơn hàng được duyệt."
     )
+    is_sales_target = models.BooleanField(
+        default=True,
+        verbose_name="Tính vào sản lượng chốt",
+        help_text="Nếu tắt, các sản phẩm trong danh mục này sẽ không được đếm vào số lượng SP chốt trên báo cáo (thường dùng cho phụ kiện, vật tư phụ)."
+    )
 
     class Meta:
         verbose_name = "Loại sản phẩm"

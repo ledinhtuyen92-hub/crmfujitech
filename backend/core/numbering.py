@@ -37,11 +37,23 @@ def _generate_code(company, prefix: str) -> str:
     Dùng CompanySequence làm bộ đếm trung tâm.
     """
     today_str = date.today().strftime("%d%m%Y")
-    is_continuous = getattr(company, "settings", None) and company.settings.continuous_sequence_numbering
+    settings = getattr(company, "settings", None)
+    
+    is_continuous = settings and settings.continuous_sequence_numbering
+    include_date = settings.code_include_date if settings else True
+    
     seq_date_str = "ALL_TIME" if is_continuous else today_str
     
     seq = _next_seq(company, prefix, seq_date_str)
-    return f"{prefix}-{today_str}-{seq:03d}"
+    
+    parts = []
+    if prefix:
+        parts.append(prefix)
+    if include_date:
+        parts.append(today_str)
+    parts.append(f"{seq:03d}")
+    
+    return "-".join(parts)
 
 
 def derive_code_from_order(source_order_number: str, company, target_doc_type: str) -> str:
@@ -72,52 +84,68 @@ def derive_code_from_order(source_order_number: str, company, target_doc_type: s
     target_prefix = resolve_doc_prefix(company, base_doc)
 
     # Trích xuất date_str và seq từ mã nguồn
-    # Định dạng: FUJI-DH-21072026-001  →  parts[-2]="21072026", parts[-1]="001"
+    # Định dạng có thể có hoặc không có date_str
     parts = source_order_number.split("-") if source_order_number else []
-    if len(parts) >= 2:
+    if len(parts) >= 1:
         try:
             seq = int(parts[-1])
-            date_str = parts[-2]
-            if len(date_str) == 8 and date_str.isdigit():
-                candidate_code = f"{target_prefix}-{date_str}-{seq:03d}"
+            date_str = None
+            if len(parts) >= 2 and len(parts[-2]) == 8 and parts[-2].isdigit():
+                date_str = parts[-2]
 
-                # Kiểm tra mã này chưa tồn tại
-                from inventory.models import InventoryTransaction
-                from production.models import ProductionOrder
-                from delivery.models import DeliveryOrder, WarrantyCard
-                from orders.models import Order
+            settings = getattr(company, "settings", None)
+            include_date = settings.code_include_date if settings else True
+            is_continuous = settings and settings.continuous_sequence_numbering
+            
+            candidate_parts = []
+            if target_prefix:
+                candidate_parts.append(target_prefix)
+            
+            if include_date:
+                candidate_parts.append(date_str if date_str else date.today().strftime("%d%m%Y"))
+                
+            candidate_parts.append(f"{seq:03d}")
+            candidate_code = "-".join(candidate_parts)
 
-                model_map = {
-                    "EXP": (InventoryTransaction, "transaction_code"),
-                    "IMP": (InventoryTransaction, "transaction_code"),
-                    "ADJ": (InventoryTransaction, "transaction_code"),
-                    "TRF": (InventoryTransaction, "transaction_code"),
-                    "LSX": (ProductionOrder, "production_order_code"),
-                    "GH":  (DeliveryOrder, "delivery_code"),
-                    "BH":  (WarrantyCard, "warranty_code"),
-                    "DH":  (Order, "order_number"),
-                }
-                model_info = model_map.get(base_doc)
-                is_taken = False
-                if model_info:
-                    model_cls, field = model_info
-                    is_taken = model_cls.objects.filter(
-                        company=company, **{field: candidate_code}
-                    ).exists()
+            # Kiểm tra mã này chưa tồn tại
+            from inventory.models import InventoryTransaction
+            from production.models import ProductionOrder
+            from delivery.models import DeliveryOrder, WarrantyCard
+            from orders.models import Order
 
-                if not is_taken:
-                    # Đảm bảo bộ đếm trung tâm không bao giờ nhỏ hơn seq này
-                    with transaction.atomic():
-                        seq_obj, created = CompanySequence.objects.select_for_update().get_or_create(
-                            company=company,
-                            prefix=target_prefix,
-                            date_str=date_str,
-                            defaults={"last_seq": seq},
-                        )
-                        if not created and seq > seq_obj.last_seq:
-                            seq_obj.last_seq = seq
-                            seq_obj.save(update_fields=["last_seq"])
-                    return candidate_code
+            model_map = {
+                "EXP": (InventoryTransaction, "transaction_code"),
+                "IMP": (InventoryTransaction, "transaction_code"),
+                "ADJ": (InventoryTransaction, "transaction_code"),
+                "TRF": (InventoryTransaction, "transaction_code"),
+                "LSX": (ProductionOrder, "production_order_code"),
+                "GH":  (DeliveryOrder, "delivery_code"),
+                "BH":  (WarrantyCard, "warranty_code"),
+                "DH":  (Order, "order_number"),
+                "PT":  (Order, "order_number"), # Temporary fallback, Receipt is different usually
+            }
+            model_info = model_map.get(base_doc)
+            is_taken = False
+            if model_info:
+                model_cls, field = model_info
+                is_taken = model_cls.objects.filter(
+                    company=company, **{field: candidate_code}
+                ).exists()
+
+            if not is_taken:
+                # Đảm bảo bộ đếm trung tâm không bao giờ nhỏ hơn seq này
+                seq_date_str = "ALL_TIME" if is_continuous else (date_str if date_str else date.today().strftime("%d%m%Y"))
+                with transaction.atomic():
+                    seq_obj, created = CompanySequence.objects.select_for_update().get_or_create(
+                        company=company,
+                        prefix=target_prefix,
+                        date_str=seq_date_str,
+                        defaults={"last_seq": seq},
+                    )
+                    if not created and seq > seq_obj.last_seq:
+                        seq_obj.last_seq = seq
+                        seq_obj.save(update_fields=["last_seq"])
+                return candidate_code
         except (ValueError, IndexError):
             pass
 
@@ -127,23 +155,24 @@ def derive_code_from_order(source_order_number: str, company, target_doc_type: s
 
 def resolve_doc_prefix(company, default_doc_code: str) -> str:
     """
-    Nếu company có cấu hình order_prefix khác 'DH' và không rỗng (ví dụ 'FUJI', 'ABC'),
-    sẽ tự động dùng làm tiền tố chung cho tất cả các loại phiếu:
-      - mặc định 'DH' -> 'FUJI-DH'
-      - mặc định 'BG' -> 'FUJI-BG'
-      - mặc định 'IMP' -> 'FUJI-IMP'
-      - mặc định 'EXP' -> 'FUJI-EXP'
-      - mặc định 'PT'  -> 'FUJI-PT'
-      - mặc định 'LSX' -> 'FUJI-LSX'
+    Sinh tiền tố dựa theo cài đặt bật tắt:
+    - code_include_company_prefix
+    - code_include_doc_type
     """
     try:
-        p = (company.settings.order_prefix or "").strip().upper()
-        if p and p != "DH":
-            if p == default_doc_code or p.endswith(f"-{default_doc_code}"):
-                return p
-            return f"{p}-{default_doc_code}"
+        settings = company.settings
+        parts = []
+        if getattr(settings, 'code_include_company_prefix', True):
+            p = (settings.order_prefix or "").strip().upper()
+            if p:
+                parts.append(p)
+        if getattr(settings, 'code_include_doc_type', True):
+            parts.append(default_doc_code)
+            
+        return "-".join(parts)
     except Exception:
         pass
+        
     return default_doc_code
 
 
