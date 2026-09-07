@@ -169,18 +169,39 @@ def unread_count(request):
     # 3. Sản xuất: đếm số lệnh chờ sản xuất
     if request.user.is_superuser or request.user.is_company_admin or (request.user.role and request.user.role.permissions.filter(code__in=["production.update_step", "production.manage_factory", "production.view"]).exists()):
         from production.models import ProductionOrder
-        pending_production_count = ProductionOrder.objects.filter(
+        qs_prod = ProductionOrder.objects.filter(
             company=request.user.company,
             status=ProductionOrder.STATUS_PENDING
-        ).count()
+        )
+        
+        is_admin = request.user.is_company_admin or request.user.is_superuser
+        can_scope_company = is_admin or request.user.has_perm_code("production.scope_company")
+        can_scope_my_factory = is_admin or request.user.has_perm_code("production.scope_my_factory")
+
+        if not can_scope_company:
+            from django.db.models import Q
+            personal_q = Q(order__created_by=request.user) | Q(steps__assigned_to=request.user)
+            if can_scope_my_factory and request.user.department_id and request.user.department.factory_id:
+                qs_prod = qs_prod.filter(Q(factory_id=request.user.department.factory_id) | personal_q).distinct()
+            else:
+                qs_prod = qs_prod.filter(personal_q).distinct()
+                
+        pending_production_count = qs_prod.count()
         
     # 4. Giao hàng: đếm số lệnh chờ giao
     if request.user.is_superuser or request.user.is_company_admin or (request.user.role and request.user.role.permissions.filter(code__in=["delivery.assign", "delivery.edit", "delivery.view"]).exists()):
         from delivery.models import DeliveryOrder
-        pending_delivery_count = DeliveryOrder.objects.filter(
+        qs_del = DeliveryOrder.objects.filter(
             company=request.user.company,
             status=DeliveryOrder.STATUS_PENDING
-        ).count()
+        )
+        
+        if not request.user.is_superuser and not getattr(request.user, 'is_company_admin', False):
+            if request.user.role and request.user.role.permissions.filter(code="delivery.shipper").exists():
+                if not request.user.role.permissions.filter(code="delivery.assign").exists():
+                    qs_del = qs_del.filter(shipper_user=request.user)
+                    
+        pending_delivery_count = qs_del.count()
 
     return Response({
         "unread_count": count,

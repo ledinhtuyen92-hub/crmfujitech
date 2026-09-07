@@ -334,6 +334,14 @@ class CompanySettings(models.Model):
         default=True,
         verbose_name="Bao gồm ngày tháng trong mã",
     )
+    independent_sequence_on_derived = models.BooleanField(
+        default=False, 
+        help_text="Đánh số thứ tự mới độc lập khi kế thừa phiếu (Đơn hàng/Xuất kho)"
+    )
+
+    # ─────────────────────────────────────────────
+    # System integrations
+    # ─────────────────────────────────────────────
     lead_routing = models.CharField(
         max_length=20,
         choices=ROUTING_CHOICES,

@@ -83,6 +83,15 @@ def derive_code_from_order(source_order_number: str, company, target_doc_type: s
     base_doc = prefix_map.get(target_doc_type, target_doc_type.upper())
     target_prefix = resolve_doc_prefix(company, base_doc)
 
+    # Lấy cài đặt
+    settings = getattr(company, "settings", None)
+    
+    # Nếu cài đặt bật Đánh số thứ tự mới độc lập thì bỏ qua kế thừa, tạo mã mới luôn
+    # Cài đặt "Số thứ tự mới độc lập khi kế thừa phiếu" chỉ áp dụng khi sinh Đơn hàng (từ Báo giá).
+    # Các chứng từ tuyến sau (Xuất kho, Sản xuất, Giao hàng...) bắt buộc phải luôn đồng bộ theo Đơn hàng.
+    if target_doc_type == "dh" and settings and getattr(settings, 'independent_sequence_on_derived', False):
+        return _generate_code(company, target_prefix)
+
     # Trích xuất date_str và seq từ mã nguồn
     # Định dạng có thể có hoặc không có date_str
     parts = source_order_number.split("-") if source_order_number else []
@@ -93,7 +102,6 @@ def derive_code_from_order(source_order_number: str, company, target_doc_type: s
             if len(parts) >= 2 and len(parts[-2]) == 8 and parts[-2].isdigit():
                 date_str = parts[-2]
 
-            settings = getattr(company, "settings", None)
             include_date = settings.code_include_date if settings else True
             is_continuous = settings and settings.continuous_sequence_numbering
             
@@ -157,7 +165,7 @@ def resolve_doc_prefix(company, default_doc_code: str) -> str:
     """
     Sinh tiền tố dựa theo cài đặt bật tắt:
     - code_include_company_prefix
-    - code_include_doc_type
+    - code_include_doc_type (Đã bị ép buộc luôn bật để tránh trùng mã)
     """
     try:
         settings = company.settings
@@ -166,8 +174,9 @@ def resolve_doc_prefix(company, default_doc_code: str) -> str:
             p = (settings.order_prefix or "").strip().upper()
             if p:
                 parts.append(p)
-        if getattr(settings, 'code_include_doc_type', True):
-            parts.append(default_doc_code)
+        
+        # Bắt buộc thêm ký hiệu loại phiếu (DH, BG, EXP, vv)
+        parts.append(default_doc_code)
             
         return "-".join(parts)
     except Exception:

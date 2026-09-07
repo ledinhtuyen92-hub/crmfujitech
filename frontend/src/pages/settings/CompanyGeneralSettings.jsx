@@ -64,6 +64,9 @@ export default function CompanyGeneralSettings() {
   const [stampFile, setStampFile] = useState(null)
   const [signatureFile, setSignatureFile] = useState(null)
 
+  const [nextSequence, setNextSequence] = useState(null)
+  const [updatingSequence, setUpdatingSequence] = useState(false)
+
   const [form] = Form.useForm()
   const [companyForm] = Form.useForm()
 
@@ -95,9 +98,10 @@ export default function CompanyGeneralSettings() {
       form.setFieldsValue({
         order_prefix: settingsRes.data.order_prefix || 'DH',
         code_include_company_prefix: settingsRes.data.code_include_company_prefix !== false,
-        code_include_doc_type: settingsRes.data.code_include_doc_type !== false,
+        code_include_doc_type: true, // Bắt buộc luôn bằng true
         code_include_date: settingsRes.data.code_include_date !== false,
         continuous_sequence_numbering: settingsRes.data.continuous_sequence_numbering || false,
+        independent_sequence_on_derived: settingsRes.data.independent_sequence_on_derived || false,
         lead_routing: settingsRes.data.lead_routing || 'manual',
         timezone: settingsRes.data.timezone || 'Asia/Ho_Chi_Minh',
         inactive_days_threshold: settingsRes.data.inactive_days_threshold || 0,
@@ -198,6 +202,29 @@ export default function CompanyGeneralSettings() {
       messageApi.error('Lỗi khi lưu cài đặt.')
     } finally {
       setLoading(false)
+    }
+  }
+
+  const handleUpdateSequence = async () => {
+    if (checkMaintenance()) return
+    if (!nextSequence) {
+      messageApi.warning('Vui lòng nhập số thứ tự tiếp theo.')
+      return
+    }
+    const currentPrefix = form.getFieldValue('order_prefix') || 'DH'
+    setUpdatingSequence(true)
+    try {
+      const res = await api.post('users/company-settings/update-sequence/', {
+        prefix: currentPrefix,
+        next_sequence: nextSequence
+      })
+      messageApi.success(res.data.message)
+      setNextSequence(null)
+      fetchData()
+    } catch (err) {
+      messageApi.error(err.response?.data?.error || 'Lỗi khi cập nhật số thứ tự.')
+    } finally {
+      setUpdatingSequence(false)
     }
   }
 
@@ -408,6 +435,9 @@ export default function CompanyGeneralSettings() {
             if (changedValues.code_include_date === false) {
               form.setFieldsValue({ continuous_sequence_numbering: true });
             }
+            if (changedValues.continuous_sequence_numbering === false) {
+              form.setFieldsValue({ independent_sequence_on_derived: false });
+            }
           }}
         >
           <Row gutter={16}>
@@ -430,9 +460,10 @@ export default function CompanyGeneralSettings() {
               
               <div style={{ marginBottom: 8, display: 'flex', alignItems: 'center' }}>
                 <Form.Item name="code_include_doc_type" valuePropName="checked" noStyle>
-                  <Switch size="small" />
+                  <Switch size="small" disabled />
                 </Form.Item>
                 <Text style={{ marginLeft: 8 }}>Bao gồm Ký hiệu loại phiếu (DH, BG, LSX...)</Text>
+                <Text type="secondary" style={{ marginLeft: 8, fontSize: 12 }}>(Bắt buộc để tránh trùng lặp mã)</Text>
               </div>
               
               <div style={{ marginBottom: 16, display: 'flex', alignItems: 'center' }}>
@@ -460,18 +491,61 @@ export default function CompanyGeneralSettings() {
               <Form.Item shouldUpdate={(prev, curr) => prev.code_include_date !== curr.code_include_date}>
                 {({ getFieldValue }) => {
                   const includeDate = getFieldValue('code_include_date');
+                  
                   return (
                     <Form.Item
                       name="continuous_sequence_numbering"
                       valuePropName="checked"
-                      label="Sinh số thứ tự liên tục toàn bộ thời gian"
-                      help={!includeDate ? "Cài đặt này bắt buộc BẬT do bạn đã TẮT thành phần Ngày tháng." : "Khi bật, số thứ tự (001, 002...) sẽ tăng liên tục qua các ngày và không bị làm mới mỗi ngày."}
+                      label="Số thứ tự tăng liên tục (Không reset theo ngày)"
+                      help={!includeDate ? "Cài đặt này bắt buộc BẬT do bạn đã TẮT thành phần Ngày tháng." : "Nếu tắt (mặc định), mỗi ngày hệ thống sẽ đếm lại từ 001. Nếu BẬT, số thứ tự sẽ tăng liên tục mãi mãi (001, 002...) bất kể ngày tháng."}
                     >
                       <Switch checkedChildren="Bật" unCheckedChildren="Tắt" disabled={!includeDate} />
                     </Form.Item>
                   );
                 }}
               </Form.Item>
+
+              <Form.Item shouldUpdate={(prev, curr) => prev.continuous_sequence_numbering !== curr.continuous_sequence_numbering}>
+                {({ getFieldValue }) => {
+                  const continuousSeq = getFieldValue('continuous_sequence_numbering');
+                  return (
+                    <Form.Item
+                      name="independent_sequence_on_derived"
+                      valuePropName="checked"
+                      label="Đánh số thứ tự mới độc lập khi kế thừa phiếu"
+                      help={!continuousSeq ? "Bắt buộc TẮT vì tính năng Tăng liên tục đang bị tắt (số thứ tự sẽ reset theo ngày, do đó Đơn hàng phải kế thừa số của Báo giá để đồng bộ)." : "Nếu BẬT: Đơn hàng tạo từ Báo giá sẽ tự lấy số tiếp theo của riêng nó, đảm bảo liền mạch không bị trống số. Nếu TẮT: Đơn hàng sẽ copy phần đuôi số thứ tự của Báo giá gốc (BG-005 -> DH-005) để dễ đối chiếu."}
+                    >
+                      <Switch checkedChildren="Bật" unCheckedChildren="Tắt" disabled={!continuousSeq} />
+                    </Form.Item>
+                  );
+                }}
+              </Form.Item>
+
+              <Divider dashed style={{ margin: '12px 0' }} />
+              <div style={{ marginBottom: 16 }}>
+                <Text strong>Thiết lập số thứ tự Đơn hàng tiếp theo</Text>
+                {settings?.current_order_sequence !== undefined && (
+                  <div style={{ marginTop: 4, marginBottom: 8 }}>
+                    <Text type="secondary">
+                      Đã cấp đến số: <Text strong style={{ color: '#16a34a' }}>{settings.current_order_sequence}</Text> 
+                      {' '}(Đơn tiếp theo sẽ là số <Text strong>{settings.current_order_sequence + 1}</Text>)
+                    </Text>
+                  </div>
+                )}
+                <div style={{ display: 'flex', marginTop: 8, gap: 8 }}>
+                  <InputNumber 
+                    min={1} 
+                    placeholder="VD: 1000" 
+                    value={nextSequence} 
+                    onChange={setNextSequence} 
+                    style={{ width: 150 }} 
+                  />
+                  <Button type="default" onClick={handleUpdateSequence} loading={updatingSequence}>
+                    Cập nhật nhảy số
+                  </Button>
+                </div>
+                <Text type="secondary" style={{ fontSize: 12 }}>Chỉ áp dụng khi cần nhảy cóc. Số mới nhập phải lớn hơn số đã cấp hiện tại.</Text>
+              </div>
             </Col>
             <Col xs={24} md={12}>
               <Form.Item name="timezone" label="Múi giờ hệ thống">

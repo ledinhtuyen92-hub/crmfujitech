@@ -582,6 +582,70 @@ class CompanySettingsView(generics.RetrieveUpdateAPIView):
         return settings_obj
 
 
+class UpdateSequenceView(APIView):
+    """
+    POST /api/users/company-settings/update-sequence/
+    API để cập nhật trực tiếp số thứ tự bắt đầu của một loại phiếu (mặc định DH).
+    Chỉ Company Admin mới có quyền.
+    """
+    permission_classes = [IsCompanyAdmin]
+
+    def post(self, request, *args, **kwargs):
+        company = request.user.company
+        if not company:
+            return Response({"error": "Người dùng không thuộc công ty nào."}, status=status.HTTP_400_BAD_REQUEST)
+
+        doc_type = request.data.get("prefix", "DH") # Actually this is doc_type, default DH
+        next_sequence = request.data.get("next_sequence")
+
+        if not next_sequence:
+            return Response({"error": "Thiếu thông tin next_sequence."}, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            next_sequence = int(next_sequence)
+        except ValueError:
+            return Response({"error": "next_sequence phải là số nguyên."}, status=status.HTTP_400_BAD_REQUEST)
+
+        if next_sequence <= 0:
+            return Response({"error": "next_sequence phải lớn hơn 0."}, status=status.HTTP_400_BAD_REQUEST)
+
+        from core.numbering import resolve_doc_prefix
+        prefix = resolve_doc_prefix(company, doc_type)
+
+        settings = getattr(company, "settings", None)
+        is_continuous = settings and settings.continuous_sequence_numbering
+        
+        from datetime import date
+        date_str = "ALL_TIME" if is_continuous else date.today().strftime("%d%m%Y")
+
+        from django.db import transaction
+        from users.models import CompanySequence
+
+        with transaction.atomic():
+            seq_obj, created = CompanySequence.objects.select_for_update().get_or_create(
+                company=company,
+                prefix=prefix,
+                date_str=date_str,
+                defaults={"last_seq": 0},
+            )
+
+            current_max = seq_obj.last_seq
+            if next_sequence <= current_max:
+                return Response(
+                    {"error": f"Số thứ tự tiếp theo ({next_sequence}) phải lớn hơn số thứ tự đã cấp lớn nhất hiện tại ({current_max})."},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+
+            seq_obj.last_seq = next_sequence - 1
+            seq_obj.save(update_fields=["last_seq"])
+
+        return Response({
+            "message": f"Cập nhật thành công. Đơn hàng tiếp theo sẽ bắt đầu từ số {next_sequence}.",
+            "prefix": prefix,
+            "next_sequence": next_sequence
+        }, status=status.HTTP_200_OK)
+
+
 # ─────────────────────────────────────────────
 # System Settings API (Superadmin only)
 # ─────────────────────────────────────────────
