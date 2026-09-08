@@ -275,16 +275,16 @@ def sync_sequences_from_db(company=None):
                 if not code:
                     continue
                 parts = code.split("-")
-                # Định dạng: PREFIX(-SUBPREFIX)-DDMMYYYY-SEQ
-                # Ví dụ: FUJI-DH-21072026-004 hoặc DH-21072026-004
-                if len(parts) < 3:
+                if len(parts) < 2:
                     continue
                 try:
                     seq = int(parts[-1])
-                    date_str = parts[-2]
-                    if len(date_str) != 8 or not date_str.isdigit():
-                        continue
-                    prefix = "-".join(parts[:-2])  # Tất cả phần còn lại là prefix
+                    if len(parts) >= 3 and len(parts[-2]) == 8 and parts[-2].isdigit():
+                        date_str = parts[-2]
+                        prefix = "-".join(parts[:-2])
+                    else:
+                        date_str = "ALL_TIME"
+                        prefix = "-".join(parts[:-1])
                 except (ValueError, IndexError):
                     continue
 

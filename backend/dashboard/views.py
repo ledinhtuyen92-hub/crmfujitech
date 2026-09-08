@@ -98,7 +98,7 @@ def summary(request):
     from crm.models import Customer
     from sales.models import Quotation
     from orders.models import Order
-    from inventory.models import StockLevel
+    from inventory.models import StockLevel, Product
     from users.models import User
     from orders.models import OrderItem
 
@@ -160,7 +160,11 @@ def summary(request):
     )
     order_stats["revenue_in_period"] = float(revenue_in_period)
 
-    order_items_qs = OrderItem.objects.filter(order__in=order_qs, item_type="product", product__category__is_sales_target=True)
+    valid_product_ids = list(Product.objects.filter(category__is_sales_target=True).values_list('id', flat=True))
+    sales_target_cond = Q(custom_data__actual_product_id__in=valid_product_ids) | (
+        Q(custom_data__actual_product_id__isnull=True) & Q(product__category__is_sales_target=True)
+    )
+    order_items_qs = OrderItem.objects.filter(order__in=order_qs, item_type="product").filter(sales_target_cond)
     won_products = order_items_qs.filter(
         order__status__in=["approved", "in_production", "completed"]
     ).aggregate(total=Sum("quantity"))["total"] or 0
@@ -353,6 +357,7 @@ def top_sellers(request):
     """Top nhân viên Sale theo doanh thu toàn công ty."""
     from users.models import User
     from orders.models import Order, OrderItem
+    from inventory.models import Product
     from django.db.models.functions import Coalesce
     from django.db.models import Sum, Count, Q, DecimalField, IntegerField
     from decimal import Decimal
@@ -376,12 +381,15 @@ def top_sellers(request):
     revenue_subquery = order_qs.values('created_by').annotate(t=Sum('total_amount')).values('t')
     order_count_subquery = order_qs.values('created_by').annotate(t=Count('id')).values('t')
     
+    valid_product_ids = list(Product.objects.filter(category__is_sales_target=True).values_list('id', flat=True))
+    sales_target_cond = Q(custom_data__actual_product_id__in=valid_product_ids) | (
+        Q(custom_data__actual_product_id__isnull=True) & Q(product__category__is_sales_target=True)
+    )
     product_qs = OrderItem.objects.filter(
         order__created_by=OuterRef('pk'),
         order__status__in=["approved", "in_production", "completed"],
-        item_type='product',
-        product__category__is_sales_target=True
-    )
+        item_type='product'
+    ).filter(sales_target_cond)
     if start_date and end_date:
         product_qs = product_qs.filter(order__created_at__date__gte=start_date, order__created_at__date__lte=end_date)
         

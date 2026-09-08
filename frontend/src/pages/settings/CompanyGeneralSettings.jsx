@@ -219,7 +219,7 @@ export default function CompanyGeneralSettings() {
     setUpdatingSequence(true)
     try {
       const res = await api.post('users/company-settings/update-sequence/', {
-        prefix: currentPrefix,
+        prefix: 'DH', // Backend expects doc_type ('DH'), not company prefix
         next_sequence: nextSequence
       })
       messageApi.success(res.data.message)
@@ -243,7 +243,7 @@ export default function CompanyGeneralSettings() {
       messageApi.success(res.data.message)
       setSyncModalVisible(false)
       setSyncConfirmText('')
-      fetchSettings()
+      fetchData()
     } catch (err) {
       console.error(err)
       messageApi.error(err.response?.data?.error || 'Đồng bộ thất bại.')
@@ -513,39 +513,6 @@ export default function CompanyGeneralSettings() {
                 }}
               </Form.Item>
 
-              <Form.Item shouldUpdate={(prev, curr) => prev.code_include_date !== curr.code_include_date}>
-                {({ getFieldValue }) => {
-                  const includeDate = getFieldValue('code_include_date');
-                  
-                  return (
-                    <Form.Item
-                      name="continuous_sequence_numbering"
-                      valuePropName="checked"
-                      label="Số thứ tự tăng liên tục (Không reset theo ngày)"
-                      help={!includeDate ? "Cài đặt này bắt buộc BẬT do bạn đã TẮT thành phần Ngày tháng." : "Nếu tắt (mặc định), mỗi ngày hệ thống sẽ đếm lại từ 001. Nếu BẬT, số thứ tự sẽ tăng liên tục mãi mãi (001, 002...) bất kể ngày tháng."}
-                    >
-                      <Switch checkedChildren="Bật" unCheckedChildren="Tắt" disabled={!includeDate} />
-                    </Form.Item>
-                  );
-                }}
-              </Form.Item>
-
-              <Form.Item shouldUpdate={(prev, curr) => prev.continuous_sequence_numbering !== curr.continuous_sequence_numbering}>
-                {({ getFieldValue }) => {
-                  const continuousSeq = getFieldValue('continuous_sequence_numbering');
-                  return (
-                    <Form.Item
-                      name="independent_sequence_on_derived"
-                      valuePropName="checked"
-                      label="Đánh số thứ tự mới độc lập khi kế thừa phiếu"
-                      help={!continuousSeq ? "Bắt buộc TẮT vì tính năng Tăng liên tục đang bị tắt (số thứ tự sẽ reset theo ngày, do đó Đơn hàng phải kế thừa số của Báo giá để đồng bộ)." : "Nếu BẬT: Đơn hàng tạo từ Báo giá sẽ tự lấy số tiếp theo của riêng nó, đảm bảo liền mạch không bị trống số. Nếu TẮT: Đơn hàng sẽ copy phần đuôi số thứ tự của Báo giá gốc (BG-005 -> DH-005) để dễ đối chiếu."}
-                    >
-                      <Switch checkedChildren="Bật" unCheckedChildren="Tắt" disabled={!continuousSeq} />
-                    </Form.Item>
-                  );
-                }}
-              </Form.Item>
-
               <Divider dashed style={{ margin: '12px 0' }} />
                 <div style={{ marginBottom: 16 }}>
                   {settings?.current_quotation_sequence !== undefined && (
@@ -589,6 +556,39 @@ export default function CompanyGeneralSettings() {
                   <Option value="Asia/Singapore">(GMT+08:00) Singapore, Kuala Lumpur</Option>
                   <Option value="UTC">(GMT+00:00) UTC Universal Time</Option>
                 </Select>
+              </Form.Item>
+
+              <Form.Item shouldUpdate={(prev, curr) => prev.code_include_date !== curr.code_include_date}>
+                {({ getFieldValue }) => {
+                  const includeDate = getFieldValue('code_include_date');
+                  
+                  return (
+                    <Form.Item
+                      name="continuous_sequence_numbering"
+                      valuePropName="checked"
+                      label="Số thứ tự tăng liên tục (Không reset theo ngày)"
+                      help={!includeDate ? "Cài đặt này bắt buộc BẬT do bạn đã TẮT thành phần Ngày tháng." : "Nếu tắt (mặc định), mỗi ngày hệ thống sẽ đếm lại từ 001. Nếu BẬT, số thứ tự sẽ tăng liên tục mãi mãi (001, 002...) bất kể ngày tháng."}
+                    >
+                      <Switch checkedChildren="Bật" unCheckedChildren="Tắt" disabled={!includeDate} />
+                    </Form.Item>
+                  );
+                }}
+              </Form.Item>
+
+              <Form.Item shouldUpdate={(prev, curr) => prev.continuous_sequence_numbering !== curr.continuous_sequence_numbering}>
+                {({ getFieldValue }) => {
+                  const continuousSeq = getFieldValue('continuous_sequence_numbering');
+                  return (
+                    <Form.Item
+                      name="independent_sequence_on_derived"
+                      valuePropName="checked"
+                      label="Đánh số thứ tự mới độc lập khi kế thừa phiếu"
+                      help={!continuousSeq ? "Bắt buộc TẮT vì tính năng Tăng liên tục đang bị tắt (số thứ tự sẽ reset theo ngày, do đó Đơn hàng phải kế thừa số của Báo giá để đồng bộ)." : "Nếu BẬT: Đơn hàng tạo từ Báo giá sẽ tự lấy số tiếp theo của riêng nó, đảm bảo liền mạch không bị trống số. Nếu TẮT: Đơn hàng sẽ copy phần đuôi số thứ tự của Báo giá gốc (BG-005 -> DH-005) để dễ đối chiếu."}
+                    >
+                      <Switch checkedChildren="Bật" unCheckedChildren="Tắt" disabled={!continuousSeq} />
+                    </Form.Item>
+                  );
+                }}
               </Form.Item>
             </Col>
           </Row>

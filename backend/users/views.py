@@ -788,19 +788,23 @@ class SyncSequenceView(APIView):
         
         max_seq = 0
         for code in codes:
-            if not code:
+            if not code or not code.startswith(prefix + "-"):
                 continue
-            parts = code.split("-")
-            if len(parts) < 3:
-                continue
+            
+            remainder = code[len(prefix) + 1:]
+            parts = remainder.split("-")
+            
             try:
-                seq = int(parts[-1])
-                parsed_date_str = parts[-2]
-                parsed_prefix = "-".join(parts[:-2])
-                
-                if parsed_prefix == prefix and (is_continuous or parsed_date_str == date_str):
+                if len(parts) == 1:
+                    seq = int(parts[0])
                     if seq > max_seq:
                         max_seq = seq
+                elif len(parts) >= 2:
+                    seq = int(parts[-1])
+                    parsed_date_str = parts[-2]
+                    if is_continuous or parsed_date_str == date_str:
+                        if seq > max_seq:
+                            max_seq = seq
             except (ValueError, IndexError):
                 continue
                 
