@@ -572,10 +572,11 @@ class CompanyRegistrationSerializer(serializers.Serializer):
 class CompanySettingsSerializer(serializers.ModelSerializer):
     quotation_template_detail = serializers.SerializerMethodField()
     current_order_sequence = serializers.SerializerMethodField()
+    current_quotation_sequence = serializers.SerializerMethodField()
 
     class Meta:
         model = CompanySettings
-        fields = ["id", "order_prefix", "lead_routing", "timezone", "active_modules", "pipeline_status_labels", "quotation_template", "default_quotation_terms", "quotation_template_detail", "custom_quotation_title", "custom_order_title", "default_warranty_content", "default_warranty_rules", "inactive_days_threshold", "website_api_key", "is_website_integration_active", "continuous_sequence_numbering", "custom_info_templates", "code_include_company_prefix", "code_include_doc_type", "code_include_date", "current_order_sequence", "independent_sequence_on_derived"]
+        fields = ["id", "order_prefix", "lead_routing", "timezone", "active_modules", "pipeline_status_labels", "quotation_template", "default_quotation_terms", "quotation_template_detail", "custom_quotation_title", "custom_order_title", "default_warranty_content", "default_warranty_rules", "inactive_days_threshold", "website_api_key", "is_website_integration_active", "continuous_sequence_numbering", "custom_info_templates", "code_include_company_prefix", "code_include_doc_type", "code_include_date", "current_order_sequence", "current_quotation_sequence", "independent_sequence_on_derived"]
 
     def get_quotation_template_detail(self, obj):
         if obj.quotation_template:
@@ -599,6 +600,24 @@ class CompanySettingsSerializer(serializers.ModelSerializer):
         ).first()
         
         return seq.last_seq if seq else 0
+
+    def get_current_quotation_sequence(self, obj):
+        from users.models import CompanySequence
+        from core.numbering import resolve_doc_prefix
+        from datetime import date
+        
+        prefix = resolve_doc_prefix(obj.company, "BG")
+        is_continuous = obj.continuous_sequence_numbering
+        date_str = "ALL_TIME" if is_continuous else date.today().strftime("%d%m%Y")
+        
+        seq = CompanySequence.objects.filter(
+            company_id=obj.company_id,
+            prefix=prefix,
+            date_str=date_str
+        ).first()
+        
+        return seq.last_seq if seq else 0
+
 
     def update(self, instance, validated_data):
         res = super().update(instance, validated_data)

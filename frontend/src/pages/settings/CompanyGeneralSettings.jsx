@@ -66,6 +66,10 @@ export default function CompanyGeneralSettings() {
 
   const [nextSequence, setNextSequence] = useState(null)
   const [updatingSequence, setUpdatingSequence] = useState(false)
+  const [syncModalVisible, setSyncModalVisible] = useState(false)
+  const [syncType, setSyncType] = useState('DH')
+  const [syncConfirmText, setSyncConfirmText] = useState('')
+  const [syncing, setSyncing] = useState(false)
 
   const [form] = Form.useForm()
   const [companyForm] = Form.useForm()
@@ -227,6 +231,27 @@ export default function CompanyGeneralSettings() {
       setUpdatingSequence(false)
     }
   }
+
+  const handleSyncSequence = async () => {
+    if (syncConfirmText !== 'RESET') {
+      messageApi.error('Vui lòng gõ chữ RESET để xác nhận.')
+      return
+    }
+    setSyncing(true)
+    try {
+      const res = await api.post('/users/company-settings/sync-sequence/', { prefix: syncType })
+      messageApi.success(res.data.message)
+      setSyncModalVisible(false)
+      setSyncConfirmText('')
+      fetchSettings()
+    } catch (err) {
+      console.error(err)
+      messageApi.error(err.response?.data?.error || 'Đồng bộ thất bại.')
+    } finally {
+      setSyncing(false)
+    }
+  }
+
 
   const handleApplyTemplate = async (templateId) => {
     if (checkMaintenance()) return
@@ -522,30 +547,40 @@ export default function CompanyGeneralSettings() {
               </Form.Item>
 
               <Divider dashed style={{ margin: '12px 0' }} />
-              <div style={{ marginBottom: 16 }}>
-                <Text strong>Thiết lập số thứ tự Đơn hàng tiếp theo</Text>
-                {settings?.current_order_sequence !== undefined && (
-                  <div style={{ marginTop: 4, marginBottom: 8 }}>
-                    <Text type="secondary">
-                      Đã cấp đến số: <Text strong style={{ color: '#16a34a' }}>{settings.current_order_sequence}</Text> 
-                      {' '}(Đơn tiếp theo sẽ là số <Text strong>{settings.current_order_sequence + 1}</Text>)
-                    </Text>
+                <div style={{ marginBottom: 16 }}>
+                  {settings?.current_quotation_sequence !== undefined && (
+                    <div style={{ marginTop: 4, marginBottom: 8, display: 'flex', alignItems: 'center' }}>
+                      <Text type="secondary" style={{ flex: 1 }}>
+                        [Báo giá] Đã cấp đến số: <Text strong style={{ color: '#16a34a' }}>{settings.current_quotation_sequence}</Text>{' '}
+                        (Báo giá tiếp theo sẽ là số <Text strong>{settings.current_quotation_sequence + 1}</Text>)
+                      </Text>
+                      <Button size="small" onClick={() => { setSyncType('BG'); setSyncModalVisible(true) }}>Đồng bộ lại</Button>
+                    </div>
+                  )}
+                  {settings?.current_order_sequence !== undefined && (
+                    <div style={{ marginTop: 4, marginBottom: 8, display: 'flex', alignItems: 'center' }}>
+                      <Text type="secondary" style={{ flex: 1 }}>
+                        [Đơn hàng] Đã cấp đến số: <Text strong style={{ color: '#16a34a' }}>{settings.current_order_sequence}</Text>{' '}
+                        (Đơn tiếp theo sẽ là số <Text strong>{settings.current_order_sequence + 1}</Text>)
+                      </Text>
+                      <Button size="small" onClick={() => { setSyncType('DH'); setSyncModalVisible(true) }}>Đồng bộ lại</Button>
+                    </div>
+                  )}
+                  <Text strong style={{ display: 'block', marginTop: 16 }}>Thiết lập số thứ tự Đơn hàng tiếp theo</Text>
+                  <div style={{ display: 'flex', marginTop: 8, gap: 8 }}>
+                    <InputNumber 
+                      min={1} 
+                      placeholder="VD: 1000" 
+                      value={nextSequence} 
+                      onChange={setNextSequence} 
+                      style={{ width: 150 }} 
+                    />
+                    <Button type="default" onClick={handleUpdateSequence} loading={updatingSequence}>
+                      Cập nhật nhảy số
+                    </Button>
                   </div>
-                )}
-                <div style={{ display: 'flex', marginTop: 8, gap: 8 }}>
-                  <InputNumber 
-                    min={1} 
-                    placeholder="VD: 1000" 
-                    value={nextSequence} 
-                    onChange={setNextSequence} 
-                    style={{ width: 150 }} 
-                  />
-                  <Button type="default" onClick={handleUpdateSequence} loading={updatingSequence}>
-                    Cập nhật nhảy số
-                  </Button>
+                  <Text type="secondary" style={{ fontSize: 12 }}>Chỉ áp dụng khi cần nhảy cóc. Số mới nhập phải lớn hơn số đã cấp hiện tại.</Text>
                 </div>
-                <Text type="secondary" style={{ fontSize: 12 }}>Chỉ áp dụng khi cần nhảy cóc. Số mới nhập phải lớn hơn số đã cấp hiện tại.</Text>
-              </div>
             </Col>
             <Col xs={24} md={12}>
               <Form.Item name="timezone" label="Múi giờ hệ thống">
@@ -954,6 +989,42 @@ export default function CompanyGeneralSettings() {
             </div>
           </div>
         )}
+      </Modal>
+
+      <Modal
+        title={
+          <Space>
+            <SettingOutlined />
+            <span>Xác nhận đồng bộ lại bộ đếm</span>
+          </Space>
+        }
+        open={syncModalVisible}
+        onCancel={() => { setSyncModalVisible(false); setSyncConfirmText('') }}
+        onOk={handleSyncSequence}
+        confirmLoading={syncing}
+        okText="Đồng bộ ngay"
+        okButtonProps={{ danger: true, disabled: syncConfirmText !== 'RESET' }}
+      >
+        <Alert
+          type="error"
+          showIcon
+          message="Cảnh báo an toàn"
+          description={
+            <>
+              Hệ thống sẽ quét toàn bộ dữ liệu {syncType === 'DH' ? 'Đơn hàng' : 'Báo giá'} và kéo lùi bộ đếm về khớp với mã lớn nhất đang tồn tại. 
+              Việc tái sử dụng mã có thể gây rủi ro nhầm lẫn nếu chứng từ cũ đã được in/gửi cho khách hàng. 
+              <br/><br/>
+              <b>Vui lòng gõ chữ RESET vào ô bên dưới để xác nhận:</b>
+            </>
+          }
+          style={{ marginBottom: 16 }}
+        />
+        <Input 
+          placeholder="Nhập chữ RESET" 
+          value={syncConfirmText} 
+          onChange={(e) => setSyncConfirmText(e.target.value)} 
+          autoFocus
+        />
       </Modal>
     </div>
   )

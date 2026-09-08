@@ -44,11 +44,17 @@ class PaymentReceiptViewSet(TenantQuerySetMixin, viewsets.ModelViewSet):
             
         company = self.request.user.company
         code = generate_receipt_code(company)
-        serializer.save(
+        
+        receipt = serializer.save(
             company=company,
             receipt_code=code,
             created_by=self.request.user,
         )
+        
+        payment_target = self.request.data.get("payment_target")
+        if payment_target and receipt.order and not receipt.order.payment_target:
+            receipt.order.payment_target = payment_target
+            receipt.order.save(update_fields=["payment_target"])
 
     def perform_destroy(self, instance):
         user = self.request.user

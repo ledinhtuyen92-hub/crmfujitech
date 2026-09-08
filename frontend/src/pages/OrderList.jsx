@@ -372,11 +372,9 @@ export default function OrderList() {
   const handleCreateReceipt = async (values) => {
     setReceiptSubmitting(true)
     try {
-      if (!selectedOrder.payment_target && values.payment_target) {
-        await api.patch(`/orders/orders/${selectedOrder.id}/`, { payment_target: values.payment_target })
-      }
       await api.post('/finance/receipts/', {
         order: selectedOrder.id,
+        payment_target: values.payment_target,
         milestone: values.milestone || null,
         amount: values.amount,
         payment_method: values.payment_method,
@@ -2751,6 +2749,11 @@ export default function OrderList() {
             >
               {val || `DH-${record.id}`}
             </Text>
+            {record.quotation_detail?.quotation_number && (
+              <Text type="secondary" style={{ fontSize: 11, display: 'block' }}>
+                Báo giá: <Text strong style={{ color: '#8b5cf6', cursor: 'pointer' }}>{record.quotation_detail.quotation_number}</Text>
+              </Text>
+            )}
             <Text type="secondary" style={{ fontSize: 11 }}>
               {dayjs(record.created_at).format('DD/MM/YYYY')}
             </Text>
@@ -3137,7 +3140,14 @@ export default function OrderList() {
                   style={{ padding: '16px', borderBottom: '1px solid #f0f0f0', display: 'block' }}
                 >
                   <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8, alignItems: 'center' }}>
-                    <Text strong style={{ color: '#2563eb' }}>{record.order_number}</Text>
+                    <div>
+                      <Text strong style={{ color: '#2563eb', display: 'block' }}>{record.order_number}</Text>
+                      {record.quotation_detail?.quotation_number && (
+                        <Text type="secondary" style={{ fontSize: 11, display: 'block', marginTop: 2 }}>
+                          Báo giá: <Text strong style={{ color: '#8b5cf6' }}>{record.quotation_detail.quotation_number}</Text>
+                        </Text>
+                      )}
+                    </div>
                     <Tag color={cfg.color} icon={cfg.icon} style={{ margin: 0 }}>{cfg.label}</Tag>
                   </div>
                   <div style={{ marginBottom: 4 }}>

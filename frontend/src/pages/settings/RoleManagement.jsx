@@ -168,6 +168,8 @@ export default function RoleManagement() {
       title: 'Tên vai trò',
       dataIndex: 'name',
       key: 'name',
+      width: '25%',
+      fixed: 'left',
       render: (name, record) => (
         <div>
           <div style={{ fontWeight: 700, fontSize: 15, color: token.colorText }}>{name}</div>
@@ -202,6 +204,7 @@ export default function RoleManagement() {
     {
       title: 'Modules được truy cập',
       key: 'modules',
+      width: '45%',
       render: (_, record) => {
         const mods = [...new Set((record.permission_details || []).map((p) => p.module))]
         return (

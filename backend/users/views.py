@@ -750,3 +750,76 @@ class SystemModuleView(APIView):
 
     def get(self, request, *args, **kwargs):
         return Response(get_available_modules())
+
+
+class SyncSequenceView(APIView):
+    """
+    POST /api/users/company-settings/sync-sequence/
+    """
+    permission_classes = [IsCompanyAdmin]
+
+    def post(self, request, *args, **kwargs):
+        company = request.user.company
+        if not company:
+            return Response({"error": "Người dùng không thuộc công ty nào."}, status=status.HTTP_400_BAD_REQUEST)
+            
+        doc_type = request.data.get("prefix")
+        if not doc_type or doc_type not in ["DH", "BG"]:
+            return Response({"error": "Loại chứng từ không hợp lệ."}, status=status.HTTP_400_BAD_REQUEST)
+            
+        from core.numbering import resolve_doc_prefix
+        prefix = resolve_doc_prefix(company, doc_type)
+        
+        settings = getattr(company, "settings", None)
+        is_continuous = settings and settings.continuous_sequence_numbering
+        
+        from datetime import date
+        date_str = "ALL_TIME" if is_continuous else date.today().strftime("%d%m%Y")
+        
+        from orders.models import Order
+        from sales.models import Quotation
+        model_map = {
+            "DH": (Order, "order_number"),
+            "BG": (Quotation, "quotation_number"),
+        }
+        
+        model_cls, field_name = model_map[doc_type]
+        codes = model_cls.objects.filter(company=company).values_list(field_name, flat=True)
+        
+        max_seq = 0
+        for code in codes:
+            if not code:
+                continue
+            parts = code.split("-")
+            if len(parts) < 3:
+                continue
+            try:
+                seq = int(parts[-1])
+                parsed_date_str = parts[-2]
+                parsed_prefix = "-".join(parts[:-2])
+                
+                if parsed_prefix == prefix and (is_continuous or parsed_date_str == date_str):
+                    if seq > max_seq:
+                        max_seq = seq
+            except (ValueError, IndexError):
+                continue
+                
+        from django.db import transaction
+        from users.models import CompanySequence
+        
+        with transaction.atomic():
+            seq_obj, created = CompanySequence.objects.select_for_update().get_or_create(
+                company=company,
+                prefix=prefix,
+                date_str=date_str,
+                defaults={"last_seq": 0},
+            )
+            seq_obj.last_seq = max_seq
+            seq_obj.save(update_fields=["last_seq"])
+            
+        return Response({
+            "message": f"Đã đồng bộ thành công! Mã số lớn nhất hiện tại là {max_seq}.",
+            "prefix": prefix,
+            "next_sequence": max_seq + 1
+        })
+

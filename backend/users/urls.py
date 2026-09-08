@@ -6,7 +6,7 @@ from .views import (
     ChangePasswordView,
     CompanyRegistrationView,
     CompanySettingsView,
-    UpdateSequenceView,
+    UpdateSequenceView, SyncSequenceView,
     CompanyViewSet,
     CurrentUserView,
     CustomTokenObtainPairView,
@@ -46,6 +46,7 @@ urlpatterns = [
     path("my-company/", MyCompanyView.as_view(), name="my-company"),
     path("company-settings/", CompanySettingsView.as_view(), name="company-settings"),
     path("company-settings/update-sequence/", UpdateSequenceView.as_view(), name="update-sequence"),
+    path("company-settings/sync-sequence/", SyncSequenceView.as_view(), name="sync-sequence"),
     path("system-settings/", SystemSettingsView.as_view(), name="system-settings"),
     path("quota/", UserQuotaView.as_view(), name="user-quota"),
 

@@ -30,6 +30,19 @@ class OrderItemSerializer(serializers.ModelSerializer):
         ]
         read_only_fields = ["id", "line_total"]
 
+    def validate(self, attrs):
+        custom_data = attrs.get('custom_data', {})
+        if custom_data and 'actual_product_id' in custom_data:
+            try:
+                from inventory.models import Product
+                actual_id = int(custom_data['actual_product_id'])
+                product = Product.objects.filter(id=actual_id).first()
+                if product:
+                    attrs['product'] = product
+            except (ValueError, TypeError):
+                pass
+        return attrs
+
     def to_representation(self, instance):
         data = super().to_representation(instance)
         for field in ['width', 'height', 'length', 'area', 'thickness']:
