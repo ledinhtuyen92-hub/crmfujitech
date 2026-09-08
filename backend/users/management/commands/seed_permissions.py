@@ -56,6 +56,7 @@ PERMISSIONS = [
 
     # ── Inventory (Kho vận) ───────────────────────────
     {"code": "inventory.view", "name": "Xem tồn kho & lịch sử giao dịch", "module": "inventory"},
+    {"code": "inventory.scope_company", "name": "Phạm vi: Xem tất cả lịch sử giao dịch toàn công ty", "module": "inventory"},
     {"code": "inventory.import", "name": "Nhập hàng vào kho (tạo phiếu nhập)", "module": "inventory"},
     {"code": "inventory.adjust", "name": "Điều chỉnh tồn kho", "module": "inventory"},
     {"code": "inventory.approve_export", "name": "Duyệt lệnh xuất kho", "module": "inventory"},
@@ -76,6 +77,7 @@ PERMISSIONS = [
 
     # ── Delivery (Giao hàng) ──────────────────────────────────────
     {"code": "delivery.view", "name": "Xem lệnh giao hàng", "module": "delivery"},
+    {"code": "delivery.scope_company", "name": "Phạm vi: Xem tất cả lệnh giao hàng toàn công ty", "module": "delivery"},
     {"code": "delivery.create", "name": "Tạo lệnh giao hàng mới", "module": "delivery"},
     {"code": "delivery.edit", "name": "Cập nhật lệnh giao hàng", "module": "delivery"},
     {"code": "delivery.delete", "name": "Xoá lệnh giao hàng", "module": "delivery"},
@@ -84,6 +86,7 @@ PERMISSIONS = [
 
     # ── Warranty (Bảo hành) ───────────────────────────────────────
     {"code": "warranty.view", "name": "Xem phiếu bảo hành", "module": "warranty"},
+    {"code": "warranty.scope_company", "name": "Phạm vi: Xem tất cả bảo hành toàn công ty", "module": "warranty"},
     {"code": "warranty.create", "name": "Tạo phiếu bảo hành mới", "module": "warranty"},
     {"code": "warranty.edit", "name": "Cập nhật phiếu bảo hành", "module": "warranty"},
     {"code": "warranty.delete", "name": "Xoá phiếu bảo hành", "module": "warranty"},

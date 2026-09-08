@@ -197,9 +197,15 @@ def unread_count(request):
         )
         
         if not request.user.is_superuser and not getattr(request.user, 'is_company_admin', False):
-            if request.user.role and request.user.role.permissions.filter(code="delivery.shipper").exists():
-                if not request.user.role.permissions.filter(code="delivery.assign").exists():
-                    qs_del = qs_del.filter(shipper_user=request.user)
+            if not request.user.has_perm_code("delivery.scope_company") and not request.user.has_perm_code("delivery.assign"):
+                from django.db.models import Q
+                managed_deps = request.user.managed_departments.all()
+                base_q = Q(order__created_by=request.user)
+                if managed_deps.exists():
+                    base_q |= Q(order__created_by__department__in=managed_deps)
+                if request.user.has_perm_code("delivery.shipper"):
+                    base_q |= Q(shipper_user=request.user)
+                qs_del = qs_del.filter(base_q)
                     
         pending_delivery_count = qs_del.count()
 

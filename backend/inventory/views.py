@@ -518,6 +518,32 @@ class InventoryTransactionViewSet(TenantQuerySetMixin, viewsets.ModelViewSet):
 
     def get_queryset(self):
         qs = super().get_queryset()
+        
+        user = self.request.user
+        if not user.is_superuser and not getattr(user, 'is_company_admin', False) and not user.has_perm_code("inventory.scope_company"):
+            from django.db.models import Q
+            allowed_q = Q(created_by=user)
+            
+            if user.has_perm_code("inventory.import"):
+                allowed_q |= Q(type="import")
+            if user.has_perm_code("inventory.adjust"):
+                allowed_q |= Q(type="adjust")
+            if user.has_perm_code("inventory.transfer"):
+                allowed_q |= Q(type="transfer")
+            if user.has_perm_code("inventory.manual_export"):
+                allowed_q |= Q(type="export", reference_order__isnull=True)
+                
+            export_q = Q(type="export", reference_order__isnull=False, reference_order__created_by=user)
+            managed_deps = user.managed_departments.all()
+            if managed_deps.exists():
+                export_q |= Q(type="export", reference_order__isnull=False, reference_order__created_by__department__in=managed_deps)
+                
+            if user.has_perm_code("inventory.approve_export"):
+                export_q |= Q(type="export")
+                
+            allowed_q |= export_q
+            qs = qs.filter(allowed_q)
+
         # Filter theo loại phiếu nếu có
         txn_type = self.request.query_params.get("type")
         if txn_type:

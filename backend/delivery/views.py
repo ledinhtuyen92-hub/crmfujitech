@@ -35,12 +35,20 @@ class DeliveryOrderViewSet(TenantQuerySetMixin, viewsets.ModelViewSet):
         qs = super().get_queryset()
         user = self.request.user
 
-        # Phân quyền phạm vi xem: Nếu là Nhân viên giao hàng (shipper) nhưng KHÔNG có quyền gán (điều phối)
-        # thì chỉ được xem những đơn hàng do chính mình được gán.
+        # Phân quyền phạm vi xem
         if not user.is_superuser and not getattr(user, 'is_company_admin', False):
-            if user.role and user.role.permissions.filter(code="delivery.shipper").exists():
-                if not user.role.permissions.filter(code="delivery.assign").exists():
-                    qs = qs.filter(shipper_user=user)
+            if not user.has_perm_code("delivery.scope_company") and not user.has_perm_code("delivery.assign"):
+                from django.db.models import Q
+                managed_deps = user.managed_departments.all()
+                
+                base_q = Q(order__created_by=user)
+                if managed_deps.exists():
+                    base_q |= Q(order__created_by__department__in=managed_deps)
+                
+                if user.has_perm_code("delivery.shipper"):
+                    base_q |= Q(shipper_user=user)
+                    
+                qs = qs.filter(base_q)
 
         status_filter = self.request.query_params.get("status")
         search_query = self.request.query_params.get("search")
@@ -171,6 +179,18 @@ class WarrantyCardViewSet(TenantQuerySetMixin, viewsets.ModelViewSet):
 
     def get_queryset(self):
         qs = super().get_queryset()
+        user = self.request.user
+
+        # Phân quyền phạm vi xem
+        if not user.is_superuser and not getattr(user, 'is_company_admin', False):
+            if not user.has_perm_code("warranty.scope_company"):
+                from django.db.models import Q
+                managed_deps = user.managed_departments.all()
+                base_q = Q(order__created_by=user)
+                if managed_deps.exists():
+                    base_q |= Q(order__created_by__department__in=managed_deps)
+                qs = qs.filter(base_q)
+
         status_filter = self.request.query_params.get("status")
         search_query = self.request.query_params.get("search")
         
