@@ -74,13 +74,15 @@ const computeRowSpan = (data, index, field = 'product') => {
   
   const currentItem = data[index];
   const matches = (item1, item2) => {
+    if (!item1 || !item2) return false;
     if (item1.item_type === 'service' || item2.item_type === 'service') return false;
     if (field === 'product') {
-      if (item1.product && item2.product) return item1.product === item2.product;
-      if (!item1.product && !item2.product) return item1.product_name === item2.product_name && !!item1.product_name;
+      if (item1.product && item2.product && item1.product == item2.product) return true;
+      if (item1.product_name && item2.product_name && item1.product_name === item2.product_name) return true;
+      if (item1.product_image && item2.product_image && item1.product_image === item2.product_image && (item1.product || item1.product_name)) return true;
       return false;
     }
-    return item1[field] === item2[field];
+    return item1[field] == item2[field];
   };
 
   if (index > 0 && matches(data[index - 1], currentItem)) {
@@ -104,11 +106,12 @@ const computeProductSTT = (data, index, field = 'product') => {
     if (!item1 || !item2) return false;
     if (item1.item_type === 'service' || item2.item_type === 'service') return false;
     if (field === 'product') {
-      if (item1.product && item2.product) return item1.product === item2.product;
-      if (!item1.product && !item2.product) return item1.product_name === item2.product_name && !!item1.product_name;
+      if (item1.product && item2.product && item1.product == item2.product) return true;
+      if (item1.product_name && item2.product_name && item1.product_name === item2.product_name) return true;
+      if (item1.product_image && item2.product_image && item1.product_image === item2.product_image && (item1.product || item1.product_name)) return true;
       return false;
     }
-    return item1[field] === item2[field];
+    return item1[field] == item2[field];
   };
 
   for (let i = 0; i <= index; i++) {
