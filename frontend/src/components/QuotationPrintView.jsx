@@ -17,7 +17,7 @@ const DEFAULT_LAYOUT_BLOCKS = [
 
 export default function QuotationPrintView({ quotation, type = 'quotation', documentType = 'quotation', effectiveTemplate, hidePricing = false, hideCustomerInfo = false, renderCustomerSignature, products = [] }) {
   const [scale, setScale] = useState(1);
-  const [showPageBreaks, setShowPageBreaks] = useState(true);
+  const [showPageBreaks, setShowPageBreaks] = useState(false);
   const [zoomedHeight, setZoomedHeight] = useState(0);
   const contentRef = useRef(null);
 

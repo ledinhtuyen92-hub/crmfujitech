@@ -16,7 +16,7 @@ export default function WarrantyPrintView({
   onOrientationChange,
 }) {
   const [scale, setScale] = useState(1)
-  const [showPageBreaks, setShowPageBreaks] = useState(true)
+  const [showPageBreaks, setShowPageBreaks] = useState(false)
   const [zoomedHeight, setZoomedHeight] = useState(0)
   const [orientation, setOrientation] = useState('landscape') // 'landscape' | 'portrait'
   const contentRef = useRef(null)
