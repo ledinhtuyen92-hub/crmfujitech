@@ -1113,10 +1113,16 @@ export default function OrderList() {
                       />
                     )}
                     {enableProductImage && (
-                      <Upload
-                        fileList={[]}
-                        showUploadList={false}
-                        customRequest={async ({ file, onSuccess, onError }) => {
+                      <div style={{ position: 'relative', display: 'inline-block' }}>
+      <Button icon={<CameraOutlined />} size="small" type="dashed" title="Tải ảnh lên"  />
+      <input 
+        type="file" 
+        accept="image/*" 
+        style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', opacity: 0, cursor: 'pointer' }}
+        onChange={async (e) => {
+          const file = e.target.files?.[0];
+          if (!file) return;
+          
                           const key = `upload-prod-${idx}`;
                           messageApi.open({ key, type: 'loading', content: 'Đang tải ảnh lên...', duration: 0 });
                           try {
@@ -1125,16 +1131,17 @@ export default function OrderList() {
                             const res = await api.postForm('/sales/quotations/upload-item-image/', formData);
                             handleLineChange(idx, 'product_image', res.data.url);
                             messageApi.open({ key, type: 'success', content: 'Đã tải ảnh thành công!', duration: 2 });
-                            onSuccess("ok");
+                            
                           } catch (e) {
                             const errDetail = e.response?.data?.error || "Vui lòng thử lại";
                             messageApi.open({ key, type: 'error', content: `Tải ảnh thất bại: ${errDetail}`, duration: 3 });
-                            onError(e);
+                            
                           }
-                        }}
-                      >
-                        <Button icon={<CameraOutlined />} size="small" type="dashed" title="Tải ảnh lên" />
-                      </Upload>
+                        
+          e.target.value = '';
+        }}
+      />
+    </div>
                     )}
                   </div>
                   {(val || record.product_name) && (
@@ -1242,8 +1249,16 @@ export default function OrderList() {
                   )
                 }
                 {enableNoteImage && (
-                  <Upload fileList={[]} showUploadList={false}
-                    customRequest={async ({ file, onSuccess, onError }) => {
+                  <div style={{ position: 'relative', display: 'inline-block' }}>
+      <Button icon={<CameraOutlined />} size="small" type={record.custom_data?.note_image ? "primary" : "dashed"} title="Tải ảnh lên"  />
+      <input 
+        type="file" 
+        accept="image/*" 
+        style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', opacity: 0, cursor: 'pointer' }}
+        onChange={async (e) => {
+          const file = e.target.files?.[0];
+          if (!file) return;
+          
                       const key = `upload-note-${idx}`;
                       messageApi.open({ key, type: 'loading', content: 'Đang tải ảnh lên...', duration: 0 });
                       try {
@@ -1253,14 +1268,16 @@ export default function OrderList() {
                         const currentData = record.custom_data || {};
                         handleLineChange(idx, 'custom_data', { ...currentData, note_image: res.data.url });
                         messageApi.open({ key, type: 'success', content: 'Đã tải ảnh ghi chú!', duration: 2 });
-                        onSuccess("ok");
+                        
                       } catch (e) {
                         messageApi.open({ key, type: 'error', content: 'Tải ảnh thất bại', duration: 3 });
-                        onError(e);
+                        
                       }
-                    }}>
-                    <Button icon={<CameraOutlined />} size="small" type={record.custom_data?.note_image ? "primary" : "dashed"} title="Tải ảnh lên" />
-                  </Upload>
+                    
+          e.target.value = '';
+        }}
+      />
+    </div>
                 )}
               </div>
             </div>
@@ -1394,10 +1411,16 @@ export default function OrderList() {
                     />
                   )}
                   {enableProductImage && (
-                    <Upload
-                      fileList={[]}
-                      showUploadList={false}
-                      customRequest={async ({ file, onSuccess, onError }) => {
+                    <div style={{ position: 'relative', display: 'inline-block' }}>
+      <Button icon={<CameraOutlined />} size="small" type="dashed" title="Tải ảnh lên"  />
+      <input 
+        type="file" 
+        accept="image/*" 
+        style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', opacity: 0, cursor: 'pointer' }}
+        onChange={async (e) => {
+          const file = e.target.files?.[0];
+          if (!file) return;
+          
                         const key = `upload-prod-${idx}`;
                         messageApi.open({ key, type: 'loading', content: 'Đang tải ảnh lên...', duration: 0 });
                         try {
@@ -1406,16 +1429,17 @@ export default function OrderList() {
                           const res = await api.postForm('/sales/quotations/upload-item-image/', formData);
                           handleLineChange(idx, 'product_image', res.data.url);
                           messageApi.open({ key, type: 'success', content: 'Đã tải ảnh thành công!', duration: 2 });
-                          onSuccess("ok");
+                          
                         } catch (e) {
                           const errDetail = e.response?.data?.error || "Vui lòng thử lại";
                           messageApi.open({ key, type: 'error', content: `Tải ảnh thất bại: ${errDetail}`, duration: 3 });
-                          onError(e);
+                          
                         }
-                      }}
-                    >
-                      <Button icon={<CameraOutlined />} size="small" type="dashed" title="Tải ảnh lên" />
-                    </Upload>
+                      
+          e.target.value = '';
+        }}
+      />
+    </div>
                   )}
                 </div>
                 {(val || record.product_name) && (
@@ -1841,8 +1865,8 @@ export default function OrderList() {
                       handleLineChange(idx, 'custom_data', finalData);
                       
                       if (matched) {
-                        handleLineChange(idx, 'product_id', matched.id);
-                        handleLineChange(idx, 'product_name', matched.name);
+                        // handleLineChange(idx, 'product_id', matched.id);
+                        // handleLineChange(idx, 'product_name', matched.name);
                         handleLineChange(idx, 'unit', matched.unit || 'cái');
                         handleLineChange(idx, 'unit_price', Number(matched.price || matched.cost_price || 0));
                         if (!record.quantity || record.quantity === 0) {
@@ -1867,8 +1891,8 @@ export default function OrderList() {
                   handleLineChange(idx, 'custom_data', finalData);
                   
                   if (matched) {
-                    handleLineChange(idx, 'product_id', matched.id);
-                    handleLineChange(idx, 'product_name', matched.name);
+                    // handleLineChange(idx, 'product_id', matched.id);
+                    // handleLineChange(idx, 'product_name', matched.name);
                     handleLineChange(idx, 'unit', matched.unit || 'cái');
                     handleLineChange(idx, 'unit_price', Number(matched.price || matched.cost_price || 0));
                     if (!record.quantity || record.quantity === 0) {
@@ -1913,10 +1937,16 @@ export default function OrderList() {
                     </div>
                   )}
                   <div style={{ flex: 1 }}>{innerChildren}</div>
-                  <Upload
-                    fileList={[]}
-                    showUploadList={false}
-                    customRequest={async ({ file, onSuccess, onError }) => {
+                  <div style={{ position: 'relative', display: 'inline-block' }}>
+      <Button icon={<CameraOutlined />} size="small" type={imgUrl ? "primary" : "dashed"} title="Tải ảnh đính kèm"  />
+      <input 
+        type="file" 
+        accept="image/*" 
+        style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', opacity: 0, cursor: 'pointer' }}
+        onChange={async (e) => {
+          const file = e.target.files?.[0];
+          if (!file) return;
+          
                       const key = `upload-img-${idx}-${colId}`;
                       messageApi.open({ key, type: 'loading', content: 'Đang tải ảnh lên...', duration: 0 });
                       try {
@@ -1926,15 +1956,16 @@ export default function OrderList() {
                         const currentData = record.custom_data || {};
                         handleLineChange(idx, 'custom_data', { ...currentData, [imgKey]: res.data.url });
                         messageApi.open({ key, type: 'success', content: 'Đã tải ảnh thành công!', duration: 2 });
-                        onSuccess("ok");
+                        
                       } catch (e) {
                         messageApi.open({ key, type: 'error', content: 'Tải ảnh thất bại', duration: 3 });
-                        onError(e);
+                        
                       }
-                    }}
-                  >
-                    <Button icon={<CameraOutlined />} size="small" type={imgUrl ? "primary" : "dashed"} title="Tải ảnh đính kèm" />
-                  </Upload>
+                    
+          e.target.value = '';
+        }}
+      />
+    </div>
                 </div>
               );
             }
@@ -1993,26 +2024,33 @@ export default function OrderList() {
               placeholder="Chọn hoặc nhập tên dịch vụ"
             />
             {enableServiceImage && (
-              <Upload
-                fileList={[]}
-                showUploadList={false}
-                customRequest={async ({ file, onSuccess, onError }) => {
+              <div style={{ position: 'relative', display: 'inline-block' }}>
+      <Button icon={<CameraOutlined />} size="small" type="dashed" title="Tải ảnh lên"  />
+      <input 
+        type="file" 
+        accept="image/*" 
+        style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', opacity: 0, cursor: 'pointer' }}
+        onChange={async (e) => {
+          const file = e.target.files?.[0];
+          if (!file) return;
+          
                   try {
                     const formData = new FormData();
                     formData.append('image', file);
                     const res = await api.postForm('/sales/quotations/upload-item-image/', formData);
                     handleServiceLineChange(index, 'product_image', res.data.url);
                     messageApi.success("Đã tải ảnh thành công!");
-                    onSuccess("ok");
+                    
                   } catch (e) {
                     const errDetail = e.response?.data?.error || "Vui lòng thử lại";
                     messageApi.error(`Tải ảnh thất bại: ${errDetail}`);
-                    onError(e);
+                    
                   }
-                }}
-              >
-                <Button icon={<CameraOutlined />} size="small" type="dashed" title="Tải ảnh lên" />
-              </Upload>
+                
+          e.target.value = '';
+        }}
+      />
+    </div>
             )}
           </div>
         ),
