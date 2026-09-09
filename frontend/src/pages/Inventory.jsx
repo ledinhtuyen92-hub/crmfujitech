@@ -1261,6 +1261,12 @@ export default function Inventory() {
       render: (v) => v ? <Tag color="orange">{v}</Tag> : null,
     }] : []),
     {
+      title: 'Người thực hiện',
+      dataIndex: 'created_by_name',
+      key: 'created_by_name',
+      render: (v) => <Text>{v || '—'}</Text>,
+    },
+    {
       title: 'Ngày tạo',
       dataIndex: 'created_at',
       key: 'created_at',
