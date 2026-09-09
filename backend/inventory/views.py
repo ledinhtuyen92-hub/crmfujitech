@@ -901,8 +901,8 @@ class InventoryTransactionViewSet(TenantQuerySetMixin, viewsets.ModelViewSet):
             if not product:
                 return Response({"detail": f"Sản phẩm ID {product_id} không tồn tại."}, status=status.HTTP_400_BAD_REQUEST)
 
-            if quantity <= 0:
-                return Response({"detail": f"Số lượng sản phẩm '{product.name}' phải lớn hơn 0."}, status=status.HTTP_400_BAD_REQUEST)
+            if quantity < 0 or (quantity == 0 and txn_type != "adjust"):
+                return Response({"detail": f"Số lượng sản phẩm '{product.name}' phải lớn hơn 0 (trừ trường hợp điều chỉnh kho)."}, status=status.HTTP_400_BAD_REQUEST)
 
             # Khóa và lấy stock hiện tại
             stock, _ = StockLevel.objects.select_for_update().get_or_create(
