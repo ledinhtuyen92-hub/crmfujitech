@@ -777,25 +777,40 @@ export default function OrderList() {
     const currentItem = data[index];
     if (!currentItem) return 1;
 
-    const matches = (item1, item2) => {
-      if (field === 'product') {
-        if (item1.product && item2.product) return item1.product === item2.product;
-        if (!item1.product && !item2.product) return item1.product_name === item2.product_name && (!!item1.product_name || item1.custom_data?.is_custom_size !== undefined || item1.custom_data?.is_child || item2.custom_data?.is_custom_size !== undefined || item2.custom_data?.is_child);
-        return false;
-      }
-      return item1[field] === item2[field];
-    };
+    if (field === 'product') {
+      // For custom items (no product ID), walk back to find the "parent" non-accessory row.
+      // Accessories (is_custom_size=true) belong to the same group as their parent.
+      const getCustomRoot = (idx) => {
+        if (data[idx]?.custom_data?.is_custom_size !== true) return idx; // is the parent itself
+        for (let k = idx - 1; k >= 0; k--) {
+          if (!data[k]?.custom_data?.is_custom_size) return k;
+        }
+        return idx; // no parent found, treat as own root
+      };
 
-    if (index > 0 && matches(data[index - 1], currentItem)) {
-      return 0;
+      const sameGroup = (i, j) => {
+        const a = data[i], b = data[j];
+        if (!a || !b) return false;
+        if (a.product && b.product) return a.product === b.product; // catalog: match by ID
+        if (a.product || b.product) return false; // mixed: never group
+        return getCustomRoot(i) === getCustomRoot(j); // custom: compare roots
+      };
+
+      if (index > 0 && sameGroup(index - 1, index)) return 0;
+      let count = 1;
+      for (let i = index + 1; i < data.length; i++) {
+        if (sameGroup(index, i)) count++;
+        else break;
+      }
+      return count;
     }
+
+    // Non-product fields: simple equality
+    if (index > 0 && data[index - 1][field] === currentItem[field]) return 0;
     let count = 1;
     for (let i = index + 1; i < data.length; i++) {
-      if (matches(data[i], currentItem)) {
-        count++;
-      } else {
-        break;
-      }
+      if (data[i][field] === currentItem[field]) count++;
+      else break;
     }
     return count;
   }
@@ -833,14 +848,24 @@ export default function OrderList() {
         },
         discount_percent: currentItem.discount_percent || 0,
       }
-      let rowSpan = 1;
-      const matches = (item1, item2) => {
-        if (item1.product && item2.product) return item1.product === item2.product;
-        if (!item1.product && !item2.product) return item1.product_name === item2.product_name && (!!item1.product_name || item1.custom_data?.is_custom_size !== undefined || item1.custom_data?.is_child || item2.custom_data?.is_custom_size !== undefined || item2.custom_data?.is_child);
-        return false;
+      // Find end of current group using root-based logic (same as computeRowSpan)
+      const getCustomRootInPrev = (arr, idx) => {
+        if (arr[idx]?.custom_data?.is_custom_size !== true) return idx;
+        for (let k = idx - 1; k >= 0; k--) {
+          if (!arr[k]?.custom_data?.is_custom_size) return k;
+        }
+        return idx;
       };
+      const sameGroupInPrev = (arr, i, j) => {
+        const a = arr[i], b = arr[j];
+        if (!a || !b) return false;
+        if (a.product && b.product) return a.product === b.product;
+        if (a.product || b.product) return false;
+        return getCustomRootInPrev(arr, i) === getCustomRootInPrev(arr, j);
+      };
+      let rowSpan = 1;
       for (let i = index + 1; i < prev.length; i++) {
-        if (matches(prev[i], prev[i - 1])) {
+        if (sameGroupInPrev(prev, i, i - 1)) {
           rowSpan++;
         } else {
           break;
