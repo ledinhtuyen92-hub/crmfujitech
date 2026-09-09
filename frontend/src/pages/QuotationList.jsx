@@ -790,7 +790,7 @@ export default function QuotationList() {
           thickness: 0,
           area: 0,
           spec: '',
-note: it.note || '',
+          note: srv.note || '',
           product_image: srv.product_image || '',
           custom_data: { unit: 'lần' },
           quantity: Number(srv.quantity || 1),
