@@ -448,8 +448,8 @@ class WarehouseViewSet(TenantQuerySetMixin, viewsets.ModelViewSet):
 
 from rest_framework import mixins
 
-class StockLevelViewSet(mixins.UpdateModelMixin, viewsets.ReadOnlyModelViewSet):
-    """Xem và cập nhật (ngưỡng cảnh báo) tồn kho — filter qua product.company."""
+class StockLevelViewSet(mixins.UpdateModelMixin, mixins.DestroyModelMixin, viewsets.ReadOnlyModelViewSet):
+    """Xem, cập nhật (ngưỡng cảnh báo) và xoá (khi bằng 0) tồn kho — filter qua product.company."""
     module_code = "inventory"
 
     queryset = StockLevel.objects.select_related(
@@ -464,6 +464,7 @@ class StockLevelViewSet(mixins.UpdateModelMixin, viewsets.ReadOnlyModelViewSet):
         "retrieve": "inventory.view",
         "update": "inventory.manage_warehouse",
         "partial_update": "inventory.manage_warehouse",
+        "destroy": "inventory.manage_warehouse",
     }
 
     def get_queryset(self):
@@ -493,6 +494,12 @@ class StockLevelViewSet(mixins.UpdateModelMixin, viewsets.ReadOnlyModelViewSet):
                 Q(product__code__icontains=search_query)
             )
         return qs
+
+    def perform_destroy(self, instance):
+        if instance.quantity > 0:
+            from rest_framework.exceptions import ValidationError
+            raise ValidationError("Không thể xóa dữ liệu tồn kho khi số lượng trong kho lớn hơn 0.")
+        instance.delete()
 
 
 class InventoryTransactionViewSet(TenantQuerySetMixin, viewsets.ModelViewSet):

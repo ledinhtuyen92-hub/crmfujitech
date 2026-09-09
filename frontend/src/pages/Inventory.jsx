@@ -260,6 +260,17 @@ export default function Inventory() {
     }
   }
 
+  const handleDeleteStockLevel = async (stockId) => {
+    try {
+      await api.delete(`/inventory/stock-levels/${stockId}/`)
+      message.success('Đã xóa dữ liệu sản phẩm khỏi kho')
+      fetchStockLevels()
+    } catch (err) {
+      console.error(err)
+      message.error(err.response?.data?.detail || 'Lỗi khi xóa dữ liệu kho')
+    }
+  }
+
   useEffect(() => {
     fetchCategories()
     fetchWarehouses()
@@ -988,6 +999,30 @@ export default function Inventory() {
         )
       },
     },
+    {
+      title: 'Thao tác',
+      key: 'action',
+      align: 'right',
+      render: (_, r) => {
+        if (r.items && r.items.length > 1) return null;
+        const actualItem = r.items ? r.items[0] : r;
+        if (actualItem.quantity === 0 && (isCompanyAdmin || hasPermission('inventory.manage_warehouse'))) {
+          return (
+            <Popconfirm
+              title="Xóa khỏi kho?"
+              description="Bạn có chắc muốn xóa dữ liệu tồn kho bằng 0 này không?"
+              onConfirm={() => handleDeleteStockLevel(actualItem.id)}
+              okText="Xóa"
+              cancelText="Hủy"
+              okButtonProps={{ danger: true }}
+            >
+              <Button type="text" danger icon={<DeleteOutlined />} size="small" />
+            </Popconfirm>
+          )
+        }
+        return null;
+      }
+    }
   ]
 
   // ── Columns for Transactions ──────────────────────────────────────────
@@ -1739,6 +1774,28 @@ export default function Inventory() {
                                       {min || 0}
                                     </Text>
                                   )
+                                },
+                                {
+                                  title: 'Thao tác',
+                                  key: 'action',
+                                  align: 'right',
+                                  render: (_, record) => {
+                                    if (record.quantity === 0 && (isCompanyAdmin || hasPermission('inventory.manage_warehouse'))) {
+                                      return (
+                                        <Popconfirm
+                                          title="Xóa khỏi kho?"
+                                          description="Bạn có chắc muốn xóa dữ liệu tồn kho bằng 0 này không?"
+                                          onConfirm={() => handleDeleteStockLevel(record.id)}
+                                          okText="Xóa"
+                                          cancelText="Hủy"
+                                          okButtonProps={{ danger: true }}
+                                        >
+                                          <Button type="text" danger icon={<DeleteOutlined />} size="small" />
+                                        </Popconfirm>
+                                      )
+                                    }
+                                    return null;
+                                  }
                                 }
                               ]}
                             />
