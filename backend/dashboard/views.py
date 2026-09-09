@@ -162,7 +162,7 @@ def summary(request):
 
     valid_product_ids = list(Product.objects.filter(category__is_sales_target=True).values_list('id', flat=True))
     sales_target_cond = Q(custom_data__actual_product_id__in=valid_product_ids) | (
-        Q(custom_data__actual_product_id__isnull=True) & Q(product__category__is_sales_target=True)
+        Q(custom_data__actual_product_id__isnull=True) & (Q(product__category__is_sales_target=True) | Q(product__isnull=True))
     )
     order_items_qs = OrderItem.objects.filter(order__in=order_qs, item_type="product").filter(sales_target_cond)
     won_products = order_items_qs.filter(
@@ -383,7 +383,7 @@ def top_sellers(request):
     
     valid_product_ids = list(Product.objects.filter(category__is_sales_target=True).values_list('id', flat=True))
     sales_target_cond = Q(custom_data__actual_product_id__in=valid_product_ids) | (
-        Q(custom_data__actual_product_id__isnull=True) & Q(product__category__is_sales_target=True)
+        Q(custom_data__actual_product_id__isnull=True) & (Q(product__category__is_sales_target=True) | Q(product__isnull=True))
     )
     product_qs = OrderItem.objects.filter(
         order__created_by=OuterRef('pk'),
