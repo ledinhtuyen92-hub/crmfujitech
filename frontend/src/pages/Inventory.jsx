@@ -2160,7 +2160,7 @@ export default function Inventory() {
                               let availableProds = products.filter(p => p.product_type !== 'service');
                               
                               if ((txnType === 'adjust' || txnType === 'export' || txnType === 'transfer') && wId) {
-                                const stockPIds = stockLevels.filter(s => s.warehouse === wId).map(s => s.product);
+                                const stockPIds = stockLevels.filter(s => Number(s.warehouse) === Number(wId)).map(s => s.product);
                                 availableProds = availableProds.filter(p => stockPIds.includes(p.id));
                               }
 
