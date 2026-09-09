@@ -946,7 +946,7 @@ export default function Products() {
             </Col>
             <Col xs={24} md={12}>
               <Form.Item name="product_type" label="Loại" rules={[{ required: true }]}>
-                <Select>
+                <Select onChange={() => productForm.setFieldsValue({ category: null })}>
                   <Option value="product">Hàng hóa</Option>
                   <Option value="service">Dịch vụ / Chi phí</Option>
                 </Select>

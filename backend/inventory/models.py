@@ -107,8 +107,7 @@ class ProductTemplate(models.Model):
         (UNIT_CHUYEN, "Chuyến"),
     ]
     unit = models.CharField(
-        max_length=20,
-        choices=UNIT_CHOICES,
+        max_length=50,
         default=UNIT_CAI,
         verbose_name="Đơn vị tính",
     )
@@ -244,8 +243,7 @@ class Product(models.Model):
         help_text="vd: {'Màu sắc': 'Đỏ', 'Kích thước': 'XL'}",
     )
     unit = models.CharField(
-        max_length=20,
-        choices=UNIT_CHOICES,
+        max_length=50,
         default=UNIT_CAI,
         verbose_name="Đơn vị tính",
     )

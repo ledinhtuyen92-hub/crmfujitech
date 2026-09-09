@@ -42,7 +42,7 @@ class ProductTemplateSerializer(serializers.ModelSerializer):
 class ProductSerializer(serializers.ModelSerializer):
     category_name = serializers.CharField(source="category.name", read_only=True)
     template_name = serializers.CharField(source="template.name", read_only=True)
-    unit_display = serializers.CharField(source="get_unit_display", read_only=True)
+    unit_display = serializers.CharField(source="unit", read_only=True)
     image_url = serializers.SerializerMethodField()
     sku = serializers.CharField(max_length=100, required=False, allow_blank=True, allow_null=True)
 
