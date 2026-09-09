@@ -1113,6 +1113,8 @@ export default function Inventory() {
       title: 'Mã phiếu',
       dataIndex: 'transaction_code',
       key: 'transaction_code',
+      fixed: 'left',
+      width: 140,
       render: (val, r) => (
         <Space direction="vertical" size={2}>
           <Tag color="purple" style={{ fontWeight: 600, margin: 0 }}>{val}</Tag>
