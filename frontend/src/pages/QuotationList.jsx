@@ -841,6 +841,201 @@ export default function QuotationList() {
       // Chỉ chọn Giám đốc (admin công ty) hoặc Trưởng phòng phụ trách trực tiếp CÓ QUYỀN DUYỆT BÁO GIÁ
       const validApprovers = userList.filter(u => {
         if (u.is_company_admin || u.is_superuser) return true
+form.setFieldsValue({
+        customer: prefillCustomerId || undefined,
+        status: 'draft',
+        discount_total: 0,
+        shipping_fee: 0,
+        installation_fee: 0,
+        delivery_time: '3-5 ngày làm việc',
+        warranty_months: 12,
+        payment_terms: defaultPaymentTerms,
+        payment_terms_schedule: [{ title: 'Thanh toán đợt 1', percentage: 100, type: 'deposit' }],
+        validity_days: 15,
+        notes: defaultTerms,
+      })
+      setFormItems([
+        { key: Date.now(), product: null, width: 0, height: 0, length: 0, thickness: 0, area: 0, spec: '', warranty: '12 tháng', quantity: 1, unit_price: 0, discount_percent: 0, note: '', product_image: '', unit: 'cái' },
+      ])
+      setServiceItems([])
+    }
+    setModalVisible(true)
+  }
+
+  // ── Submit Form (Create / Edit) ───────────────────────────────────────
+  const handleSubmit = async () => {
+    try {
+      const values = await form.validateFields()
+      setSubmitting(true)
+
+      // Validate items
+      const validItems = formItems.filter((it) => it.product || it.product_name)
+      const validServiceItems = serviceItems.filter((it) => it.product_name)
+      if (validItems.length === 0 && validServiceItems.length === 0) {
+        messageApi.error('Vui lòng chọn ít nhất 1 sản phẩm hoặc 1 dịch vụ/chi phí cho báo giá.')
+        setSubmitting(false)
+        return
+      }
+
+      const pt = values.payment_terms_schedule || []
+      const totalPercentage = pt.reduce((sum, item) => sum + Number(item.percentage || 0), 0)
+      if (pt.length > 0 && Math.abs(totalPercentage - 100) > 0.01) {
+        messageApi.error('Tổng % của các đợt thanh toán phải bằng đúng 100%.')
+        setSubmitting(false)
+        return
+      }
+
+      const subtotal = calculateModalTotal()
+      const vatAmount = (subtotal * Number(values.vat_rate || 0)) / 100.0
+      const totalAmt = subtotal + vatAmount + Number(values.shipping_fee || 0) + Number(values.installation_fee || 0) - Number(values.discount_total || 0)
+
+      // Build template snapshot to freeze the current layout with this quotation
+      const effTmpl = getEffectiveTemplate(editingQuotation)
+      const templateSnapshot = effTmpl ? {
+        id: effTmpl.id,
+        code: effTmpl.code,
+        name: effTmpl.name,
+        layout_config: effTmpl.layout_config,
+        layout_style: effTmpl.layout_style,
+        footer_content: effTmpl.footer_content,
+      } : null
+
+      const payload = {
+        customer: values.customer,
+        status: values.status,
+        installation_date: values.installation_date ? values.installation_date.format('YYYY-MM-DD') : null,
+        notes: values.notes || '',
+        shipping_fee: Number(values.shipping_fee || 0),
+        installation_fee: Number(values.installation_fee || 0),
+        delivery_time: values.delivery_time || '',
+        warranty_months: Number(values.warranty_months) || 12,
+        payment_terms: values.payment_terms || '',
+        payment_terms_schedule: values.payment_terms_schedule || [],
+        validity_days: Number(values.validity_days || 15),
+        subtotal: subtotal,
+        vat_rate: Number(values.vat_rate || 0),
+        vat_amount: vatAmount,
+        discount_total: Number(values.discount_total || 0),
+        total_amount: Math.max(0, totalAmt),
+        custom_data: {
+          ...(editingQuotation?.custom_data || {}),
+          ...(templateSnapshot ? { template_snapshot: templateSnapshot } : {}),
+        },
+      }
+
+      let quotationId
+      if (editingQuotation) {
+        const res = await api.patch(`/sales/quotations/${editingQuotation.id}/`, payload)
+        quotationId = res.data.id
+        messageApi.success('Cập nhật báo giá thành công!')
+      } else {
+        const res = await api.post('/sales/quotations/', payload)
+        quotationId = res.data.id
+        messageApi.success('Tạo báo giá mới thành công!')
+      }
+
+      // Add / replace items
+      if (editingQuotation && editingQuotation.items) {
+        await Promise.all(
+          editingQuotation.items.map((it) => api.delete(`/sales/quotation-items/${it.id}/`).catch(() => {}))
+        )
+      }
+
+      for (const it of validItems) {
+        const prodObj = products.find((p) => p.id === it.product)
+        await api.post('/sales/quotation-items/', {
+          quotation: quotationId,
+          product: it.product,
+          product_name: it.product_name || (prodObj ? prodObj.name : 'Sản phẩm'),
+          unit_price: Number(it.unit_price || 0),
+          width: Math.round(Number(it.width || 0)),
+          height: Math.round(Number(it.height || 0)),
+          length: Math.round(Number(it.length || 0)),
+          thickness: Math.round(Number(it.thickness || 0)),
+          area: Number(Number(it.area || 0).toFixed(2)),
+          spec: it.spec || (prodObj ? prodObj.description : '') || '',
+          warranty: it.warranty || '12 tháng',
+          product_image: it.product_image || (prodObj ? (prodObj.image_url || prodObj.image) : '') || '',
+          custom_data: {
+            ...(it.custom_data || {}),
+            unit: it.unit || (prodObj ? prodObj.unit : 'cái'),
+            thickness: Math.round(Number(it.thickness || 0)),
+            symbol: it.custom_data?.symbol || it.symbol || '',
+          },
+          quantity: Number(it.quantity || 1),
+          discount_percent: Number(it.discount_percent || 0),
+          note: it.note || '',
+        })
+      }
+
+      for (const srv of validServiceItems) {
+        let prodId = null
+        if (typeof srv.product === 'number') {
+          prodId = srv.product
+        }
+        await api.post('/sales/quotation-items/', {
+          quotation: quotationId,
+          product: prodId,
+          item_type: 'service',
+          product_name: srv.product_name,
+          unit_price: Number(srv.unit_price || 0),
+          width: 0,
+          height: 0,
+          length: 0,
+          thickness: 0,
+          area: 0,
+          spec: '',
+          note: srv.note || '',
+          product_image: srv.product_image || '',
+          custom_data: { unit: 'lần' },
+          quantity: Number(srv.quantity || 1),
+          discount_percent: Number(srv.discount_percent || 0),
+        })
+      }
+
+      setModalVisible(false)
+      fetchQuotations()
+    } catch (error) {
+      if (error.errorFields) return
+      let detailMsg = error.response?.data?.detail || error.response?.data?.message
+      if (!detailMsg && typeof error.response?.data === 'string') {
+        detailMsg = error.response.data
+      }
+      if (!detailMsg && error.response?.data && typeof error.response.data === 'object') {
+        const errList = []
+        for (const [k, v] of Object.entries(error.response.data)) {
+          const valStr = Array.isArray(v) ? v.join(', ') : (typeof v === 'object' ? JSON.stringify(v) : String(v))
+          errList.push(`${k}: ${valStr}`)
+        }
+        if (errList.length > 0) detailMsg = errList.join('; ')
+      }
+      console.error('Lỗi khi lưu báo giá:', error.response?.data || error)
+      messageApi.error(detailMsg || 'Lưu báo giá thất bại. Vui lòng thử lại.')
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
+  // ── Delete Quotation ──────────────────────────────────────────────────
+  const handleDelete = async (id) => {
+    if (checkMaintenance()) return
+    try {
+      await api.delete(`/sales/quotations/${id}/`)
+      messageApi.success('Đã xoá báo giá.')
+      fetchQuotations()
+    } catch {
+      messageApi.error('Không thể xoá báo giá này.')
+    }
+  }
+
+  const loadApprovers = async () => {
+    try {
+      const res = await api.get('/users/users/')
+      const userList = Array.isArray(res.data) ? res.data : (res.data?.results || [])
+      const myDeptId = user?.department
+      // Chỉ chọn Giám đốc (admin công ty) hoặc Trưởng phòng phụ trách trực tiếp CÓ QUYỀN DUYỆT BÁO GIÁ
+      const validApprovers = userList.filter(u => {
+        if (u.is_company_admin || u.is_superuser) return true
         if (u.permissions && u.permissions.includes('sales.approve')) return true
         
         if (myDeptId && u.managed_department_ids && u.managed_department_ids.includes(myDeptId)) return true
@@ -886,7 +1081,21 @@ export default function QuotationList() {
     setSelectedQuotationForOrder(record)
     createOrderForm.resetFields()
     setCreateOrderModalVisible(true)
-    await loadApprovers()
+    try {
+      const res = await api.get('/users/users/')
+      const userList = Array.isArray(res.data) ? res.data : (res.data?.results || [])
+      const myDeptId = user?.department
+      const validApprovers = userList.filter(u => {
+        if (u.is_company_admin || u.is_superuser) return true
+        if (u.permissions && u.permissions.includes('orders.approve')) return true
+        if (myDeptId && u.managed_department_ids && u.managed_department_ids.includes(myDeptId)) return true
+        if (myDeptId && u.department === myDeptId && u.id !== user?.id && u.role_name && u.role_name.toLowerCase().includes('trưởng')) return true
+        return false
+      })
+      setOrderApprovers(validApprovers.length > 0 ? validApprovers : userList.filter(u => u.is_company_admin || u.is_superuser))
+    } catch {
+      messageApi.error('Lỗi tải danh sách người duyệt đơn hàng.')
+    }
   }
 
   const handleConfirmCreateOrder = async () => {
@@ -2613,521 +2822,6 @@ export default function QuotationList() {
         onChange={async (e) => {
           const file = e.target.files?.[0];
           if (!file) return;
-          
-                      const key = `upload-${colId}-${idx}`;
-                      messageApi.open({ key, type: 'loading', content: 'Đang tải ảnh lên...', duration: 0 });
-                      try {
-                        const formData = new FormData();
-                        formData.append('image', file);
-                        const res = await api.postForm('/sales/quotations/upload-item-image/', formData);
-                        const cd = record.custom_data || {};
-                        handleLineChange(idx, 'custom_data', { ...cd, [imgKey]: res.data.url });
-                        messageApi.open({ key, type: 'success', content: 'Tải ảnh thành công!', duration: 2 });
-                        
-                      } catch (e) {
-                        messageApi.open({ key, type: 'error', content: 'Tải ảnh thất bại', duration: 3 });
-                        
-                      }
-                    
-          e.target.value = '';
-        }}
-      />
-    </div>
-                </div>
-              );
-            }
-
-            return { children: innerChildren, props: finalProps };
-          }
-        };
-      });
-    };
-
-    return applyColFeatures(baseCols);
-  }
-
-  return (
-    <section>
-      {contextHolder}
-
-      {/* ── Page Header & Stats ────────────────────────────────────────── */}
-      <Row justify="space-between" align="middle" style={{ marginBottom: 24 }}>
-        <Col>
-          <Title level={3} style={{ margin: 0, fontWeight: 800 }}>
-            <FileTextOutlined style={{ color: '#2563eb', marginRight: 10 }} />
-            Quản lý Bán hàng & Báo giá
-          </Title>
-          <Text type="secondary">
-            Tạo, theo dõi và chuyển đổi báo giá thành đơn hàng chính thức một cách chuyên nghiệp.
-          </Text>
-        </Col>
-        <Col>
-          {canCreate && (
-            <Button
-              type="primary"
-              size="large"
-              icon={<PlusOutlined />}
-              onClick={() => openModal()}
-              style={{
-                borderRadius: 10,
-                fontWeight: 600,
-                background: 'linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%)',
-                boxShadow: '0 4px 12px rgba(37, 99, 235, 0.25)',
-              }}
-            >
-              Tạo Báo Giá Mới
-            </Button>
-          )}
-        </Col>
-      </Row>
-
-      {/* ── Cards Thống Kê (Minimal Premium) ─────────────────────────────── */}
-      <Row gutter={[16, 16]} style={{ marginBottom: 24 }}>
-        {/* Card 1: Nháp */}
-        <Col xs={24} sm={12} md={6}>
-          <div style={{
-            background: '#ffffff',
-            borderRadius: 12,
-            padding: '16px 20px',
-            border: '1px solid #e2e8f0',
-            boxShadow: '0 2px 8px rgba(0,0,0,0.02)',
-            display: 'flex',
-            flexDirection: 'column',
-            transition: 'all 0.2s ease',
-            cursor: 'default',
-          }}
-            onMouseEnter={e => { e.currentTarget.style.borderColor = '#cbd5e1'; e.currentTarget.style.boxShadow = '0 4px 12px rgba(0,0,0,0.05)'; }}
-            onMouseLeave={e => { e.currentTarget.style.borderColor = '#e2e8f0'; e.currentTarget.style.boxShadow = '0 2px 8px rgba(0,0,0,0.02)'; }}
-          >
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
-              <span style={{ fontSize: 13, fontWeight: 600, color: '#64748b' }}>Báo giá nháp</span>
-              <div style={{ width: 32, height: 32, borderRadius: 8, background: '#f8fafc', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                <FileTextOutlined style={{ color: '#94a3b8', fontSize: 15 }} />
-              </div>
-            </div>
-            <div style={{ display: 'flex', alignItems: 'baseline', gap: 8 }}>
-              <div style={{ fontSize: 28, fontWeight: 700, color: '#0f172a', lineHeight: 1, fontFamily: "'Inter', sans-serif" }}>{totalDraft}</div>
-            </div>
-          </div>
-        </Col>
-
-        {/* Card 2: Đã gửi */}
-        <Col xs={24} sm={12} md={6}>
-          <div style={{
-            background: '#ffffff',
-            borderRadius: 12,
-            padding: '16px 20px',
-            border: '1px solid #e2e8f0',
-            boxShadow: '0 2px 8px rgba(0,0,0,0.02)',
-            display: 'flex',
-            flexDirection: 'column',
-            transition: 'all 0.2s ease',
-            cursor: 'default',
-          }}
-            onMouseEnter={e => { e.currentTarget.style.borderColor = '#93c5fd'; e.currentTarget.style.boxShadow = '0 4px 12px rgba(59,130,246,0.08)'; }}
-            onMouseLeave={e => { e.currentTarget.style.borderColor = '#e2e8f0'; e.currentTarget.style.boxShadow = '0 2px 8px rgba(0,0,0,0.02)'; }}
-          >
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
-              <span style={{ fontSize: 13, fontWeight: 600, color: '#64748b' }}>Đã gửi khách hàng</span>
-              <div style={{ width: 32, height: 32, borderRadius: 8, background: '#eff6ff', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                <SendOutlined style={{ color: '#3b82f6', fontSize: 15 }} />
-              </div>
-            </div>
-            <div style={{ display: 'flex', alignItems: 'baseline', gap: 8 }}>
-              <div style={{ fontSize: 28, fontWeight: 700, color: '#1d4ed8', lineHeight: 1, fontFamily: "'Inter', sans-serif" }}>{totalSent}</div>
-            </div>
-          </div>
-        </Col>
-
-        {/* Card 3: Đã chấp nhận */}
-        <Col xs={24} sm={12} md={6}>
-          <div style={{
-            background: '#ffffff',
-            borderRadius: 12,
-            padding: '16px 20px',
-            border: '1px solid #e2e8f0',
-            boxShadow: '0 2px 8px rgba(0,0,0,0.02)',
-            display: 'flex',
-            flexDirection: 'column',
-            transition: 'all 0.2s ease',
-            cursor: 'default',
-          }}
-            onMouseEnter={e => { e.currentTarget.style.borderColor = '#86efac'; e.currentTarget.style.boxShadow = '0 4px 12px rgba(34,197,94,0.08)'; }}
-            onMouseLeave={e => { e.currentTarget.style.borderColor = '#e2e8f0'; e.currentTarget.style.boxShadow = '0 2px 8px rgba(0,0,0,0.02)'; }}
-          >
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
-              <span style={{ fontSize: 13, fontWeight: 600, color: '#64748b' }}>Đã chấp nhận</span>
-              <div style={{ width: 32, height: 32, borderRadius: 8, background: '#f0fdf4', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                <CheckCircleOutlined style={{ color: '#22c55e', fontSize: 15 }} />
-              </div>
-            </div>
-            <div style={{ display: 'flex', alignItems: 'baseline', gap: 8 }}>
-              <div style={{ fontSize: 28, fontWeight: 700, color: '#15803d', lineHeight: 1, fontFamily: "'Inter', sans-serif" }}>{totalAccepted}</div>
-            </div>
-          </div>
-        </Col>
-
-        {/* Card 4: Tổng doanh số */}
-        <Col xs={24} sm={12} md={6}>
-          <div style={{
-            background: 'linear-gradient(135deg, #0f172a 0%, #1e293b 100%)',
-            borderRadius: 12,
-            padding: '16px 20px',
-            border: '1px solid #334155',
-            boxShadow: '0 4px 12px rgba(15,23,42,0.15)',
-            display: 'flex',
-            flexDirection: 'column',
-            transition: 'all 0.2s ease',
-            cursor: 'default',
-          }}
-            onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-2px)'; e.currentTarget.style.boxShadow = '0 8px 16px rgba(15,23,42,0.25)'; }}
-            onMouseLeave={e => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.boxShadow = '0 4px 12px rgba(15,23,42,0.15)'; }}
-          >
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
-              <span style={{ fontSize: 13, fontWeight: 600, color: '#94a3b8' }}>Doanh số chốt</span>
-              <div style={{ width: 32, height: 32, borderRadius: 8, background: 'rgba(245, 158, 11, 0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                <FileDoneOutlined style={{ color: '#f59e0b', fontSize: 15 }} />
-              </div>
-            </div>
-            <div style={{ display: 'flex', alignItems: 'baseline', gap: 8 }}>
-              <div style={{ fontSize: totalAmountAccepted >= 1e9 ? 22 : 26, fontWeight: 700, color: '#fbbf24', lineHeight: 1, fontFamily: "'Inter', sans-serif", letterSpacing: '-0.02em' }}>
-                {totalAmountAccepted.toLocaleString('vi-VN')} đ
-              </div>
-            </div>
-          </div>
-        </Col>
-      </Row>
-
-
-      {/* ── Search & Filter Bar ────────────────────────────────────────── */}
-      <Card
-        style={{
-          borderRadius: 12,
-          marginBottom: 24,
-          boxShadow: '0 2px 8px rgba(0,0,0,0.04)',
-        }}
-        bodyStyle={{ padding: 16 }}
-      >
-        <Row gutter={[16, 16]} align="middle">
-          <Col xs={24} sm={12} md={8}>
-            <Input
-              placeholder="Tìm theo mã báo giá, tên, SĐT khách hàng..."
-              prefix={<SearchOutlined style={{ color: '#94a3b8' }} />}
-              value={searchText}
-              onChange={(e) => setSearchText(e.target.value)}
-              allowClear
-              style={{ borderRadius: 8 }}
-            />
-          </Col>
-          <Col xs={24} sm={12} md={6}>
-            <Select
-              placeholder="Lọc theo trạng thái"
-              value={statusFilter || undefined}
-              onChange={(val) => setStatusFilter(val || '')}
-              allowClear
-              style={{ width: '100%' }}
-            >
-              <Option value="draft"><Badge status="default" text="Nháp" /></Option>
-              <Option value="sent"><Badge status="processing" text="Đã gửi" /></Option>
-              <Option value="accepted"><Badge status="success" text="Đã chấp nhận" /></Option>
-              <Option value="rejected"><Badge status="error" text="Đã từ chối" /></Option>
-            </Select>
-          </Col>
-        </Row>
-      </Card>
-
-      {/* ── Quotation Table ────────────────────────────────────────────── */}
-      <Card
-        style={{
-          borderRadius: 12,
-          boxShadow: '0 4px 16px rgba(0,0,0,0.05)',
-        }}
-        bodyStyle={{ padding: 0 }}
-      >
-        {isMobile ? (
-          <List
-            dataSource={filteredQuotations}
-            loading={loading}
-            pagination={{ pageSize: 10, size: 'small', showTotal: (total) => `Tổng cộng ${total} báo giá` }}
-            renderItem={(record) => {
-              const cfg = statusConfig[record.status] || statusConfig.draft
-              return (
-                <List.Item
-                  style={{ padding: '16px', borderBottom: '1px solid #f0f0f0', display: 'block' }}
-                >
-                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8, alignItems: 'center' }}>
-                    <Text strong style={{ color: '#2563eb' }}>{record.quotation_number}</Text>
-                    <Tag color={cfg.color} icon={cfg.icon} style={{ margin: 0 }}>{cfg.label}</Tag>
-                  </div>
-                  <div style={{ marginBottom: 4 }}>
-                    <Text type="secondary" style={{ fontSize: 13 }}>Khách hàng: </Text>
-                    <Text strong>{record.customer_name || 'Khách lẻ'}</Text>
-                  </div>
-                  <div style={{ marginBottom: 4 }}>
-                    <Text type="secondary" style={{ fontSize: 13 }}>Ngày tạo: </Text>
-                    <Text>{dayjs(record.created_at).format('DD/MM/YYYY')}</Text>
-                  </div>
-                  <div style={{ marginBottom: 12 }}>
-                    <Text type="secondary" style={{ fontSize: 13 }}>Tổng tiền: </Text>
-                    <Text strong style={{ color: '#16a34a', fontSize: 15 }}>{Number(record.total_amount || 0).toLocaleString('vi-VN')} đ</Text>
-                  </div>
-                  <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-start', flexWrap: 'wrap' }}>
-                    {renderQuotationActions(record)}
-                  </div>
-                </List.Item>
-              )
-            }}
-          />
-        ) : (
-          <Table scroll={{ x: 'max-content' }}
-            columns={columns}
-            dataSource={filteredQuotations}
-            rowKey="id"
-            loading={loading}
-            pagination={{
-              pageSize: 10,
-              showSizeChanger: false,
-              showTotal: (total) => `Tổng cộng ${total} báo giá`,
-            }}
-          />
-        )}
-      </Card>
-
-      {/* ── Modal Add / Edit Quotation ─────────────────────────────────── */}
-      <Modal
-        title={
-          <Space>
-            <FileTextOutlined style={{ color: '#2563eb' }} />
-            <Text strong style={{ fontSize: 18 }}>
-              {editingQuotation ? `Chỉnh sửa Báo giá (${editingQuotation.quotation_number})` : 'Tạo Báo Giá Mới'}
-            </Text>
-          </Space>
-        }
-        open={modalVisible}
-        onCancel={() => setModalVisible(false)}
-        onOk={handleSubmit}
-        confirmLoading={submitting}
-        okText="Lưu Báo Giá"
-        cancelText="Hủy"
-        width={1050}
-      >
-        <Form form={form} layout="vertical" style={{ marginTop: 16 }}>
-          <Row gutter={16}>
-            <Col xs={24} md={12}>
-              <Form.Item
-                name="customer"
-                label="Khách hàng"
-                rules={[{ required: true, message: 'Vui lòng chọn khách hàng' }]}
-              >
-                <Select
-                  showSearch
-                  placeholder="Chọn hoặc tìm kiếm khách hàng..."
-                  optionFilterProp="children"
-                >
-                  {customers.map((c) => (
-                    <Option key={c.id} value={c.id}>
-                      {c.name} {c.phone ? `(${c.phone})` : ''}
-                    </Option>
-                  ))}
-                </Select>
-              </Form.Item>
-            </Col>
-            <Col xs={24} md={6}>
-              <Form.Item name="status" label="Trạng thái">
-                <Select disabled={requireApproval && !['approved', 'sent', 'accepted'].includes(editingQuotation?.status)}>
-                  <Option value="draft">Nháp</Option>
-                  {(!requireApproval || ['approved', 'sent', 'accepted'].includes(editingQuotation?.status)) && (
-                    <Option value="sent">Đã gửi</Option>
-                  )}
-                  {isCompanyAdmin && <Option value="accepted">Đã chấp nhận</Option>}
-                  <Option value="rejected">Đã từ chối</Option>
-                </Select>
-              </Form.Item>
-            </Col>
-            <Col xs={24} md={6}>
-              <Form.Item name="installation_date" label="Ngày thi công / lắp đặt">
-                <DatePicker style={{ width: '100%' }} format="DD/MM/YYYY" />
-              </Form.Item>
-            </Col>
-          </Row>
-
-          <Divider style={{ margin: '12px 0' }}>
-            <Space>
-              <Text strong>Bảng Tính Chi Tiết Hạng Mục (Mẫu: {getEffectiveTemplate(editingQuotation)?.name || 'Tiêu chuẩn'})</Text>
-              <Tag color="blue">{formItems.length} dòng</Tag>
-            </Space>
-          </Divider>
-
-          <div style={{ marginBottom: 16, border: '1px solid #e2e8f0', borderRadius: 8, overflow: 'hidden' }}>
-            <DndContext sensors={sensors} modifiers={[restrictToVerticalAxis]} onDragEnd={(e) => handleDragEnd(e, formItems, setFormItems)}>
-              <SortableContext items={formItems.map(i => i.key)} strategy={verticalListSortingStrategy}>
-                <Table
-                  components={{ body: { row: DraggableBodyRow } }}
-                  dataSource={formItems}
-                  columns={getItemColumns()}
-                  rowKey="key"
-                  pagination={false}
-                  size="small"
-                  scroll={{ x: 'max-content' }}
-                />
-              </SortableContext>
-            </DndContext>
-          </div>
-
-          <Button type="dashed" onClick={handleAddLine} block icon={<PlusOutlined />} style={{ marginBottom: 20 }}>
-            Thêm dòng sản phẩm / hạng mục mới
-          </Button>
-
-          <Divider style={{ margin: '12px 0' }}>
-            <Space>
-              <Text strong>Dịch Vụ & Chi Phí Phát Sinh</Text>
-              <Tag color="blue">{serviceItems.length} dịch vụ</Tag>
-            </Space>
-          </Divider>
-
-          <div style={{ marginBottom: 16, border: '1px solid #e2e8f0', borderRadius: 8, overflow: 'hidden' }}>
-            <DndContext sensors={sensors} modifiers={[restrictToVerticalAxis]} onDragEnd={(e) => handleDragEnd(e, serviceItems, setServiceItems)}>
-              <SortableContext items={serviceItems.map(i => i.key)} strategy={verticalListSortingStrategy}>
-                <Table
-                  components={{ body: { row: DraggableBodyRow } }}
-                  dataSource={serviceItems}
-                  columns={getServiceItemColumns()}
-                  rowKey="key"
-                  pagination={false}
-                  size="small"
-                  scroll={{ x: 'max-content' }}
-                />
-              </SortableContext>
-            </DndContext>
-          </div>
-
-          <Button type="dashed" onClick={handleAddServiceLine} block icon={<PlusOutlined />} style={{ marginBottom: 20 }}>
-            Thêm dịch vụ / chi phí phát sinh
-          </Button>
-
-          <Card size="small" style={{ background: '#f8fafc', borderRadius: 8, marginBottom: 16 }}>
-            {(() => {
-              const effTmpl = getEffectiveTemplate(editingQuotation);
-              const totalsBlock = effTmpl?.layout_config?.blocks?.find(b => b.type === 'totals')?.props || {};
-              const showShipping = totalsBlock.showShippingFee !== false;
-              const showInstallation = totalsBlock.showInstallationFee !== false;
-              const showDiscount = totalsBlock.showDiscount !== false;
-              const showVAT = totalsBlock.showVAT !== false;
-              return (
-                <Row gutter={16} align="bottom" justify="end">
-                  {showShipping && (
-                    <Col xs={24} sm={4}>
-                      <Form.Item name="shipping_fee" label="Phí vận chuyển" style={{ marginBottom: 8 }}>
-                        <InputNumber min={0} step={50000} style={{ width: '100%' }} formatter={(v) => `${v}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',')} parser={(v) => v.replace(/\$\s?|(,*)/g, '')} />
-                      </Form.Item>
-                    </Col>
-                  )}
-                  {showInstallation && (
-                    <Col xs={24} sm={4}>
-                      <Form.Item name="installation_fee" label="Phí thi công" style={{ marginBottom: 8 }}>
-                        <InputNumber min={0} step={50000} style={{ width: '100%' }} formatter={(v) => `${v}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',')} parser={(v) => v.replace(/\$\s?|(,*)/g, '')} />
-                      </Form.Item>
-                    </Col>
-                  )}
-                  {showDiscount && (
-                    <Col xs={24} sm={4}>
-                      <Form.Item name="discount_total" label="Chiết khấu" style={{ marginBottom: 8 }}>
-                        <InputNumber min={0} step={10000} style={{ width: '100%' }} formatter={(val) => `${val}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',')} parser={(val) => val.replace(/\$\s?|(,*)/g, '')} />
-                      </Form.Item>
-                    </Col>
-                  )}
-                  {showVAT && (
-                    <Col xs={24} sm={4}>
-                      <Form.Item name="vat_rate" label="% VAT" style={{ marginBottom: 8 }}>
-                        <InputNumber min={0} max={100} step={1} style={{ width: '100%' }} />
-                      </Form.Item>
-                    </Col>
-                  )}
-                  <Col xs={24} sm={8}>
-                <Form.Item shouldUpdate noStyle>
-                  {() => {
-                    const shipping = Number(form.getFieldValue('shipping_fee') || 0)
-                    const install = Number(form.getFieldValue('installation_fee') || 0)
-                    const discount = Number(form.getFieldValue('discount_total') || 0)
-                    const vatRate = Number(form.getFieldValue('vat_rate') || 0)
-                    const subtotal = calculateModalTotal()
-                    const vatAmount = (subtotal * vatRate) / 100.0
-                    const total = Math.max(0, subtotal + vatAmount + shipping + install - discount)
-                    return (
-                      <div style={{ textAlign: 'right', paddingRight: 8, marginBottom: 8 }}>
-                        <Text type="secondary" style={{ fontSize: 12, display: 'block' }}>Tổng Trước Thuế: {subtotal.toLocaleString('vi-VN')} đ</Text>
-                        <Text type="secondary" style={{ fontSize: 12, display: 'block' }}>Tiền VAT: {vatAmount.toLocaleString('vi-VN')} đ</Text>
-                        <Text strong style={{ fontSize: 18, color: '#e11d48', display: 'block', marginTop: 4 }}>
-                          Tổng: {total.toLocaleString('vi-VN')} đ
-                        </Text>
-                      </div>
-                    )
-                  }}
-                </Form.Item>
-              </Col>
-            </Row>
-            );
-            })()}
-          </Card>
-
-          <Row gutter={16}>
-            <Col xs={24} sm={8}>
-              <Form.Item name="delivery_time" label="Thời gian giao hàng / thi công">
-                <Input placeholder="3-5 ngày làm việc..." />
-              </Form.Item>
-            </Col>
-            <Col xs={24} sm={8}>
-              <Form.Item name="warranty_months" label="Thời hạn bảo hành (tháng)">
-                <InputNumber min={0} style={{ width: '100%' }} />
-              </Form.Item>
-            </Col>
-            <Col xs={24} sm={8}>
-              <Form.Item name="validity_days" label="Hiệu lực báo giá (ngày)">
-                <InputNumber min={1} style={{ width: '100%' }} />
-              </Form.Item>
-            </Col>
-          </Row>
-
-          <Card size="small" title="Tiến độ thanh toán (Tự động chuyển sang Công nợ)" style={{ marginBottom: 16 }}>
-            <Form.List name="payment_terms_schedule">
-              {(fields, { add, remove }) => (
-                <>
-                  {fields.map(({ key, name, ...restField }) => (
-                    <Row key={key} gutter={16} align="middle" style={{ marginBottom: 8 }}>
-                      <Col xs={24} sm={8}>
-                        <Form.Item
-                          {...restField}
-                          name={[name, 'title']}
-                          rules={[{ required: true, message: 'Nhập tên đợt' }]}
-                          style={{ marginBottom: 0 }}
-                        >
-                          <Input placeholder="VD: Đặt cọc lần 1" />
-                        </Form.Item>
-                      </Col>
-                      <Col xs={24} sm={6}>
-                        <Form.Item
-                          {...restField}
-                          name={[name, 'percentage']}
-                          rules={[{ required: true, message: 'Nhập %' }]}
-                          style={{ marginBottom: 0 }}
-                        >
-                          <InputNumber placeholder="%" min={0} max={100} style={{ width: '100%' }} />
-                        </Form.Item>
-                      </Col>
-                      <Col xs={24} sm={8}>
-                        <Form.Item
-                          {...restField}
-                          name={[name, 'type']}
-                          rules={[{ required: true, message: 'Chọn loại' }]}
-                          style={{ marginBottom: 0 }}
-                        >
-                          <Select>
-                            <Option value="deposit">Đặt cọc</Option>
-                            <Option value="before_delivery">Trước giao hàng</Option>
-                            <Option value="after_delivery">Sau giao hàng / Lắp đặt</Option>
-                            <Option value="warranty">Bảo hành</Option>
-                          </Select>
-                        </Form.Item>
                       </Col>
                       <Col xs={24} sm={2}>
                         {fields.length > 1 && (
