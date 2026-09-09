@@ -212,15 +212,25 @@ class Order(models.Model):
     def save(self, *args, **kwargs):
         # Auto snapshot customer data on creation or if it's missing (and we have a customer)
         if self.customer:
-            # We snapshot if this is a new record (not pk) or if the snapshot fields are suspiciously empty.
-            if not self.pk or not self.customer_name_snapshot:
+            # Detect if customer has changed (compare with value in DB)
+            customer_changed = False
+            if not self.pk:
+                customer_changed = True  # new record
+            else:
+                try:
+                    old = Order.objects.only('customer_id', 'customer_name_snapshot').get(pk=self.pk)
+                    customer_changed = (old.customer_id != self.customer_id) or not old.customer_name_snapshot
+                except Order.DoesNotExist:
+                    customer_changed = True
+
+            if customer_changed:
                 self.customer_name_snapshot = self.customer.name or ''
                 self.customer_company_snapshot = getattr(self.customer, 'company_name', '') or ''
                 self.customer_tax_code_snapshot = getattr(self.customer, 'tax_code', '') or ''
                 self.customer_phone_snapshot = getattr(self.customer, 'phone', '') or ''
                 self.customer_address_snapshot = getattr(self.customer, 'address', '') or ''
                 self.customer_city_snapshot = getattr(self.customer, 'city', '') or ''
-                
+
         super().save(*args, **kwargs)
 
     @property
