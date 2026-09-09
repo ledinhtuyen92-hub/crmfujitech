@@ -484,8 +484,8 @@ class InventoryTransaction(models.Model):
         ordering = ["-created_at"]
         constraints = [
             models.CheckConstraint(
-                check=models.Q(quantity__gt=0),
-                name="inventory_transaction_quantity_gt_0",
+                check=models.Q(quantity__gte=0),
+                name="inventory_transaction_quantity_gte_0",
             ),
             models.CheckConstraint(
                 check=models.Q(unit_cost__gte=0),

@@ -138,7 +138,7 @@ class InventoryTransactionSerializer(serializers.ModelSerializer):
     product_sku = serializers.CharField(source="product.sku", read_only=True)
     warehouse_name = serializers.CharField(source="warehouse.name", read_only=True)
     target_warehouse_name = serializers.CharField(source="target_warehouse.name", read_only=True)
-    created_by_name = serializers.CharField(source="created_by.get_full_name", read_only=True)
+    created_by_name = serializers.CharField(source="created_by.full_name", read_only=True)
     reference_order_number = serializers.CharField(source="reference_order.order_number", read_only=True)
     company_info = serializers.SerializerMethodField()
     factory_name = serializers.CharField(source="factory.name", read_only=True, allow_null=True)
