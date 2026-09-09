@@ -205,7 +205,18 @@ class OrderViewSet(TenantQuerySetMixin, viewsets.ModelViewSet):
         if old_status in ["pending", "rejected", "approved"]:
             serializer.validated_data["status"] = "pending"
             
-        order = serializer.save()
+        kwargs = {}
+        if 'customer' in serializer.validated_data:
+            new_customer = serializer.validated_data['customer']
+            if new_customer != instance.customer:
+                kwargs['customer_name_snapshot'] = new_customer.name or '' if new_customer else ''
+                kwargs['customer_company_snapshot'] = getattr(new_customer, 'company_name', '') or '' if new_customer else ''
+                kwargs['customer_tax_code_snapshot'] = getattr(new_customer, 'tax_code', '') or '' if new_customer else ''
+                kwargs['customer_phone_snapshot'] = getattr(new_customer, 'phone', '') or '' if new_customer else ''
+                kwargs['customer_address_snapshot'] = getattr(new_customer, 'address', '') or '' if new_customer else ''
+                kwargs['customer_city_snapshot'] = getattr(new_customer, 'city', '') or '' if new_customer else ''
+
+        order = serializer.save(**kwargs)
         order.generate_payment_milestones()
 
         if old_status in ["pending", "rejected", "approved"]:
