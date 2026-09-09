@@ -131,8 +131,8 @@ class OrderViewSet(TenantQuerySetMixin, viewsets.ModelViewSet):
         order = self.get_object()
         
         # Kiểm tra Lệnh xuất kho (InventoryTransaction)
-        # Chỉ cho phép xóa nếu KHÔNG có phiếu kho nào, hoặc tất cả đều đã bị Hủy/Từ chối
-        has_active_inventory = order.inventory_transactions.exclude(status='rejected').exists()
+        # Chỉ cho phép xóa nếu KHÔNG có phiếu xuất kho nào, hoặc tất cả đều đã bị Hủy/Từ chối
+        has_active_inventory = order.inventory_transactions.filter(type='export').exclude(status='rejected').exists()
         if has_active_inventory:
             from rest_framework.exceptions import ValidationError
             raise ValidationError({"detail": "Không thể xóa đơn hàng. Vui lòng Hủy hoặc Từ chối lệnh xuất kho trước."})
