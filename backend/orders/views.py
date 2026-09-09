@@ -394,6 +394,10 @@ class OrderViewSet(TenantQuerySetMixin, viewsets.ModelViewSet):
         order.status = Order.STATUS_CANCELLED
         order.save(update_fields=["status", "updated_at"])
         
+        # Hủy các lệnh xuất kho đang chờ duyệt
+        from inventory.models import InventoryTransaction
+        order.inventory_transactions.filter(status=InventoryTransaction.STATUS_PENDING).update(status=InventoryTransaction.STATUS_REJECTED)
+        
         try:
             from approvals.models import ApprovalRequest, ApprovalStep
             from django.contrib.contenttypes.models import ContentType
