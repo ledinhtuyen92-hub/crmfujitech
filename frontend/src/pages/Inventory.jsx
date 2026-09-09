@@ -2151,17 +2151,35 @@ export default function Inventory() {
                       <Row key={key} gutter={16} align="middle" style={{ marginBottom: 12, background: '#f8fafc', padding: '12px 8px', borderRadius: 8 }}>
                         <Col xs={24} md={txnModalMode !== 'transfer' ? 9 : 14}>
                           <Form.Item
-                            {...restField}
-                            name={[name, 'product']}
-                            label="Sản phẩm"
-                            rules={[{ required: true, message: 'Chọn sản phẩm' }]}
-                            style={{ marginBottom: 0 }}
+                            noStyle
+                            shouldUpdate={(prev, curr) => prev.type !== curr.type || prev.warehouse !== curr.warehouse}
                           >
-                            <Select showSearch optionFilterProp="children" placeholder="Chọn sản phẩm...">
-                              {products.filter(p => p.product_type !== 'service').map((p) => (
-                                <Option key={p.id} value={p.id}>{p.name} ({p.sku})</Option>
-                              ))}
-                            </Select>
+                            {({ getFieldValue }) => {
+                              const txnType = getFieldValue('type');
+                              const wId = getFieldValue('warehouse');
+                              let availableProds = products.filter(p => p.product_type !== 'service');
+                              
+                              if ((txnType === 'adjust' || txnType === 'export' || txnType === 'transfer') && wId) {
+                                const stockPIds = stockLevels.filter(s => s.warehouse === wId).map(s => s.product);
+                                availableProds = availableProds.filter(p => stockPIds.includes(p.id));
+                              }
+
+                              return (
+                                <Form.Item
+                                  {...restField}
+                                  name={[name, 'product']}
+                                  label="Sản phẩm"
+                                  rules={[{ required: true, message: 'Chọn sản phẩm' }]}
+                                  style={{ marginBottom: 0 }}
+                                >
+                                  <Select showSearch optionFilterProp="children" placeholder="Chọn sản phẩm...">
+                                    {availableProds.map((p) => (
+                                      <Option key={p.id} value={p.id}>{p.name} ({p.sku})</Option>
+                                    ))}
+                                  </Select>
+                                </Form.Item>
+                              )
+                            }}
                           </Form.Item>
                         </Col>
                         <Col xs={24} md={txnModalMode !== 'transfer' ? 6 : 8}>
