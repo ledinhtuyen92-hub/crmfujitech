@@ -938,6 +938,15 @@ export default function Inventory() {
       },
     },
     {
+      title: 'Đơn vị tính',
+      key: 'unit',
+      align: 'center',
+      render: (_, r) => {
+        const prod = products.find((p) => p.id === r.product)
+        return <Tag>{(prod && prod.unit) ? prod.unit : 'cái'}</Tag>
+      },
+    },
+    {
       title: 'Số lượng tồn kho thực tế',
       dataIndex: 'quantity',
       key: 'quantity',
