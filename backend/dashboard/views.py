@@ -161,9 +161,11 @@ def summary(request):
     order_stats["revenue_in_period"] = float(revenue_in_period)
 
     valid_product_ids = list(Product.objects.filter(category__is_sales_target=True).values_list('id', flat=True))
-    sales_target_cond = Q(custom_data__actual_product_id__in=valid_product_ids) | (
-        Q(custom_data__actual_product_id__isnull=True) & (Q(product__category__is_sales_target=True) | Q(product__isnull=True))
-    )
+    is_accessory_cond = Q(custom_data__is_custom_size=True)
+    is_main_cond = ~Q(custom_data__is_custom_size=True)
+    accessory_sales_cond = is_accessory_cond & Q(custom_data__actual_product_id__in=valid_product_ids)
+    main_sales_cond = is_main_cond & (Q(product__category__is_sales_target=True) | Q(product__isnull=True))
+    sales_target_cond = accessory_sales_cond | main_sales_cond
     order_items_qs = OrderItem.objects.filter(order__in=order_qs, item_type="product").filter(sales_target_cond)
     won_products = order_items_qs.filter(
         order__status__in=["approved", "in_production", "completed"]
@@ -382,9 +384,11 @@ def top_sellers(request):
     order_count_subquery = order_qs.values('created_by').annotate(t=Count('id')).values('t')
     
     valid_product_ids = list(Product.objects.filter(category__is_sales_target=True).values_list('id', flat=True))
-    sales_target_cond = Q(custom_data__actual_product_id__in=valid_product_ids) | (
-        Q(custom_data__actual_product_id__isnull=True) & (Q(product__category__is_sales_target=True) | Q(product__isnull=True))
-    )
+    is_accessory_cond = Q(custom_data__is_custom_size=True)
+    is_main_cond = ~Q(custom_data__is_custom_size=True)
+    accessory_sales_cond = is_accessory_cond & Q(custom_data__actual_product_id__in=valid_product_ids)
+    main_sales_cond = is_main_cond & (Q(product__category__is_sales_target=True) | Q(product__isnull=True))
+    sales_target_cond = accessory_sales_cond | main_sales_cond
     product_qs = OrderItem.objects.filter(
         order__created_by=OuterRef('pk'),
         order__status__in=["approved", "in_production", "completed"],
