@@ -789,11 +789,8 @@ export default function OrderList() {
       };
 
       const sameGroup = (i, j) => {
-        const a = data[i], b = data[j];
-        if (!a || !b) return false;
-        if (a.product && b.product) return a.product === b.product; // catalog: match by ID
-        if (a.product || b.product) return false; // mixed: never group
-        return getCustomRoot(i) === getCustomRoot(j); // custom: compare roots
+        if (!data[i] || !data[j]) return false;
+        return getCustomRoot(i) === getCustomRoot(j);
       };
 
       if (index > 0 && sameGroup(index - 1, index)) return 0;
@@ -857,10 +854,7 @@ export default function OrderList() {
         return idx;
       };
       const sameGroupInPrev = (arr, i, j) => {
-        const a = arr[i], b = arr[j];
-        if (!a || !b) return false;
-        if (a.product && b.product) return a.product === b.product;
-        if (a.product || b.product) return false;
+        if (!arr[i] || !arr[j]) return false;
         return getCustomRootInPrev(arr, i) === getCustomRootInPrev(arr, j);
       };
       let rowSpan = 1;
