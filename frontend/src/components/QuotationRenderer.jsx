@@ -415,8 +415,8 @@ export default function QuotationRenderer({ layoutConfig, layoutStyle, data, ren
                   <tr><td colSpan={10} style={{ ...tdStyle, textAlign: 'center', color: '#888' }}>[Danh sách {isService ? 'dịch vụ' : 'sản phẩm'} trống]</td></tr>
                 ) : (
                   tableData.map((item, index) => {
-                    const rowSpan = isLandscape ? computeRowSpan(tableData, index, 'product') : 1;
-                    const sttNum = isLandscape ? computeProductSTT(tableData, index, 'product') : index + 1;
+                    const rowSpan = computeRowSpan(tableData, index, 'product');
+                    const sttNum = computeProductSTT(tableData, index, 'product');
                     const lineTotal = computeLineTotal(item);
 
                     return (
