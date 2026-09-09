@@ -2184,30 +2184,40 @@ export default function Inventory() {
                         </Col>
                         <Col xs={24} md={txnModalMode !== 'transfer' ? 6 : 8}>
                           <Form.Item
-                            {...restField}
-                            name={[name, 'quantity']}
-                            label="Số lượng"
-                            style={{ marginBottom: 0 }}
-                            dependencies={['warehouse', ['items', name, 'product']]}
-                            rules={[
-                              { required: true, message: 'Nhập SL' },
-                              ({ getFieldValue }) => ({
-                                validator(_, value) {
-                                  const wId = getFieldValue('warehouse');
-                                  const pId = getFieldValue(['items', name, 'product']);
-                                  if (value > 0 && wId && pId && (txnModalMode === 'export' || txnModalMode === 'transfer')) {
-                                    const stock = stockLevels.find(s => s.warehouse === wId && s.product === pId);
-                                    const maxS = stock ? stock.quantity : 0;
-                                    if (value > maxS) {
-                                      return Promise.reject(new Error(`Tồn kho: ${maxS}`));
-                                    }
-                                  }
-                                  return Promise.resolve();
-                                },
-                              }),
-                            ]}
+                            noStyle
+                            shouldUpdate={(prev, curr) => prev.type !== curr.type}
                           >
-                            <InputNumber min={1} style={{ width: '100%' }} />
+                            {({ getFieldValue }) => {
+                              const txnType = getFieldValue('type');
+                              return (
+                                <Form.Item
+                                  {...restField}
+                                  name={[name, 'quantity']}
+                                  label="Số lượng"
+                                  style={{ marginBottom: 0 }}
+                                  dependencies={['warehouse', ['items', name, 'product']]}
+                                  rules={[
+                                    { required: true, message: 'Nhập SL' },
+                                    ({ getFieldValue }) => ({
+                                      validator(_, value) {
+                                        const wId = getFieldValue('warehouse');
+                                        const pId = getFieldValue(['items', name, 'product']);
+                                        if (value > 0 && wId && pId && (txnModalMode === 'export' || txnModalMode === 'transfer')) {
+                                          const stock = stockLevels.find(s => s.warehouse === wId && s.product === pId);
+                                          const maxS = stock ? stock.quantity : 0;
+                                          if (value > maxS) {
+                                            return Promise.reject(new Error(`Tồn kho: ${maxS}`));
+                                          }
+                                        }
+                                        return Promise.resolve();
+                                      },
+                                    }),
+                                  ]}
+                                >
+                                  <InputNumber min={txnType === 'adjust' ? 0 : 1} style={{ width: '100%' }} />
+                                </Form.Item>
+                              )
+                            }}
                           </Form.Item>
                         </Col>
                         {txnModalMode !== 'transfer' && (
