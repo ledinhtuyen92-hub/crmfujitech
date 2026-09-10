@@ -153,6 +153,7 @@ class QuotationSerializer(serializers.ModelSerializer):
     company_info = serializers.SerializerMethodField()
     customer_info = serializers.SerializerMethodField()
     order_status = serializers.SerializerMethodField()
+    factory_name = serializers.CharField(source="factory.name", read_only=True, default=None)
 
     class Meta:
         model = Quotation
@@ -161,6 +162,8 @@ class QuotationSerializer(serializers.ModelSerializer):
             "company",
             "quotation_number",
             "template",
+            "factory",
+            "factory_name",
             "customer",
             "customer_name",
             "customer_phone",

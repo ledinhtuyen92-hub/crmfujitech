@@ -84,6 +84,14 @@ class Order(models.Model):
         verbose_name="Trạng thái",
         db_index=True,
     )
+    factory = models.ForeignKey(
+        "production.Factory",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="orders_set",
+        verbose_name="Nhà máy sản xuất",
+    )
     financial_status = models.CharField(
         max_length=30,
         choices=FIN_STATUS_CHOICES,

@@ -57,6 +57,14 @@ class Quotation(models.Model):
         default=STATUS_DRAFT,
         verbose_name="Trạng thái",
     )
+    factory = models.ForeignKey(
+        "production.Factory",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="quotations",
+        verbose_name="Nhà máy sản xuất dự kiến",
+    )
     installation_date = models.DateField(
         null=True,
         blank=True,

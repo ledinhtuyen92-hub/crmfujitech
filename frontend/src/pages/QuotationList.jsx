@@ -101,7 +101,7 @@ const statusConfig = {
 export default function QuotationList() {
   const { isMobile } = useResponsive()
   const { token } = theme.useToken()
-  const { user, isCompanyAdmin, hasPermission, checkMaintenance, companySettings } = useAuth()
+  const { user, isCompanyAdmin, hasPermission, checkMaintenance, isModuleActive, companySettings } = useAuth()
   const location = useLocation()
   const [messageApi, contextHolder] = message.useMessage()
 
@@ -109,6 +109,7 @@ export default function QuotationList() {
   const [quotations, setQuotations] = useState([])
   const [customers, setCustomers] = useState([])
   const [products, setProducts] = useState([])
+  const [factories, setFactories] = useState([])
   const [companyTemplate, setCompanyTemplate] = useState(null)
 
   const [loading, setLoading] = useState(false)
@@ -207,15 +208,18 @@ export default function QuotationList() {
   const fetchCustomersAndProducts = useCallback(async () => {
     await Promise.resolve()
     try {
-      const [custRes, prodRes, tmplRes] = await Promise.all([
+      const [custRes, prodRes, tmplRes, factoryRes] = await Promise.all([
         api.get('/crm/customers/').catch(() => ({ data: [] })),
         api.get('/inventory/products/').catch(() => ({ data: [] })),
         api.get('/sales/quotation-templates/my-company-template/').catch(() => ({ data: null })),
+        api.get('/production/factories/').catch(() => ({ data: [] })),
       ])
       const custData = Array.isArray(custRes.data) ? custRes.data : custRes.data?.results ?? []
       const prodData = Array.isArray(prodRes.data) ? prodRes.data : prodRes.data?.results ?? []
+      const factoryData = Array.isArray(factoryRes.data) ? factoryRes.data : factoryRes.data?.results ?? []
       setCustomers(custData)
       setProducts(prodData)
+      setFactories(factoryData)
       if (tmplRes?.data) setCompanyTemplate(tmplRes.data)
     } catch {
       // ignore silently
@@ -310,42 +314,71 @@ export default function QuotationList() {
     const currentItem = data[index];
     if (!currentItem) return 1;
 
-    const matches = (item1, item2) => {
-      if (field === 'product') {
-        if (item1.product && item2.product) return item1.product === item2.product;
-        if (!item1.product && !item2.product) return item1.product_name === item2.product_name && (!!item1.product_name || item1.custom_data?.is_custom_size !== undefined || item1.custom_data?.is_child || item2.custom_data?.is_custom_size !== undefined || item2.custom_data?.is_child);
-        return false;
-      }
-      return item1[field] === item2[field];
-    };
+    if (field === 'product') {
+      const getCustomRoot = (idx) => {
+        if (data[idx]?.custom_data?.is_custom_size !== true) return data[idx];
+        for (let k = idx - 1; k >= 0; k--) {
+          if (data[k]?.custom_data?.is_custom_size !== true) return data[k];
+        }
+        return data[idx];
+      };
 
-    if (index > 0 && matches(data[index - 1], currentItem)) {
-      return 0;
+      const sameGroup = (i, j) => {
+        const p1 = getCustomRoot(i);
+        const p2 = getCustomRoot(j);
+        if (!p1 || !p2) return false;
+        if (p1.product && p2.product) return p1.product === p2.product;
+        if (!p1.product && !p2.product) return p1.product_name === p2.product_name;
+        return false;
+      };
+
+      if (index > 0 && sameGroup(index - 1, index)) return 0;
+      let count = 1;
+      for (let i = index + 1; i < data.length; i++) {
+        if (sameGroup(index, i)) count++;
+        else break;
+      }
+      return count;
     }
+
+    if (index > 0 && data[index - 1][field] === currentItem[field]) return 0;
     let count = 1;
     for (let i = index + 1; i < data.length; i++) {
-      if (matches(data[i], currentItem)) {
-        count++;
-      } else {
-        break;
-      }
+      if (data[i][field] === currentItem[field]) count++;
+      else break;
     }
     return count;
   }
 
   const computeProductSTT = (data, index, field = 'product') => {
     let count = 0;
-    const matches = (item1, item2) => {
-      if (field === 'product') {
-        if (item1.product && item2.product) return item1.product === item2.product;
-        if (!item1.product && !item2.product) return item1.product_name === item2.product_name && (!!item1.product_name || item1.custom_data?.is_custom_size !== undefined || item1.custom_data?.is_child || item2.custom_data?.is_custom_size !== undefined || item2.custom_data?.is_child);
-        return false;
+    
+    const getCustomRoot = (idx) => {
+      if (data[idx]?.custom_data?.is_custom_size !== true) return data[idx];
+      for (let k = idx - 1; k >= 0; k--) {
+        if (data[k]?.custom_data?.is_custom_size !== true) return data[k];
       }
-      return item1[field] === item2[field];
+      return data[idx];
     };
+
+    const sameGroup = (i, j) => {
+      const p1 = getCustomRoot(i);
+      const p2 = getCustomRoot(j);
+      if (!p1 || !p2) return false;
+      if (p1.product && p2.product) return p1.product === p2.product;
+      if (!p1.product && !p2.product) return p1.product_name === p2.product_name;
+      return false;
+    };
+
     for (let i = 0; i <= index; i++) {
-      if (i === 0 || !matches(data[i], data[i - 1])) {
-        count++;
+      if (field === 'product') {
+        if (i === 0 || !sameGroup(i, i - 1)) {
+          count++;
+        }
+      } else {
+        if (i === 0 || data[i][field] !== data[i - 1][field]) {
+          count++;
+        }
       }
     }
     return count;
@@ -574,6 +607,7 @@ export default function QuotationList() {
     if (quotation) {
       form.setFieldsValue({
         customer: quotation.customer,
+        factory: quotation.factory,
         status: quotation.status,
         installation_date: quotation.installation_date ? dayjs(quotation.installation_date) : null,
         shipping_fee: Number(quotation.shipping_fee || 0),
@@ -712,6 +746,7 @@ export default function QuotationList() {
 
       const payload = {
         customer: values.customer,
+        factory: values.factory || null,
         status: values.status,
         installation_date: values.installation_date ? values.installation_date.format('YYYY-MM-DD') : null,
         notes: values.notes || '',
@@ -1810,10 +1845,7 @@ export default function QuotationList() {
                             }
                             updated[idx] = item;
                             for (let i = idx + 1; i < prev.length; i++) {
-                              const ni = prev[i];
-                              const sameGroup = (ni.product && ni.product === prev[idx].product) ||
-                                (!ni.product && !prev[idx].product && ni.product_name === prev[idx].product_name && (!!ni.product_name || ni.custom_data?.is_custom_size !== undefined || ni.custom_data?.is_child));
-                              if (!sameGroup) break;
+                              if (!sameGroup(prev, idx, i)) break;
                               updated[i] = { ...updated[i], product: item.product, product_name: item.product_name, product_image: item.product_image };
                             }
                             return updated;
@@ -2984,7 +3016,19 @@ export default function QuotationList() {
               </Form.Item>
             </Col>
           </Row>
-
+          {isModuleActive('production') && (
+            <Row gutter={16}>
+              <Col xs={24} md={8}>
+                <Form.Item name="factory" label="Nhà máy sản xuất (Dự kiến)">
+                  <Select placeholder="Chọn nhà máy (tùy chọn)..." allowClear>
+                    {factories.map(f => (
+                      <Option key={f.id} value={f.id}>{f.name}</Option>
+                    ))}
+                  </Select>
+                </Form.Item>
+              </Col>
+            </Row>
+          )}
           <Divider style={{ margin: '12px 0' }}>
             <Space>
               <Text strong>Bảng Tính Chi Tiết Hạng Mục (Mẫu: {getEffectiveTemplate(editingQuotation)?.name || 'Tiêu chuẩn'})</Text>

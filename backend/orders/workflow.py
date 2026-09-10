@@ -65,18 +65,61 @@ class OrderWorkflowEngine:
         current_step: None (start), "inventory", "production", "delivery"
         """
         active_modules = cls.get_active_modules(order)
-        next_step = cls.get_next_step(active_modules, current_step)
         
-        logger.info(f"WorkflowEngine [Order {order.order_number}]: Current step '{current_step}', next step '{next_step}'. Active modules: {active_modules}")
+        logger.info(f"WorkflowEngine [Order {order.order_number}]: Current step '{current_step}'. Active modules: {active_modules}")
         
-        if next_step == "inventory":
-            cls._trigger_inventory(order, **kwargs)
-        elif next_step == "production":
-            cls._trigger_production(order, **kwargs)
-        elif next_step == "delivery":
-            cls._trigger_delivery(order, **kwargs)
-        else:
+        if current_step is None:
+            # Bắt đầu duyệt đơn: Chạy SONG SONG cả Xuất kho và Sản xuất
+            if "inventory" in active_modules:
+                cls._trigger_inventory(order, **kwargs)
+            if "production" in active_modules:
+                cls._trigger_production(order, **kwargs)
+            
+            # Kiểm tra xem có đủ điều kiện đi tiếp ngay không (VD: cả 2 luồng đều trống/không cần)
+            cls._check_and_trigger_delivery(order, active_modules, **kwargs)
+            
+        elif current_step in ["inventory", "production"]:
+            # Một trong hai nhánh hoàn thành -> Kiểm tra xem nhánh kia xong chưa
+            cls._check_and_trigger_delivery(order, active_modules, **kwargs)
+            
+        elif current_step == "delivery":
             cls._trigger_completion(order, **kwargs)
+
+    @classmethod
+    def _check_and_trigger_delivery(cls, order, active_modules, **kwargs):
+        if "delivery" not in active_modules:
+            cls._trigger_completion(order, **kwargs)
+            return
+
+        inventory_done = True
+        if "inventory" in active_modules and getattr(order, 'requires_inventory_export', True):
+            try:
+                from inventory.models import InventoryTransaction
+                pending_exports = InventoryTransaction.objects.filter(
+                    reference_order=order, 
+                    type=InventoryTransaction.TYPE_EXPORT
+                ).exclude(status__in=[InventoryTransaction.STATUS_COMPLETED, InventoryTransaction.STATUS_REJECTED]).exists()
+                if pending_exports:
+                    inventory_done = False
+            except Exception:
+                pass
+
+        production_done = True
+        if "production" in active_modules:
+            try:
+                from production.models import ProductionOrder
+                pending_pos = ProductionOrder.objects.filter(
+                    order=order
+                ).exclude(status__in=[ProductionOrder.STATUS_COMPLETED, ProductionOrder.STATUS_CANCELLED]).exists()
+                if pending_pos:
+                    production_done = False
+            except Exception:
+                pass
+
+        if inventory_done and production_done:
+            from delivery.models import DeliveryOrder
+            if not DeliveryOrder.objects.filter(order=order).exists():
+                cls._trigger_delivery(order, **kwargs)
 
     @classmethod
     def _trigger_inventory(cls, order, **kwargs):

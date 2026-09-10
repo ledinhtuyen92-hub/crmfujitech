@@ -72,6 +72,7 @@ class OrderSerializer(serializers.ModelSerializer):
     has_production_order = serializers.SerializerMethodField()
     has_pending_export = serializers.SerializerMethodField()
     requires_inventory_export = serializers.ReadOnlyField()
+    factory_name = serializers.CharField(source="factory.name", read_only=True, default=None)
 
     class Meta:
         model = Order
@@ -80,6 +81,8 @@ class OrderSerializer(serializers.ModelSerializer):
             "company",
             "order_number",
             "customer",
+            "factory",
+            "factory_name",
             "customer_name",
             "customer_phone",
             "customer_address",

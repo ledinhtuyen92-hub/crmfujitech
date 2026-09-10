@@ -515,16 +515,19 @@ export default function OrderList() {
   const fetchCustomersAndProducts = useCallback(async () => {
     await Promise.resolve()
     try {
-      const [custRes, prodRes, tmplRes, myCompTmplRes] = await Promise.all([
+      const [custRes, prodRes, tmplRes, myCompTmplRes, factoryRes] = await Promise.all([
         api.get('/crm/customers/').catch(() => ({ data: [] })),
         api.get('/inventory/products/').catch(() => ({ data: [] })),
         api.get('/sales/quotation-templates/active/').catch(() => ({ data: [] })),
         api.get('/sales/quotation-templates/my-company-template/').catch(() => ({ data: null })),
+        api.get('/production/factories/').catch(() => ({ data: [] })),
       ])
       const custData = Array.isArray(custRes.data) ? custRes.data : custRes.data?.results ?? []
       const prodData = Array.isArray(prodRes.data) ? prodRes.data : prodRes.data?.results ?? []
+      const factoryData = Array.isArray(factoryRes.data) ? factoryRes.data : factoryRes.data?.results ?? []
       setCustomers(custData)
       setProducts(prodData)
+      setFactories(factoryData)
       setTemplates(tmplRes.data || [])
       if (myCompTmplRes?.data) {
         setCompanyTemplate(myCompTmplRes.data)
@@ -784,16 +787,20 @@ export default function OrderList() {
       // For custom items (no product ID), walk back to find the "parent" non-accessory row.
       // Accessories (is_custom_size=true) belong to the same group as their parent.
       const getCustomRoot = (idx) => {
-        if (data[idx]?.custom_data?.is_custom_size !== true) return idx; // is the parent itself
+        if (data[idx]?.custom_data?.is_custom_size !== true) return data[idx];
         for (let k = idx - 1; k >= 0; k--) {
-          if (!data[k]?.custom_data?.is_custom_size) return k;
+          if (data[k]?.custom_data?.is_custom_size !== true) return data[k];
         }
-        return idx; // no parent found, treat as own root
+        return data[idx];
       };
 
       const sameGroup = (i, j) => {
-        if (!data[i] || !data[j]) return false;
-        return getCustomRoot(i) === getCustomRoot(j);
+        const p1 = getCustomRoot(i);
+        const p2 = getCustomRoot(j);
+        if (!p1 || !p2) return false;
+        if (p1.product && p2.product) return p1.product === p2.product;
+        if (!p1.product && !p2.product) return p1.product_name === p2.product_name;
+        return false;
       };
 
       if (index > 0 && sameGroup(index - 1, index)) return 0;
@@ -850,15 +857,19 @@ export default function OrderList() {
       }
       // Find end of current group using root-based logic (same as computeRowSpan)
       const getCustomRootInPrev = (arr, idx) => {
-        if (arr[idx]?.custom_data?.is_custom_size !== true) return idx;
+        if (arr[idx]?.custom_data?.is_custom_size !== true) return arr[idx];
         for (let k = idx - 1; k >= 0; k--) {
-          if (!arr[k]?.custom_data?.is_custom_size) return k;
+          if (arr[k]?.custom_data?.is_custom_size !== true) return arr[k];
         }
-        return idx;
+        return arr[idx];
       };
       const sameGroupInPrev = (arr, i, j) => {
-        if (!arr[i] || !arr[j]) return false;
-        return getCustomRootInPrev(arr, i) === getCustomRootInPrev(arr, j);
+        const p1 = getCustomRootInPrev(arr, i);
+        const p2 = getCustomRootInPrev(arr, j);
+        if (!p1 || !p2) return false;
+        if (p1.product && p2.product) return p1.product === p2.product;
+        if (!p1.product && !p2.product) return p1.product_name === p2.product_name;
+        return false;
       };
       let rowSpan = 1;
       for (let i = index + 1; i < prev.length; i++) {
@@ -1110,8 +1121,13 @@ export default function OrderList() {
                             // sync children in same group
                             for (let i = idx + 1; i < prev.length; i++) {
                               const ni = prev[i];
-                              const sameGroup = (ni.product && ni.product === prev[idx].product) ||
-                                (!ni.product && !prev[idx].product && ni.product_name === prev[idx].product_name && (!!ni.product_name || ni.custom_data?.is_custom_size !== undefined || ni.custom_data?.is_child));
+                              const sameGroup = (() => {
+                                const p1 = ni.custom_data?.is_custom_size === true ? prev[idx] : ni;
+                                const p2 = prev[idx];
+                                if (p1.product && p2.product) return p1.product === p2.product;
+                                if (!p1.product && !p2.product) return p1.product_name === p2.product_name;
+                                return false;
+                              })();
                               if (!sameGroup) break;
                               updated[i] = { ...updated[i], product: item.product, product_name: item.product_name, product_image: item.product_image };
                             }
@@ -1408,8 +1424,13 @@ export default function OrderList() {
                           // sync children in same group
                           for (let i = idx + 1; i < prev.length; i++) {
                             const ni = prev[i];
-                            const sameGroup = (ni.product && ni.product === prev[idx].product) ||
-                              (!ni.product && !prev[idx].product && ni.product_name === prev[idx].product_name && (!!ni.product_name || ni.custom_data?.is_custom_size !== undefined || ni.custom_data?.is_child));
+                            const sameGroup = (() => {
+                              const p1 = ni.custom_data?.is_custom_size === true ? prev[idx] : ni;
+                              const p2 = prev[idx];
+                              if (p1.product && p2.product) return p1.product === p2.product;
+                              if (!p1.product && !p2.product) return p1.product_name === p2.product_name;
+                              return false;
+                            })();
                             if (!sameGroup) break;
                             updated[i] = { ...updated[i], product: item.product, product_name: item.product_name, product_image: item.product_image };
                           }
@@ -2267,6 +2288,7 @@ export default function OrderList() {
     if (order) {
       form.setFieldsValue({
         customer: order.customer,
+        factory: order.factory,
         status: order.status,
         installation_date: order.installation_date ? dayjs(order.installation_date) : null,
         notes: order.notes,
@@ -2397,6 +2419,7 @@ export default function OrderList() {
 
       const payload = {
         customer: values.customer,
+        factory: values.factory || null,
         status: values.status,
         installation_date: values.installation_date ? values.installation_date.format('YYYY-MM-DD') : null,
         notes: values.notes || '',
@@ -2533,8 +2556,8 @@ export default function OrderList() {
     if (checkMaintenance()) return
 
     const order = orders.find(o => o.id === id)
-    if (order && order.requires_inventory_export === false) {
-      // Đơn hàng không có vật tư qua kho -> Cần chọn nhà máy trực tiếp
+    // Nếu có module sản xuất mà đơn hàng chưa gán nhà máy -> Bật modal chọn nhà máy
+    if (order && isModuleActive('production') && !order.factory) {
       if (factories.length === 0) {
         try {
           const res = await api.get('/production/factories/')
@@ -3320,7 +3343,19 @@ export default function OrderList() {
               </Form.Item>
             </Col>
           </Row>
-
+          {isModuleActive('production') && (
+            <Row gutter={16}>
+              <Col xs={24} md={8}>
+                <Form.Item name="factory" label="Nhà máy sản xuất (Dự kiến)">
+                  <Select placeholder="Chọn nhà máy (tùy chọn)..." allowClear>
+                    {factories.map(f => (
+                      <Option key={f.id} value={f.id}>{f.name}</Option>
+                    ))}
+                  </Select>
+                </Form.Item>
+              </Col>
+            </Row>
+          )}
           <Divider style={{ margin: '12px 0' }}>
             <Space>
               <Text strong>Bảng Tính Chi Tiết Hạng Mục (Mẫu: {companyTemplate?.name || 'Tiêu chuẩn'})</Text>
@@ -3700,7 +3735,7 @@ export default function OrderList() {
               </div>
             )}
 
-            {(isCompanyAdmin || selectedOrder.created_by === user?.id) && isModuleActive('production') && selectedOrder.requires_inventory_export === false && !selectedOrder.has_production_order && ['fully_paid', 'deposit_paid', 'credit_approved'].includes(selectedOrder.financial_status) && ['approved', 'completed'].includes(selectedOrder.status) && (
+            {(isCompanyAdmin || selectedOrder.created_by === user?.id) && isModuleActive('production') && !selectedOrder.has_production_order && ['fully_paid', 'deposit_paid', 'credit_approved'].includes(selectedOrder.financial_status) && ['approved', 'completed'].includes(selectedOrder.status) && (
               <div style={{ padding: '16px', background: '#fef2f2', borderRadius: '12px', border: '1px solid #fca5a5', marginBottom: '16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <Space size={12}>
                   <AlertOutlined style={{ color: '#ef4444', fontSize: 20 }} />
