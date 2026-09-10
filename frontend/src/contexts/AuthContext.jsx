@@ -9,6 +9,7 @@ export function AuthProvider({ children }) {
   const [user, setUser] = useState(null)
   const [loading, setLoading] = useState(true) // kiểm tra token lúc khởi động
   const [maintenanceMode, setMaintenanceMode] = useState(false)
+  const [companySettings, setCompanySettings] = useState(null)
   const navigate = useNavigate()
 
   const fetchPublicSettings = useCallback(() => {
@@ -18,6 +19,15 @@ export function AuthProvider({ children }) {
         if (data && typeof data.maintenance_mode === 'boolean') {
           setMaintenanceMode(data.maintenance_mode)
         }
+      })
+      .catch(() => {})
+  }, [])
+
+  const fetchCompanySettings = useCallback(() => {
+    api
+      .get('users/company-settings/')
+      .then(({ data }) => {
+        setCompanySettings(data)
       })
       .catch(() => {})
   }, [])
@@ -32,7 +42,10 @@ export function AuthProvider({ children }) {
     }
     api
       .get('users/me/')
-      .then(({ data }) => setUser(data))
+      .then(({ data }) => {
+        setUser(data)
+        fetchCompanySettings()
+      })
       .catch(() => {
         localStorage.removeItem('accessToken')
         localStorage.removeItem('refreshToken')
@@ -52,8 +65,9 @@ export function AuthProvider({ children }) {
     localStorage.setItem('refreshToken', data.refresh)
     setUser(data.user)
     fetchPublicSettings()
+    fetchCompanySettings()
     return data.user
-  }, [fetchPublicSettings])
+  }, [fetchPublicSettings, fetchCompanySettings])
 
   // ── Đăng xuất ──────────────────────────────────────────────────────
   const logout = useCallback(() => {
@@ -134,6 +148,7 @@ export function AuthProvider({ children }) {
       isCompanyAdmin,
       maintenanceMode,
       checkMaintenance,
+      companySettings,
       login,
       logout,
       hasPermission,

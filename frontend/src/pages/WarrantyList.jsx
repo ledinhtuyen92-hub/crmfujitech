@@ -35,7 +35,7 @@ const statusConfig = {
 }
 
 export default function WarrantyList() {
-  const { checkMaintenance, hasPermission } = useAuth()
+  const { checkMaintenance, hasPermission, companySettings } = useAuth()
   const [warranties, setWarranties] = useState([])
   const [loading, setLoading] = useState(false)
   const [searchText, setSearchText] = useState('')
@@ -55,7 +55,7 @@ export default function WarrantyList() {
   const [printDrawerVisible, setPrintDrawerVisible] = useState(false)
   const [printingWarranty, setPrintingWarranty] = useState(null)
   const [companyInfo, setCompanyInfo] = useState(null)
-  const [companySettings, setCompanySettings] = useState(null)
+
   const [printOrientation, setPrintOrientation] = useState('landscape')
 
   const canEdit = hasPermission('warranty.edit')
@@ -64,24 +64,23 @@ export default function WarrantyList() {
 
   const fetchDataForForm = async () => {
     try {
-      const resOrders = await api.get('/orders/orders/', { params: { page_size: 1000, status: 'completed', without_warranty: 'true' } })
+      const resOrders = await api.get('/orders/orders/', { params: { page_size: companySettings?.list_page_size || 1000, status: 'completed', without_warranty: 'true' } })
       setAvailableOrders(Array.isArray(resOrders.data) ? resOrders.data : resOrders.data?.results ?? [])
       
-      const resCustomers = await api.get('/crm/customers/', { params: { page_size: 1000 } })
+      const resCustomers = await api.get('/crm/customers/', { params: { page_size: companySettings?.list_page_size || 1000 } })
       setAvailableCustomers(Array.isArray(resCustomers.data) ? resCustomers.data : resCustomers.data?.results ?? [])
 
       const resCompany = await api.get('/users/my-company/')
       setCompanyInfo(resCompany.data)
 
-      const resSettings = await api.get('/users/company-settings/')
-      setCompanySettings(resSettings.data)
+
     } catch {}
   }
 
   const fetchWarranties = useCallback(async () => {
     setLoading(true)
     try {
-      const params = { page_size: 1000 }
+      const params = { page_size: companySettings?.list_page_size || 1000 }
       if (statusFilter) params.status = statusFilter
       if (searchText) params.search = searchText
       const res = await api.get('/delivery/warranties/', { params })

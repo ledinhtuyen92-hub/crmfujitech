@@ -108,6 +108,7 @@ export default function CompanyGeneralSettings() {
         independent_sequence_on_derived: settingsRes.data.independent_sequence_on_derived || false,
         lead_routing: settingsRes.data.lead_routing || 'manual',
         timezone: settingsRes.data.timezone || 'Asia/Ho_Chi_Minh',
+        list_page_size: settingsRes.data.list_page_size || 1000,
         inactive_days_threshold: settingsRes.data.inactive_days_threshold || 0,
         quotation_template: settingsRes.data.quotation_template || null,
         default_quotation_terms: settingsRes.data.default_quotation_terms || '',
@@ -717,6 +718,16 @@ export default function CompanyGeneralSettings() {
             </Col>
           </Row>
           <Row gutter={16}>
+            <Col xs={24} md={12}>
+              <Form.Item
+                name="list_page_size"
+                label="Giới hạn bản ghi tải về (Màn hình danh sách)"
+                help="Số lượng dữ liệu kéo về mỗi lần (VD: Đơn hàng, Kho). Đặt 1000 - 10000 để đảm bảo thống kê không bị sai."
+                rules={[{ required: true, message: 'Vui lòng nhập số lượng' }]}
+              >
+                <InputNumber min={20} max={100000} style={{ width: '100%' }} />
+              </Form.Item>
+            </Col>
             <Col xs={24} md={12}>
               <Form.Item
                 name="inactive_days_threshold"

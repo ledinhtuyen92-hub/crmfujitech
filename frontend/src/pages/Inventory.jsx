@@ -56,7 +56,7 @@ const { Option } = Select
 const { TextArea } = Input
 
 export default function Inventory() {
-  const { isCompanyAdmin, hasPermission, checkMaintenance, user } = useAuth()
+  const { isCompanyAdmin, hasPermission, checkMaintenance, user, companySettings } = useAuth()
   const { isMobile } = useResponsive()
   const [messageApi, contextHolder] = message.useMessage()
 
@@ -220,7 +220,7 @@ export default function Inventory() {
           params.low_stock_threshold = lowStockThreshold
         }
       }
-      params.page_size = 1000
+      params.page_size = companySettings?.list_page_size || 1000
       const res = await api.get('/inventory/stock-levels/', { params })
       const data = Array.isArray(res.data) ? res.data : res.data?.results ?? []
       setStockLevels(data)
@@ -235,7 +235,7 @@ export default function Inventory() {
     await Promise.resolve()
     setLoading(true)
     try {
-      const res = await api.get('/inventory/transactions/', { params: { page_size: 1000 } })
+      const res = await api.get('/inventory/transactions/', { params: { page_size: companySettings?.list_page_size || 1000 } })
       const data = Array.isArray(res.data) ? res.data : res.data?.results ?? []
       setTransactions(data)
     } catch {

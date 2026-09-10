@@ -63,7 +63,7 @@ const stepStatusConfig = {
 }
 
 export default function ProductionList() {
-  const { isCompanyAdmin, hasPermission, checkMaintenance, user } = useAuth()
+  const { isCompanyAdmin, hasPermission, checkMaintenance, user, companySettings } = useAuth()
   const { isMobile } = useResponsive()
   const [messageApi, contextHolder] = message.useMessage()
   const navigate = useNavigate()
@@ -152,7 +152,7 @@ export default function ProductionList() {
     try {
       const params = {}
       if (statusFilter) params.status = statusFilter
-      params.page_size = 1000
+      params.page_size = companySettings?.list_page_size || 1000
       const res = await api.get('/production/orders/', { params })
       const data = Array.isArray(res.data) ? res.data : res.data?.results ?? []
       setProductionOrders(data)

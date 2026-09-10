@@ -317,6 +317,11 @@ class CompanySettings(models.Model):
         verbose_name="Sinh số thứ tự liên tục",
         help_text="Nếu bật, số thứ tự (001, 002...) sẽ tăng liên tục không reset về 1 mỗi ngày.",
     )
+    list_page_size = models.PositiveIntegerField(
+        default=1000,
+        verbose_name="Giới hạn số bản ghi danh sách",
+        help_text="Số lượng bản ghi tối đa được tải về trong các màn hình danh sách (Đơn hàng, Kho vận, v.v...). Mặc định 1000.",
+    )
     inactive_days_threshold = models.PositiveIntegerField(
         default=0,
         verbose_name="Số ngày tính là khách ngủ đông",

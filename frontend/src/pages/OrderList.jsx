@@ -132,7 +132,7 @@ const statusConfig = {
 export default function OrderList() {
   const { isMobile } = useResponsive()
   const { token } = theme.useToken()
-  const { user, isCompanyAdmin, hasPermission, checkMaintenance, isModuleActive } = useAuth()
+  const { user, isCompanyAdmin, hasPermission, checkMaintenance, isModuleActive, companySettings } = useAuth()
   const [messageApi, contextHolder] = message.useMessage()
   const location = useLocation()
 
@@ -207,7 +207,6 @@ export default function OrderList() {
   // Drawer details
   const [drawerVisible, setDrawerVisible] = useState(false)
   const [selectedOrder, setSelectedOrder] = useState(null)
-  const [companySettings, setCompanySettings] = useState(null)
 
   // Finance modal
   const [receiptModalVisible, setReceiptModalVisible] = useState(false)
@@ -488,7 +487,7 @@ export default function OrderList() {
       if (financialFilter) params.financial_status = financialFilter
       if (paymentTargetFilter) params.payment_target = paymentTargetFilter
       if (exportFilter) params.export_status = exportFilter
-      params.page_size = 1000
+      params.page_size = companySettings?.list_page_size || 1000
       const res = await api.get('/orders/orders/', { params })
       const data = Array.isArray(res.data) ? res.data : res.data?.results ?? []
       setOrders(data)
@@ -502,12 +501,11 @@ export default function OrderList() {
   const fetchCustomersAndProducts = useCallback(async () => {
     await Promise.resolve()
     try {
-      const [custRes, prodRes, tmplRes, myCompTmplRes, settingsRes] = await Promise.all([
+      const [custRes, prodRes, tmplRes, myCompTmplRes] = await Promise.all([
         api.get('/crm/customers/').catch(() => ({ data: [] })),
         api.get('/inventory/products/').catch(() => ({ data: [] })),
         api.get('/sales/quotation-templates/active/').catch(() => ({ data: [] })),
         api.get('/sales/quotation-templates/my-company-template/').catch(() => ({ data: null })),
-        api.get('/users/company/settings/').catch(() => ({ data: null })),
       ])
       const custData = Array.isArray(custRes.data) ? custRes.data : custRes.data?.results ?? []
       const prodData = Array.isArray(prodRes.data) ? prodRes.data : prodRes.data?.results ?? []
@@ -519,7 +517,6 @@ export default function OrderList() {
       } else {
         setCompanyTemplate((tmplRes.data || []).find(t => t.is_default) || null)
       }
-      if (settingsRes?.data) setCompanySettings(settingsRes.data)
     } catch {
       // ignore silently
     }

@@ -101,7 +101,7 @@ const statusConfig = {
 export default function QuotationList() {
   const { isMobile } = useResponsive()
   const { token } = theme.useToken()
-  const { user, isCompanyAdmin, hasPermission, checkMaintenance } = useAuth()
+  const { user, isCompanyAdmin, hasPermission, checkMaintenance, companySettings } = useAuth()
   const location = useLocation()
   const [messageApi, contextHolder] = message.useMessage()
 
@@ -110,7 +110,7 @@ export default function QuotationList() {
   const [customers, setCustomers] = useState([])
   const [products, setProducts] = useState([])
   const [companyTemplate, setCompanyTemplate] = useState(null)
-  const [companySettings, setCompanySettings] = useState(null)
+
   const [loading, setLoading] = useState(false)
 
   // Filters
@@ -179,7 +179,7 @@ export default function QuotationList() {
     try {
       const params = {}
       if (statusFilter) params.status = statusFilter
-      params.page_size = 1000
+      params.page_size = companySettings?.list_page_size || 1000
       const res = await api.get('/sales/quotations/', { params })
       const data = Array.isArray(res.data) ? res.data : res.data?.results ?? []
       setQuotations(data)
@@ -188,23 +188,21 @@ export default function QuotationList() {
     } finally {
       setLoading(false)
     }
-  }, [statusFilter, messageApi])
+  }, [statusFilter, messageApi, companySettings])
 
   const fetchCustomersAndProducts = useCallback(async () => {
     await Promise.resolve()
     try {
-      const [custRes, prodRes, tmplRes, settingsRes] = await Promise.all([
+      const [custRes, prodRes, tmplRes] = await Promise.all([
         api.get('/crm/customers/').catch(() => ({ data: [] })),
         api.get('/inventory/products/').catch(() => ({ data: [] })),
         api.get('/sales/quotation-templates/my-company-template/').catch(() => ({ data: null })),
-        api.get('/users/company-settings/').catch(() => ({ data: null })),
       ])
       const custData = Array.isArray(custRes.data) ? custRes.data : custRes.data?.results ?? []
       const prodData = Array.isArray(prodRes.data) ? prodRes.data : prodRes.data?.results ?? []
       setCustomers(custData)
       setProducts(prodData)
       if (tmplRes?.data) setCompanyTemplate(tmplRes.data)
-      if (settingsRes?.data) setCompanySettings(settingsRes.data)
     } catch {
       // ignore silently
     }

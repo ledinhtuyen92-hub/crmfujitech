@@ -21,6 +21,7 @@ Thumbs.db
 # Bỏ qua media upload và file tạm
 backend/media/
 scratch/
+backend/sync_data*.json
 celerybeat-schedule
 recent_git_log.txt
 

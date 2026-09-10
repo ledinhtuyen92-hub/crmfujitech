@@ -130,7 +130,7 @@ const INTERACTION_RESULTS = {
 }
 
 function CustomerList() {
-  const { isCompanyAdmin, hasPermission, checkMaintenance, isModuleActive, pipelineStatusLabels = {}, getPipelineLabel, refreshSettings } = useAuth()
+  const { isCompanyAdmin, hasPermission, checkMaintenance, isModuleActive, pipelineStatusLabels = {}, getPipelineLabel, refreshSettings, companySettings } = useAuth()
   const { isMobile } = useResponsive()
   const navigate = useNavigate()
   const [customers, setCustomers] = useState([])
@@ -261,7 +261,7 @@ function CustomerList() {
           if (field === 'name') field = 'created_at'
           params.ordering = tableSort.order === 'ascend' ? field : `-${field}`
       }
-      params.page_size = 1000
+      params.page_size = companySettings?.list_page_size || 1000
       const response = await api.get('/crm/customers/', { params })
       let data = Array.isArray(response.data)
         ? response.data
