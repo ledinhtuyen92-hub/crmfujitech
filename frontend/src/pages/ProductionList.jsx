@@ -152,6 +152,7 @@ export default function ProductionList() {
     try {
       const params = {}
       if (statusFilter) params.status = statusFilter
+      params.page_size = 1000
       const res = await api.get('/production/orders/', { params })
       const data = Array.isArray(res.data) ? res.data : res.data?.results ?? []
       setProductionOrders(data)

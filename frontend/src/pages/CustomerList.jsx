@@ -261,7 +261,7 @@ function CustomerList() {
           if (field === 'name') field = 'created_at'
           params.ordering = tableSort.order === 'ascend' ? field : `-${field}`
       }
-
+      params.page_size = 1000
       const response = await api.get('/crm/customers/', { params })
       let data = Array.isArray(response.data)
         ? response.data

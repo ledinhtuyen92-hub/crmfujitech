@@ -123,6 +123,7 @@ export default function Products() {
     try {
       const params = { include_inactive: 'true' }
       if (categoryFilter) params.category_id = categoryFilter
+      params.page_size = 1000
       const res = await api.get('/inventory/products/', { params })
       const data = Array.isArray(res.data) ? res.data : res.data?.results ?? []
       setProducts(data)

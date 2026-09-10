@@ -64,10 +64,10 @@ export default function WarrantyList() {
 
   const fetchDataForForm = async () => {
     try {
-      const resOrders = await api.get('/orders/orders/', { params: { limit: 100, status: 'completed', without_warranty: 'true' } })
+      const resOrders = await api.get('/orders/orders/', { params: { page_size: 1000, status: 'completed', without_warranty: 'true' } })
       setAvailableOrders(Array.isArray(resOrders.data) ? resOrders.data : resOrders.data?.results ?? [])
       
-      const resCustomers = await api.get('/crm/customers/', { params: { limit: 100 } })
+      const resCustomers = await api.get('/crm/customers/', { params: { page_size: 1000 } })
       setAvailableCustomers(Array.isArray(resCustomers.data) ? resCustomers.data : resCustomers.data?.results ?? [])
 
       const resCompany = await api.get('/users/my-company/')
@@ -81,7 +81,7 @@ export default function WarrantyList() {
   const fetchWarranties = useCallback(async () => {
     setLoading(true)
     try {
-      const params = {}
+      const params = { page_size: 1000 }
       if (statusFilter) params.status = statusFilter
       if (searchText) params.search = searchText
       const res = await api.get('/delivery/warranties/', { params })

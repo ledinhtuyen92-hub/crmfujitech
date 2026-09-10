@@ -76,7 +76,7 @@ export default function DeliveryList() {
 
   const fetchDataForForm = async () => {
     try {
-      const resOrders = await api.get('/orders/orders/', { params: { limit: 100, ready_for_delivery: 'true' } })
+      const resOrders = await api.get('/orders/orders/', { params: { page_size: 1000, ready_for_delivery: 'true' } })
       setAvailableOrders(Array.isArray(resOrders.data) ? resOrders.data : resOrders.data?.results ?? [])
 
       const resTmpl = await api.get('/sales/quotation-templates/active/')
@@ -103,6 +103,7 @@ export default function DeliveryList() {
       const params = {}
       if (statusFilter) params.status = statusFilter
       if (searchText) params.search = searchText
+      params.page_size = 1000
       const res = await api.get('/delivery/deliveries/', { params })
       const data = Array.isArray(res.data) ? res.data : res.data?.results ?? []
       setDeliveries(data)
