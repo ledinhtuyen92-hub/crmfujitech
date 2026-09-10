@@ -488,6 +488,7 @@ export default function OrderList() {
       if (financialFilter) params.financial_status = financialFilter
       if (paymentTargetFilter) params.payment_target = paymentTargetFilter
       if (exportFilter) params.export_status = exportFilter
+      params.page_size = 1000
       const res = await api.get('/orders/orders/', { params })
       const data = Array.isArray(res.data) ? res.data : res.data?.results ?? []
       setOrders(data)

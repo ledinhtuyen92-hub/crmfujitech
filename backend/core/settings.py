@@ -220,7 +220,7 @@ REST_FRAMEWORK = {
         'users.permissions.CheckDataMaintenanceMode',
         'users.permissions.IsModuleActivePermission',
     ),
-    'DEFAULT_PAGINATION_CLASS': 'rest_framework.pagination.PageNumberPagination',
+    'DEFAULT_PAGINATION_CLASS': 'core.pagination.StandardPagination',
     'PAGE_SIZE': 20,
 }
 

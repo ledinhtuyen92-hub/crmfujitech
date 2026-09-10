@@ -220,6 +220,7 @@ export default function Inventory() {
           params.low_stock_threshold = lowStockThreshold
         }
       }
+      params.page_size = 1000
       const res = await api.get('/inventory/stock-levels/', { params })
       const data = Array.isArray(res.data) ? res.data : res.data?.results ?? []
       setStockLevels(data)
@@ -234,7 +235,7 @@ export default function Inventory() {
     await Promise.resolve()
     setLoading(true)
     try {
-      const res = await api.get('/inventory/transactions/')
+      const res = await api.get('/inventory/transactions/', { params: { page_size: 1000 } })
       const data = Array.isArray(res.data) ? res.data : res.data?.results ?? []
       setTransactions(data)
     } catch {
