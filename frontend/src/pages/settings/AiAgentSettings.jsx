@@ -736,7 +736,7 @@ export default function AiAgentSettings() {
           scroll={{ x: 'max-content' }}
           dataSource={pricings.filter(p => p.model_name.toLowerCase().includes(pricingSearch.toLowerCase()))} 
           rowKey="id"
-          pagination={{ pageSize: 10, showSizeChanger: false }}
+          pagination={{ pageSize: 25, showSizeChanger: false }}
           size="small"
           columns={pricingColumns} 
           loading={pricingLoading}

@@ -40,6 +40,11 @@ export default function ApprovalList() {
   const [deleteConfirmText, setDeleteConfirmText] = useState('')
   const [deleting, setDeleting] = useState(false)
 
+  // Factory selection for order approvals
+  const [factories, setFactories] = useState([])
+  const [selectedFactoryId, setSelectedFactoryId] = useState(null)
+  const [needsFactory, setNeedsFactory] = useState(false)
+
   const fetchRequests = useCallback(async () => {
     setLoading(true)
     try {
@@ -56,21 +61,46 @@ export default function ApprovalList() {
     fetchRequests()
   }, [fetchRequests])
 
-  const openActionModal = (req, step, type) => {
+  const openActionModal = async (req, step, type) => {
     setSelectedReq(req)
     setSelectedStepId(step.id)
     setActionType(type)
     setComment('')
+    setSelectedFactoryId(null)
+    setNeedsFactory(false)
+
+    // Kiểm tra nếu là duyệt đơn hàng chưa có nhà máy
+    if (type === 'approve' && req.title?.toLowerCase().includes('đơn hàng')) {
+      try {
+        const orderRes = await api.get(`/orders/orders/${req.object_id}/`)
+        const order = orderRes.data
+        if (!order.factory) {
+          setNeedsFactory(true)
+          if (factories.length === 0) {
+            const facRes = await api.get('/production/factories/')
+            setFactories(Array.isArray(facRes.data) ? facRes.data : (facRes.data?.results || []))
+          }
+        }
+      } catch (e) {
+        // ignore - không block flow duyệt
+      }
+    }
+
     setModalVisible(true)
   }
 
   const handleAction = async () => {
+    if (needsFactory && actionType === 'approve' && !selectedFactoryId) {
+      message.error('Vui lòng chọn nhà máy sản xuất cho đơn hàng này.')
+      return
+    }
     setProcessing(true)
     try {
       const endpoint = actionType === 'approve' ? 'approve-step' : 'reject-step'
       await api.post(`/approvals/requests/${selectedReq.id}/${endpoint}/`, {
         step_id: selectedStepId,
-        comment
+        comment,
+        ...(needsFactory && selectedFactoryId ? { factory_id: selectedFactoryId } : {})
       })
       message.success(`Đã ${actionType === 'approve' ? 'duyệt' : 'từ chối'} thành công.`)
       setModalVisible(false)
@@ -200,7 +230,7 @@ export default function ApprovalList() {
     <List
       dataSource={requests}
       loading={loading}
-      pagination={{ pageSize: 10, size: "small" }}
+      pagination={{ pageSize: 25, size: "small" }}
       renderItem={(record) => {
         const cfg = statusConfig[record.status] || { label: record.status, color: 'default' }
         const pendingStep = (record.steps || []).find(s => s.status === 'pending')
@@ -353,7 +383,7 @@ export default function ApprovalList() {
               dataSource={requests} 
               rowKey="id" 
               loading={loading}
-              pagination={{ pageSize: 10 }}
+              pagination={{ pageSize: 25 }}
             />
           </>
         )}
@@ -398,7 +428,6 @@ export default function ApprovalList() {
         )}
       </Modal>
 
-      {/* Modal Confirm Action */}
       <Modal
         title={actionType === 'approve' ? 'Xác nhận duyệt' : 'Xác nhận từ chối'}
         open={modalVisible}
@@ -408,7 +437,24 @@ export default function ApprovalList() {
         okText={actionType === 'approve' ? 'Duyệt' : 'Từ chối'}
         okButtonProps={{ danger: actionType === 'reject', style: actionType === 'approve' ? { background: '#16a34a' } : {} }}
       >
-        <div style={{ marginTop: 16 }}>
+        {needsFactory && actionType === 'approve' && (
+          <div style={{ marginBottom: 16, padding: '12px 16px', background: '#fffbeb', border: '1px solid #fde68a', borderRadius: 8 }}>
+            <Text strong style={{ color: '#b45309', display: 'block', marginBottom: 8 }}>
+              ⚠️ Đơn hàng này chưa được chọn nhà máy sản xuất
+            </Text>
+            <Text type="secondary" style={{ fontSize: 13, display: 'block', marginBottom: 10 }}>
+              Vui lòng chọn nhà máy để hệ thống tự động tạo lệnh sản xuất sau khi duyệt.
+            </Text>
+            <Select
+              style={{ width: '100%' }}
+              placeholder="--- Chọn nhà máy sản xuất ---"
+              value={selectedFactoryId}
+              onChange={setSelectedFactoryId}
+              options={factories.map(f => ({ label: f.name, value: f.id }))}
+            />
+          </div>
+        )}
+        <div style={{ marginTop: needsFactory ? 0 : 16 }}>
           <Text strong>Nhập ghi chú (không bắt buộc):</Text>
           <TextArea 
             rows={4} 

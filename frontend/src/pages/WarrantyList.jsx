@@ -16,8 +16,10 @@ import {
   Drawer,
   List,
   message,
+  Checkbox,
+  Popover,
 } from 'antd'
-import { SafetyCertificateOutlined, SearchOutlined, EditOutlined, EyeOutlined, PlusOutlined, DeleteOutlined, PrinterOutlined } from '@ant-design/icons'
+import { SafetyCertificateOutlined, SearchOutlined, EditOutlined, EyeOutlined, PlusOutlined, DeleteOutlined, PrinterOutlined, SettingOutlined } from '@ant-design/icons'
 import dayjs from 'dayjs'
 import { useResponsive } from '../hooks/useResponsive'
 
@@ -39,10 +41,20 @@ export default function WarrantyList() {
   const [warranties, setWarranties] = useState([])
   const [loading, setLoading] = useState(false)
   const [currentPage, setCurrentPage] = useState(1)
-  const [pageSize, setPageSize] = useState(50)
+  const [pageSize, setPageSize] = useState(25)
   const [totalCount, setTotalCount] = useState(0)
   const [searchText, setSearchText] = useState('')
   const [statusFilter, setStatusFilter] = useState(null)
+
+  const DEFAULT_COLUMNS = ['warranty_code', 'order_number', 'customer', 'status', 'dates', 'actions']
+  const [visibleColumns, setVisibleColumns] = useState(() => {
+    const saved = localStorage.getItem('warrantyListVisibleColumns')
+    return saved ? JSON.parse(saved) : DEFAULT_COLUMNS
+  })
+
+  useEffect(() => {
+    localStorage.setItem('warrantyListVisibleColumns', JSON.stringify(visibleColumns))
+  }, [visibleColumns])
 
   const [modalVisible, setModalVisible] = useState(false)
   const [editingWarranty, setEditingWarranty] = useState(null)
@@ -319,6 +331,7 @@ export default function WarrantyList() {
       title: 'Mã BH',
       dataIndex: 'warranty_code',
       key: 'warranty_code',
+      fixed: 'left',
       render: (v, r) => <Text strong style={{ color: '#059669' }}>{v || `BH-${r.id}`}</Text>,
     },
     {
@@ -374,11 +387,35 @@ export default function WarrantyList() {
           <SafetyCertificateOutlined style={{ marginRight: 8, color: '#059669' }} />
           Quản lý Bảo hành
         </Title>
-        {canCreate && (
-          <Button type="primary" icon={<PlusOutlined />} onClick={() => openModal()} size={isMobile ? 'middle' : 'large'} style={{ borderRadius: 8 }}>
-            {isMobile ? 'Tạo BH' : 'Tạo Phiếu Bảo Hành'}
-          </Button>
-        )}
+        <Space>
+          <Popover 
+            placement="bottomRight" 
+            title="Tùy chỉnh cột hiển thị" 
+            content={
+              <Checkbox.Group 
+                options={[
+                  { label: 'Mã BH', value: 'warranty_code' },
+                  { label: 'Đơn hàng', value: 'order_number' },
+                  { label: 'Khách hàng', value: 'customer' },
+                  { label: 'Trạng thái', value: 'status' },
+                  { label: 'Thời hạn', value: 'dates' },
+                  { label: 'Hành động', value: 'actions' },
+                ]}
+                value={visibleColumns}
+                onChange={setVisibleColumns}
+                style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}
+              />
+            }
+            trigger="click"
+          >
+            <Button icon={<SettingOutlined />} size={isMobile ? 'middle' : 'large'} style={{ borderRadius: 8 }} />
+          </Popover>
+          {canCreate && (
+            <Button type="primary" icon={<PlusOutlined />} onClick={() => openModal()} size={isMobile ? 'middle' : 'large'} style={{ borderRadius: 8 }}>
+              {isMobile ? 'Tạo BH' : 'Tạo Phiếu Bảo Hành'}
+            </Button>
+          )}
+        </Space>
       </Row>
 
       <Card style={{ marginBottom: 16, borderRadius: 12 }} bodyStyle={{ padding: 16 }}>
@@ -452,7 +489,7 @@ export default function WarrantyList() {
       ) : (
         <Table scroll={{ x: 'max-content' }}
           dataSource={warranties}
-          columns={columns}
+          columns={columns.filter(col => visibleColumns.includes(col.key))}
           rowKey="id"
           loading={loading}
           onChange={(pagination) => {

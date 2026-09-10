@@ -848,6 +848,9 @@ class InventoryTransactionViewSet(TenantQuerySetMixin, viewsets.ModelViewSet):
         try:
             from orders.workflow import OrderWorkflowEngine
             factory_id = txn.factory_id  # Lấy từ phiếu xuất (nếu có gắn nhà máy)
+            # Fallback: lấy từ đơn hàng nếu phiếu xuất không có nhà máy
+            if not factory_id:
+                factory_id = order.factory_id
             OrderWorkflowEngine.trigger_next_step(order, current_step="inventory", factory_id=factory_id)
             # Lấy mã lệnh SX vừa tạo để trả về (nếu có)
             po = order.production_orders.first()

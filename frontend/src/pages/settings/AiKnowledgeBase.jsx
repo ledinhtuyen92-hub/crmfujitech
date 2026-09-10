@@ -933,7 +933,7 @@ export default function AiKnowledgeBase() {
             <List
               dataSource={groupedDocuments}
               loading={loading}
-              pagination={{ pageSize: 10, size: 'small' }}
+              pagination={{ pageSize: 25, size: 'small' }}
               renderItem={(record) => {
                 let finalStatus = record.status
                 let errorMsg = record.error_message || ''
@@ -1078,7 +1078,7 @@ export default function AiKnowledgeBase() {
               dataSource={groupedDocuments} 
               rowKey="id" 
               loading={loading}
-              pagination={{ pageSize: 10 }}
+              pagination={{ pageSize: 25 }}
               scroll={{ x: 'max-content' }}
             />
           )}

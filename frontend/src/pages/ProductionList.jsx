@@ -35,6 +35,8 @@ import {
   Descriptions,
   message,
   List,
+  Checkbox,
+  Popover,
 } from 'antd'
 import dayjs from 'dayjs'
 import { useCallback, useEffect, useState } from 'react'
@@ -71,10 +73,20 @@ export default function ProductionList() {
   // Data
   const [productionOrders, setProductionOrders] = useState([])
   const [currentPage, setCurrentPage] = useState(1)
-  const [pageSize, setPageSize] = useState(50)
+  const [pageSize, setPageSize] = useState(25)
   const [totalCount, setTotalCount] = useState(0)
   const [orders, setOrders] = useState([])
   const [users, setUsers] = useState([])
+
+  const DEFAULT_COLUMNS = ['id', 'status', 'factory', 'progress', 'dates', 'notes', 'action']
+  const [visibleColumns, setVisibleColumns] = useState(() => {
+    const saved = localStorage.getItem('productionListVisibleColumns')
+    return saved ? JSON.parse(saved) : DEFAULT_COLUMNS
+  })
+
+  useEffect(() => {
+    localStorage.setItem('productionListVisibleColumns', JSON.stringify(visibleColumns))
+  }, [visibleColumns])
   const [loading, setLoading] = useState(false)
   const [templates, setTemplates] = useState([])
   const [companyTemplate, setCompanyTemplate] = useState(null)
@@ -88,6 +100,7 @@ export default function ProductionList() {
   const [editingPO, setEditingPO] = useState(null)
   const [form] = Form.useForm()
   const [submitting, setSubmitting] = useState(false)
+  const [factories, setFactories] = useState([])
 
   // Drawer Manage Steps
   const [drawerVisible, setDrawerVisible] = useState(false)
@@ -176,19 +189,22 @@ export default function ProductionList() {
   const fetchOrdersAndUsers = useCallback(async () => {
     await Promise.resolve()
     try {
-      const [ordRes, usrRes, tmplRes, compTmplRes] = await Promise.all([
+      const [ordRes, usrRes, tmplRes, compTmplRes, facRes] = await Promise.all([
         api.get('/orders/orders/', { params: { status: 'approved' } }),
         api.get('/users/users/').catch(() => ({ data: [] })),
         api.get('/sales/quotation-templates/active/').catch(() => ({ data: [] })),
         api.get('/sales/quotation-templates/my-company-template/').catch(() => ({ data: null })),
+        api.get('/production/factories/').catch(() => ({ data: [] })),
       ])
       const ordData = Array.isArray(ordRes.data) ? ordRes.data : ordRes.data?.results ?? []
       const usrData = Array.isArray(usrRes.data) ? usrRes.data : usrRes.data?.results ?? []
       const tmplData = Array.isArray(tmplRes.data) ? tmplRes.data : tmplRes.data?.results ?? []
+      const facData = Array.isArray(facRes.data) ? facRes.data : facRes.data?.results ?? []
       setOrders(ordData)
       setUsers(usrData)
       setTemplates(tmplData)
       setCompanyTemplate(compTmplRes.data || null)
+      setFactories(facData)
     } catch {
       // ignore
     }
@@ -404,6 +420,7 @@ export default function ProductionList() {
     if (po) {
       form.setFieldsValue({
         order: po.order,
+        factory: po.factory || null,
         status: po.status,
         start_date: po.start_date ? dayjs(po.start_date) : null,
         end_date: po.end_date ? dayjs(po.end_date) : null,
@@ -424,6 +441,7 @@ export default function ProductionList() {
       const payload = {
         order: values.order,
         status: values.status,
+        factory: values.factory || null,
         start_date: values.start_date ? values.start_date.format('YYYY-MM-DD') : null,
         end_date: values.end_date ? values.end_date.format('YYYY-MM-DD') : null,
         notes: values.notes || '',
@@ -660,6 +678,7 @@ export default function ProductionList() {
     {
       title: 'Mã Lệnh SX',
       key: 'id',
+      fixed: 'left',
       render: (_, r) => (
         <Space>
           <div
@@ -795,6 +814,29 @@ export default function ProductionList() {
         </Col>
         <Col xs={24} md={14} style={{ textAlign: isMobile ? 'left' : 'right' }}>
           <Space wrap style={{ justifyContent: isMobile ? 'flex-start' : 'flex-end' }}>
+            <Popover 
+              placement="bottomRight" 
+              title="Tùy chỉnh cột hiển thị" 
+              content={
+                <Checkbox.Group 
+                  options={[
+                    { label: 'Mã Lệnh SX', value: 'id' },
+                    { label: 'Trạng thái', value: 'status' },
+                    { label: 'Nhà máy', value: 'factory' },
+                    { label: 'Tiến độ công đoạn', value: 'progress' },
+                    { label: 'Thời gian thực hiện', value: 'dates' },
+                    { label: 'Ghi chú', value: 'notes' },
+                    { label: 'Hành động', value: 'action' },
+                  ]}
+                  value={visibleColumns}
+                  onChange={setVisibleColumns}
+                  style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}
+                />
+              }
+              trigger="click"
+            >
+              <Button icon={<SettingOutlined />} size="large" style={{ borderRadius: 10 }} />
+            </Popover>
             {(isCompanyAdmin || hasPermission('production.manage_factory')) && (
               <Button
                 size="large"
@@ -906,7 +948,7 @@ export default function ProductionList() {
           />
         ) : (
           <Table scroll={{ x: 'max-content' }}
-            columns={columns}
+            columns={columns.filter(col => visibleColumns.includes(col.key))}
             dataSource={filteredPOs}
             rowKey="id"
             loading={loading}
@@ -938,11 +980,62 @@ export default function ProductionList() {
       >
         <Form form={form} layout="vertical" style={{ marginTop: 16 }}>
           <Form.Item name="order" label="Đơn hàng liên kết" rules={[{ required: true, message: 'Vui lòng chọn đơn hàng' }]}>
-            <Select showSearch optionFilterProp="children" placeholder="Chọn đơn hàng đã được chấp thuận..." disabled={!!editingPO}>
+            <Select 
+              showSearch 
+              optionFilterProp="children" 
+              placeholder="Chọn đơn hàng đã được chấp thuận..." 
+              disabled={!!editingPO}
+              onSelect={(orderId) => {
+                const selectedOrder = orders.find(o => o.id === orderId)
+                if (selectedOrder?.factory) {
+                  // Đơn hàng đã có nhà máy → tự động điền và khóa lại
+                  form.setFieldsValue({ factory: selectedOrder.factory })
+                } else {
+                  // Chưa có nhà máy → cho chọn tự do
+                  form.setFieldsValue({ factory: null })
+                }
+              }}
+            >
               {orders.filter(o => editingPO || !o.has_production_order).map((o) => (
                 <Option key={o.id} value={o.id}>{o.order_number} — Khách: {o.customer_name}</Option>
               ))}
             </Select>
+          </Form.Item>
+          <Form.Item
+            noStyle
+            shouldUpdate={(prev, curr) => prev.order !== curr.order || prev.factory !== curr.factory}
+          >
+            {({ getFieldValue }) => {
+              const selectedOrderId = getFieldValue('order')
+              const selectedOrder = orders.find(o => o.id === selectedOrderId)
+              const isFactoryLocked = !!selectedOrder?.factory
+              // Tìm tên nhà máy để hiển thị khi bị khoá
+              const lockedFactoryName = isFactoryLocked
+                ? (factories.find(f => f.id === selectedOrder.factory)?.name || selectedOrder.factory_name || `Nhà máy #${selectedOrder.factory}`)
+                : null
+              return (
+                <Form.Item name="factory" label="Nhà máy sản xuất">
+                  {isFactoryLocked ? (
+                    <>
+                      <Input
+                        value={lockedFactoryName}
+                        disabled
+                        style={{ backgroundColor: '#f5f5f5', color: '#595959', cursor: 'not-allowed' }}
+                      />
+                      <div style={{ color: '#6b7280', fontSize: 12, marginTop: 4 }}>
+                        🔒 Nhà máy được lấy từ đơn hàng, không thể thay đổi để tránh xung đột dữ liệu.
+                      </div>
+                    </>
+                  ) : (
+                    <Select
+                      placeholder="--- Chọn nhà máy sản xuất ---"
+                      allowClear
+                      options={factories.map(f => ({ label: f.name, value: f.id }))}
+                    />
+                  )}
+                </Form.Item>
+              )
+            }}
           </Form.Item>
           <Row gutter={16}>
             <Col xs={24} md={12}>

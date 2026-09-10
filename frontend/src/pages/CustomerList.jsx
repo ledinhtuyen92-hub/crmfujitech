@@ -138,7 +138,7 @@ function CustomerList() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [currentPage, setCurrentPage] = useState(1)
-  const [pageSize, setPageSize] = useState(50)
+  const [pageSize, setPageSize] = useState(25)
   const [totalCount, setTotalCount] = useState(0)
 
   const getStatusItem = useCallback((key) => {
@@ -666,6 +666,7 @@ function CustomerList() {
       title: 'Khách hàng',
       dataIndex: 'name',
       key: 'name',
+      fixed: 'left',
       sorter: true,
       render: (text, record) => {
         const isNewUnattended = record.status === 'new' && record.interaction_count === 0;

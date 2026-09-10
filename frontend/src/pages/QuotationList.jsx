@@ -1,5 +1,5 @@
 import { AlertOutlined, CheckCircleOutlined, ClockCircleOutlined, CloseCircleOutlined, DeleteOutlined, EditOutlined, FileDoneOutlined, FilePdfOutlined, FileTextOutlined, PlusOutlined, PrinterOutlined, SearchOutlined, SendOutlined, SettingOutlined, UserOutlined, CameraOutlined } from '@ant-design/icons'
-import { AutoComplete, Badge, Button, Card, Col, DatePicker, Divider, Drawer, Form, Input, InputNumber, Modal, Popconfirm, Row, Select, Space, Table, Tag, Tooltip, Typography, message, theme, Upload, Avatar, Image, List } from 'antd' 
+import { AutoComplete, Badge, Button, Card, Checkbox, Col, DatePicker, Divider, Drawer, Form, Input, InputNumber, Modal, Popconfirm, Row, Select, Space, Table, Tag, Tooltip, Typography, message, theme, Upload, Avatar, Image, List, Popover } from 'antd' 
 import dayjs from 'dayjs'
 import React, { useCallback, useEffect, useState } from 'react'
 import { useAuth } from '../contexts/AuthContext'
@@ -114,10 +114,19 @@ export default function QuotationList() {
 
   const [loading, setLoading] = useState(false)
   const [currentPage, setCurrentPage] = useState(1)
-  const [pageSize, setPageSize] = useState(50)
+  const [pageSize, setPageSize] = useState(25)
   const [totalCount, setTotalCount] = useState(0)
   const [stats, setStats] = useState({ total_draft: 0, total_sent: 0, total_accepted: 0, total_amount_accepted: 0 })
 
+  const DEFAULT_COLUMNS = ['quotation_number', 'customer_name', 'customer_phone', 'status', 'created_by_name', 'total_amount', 'action']
+  const [visibleColumns, setVisibleColumns] = useState(() => {
+    const saved = localStorage.getItem('quotationListVisibleColumns')
+    return saved ? JSON.parse(saved) : DEFAULT_COLUMNS
+  })
+
+  useEffect(() => {
+    localStorage.setItem('quotationListVisibleColumns', JSON.stringify(visibleColumns))
+  }, [visibleColumns])
   // Filters
   const [searchText, setSearchText] = useState('')
   const [statusFilter, setStatusFilter] = useState('')
@@ -1365,6 +1374,7 @@ export default function QuotationList() {
       title: 'Mã báo giá',
       dataIndex: 'quotation_number',
       key: 'quotation_number',
+      fixed: 'left',
       render: (val, record) => (
         <Space>
           <div
@@ -2713,22 +2723,47 @@ export default function QuotationList() {
           </Text>
         </Col>
         <Col>
-          {canCreate && (
-            <Button
-              type="primary"
-              size="large"
-              icon={<PlusOutlined />}
-              onClick={() => openModal()}
-              style={{
-                borderRadius: 10,
-                fontWeight: 600,
-                background: 'linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%)',
-                boxShadow: '0 4px 12px rgba(37, 99, 235, 0.25)',
-              }}
+          <Space>
+            <Popover 
+              placement="bottomRight" 
+              title="Tùy chỉnh cột hiển thị" 
+              content={
+                <Checkbox.Group 
+                  options={[
+                    { label: 'Mã báo giá', value: 'quotation_number' },
+                    { label: 'Khách hàng', value: 'customer_name' },
+                    { label: 'SĐT khách hàng', value: 'customer_phone' },
+                    { label: 'Trạng thái', value: 'status' },
+                    { label: 'Người tạo', value: 'created_by_name' },
+                    { label: 'Tổng tiền', value: 'total_amount' },
+                    { label: 'Hành động', value: 'action' },
+                  ]}
+                  value={visibleColumns}
+                  onChange={setVisibleColumns}
+                  style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}
+                />
+              }
+              trigger="click"
             >
-              Tạo Báo Giá Mới
-            </Button>
-          )}
+              <Button icon={<SettingOutlined />} style={{ borderRadius: 10, height: 40 }} />
+            </Popover>
+            {canCreate && (
+              <Button
+                type="primary"
+                size="large"
+                icon={<PlusOutlined />}
+                onClick={() => openModal()}
+                style={{
+                  borderRadius: 10,
+                  fontWeight: 600,
+                  background: 'linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%)',
+                  boxShadow: '0 4px 12px rgba(37, 99, 235, 0.25)',
+                }}
+              >
+                Tạo Báo Giá Mới
+              </Button>
+            )}
+          </Space>
         </Col>
       </Row>
 
@@ -2939,7 +2974,7 @@ export default function QuotationList() {
           />
         ) : (
           <Table scroll={{ x: 'max-content' }}
-            columns={columns}
+            columns={columns.filter(col => visibleColumns.includes(col.key))}
             dataSource={filteredQuotations}
             rowKey="id"
             loading={loading}

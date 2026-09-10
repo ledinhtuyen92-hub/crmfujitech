@@ -282,7 +282,7 @@ export default function RoleManagement() {
           <List
             dataSource={roles}
             loading={loading}
-            pagination={{ pageSize: 10, size: 'small' }}
+            pagination={{ pageSize: 25, size: 'small' }}
             renderItem={(record) => {
               const mods = [...new Set((record.permission_details || []).map((p) => p.module))]
               return (
@@ -330,7 +330,7 @@ export default function RoleManagement() {
             dataSource={roles}
             rowKey="id"
             loading={loading}
-            pagination={{ pageSize: 10 }}
+            pagination={{ pageSize: 25 }}
           />
         )}
       </Card>

@@ -296,6 +296,10 @@ class OrderViewSet(TenantQuerySetMixin, viewsets.ModelViewSet):
         try:
             factory_id = request.data.get("factory_id")
             if factory_id:
+                order.factory_id = factory_id
+                order.save(update_fields=["factory", "updated_at"])
+                
+                # Vẫn giữ lại cho compatibility nếu cần
                 order._factory_id = factory_id
                 order.custom_data["factory_id"] = factory_id
                 

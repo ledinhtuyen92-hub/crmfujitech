@@ -229,7 +229,7 @@ export default function FactoryManagement() {
         <List
           dataSource={factories}
           loading={loading}
-          pagination={{ pageSize: 20, size: 'small' }}
+          pagination={{ pageSize: 25, size: 'small' }}
           renderItem={(item) => (
             <List.Item style={{ padding: '16px', borderBottom: '1px solid #f0f0f0', display: 'block', background: '#fff' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8, alignItems: 'center' }}>
@@ -269,7 +269,7 @@ export default function FactoryManagement() {
           dataSource={factories}
           rowKey="id"
           loading={loading}
-          pagination={{ pageSize: 20 }}
+          pagination={{ pageSize: 25 }}
         />
       )}
 

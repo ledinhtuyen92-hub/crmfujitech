@@ -170,6 +170,9 @@ def check_and_trigger_mo_gate(order):
         factory_id = getattr(order, '_factory_id', None)
         if not factory_id and isinstance(order.custom_data, dict):
             factory_id = order.custom_data.get('factory_id')
+        # Fallback: đọc trực tiếp từ FK factory trên Order (đặt khi tạo/sửa đơn)
+        if not factory_id:
+            factory_id = order.factory_id
         OrderWorkflowEngine.trigger_next_step(order, current_step=None, factory_id=factory_id)
     else:
         logger.info("Order %s approved but waiting for deposit payment to open Workflow Gate.", order.order_number)

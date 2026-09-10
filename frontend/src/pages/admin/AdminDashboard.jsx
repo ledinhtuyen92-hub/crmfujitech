@@ -386,7 +386,7 @@ export default function AdminDashboard() {
           columns={columns}
           dataSource={companies}
           rowKey="id"
-          pagination={{ pageSize: 5 }}
+          pagination={{ pageSize: 25 }}
           style={{ background: 'transparent' }}
         />
       </Card>

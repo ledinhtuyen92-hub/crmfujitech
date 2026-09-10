@@ -221,7 +221,7 @@ REST_FRAMEWORK = {
         'users.permissions.IsModuleActivePermission',
     ),
     'DEFAULT_PAGINATION_CLASS': 'core.pagination.StandardPagination',
-    'PAGE_SIZE': 20,
+    'PAGE_SIZE': 25,
 }
 
 

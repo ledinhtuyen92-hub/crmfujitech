@@ -16,8 +16,10 @@ import {
   Drawer,
   List,
   message,
+  Checkbox,
+  Popover,
 } from 'antd'
-import { CarOutlined, SearchOutlined, EditOutlined, EyeOutlined, PlusOutlined, DeleteOutlined, UserAddOutlined, FileTextOutlined, PrinterOutlined, CheckCircleOutlined, CloseCircleOutlined, SyncOutlined } from '@ant-design/icons'
+import { CarOutlined, SearchOutlined, EditOutlined, EyeOutlined, PlusOutlined, DeleteOutlined, UserAddOutlined, FileTextOutlined, PrinterOutlined, CheckCircleOutlined, CloseCircleOutlined, SyncOutlined, SettingOutlined } from '@ant-design/icons'
 import dayjs from 'dayjs'
 import { useResponsive } from '../hooks/useResponsive'
 
@@ -40,10 +42,20 @@ export default function DeliveryList() {
   const [deliveries, setDeliveries] = useState([])
   const [loading, setLoading] = useState(false)
   const [currentPage, setCurrentPage] = useState(1)
-  const [pageSize, setPageSize] = useState(50)
+  const [pageSize, setPageSize] = useState(25)
   const [totalCount, setTotalCount] = useState(0)
   const [searchText, setSearchText] = useState('')
   const [statusFilter, setStatusFilter] = useState(null)
+
+  const DEFAULT_COLUMNS = ['delivery_code', 'order_number', 'customer', 'factory', 'debt', 'status', 'shipper', 'dates', 'actions']
+  const [visibleColumns, setVisibleColumns] = useState(() => {
+    const saved = localStorage.getItem('deliveryListVisibleColumns')
+    return saved ? JSON.parse(saved) : DEFAULT_COLUMNS
+  })
+
+  useEffect(() => {
+    localStorage.setItem('deliveryListVisibleColumns', JSON.stringify(visibleColumns))
+  }, [visibleColumns])
 
   const [modalVisible, setModalVisible] = useState(false)
   const [editingDelivery, setEditingDelivery] = useState(null)
@@ -392,6 +404,7 @@ export default function DeliveryList() {
       title: 'Mã GH',
       dataIndex: 'delivery_code',
       key: 'delivery_code',
+      fixed: 'left',
       render: (v, r) => <Text strong style={{ color: '#0284c7' }}>{v || `GH-${r.id}`}</Text>,
     },
     {
@@ -498,11 +511,38 @@ export default function DeliveryList() {
           <CarOutlined style={{ marginRight: 8, color: '#f59e0b' }} />
           Quản lý Giao hàng
         </Title>
-        {canCreate && (
-          <Button type="primary" icon={<PlusOutlined />} onClick={() => openModal()} size={isMobile ? 'middle' : 'large'} style={{ borderRadius: 8 }}>
-            {isMobile ? 'Tạo GH' : 'Tạo Giao Hàng Mới'}
-          </Button>
-        )}
+        <Space>
+          <Popover 
+            placement="bottomRight" 
+            title="Tùy chỉnh cột hiển thị" 
+            content={
+              <Checkbox.Group 
+                options={[
+                  { label: 'Mã GH', value: 'delivery_code' },
+                  { label: 'Đơn hàng', value: 'order_number' },
+                  { label: 'Khách hàng', value: 'customer' },
+                  { label: 'Nhà máy', value: 'factory' },
+                  { label: 'Công nợ', value: 'debt' },
+                  { label: 'Trạng thái', value: 'status' },
+                  { label: 'Giao hàng', value: 'shipper' },
+                  { label: 'Thời gian', value: 'dates' },
+                  { label: 'Hành động', value: 'actions' },
+                ]}
+                value={visibleColumns}
+                onChange={setVisibleColumns}
+                style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}
+              />
+            }
+            trigger="click"
+          >
+            <Button icon={<SettingOutlined />} size={isMobile ? 'middle' : 'large'} style={{ borderRadius: 8 }} />
+          </Popover>
+          {canCreate && (
+            <Button type="primary" icon={<PlusOutlined />} onClick={() => openModal()} size={isMobile ? 'middle' : 'large'} style={{ borderRadius: 8 }}>
+              {isMobile ? 'Tạo GH' : 'Tạo Giao Hàng Mới'}
+            </Button>
+          )}
+        </Space>
       </Row>
 
       <Card style={{ marginBottom: 16, borderRadius: 12 }} bodyStyle={{ padding: 16 }}>
@@ -584,7 +624,7 @@ export default function DeliveryList() {
       ) : (
         <Table scroll={{ x: 'max-content' }}
           dataSource={deliveries}
-          columns={columns}
+          columns={columns.filter(col => visibleColumns.includes(col.key))}
           rowKey="id"
           loading={loading}
           onChange={(pagination) => {

@@ -490,7 +490,7 @@ export default function Products() {
     <List
       dataSource={dataSource}
       loading={loading}
-      pagination={{ pageSize: 15, showSizeChanger: false, size: "small" }}
+      pagination={{ pageSize: 25, showSizeChanger: false, size: "small" }}
       renderItem={(r) => {
         const imgUrl = r.image_url || r.image
         const cat = categories.find((c) => c.id === r.category)
@@ -681,7 +681,7 @@ export default function Products() {
                 rowKey="id"
                 loading={loading}
                 scroll={{ x: 1200 }}
-                pagination={{ pageSize: 15 }}
+                pagination={{ pageSize: 25 }}
               />
             )}
           </div>
@@ -822,7 +822,7 @@ export default function Products() {
               rowKey="id"
               loading={loading}
               scroll={{ x: 1200 }}
-              pagination={{ pageSize: 15 }}
+              pagination={{ pageSize: 25 }}
             />
           )}
           </div>

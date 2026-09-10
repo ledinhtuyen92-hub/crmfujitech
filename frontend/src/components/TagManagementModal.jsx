@@ -139,7 +139,7 @@ function TagManagementModal({ open, onCancel }) {
         dataSource={tags}
         columns={columns}
         rowKey="id"
-        pagination={{ pageSize: 10 }}
+        pagination={{ pageSize: 25 }}
         loading={loading}
         size="small"
       />

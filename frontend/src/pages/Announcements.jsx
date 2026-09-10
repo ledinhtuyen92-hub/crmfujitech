@@ -44,7 +44,7 @@ const Announcements = () => {
     
     const [total, setTotal] = useState(0);
     const [page, setPage] = useState(1);
-    const [pageSize, setPageSize] = useState(10);
+    const [pageSize, setPageSize] = useState(25);
 
     // Filter lists
     const [usersList, setUsersList] = useState([]);

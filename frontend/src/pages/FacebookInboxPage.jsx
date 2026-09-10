@@ -547,7 +547,7 @@ export default function FacebookInboxPage() {
   const [syncModal, setSyncModal] = useState(false)
   const [syncing, setSyncing] = useState(false)
   const [syncMaxConv, setSyncMaxConv] = useState(100)
-  const [syncLimitMsg, setSyncLimitMsg] = useState(50)
+  const [syncLimitMsg, setSyncLimitMsg] = useState(25)
   const [syncTargetPage, setSyncTargetPage] = useState('all')
 
   // Quick Media Library

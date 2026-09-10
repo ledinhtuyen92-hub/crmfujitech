@@ -243,7 +243,7 @@ export default function DepartmentManagement() {
           <List
             dataSource={departments}
             loading={loading}
-            pagination={{ pageSize: 10, size: 'small' }}
+            pagination={{ pageSize: 25, size: 'small' }}
             renderItem={(record) => (
               <List.Item style={{ padding: '16px', borderBottom: '1px solid #f0f0f0', display: 'block', background: '#fff' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 12 }}>
@@ -281,7 +281,7 @@ export default function DepartmentManagement() {
             dataSource={departments}
             rowKey="id"
             loading={loading}
-            pagination={{ pageSize: 10 }}
+            pagination={{ pageSize: 25 }}
           />
         )}
       </Card>

@@ -140,7 +140,7 @@ export default function OrderList() {
   const [orders, setOrders] = useState([])
   const [loading, setLoading] = useState(false)
   const [currentPage, setCurrentPage] = useState(1)
-  const [pageSize, setPageSize] = useState(50)
+  const [pageSize, setPageSize] = useState(25)
   const [totalCount, setTotalCount] = useState(0)
   const [stats, setStats] = useState({ total_revenue: 0, total_pending: 0, total_approved: 0, total_completed: 0 })
   const [customers, setCustomers] = useState([])
@@ -164,14 +164,14 @@ export default function OrderList() {
   const [deleteConfirmText, setDeleteConfirmText] = useState('')
 
   // Column Visibility
-  const DEFAULT_COLUMNS = ['order_number', 'customer_name', 'status', 'financial_status', 'payment_target', 'people', 'total_amount', 'action']
+  const DEFAULT_COLUMNS = ['order_number', 'customer_name', ...(isModuleActive('production') ? ['factory_name'] : []), 'status', 'financial_status', 'payment_target', 'people', 'total_amount', 'action']
   const [visibleColumns, setVisibleColumns] = useState(() => {
-    const saved = localStorage.getItem('orderListVisibleColumns')
+    const saved = localStorage.getItem('orderListVisibleColumns_v2')
     return saved ? JSON.parse(saved) : DEFAULT_COLUMNS
   })
 
   useEffect(() => {
-    localStorage.setItem('orderListVisibleColumns', JSON.stringify(visibleColumns))
+    localStorage.setItem('orderListVisibleColumns_v2', JSON.stringify(visibleColumns))
   }, [visibleColumns])
 
   // Filters
@@ -2574,7 +2574,7 @@ export default function OrderList() {
 
     try {
       await api.post(`/orders/orders/${id}/approve/`)
-      messageApi.success('✅ Đã duyệt đơn hàng! Hệ thống đã tự động xuất kho & tạo lệnh sản xuất.')
+      messageApi.success('Đã duyệt đơn hàng! Hệ thống đã tự động xuất kho & tạo lệnh sản xuất.')
       fetchOrders()
     } catch (error) {
       const msg = error.response?.data?.detail || 'Không thể duyệt đơn hàng này.'
@@ -2595,7 +2595,7 @@ export default function OrderList() {
       await api.post(`/orders/orders/${approveOrderData.id}/approve/`, {
         factory_id: approveOrderData.factory_id
       })
-      messageApi.success('✅ Đã duyệt đơn hàng và chuyển thẳng sang Lệnh sản xuất.')
+      messageApi.success('Đã duyệt đơn hàng và chuyển thẳng sang Lệnh sản xuất.')
       setApproveFactoryModalVisible(false)
       fetchOrders()
     } catch (error) {
@@ -2804,6 +2804,7 @@ export default function OrderList() {
       title: 'Mã đơn hàng',
       dataIndex: 'order_number',
       key: 'order_number',
+      fixed: 'left',
       render: (val, record) => (
         <Space>
           <div
@@ -2855,6 +2856,12 @@ export default function OrderList() {
         </div>
       ),
     },
+    ...(isModuleActive('production') ? [{
+      title: 'Nhà máy',
+      dataIndex: 'factory_name',
+      key: 'factory_name',
+      render: (val) => val ? <Tag color="blue" style={{ whiteSpace: 'normal', maxWidth: 150 }}>{val}</Tag> : '-',
+    }] : []),
     {
       title: 'Trạng thái',
       dataIndex: 'status',
@@ -2882,13 +2889,13 @@ export default function OrderList() {
                 ⚠️ Đang đợi duyệt xuất kho
               </Tag>
             )}
-            {isModuleActive('production') && r.requires_inventory_export === false && !r.has_production_order && ['fully_paid', 'deposit_paid', 'credit_approved'].includes(r.financial_status) && ['approved', 'completed'].includes(r.status) && (
+            {isModuleActive('production') && !r.has_production_order && !r.has_pending_export && ['fully_paid', 'deposit_paid', 'credit_approved'].includes(r.financial_status) && ['approved', 'completed'].includes(r.status) && (
               <Tag color="error" style={{ fontSize: 11, cursor: 'pointer' }} onClick={(e) => {
                 e.stopPropagation()
                 setSelectedOrder(r)
                 setDrawerVisible(true)
               }}>
-                ⚠️ Chưa có lệnh SX
+                ⚠️ Thiếu lệnh SX
               </Tag>
             )}
           </Space>
@@ -2973,6 +2980,7 @@ export default function OrderList() {
                   options={[
                     { label: 'Mã đơn hàng', value: 'order_number' },
                     { label: 'Khách hàng', value: 'customer_name' },
+                    ...(isModuleActive('production') ? [{ label: 'Nhà máy', value: 'factory_name' }] : []),
                     { label: 'Trạng thái', value: 'status' },
                     { label: 'Thanh toán & Công nợ', value: 'financial_status' },
                     { label: 'Đối tượng TT', value: 'payment_target' },
@@ -3733,7 +3741,7 @@ export default function OrderList() {
               </div>
             )}
 
-            {(isCompanyAdmin || selectedOrder.created_by === user?.id) && isModuleActive('production') && !selectedOrder.has_production_order && ['fully_paid', 'deposit_paid', 'credit_approved'].includes(selectedOrder.financial_status) && ['approved', 'completed'].includes(selectedOrder.status) && (
+            {(isCompanyAdmin || selectedOrder.created_by === user?.id || hasPermission('orders.approve')) && isModuleActive('production') && !selectedOrder.has_production_order && ['fully_paid', 'deposit_paid', 'credit_approved'].includes(selectedOrder.financial_status) && ['approved', 'completed'].includes(selectedOrder.status) && (
               <div style={{ padding: '16px', background: '#fef2f2', borderRadius: '12px', border: '1px solid #fca5a5', marginBottom: '16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <Space size={12}>
                   <AlertOutlined style={{ color: '#ef4444', fontSize: 20 }} />
@@ -3746,6 +3754,25 @@ export default function OrderList() {
                   type="primary" 
                   danger 
                   onClick={async () => {
+                    const orderFactory = selectedOrder.factory
+                    if (orderFactory) {
+                      // Đơn hàng đã có nhà máy → tạo lại ngay, không cần chọn lại
+                      try {
+                        await api.post(`/orders/orders/${selectedOrder.id}/trigger_production/`, {
+                          factory_id: orderFactory
+                        })
+                        messageApi.success('Đã tạo lại lệnh sản xuất thành công.')
+                        fetchOrders()
+                        if (drawerVisible && selectedOrder) {
+                          const res = await api.get(`/orders/orders/${selectedOrder.id}/`)
+                          setSelectedOrder(res.data)
+                        }
+                      } catch (e) {
+                        messageApi.error(e.response?.data?.detail || 'Lỗi khi tạo lệnh sản xuất.')
+                      }
+                      return
+                    }
+                    // Chưa có nhà máy → mở modal để chọn
                     if (factories.length === 0) {
                       try {
                         const res = await api.get('/production/factories/')

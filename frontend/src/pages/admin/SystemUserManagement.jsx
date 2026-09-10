@@ -387,7 +387,7 @@ export default function SystemUserManagement() {
           dataSource={filteredUsers}
           rowKey="id"
           loading={loading}
-          pagination={{ pageSize: 15 }}
+          pagination={{ pageSize: 25 }}
         />
       </Card>
 

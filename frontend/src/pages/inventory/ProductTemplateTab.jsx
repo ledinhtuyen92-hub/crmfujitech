@@ -173,7 +173,7 @@ export default function ProductTemplateTab({ categories }) {
         <List
           dataSource={templates}
           loading={loading}
-          pagination={{ pageSize: 10, size: "small" }}
+          pagination={{ pageSize: 25, size: "small" }}
           renderItem={(record) => {
             const c = categories.find(x => x.id === record.category)
             return (

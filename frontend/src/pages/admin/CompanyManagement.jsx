@@ -471,7 +471,7 @@ export default function CompanyManagement() {
           dataSource={filteredCompanies}
           rowKey="id"
           loading={loading}
-          pagination={{ pageSize: 10, showTotal: (total) => `${total} công ty` }}
+          pagination={{ pageSize: 25, showTotal: (total) => `${total} công ty` }}
         />
       </Card>
 

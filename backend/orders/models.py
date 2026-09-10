@@ -331,9 +331,18 @@ class Order(models.Model):
             except Exception:
                 pass
 
-    def handle_approval_result(self, approval_status, acted_by=None):
+    def handle_approval_result(self, approval_status, acted_by=None, factory_id=None):
         if approval_status == "approved":
             if self.status == self.STATUS_PENDING:
+                # Nếu được truyền factory_id từ người duyệt, cập nhật vào đơn hàng
+                if factory_id and not self.factory_id:
+                    try:
+                        from production.models import Factory
+                        factory = Factory.objects.get(id=factory_id)
+                        self.factory = factory
+                        self.save(update_fields=["factory", "updated_at"])
+                    except Exception:
+                        pass
                 self.approve(approved_by_user=acted_by)
             else:
                 self.financial_status = self.FIN_STATUS_CREDIT_APPROVED

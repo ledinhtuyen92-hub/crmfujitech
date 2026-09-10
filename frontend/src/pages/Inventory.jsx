@@ -18,6 +18,7 @@ import {
   TagOutlined,
   UploadOutlined,
   WarningOutlined,
+  SettingOutlined,
 } from '@ant-design/icons'
 import {
   Alert,
@@ -41,6 +42,8 @@ import {
   List,
   Collapse,
   AutoComplete,
+  Checkbox,
+  Popover,
 } from 'antd'
 import dayjs from 'dayjs'
 import { useCallback, useEffect, useState, useMemo, useRef } from 'react'
@@ -71,7 +74,7 @@ export default function Inventory() {
   const [transactions, setTransactions] = useState([])
   const [loading, setLoading] = useState(false)
   const [currentTxnPage, setCurrentTxnPage] = useState(1)
-  const [txnPageSize, setTxnPageSize] = useState(20)
+  const [txnPageSize, setTxnPageSize] = useState(25)
   const [txnTotalCount, setTxnTotalCount] = useState(0)
   const [pendingExportsCount, setPendingExportsCount] = useState(0)
 
@@ -137,6 +140,16 @@ export default function Inventory() {
   const [transferModalVisible, setTransferModalVisible] = useState(false)
   const [deletingWarehouse, setDeletingWarehouse] = useState(null)
   const [targetWarehouseId, setTargetWarehouseId] = useState(null)
+
+  const DEFAULT_TXN_COLUMNS = ['transaction_code', 'status', 'type', 'product', 'warehouse', 'quantity', 'unit', 'note', 'factory_name', 'created_by_name', 'created_at', 'action']
+  const [visibleTxnColumns, setVisibleTxnColumns] = useState(() => {
+    const saved = localStorage.getItem('inventoryTxnVisibleColumns')
+    return saved ? JSON.parse(saved) : DEFAULT_TXN_COLUMNS
+  })
+
+  useEffect(() => {
+    localStorage.setItem('inventoryTxnVisibleColumns', JSON.stringify(visibleTxnColumns))
+  }, [visibleTxnColumns])
 
   const [txnModalVisible, setTxnModalVisible] = useState(false)
   const [txnModalMode, setTxnModalMode] = useState('import')
@@ -718,6 +731,14 @@ export default function Inventory() {
       type: defaultType, 
       items: [{ product: null, quantity: 1, unit_cost: 0 }]
     })
+    // For export/adjust/transfer we need stock levels to filter available products
+    if (defaultType !== 'import') {
+      fetchStockLevels()
+    }
+    // Ensure products are loaded
+    if (products.length === 0) {
+      fetchProducts()
+    }
     setTxnModalVisible(true)
   }
 
@@ -1343,6 +1364,36 @@ export default function Inventory() {
         </Col>
         <Col xs={24} md={14} style={{ textAlign: isMobile ? 'left' : 'right' }}>
           <Space wrap style={{ justifyContent: isMobile ? 'flex-start' : 'flex-end' }}>
+            {activeTab === 'transactions' && (
+              <Popover 
+                placement="bottomRight" 
+                title="Tùy chỉnh cột hiển thị" 
+                content={
+                  <Checkbox.Group 
+                    options={[
+                      { label: 'Mã phiếu', value: 'transaction_code' },
+                      { label: 'Trạng thái', value: 'status' },
+                      { label: 'Loại phiếu', value: 'type' },
+                      { label: 'Sản phẩm', value: 'product' },
+                      { label: 'Kho', value: 'warehouse' },
+                      { label: 'Số lượng', value: 'quantity' },
+                      { label: 'Đơn vị tính', value: 'unit' },
+                      { label: 'Ghi chú', value: 'note' },
+                      ...(hasFactoryInHistory ? [{ label: 'Nhà máy', value: 'factory_name' }] : []),
+                      { label: 'Người thực hiện', value: 'created_by_name' },
+                      { label: 'Ngày tạo', value: 'created_at' },
+                      { label: 'Hành động', value: 'action' },
+                    ]}
+                    value={visibleTxnColumns}
+                    onChange={setVisibleTxnColumns}
+                    style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}
+                  />
+                }
+                trigger="click"
+              >
+                <Button icon={<SettingOutlined />} style={{ borderRadius: 8 }} />
+              </Popover>
+            )}
             {activeTab === 'transactions' && canCreate && (
               <Button
                 type="primary"
@@ -1598,8 +1649,8 @@ export default function Inventory() {
                       }}
                     />
                   ) : (
-                    <Table
-                      columns={txnColumns}
+                    <Table scroll={{ x: 'max-content' }}
+                      columns={txnColumns.filter(col => visibleTxnColumns.includes(col.key))}
                       dataSource={groupedFilteredTransactions}
                       rowKey="id"
                       loading={loading}
@@ -1722,7 +1773,7 @@ export default function Inventory() {
                     <List
                       dataSource={groupedFilteredStockLevels}
                       loading={loading}
-                      pagination={{ pageSize: 10, size: 'small' }}
+                      pagination={{ pageSize: 25, size: 'small' }}
                       renderItem={(r) => {
                         const isGroup = r.items && r.items.length > 1;
                         return (
@@ -1763,7 +1814,7 @@ export default function Inventory() {
                       dataSource={groupedFilteredStockLevels}
                       rowKey="id"
                       loading={loading}
-                      pagination={{ pageSize: 10 }}
+                      pagination={{ pageSize: 25 }}
                       scroll={{ x: 'max-content' }}
                       expandable={{
                         expandedRowRender: (record) => {
@@ -1861,7 +1912,7 @@ export default function Inventory() {
                   {isMobile ? (
                     <List
                       dataSource={warehouses}
-                      pagination={{ pageSize: 10, size: "small" }}
+                      pagination={{ pageSize: 25, size: "small" }}
                       renderItem={(w) => (
                         <List.Item style={{ padding: '16px', borderBottom: '1px solid #f0f0f0', display: 'block', background: '#fff' }}>
                           <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8, alignItems: 'center' }}>
@@ -1940,7 +1991,7 @@ export default function Inventory() {
                           ),
                         },
                       ]}
-                      pagination={{ pageSize: 10 }}
+                      pagination={{ pageSize: 25 }}
                     />
                   )}
                 </div>
@@ -2246,7 +2297,10 @@ export default function Inventory() {
                               
                               if ((txnType === 'adjust' || txnType === 'export' || txnType === 'transfer') && wId) {
                                 const stockPIds = stockLevels.filter(s => Number(s.warehouse) === Number(wId)).map(s => s.product);
-                                availableProds = availableProds.filter(p => stockPIds.includes(p.id));
+                                // Only filter if stockLevels is loaded; fallback to all products if empty
+                                if (stockPIds.length > 0) {
+                                  availableProds = availableProds.filter(p => stockPIds.includes(p.id));
+                                }
                               }
 
                               return (

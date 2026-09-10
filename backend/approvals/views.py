@@ -175,10 +175,16 @@ class ApprovalRequestViewSet(TenantQuerySetMixin, viewsets.ModelViewSet):
             approval_req.status = ApprovalRequest.STATUS_APPROVED
             approval_req.save()
             # Notify the linked object
+            factory_id = request.data.get("factory_id")
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.error(f"====== APPROVE STEP RECEIVED FACTORY_ID: {factory_id} ======")
+            
             if hasattr(approval_req.content_object, 'handle_approval_result'):
                 try:
-                    approval_req.content_object.handle_approval_result('approved', acted_by=user)
-                except TypeError:
+                    approval_req.content_object.handle_approval_result('approved', acted_by=user, factory_id=factory_id)
+                except TypeError as e:
+                    logger.error(f"TypeError when calling handle_approval_result with factory_id: {e}")
                     approval_req.content_object.handle_approval_result('approved')
             try:
                 from notifications.utils import create_notification

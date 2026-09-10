@@ -396,7 +396,7 @@ export default function UserManagement() {
           <List
             dataSource={filteredUsers}
             loading={loading}
-            pagination={{ pageSize: 10, size: 'small' }}
+            pagination={{ pageSize: 25, size: 'small' }}
             renderItem={(record) => {
               const isSelf = record.id === currentUser?.id
               return (
@@ -462,7 +462,7 @@ export default function UserManagement() {
             dataSource={filteredUsers}
             rowKey="id"
             loading={loading}
-            pagination={{ pageSize: 10, showTotal: (total) => `${total} nhân viên` }}
+            pagination={{ pageSize: 25, showTotal: (total) => `${total} nhân viên` }}
           />
         )}
       </Card>
