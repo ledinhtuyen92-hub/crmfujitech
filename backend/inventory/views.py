@@ -175,7 +175,8 @@ class ProductViewSet(TenantQuerySetMixin, viewsets.ModelViewSet):
     queryset = Product.objects.select_related("company", "category").order_by("name")
     serializer_class = ProductSerializer
     permission_classes = [permissions.IsAuthenticated, ActionBasedPermission]
-    pagination_class = None
+    from core.pagination import OptionalPagination
+    pagination_class = OptionalPagination
     
     action_permissions = {
         "list": ["products.view", "sales.view", "sales.create", "orders.view", "orders.create", "crm.view"],
@@ -457,7 +458,8 @@ class StockLevelViewSet(mixins.UpdateModelMixin, mixins.DestroyModelMixin, views
     ).order_by("product__name", "warehouse__name")
     serializer_class = StockLevelSerializer
     permission_classes = [permissions.IsAuthenticated, ActionBasedPermission]
-    pagination_class = None
+    from core.pagination import OptionalPagination
+    pagination_class = OptionalPagination
     
     action_permissions = {
         "list": "inventory.view",
@@ -502,6 +504,8 @@ class StockLevelViewSet(mixins.UpdateModelMixin, mixins.DestroyModelMixin, views
         instance.delete()
 
 
+from core.pagination import StandardPagination
+
 class InventoryTransactionViewSet(TenantQuerySetMixin, viewsets.ModelViewSet):
     """
     CRUD phiếu kho — cô lập theo company.
@@ -513,6 +517,7 @@ class InventoryTransactionViewSet(TenantQuerySetMixin, viewsets.ModelViewSet):
         "company", "product", "warehouse", "reference_order", "created_by"
     ).order_by("-created_at")
     serializer_class = InventoryTransactionSerializer
+    pagination_class = StandardPagination
     permission_classes = [permissions.IsAuthenticated, ActionBasedPermission]
     
     action_permissions = {
@@ -522,6 +527,32 @@ class InventoryTransactionViewSet(TenantQuerySetMixin, viewsets.ModelViewSet):
         "update": "inventory.adjust",
         "partial_update": "inventory.adjust",
     }
+
+    def list(self, request, *args, **kwargs):
+        queryset = self.filter_queryset(self.get_queryset())
+        
+        # Calculate pending exports count for stats badge
+        pending_exports_count = queryset.filter(type="export", status="pending").values('transaction_code').distinct().count()
+        stats = {
+            "pending_exports_count": pending_exports_count
+        }
+        
+        from django.db.models import Max
+        # Gom nhóm theo transaction_code và phân trang trên tập hợp mã phiếu
+        grouped_qs = queryset.values('transaction_code').annotate(max_created=Max('created_at')).order_by('-max_created')
+        
+        page = self.paginate_queryset(grouped_qs)
+        if page is not None:
+            txn_codes = [item['transaction_code'] for item in page]
+            # Lấy toàn bộ items của các mã phiếu này, giữ nguyên order mặc định của queryset
+            actual_items = queryset.filter(transaction_code__in=txn_codes)
+            serializer = self.get_serializer(actual_items, many=True)
+            response = self.get_paginated_response(serializer.data)
+            response.data["stats"] = stats
+            return response
+
+        serializer = self.get_serializer(queryset, many=True)
+        return Response({"results": serializer.data, "stats": stats})
 
     def get_queryset(self):
         qs = super().get_queryset()
@@ -555,13 +586,23 @@ class InventoryTransactionViewSet(TenantQuerySetMixin, viewsets.ModelViewSet):
         txn_type = self.request.query_params.get("type")
         if txn_type:
             qs = qs.filter(type=txn_type)
+            
+        status_val = self.request.query_params.get("status")
+        if status_val:
+            qs = qs.filter(status=status_val)
+            
+        warehouse_id = self.request.query_params.get("warehouse")
+        if warehouse_id:
+            from django.db.models import Q
+            qs = qs.filter(Q(warehouse_id=warehouse_id) | Q(target_warehouse_id=warehouse_id))
+            
         search_query = self.request.query_params.get("search")
         if search_query:
             from django.db.models import Q
             qs = qs.filter(
                 Q(transaction_code__icontains=search_query) |
                 Q(product__name__icontains=search_query) |
-                Q(product__code__icontains=search_query) |
+                Q(product__sku__icontains=search_query) |
                 Q(reference_order__order_number__icontains=search_query) |
                 Q(note__icontains=search_query)
             )

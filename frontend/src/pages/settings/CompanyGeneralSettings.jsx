@@ -721,8 +721,8 @@ export default function CompanyGeneralSettings() {
             <Col xs={24} md={12}>
               <Form.Item
                 name="list_page_size"
-                label="Giới hạn bản ghi tải về (Màn hình danh sách)"
-                help="Số lượng dữ liệu kéo về mỗi lần (VD: Đơn hàng, Kho). Đặt 1000 - 10000 để đảm bảo thống kê không bị sai."
+                label="Giới hạn bản ghi tải về (Danh mục & Cài đặt)"
+                help="Số lượng dữ liệu kéo về đối với các module tĩnh (VD: Danh sách Sản phẩm, Tồn kho). Các module giao dịch (Đơn hàng, Kho vận, v.v) đã được tự động phân trang."
                 rules={[{ required: true, message: 'Vui lòng nhập số lượng' }]}
               >
                 <InputNumber min={20} max={100000} style={{ width: '100%' }} />

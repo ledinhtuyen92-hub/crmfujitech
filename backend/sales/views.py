@@ -6,6 +6,8 @@ from django.utils import timezone
 
 from users.views import TenantQuerySetMixin
 from users.permissions import ActionBasedPermission
+from core.pagination import StandardPagination
+from django.db.models import Sum, Q, Count
 
 from .models import Quotation, QuotationItem, QuotationTemplate, SavedTemplateBlock
 from .serializers import QuotationItemSerializer, QuotationSerializer, QuotationTemplateSerializer, SavedTemplateBlockSerializer
@@ -19,6 +21,7 @@ class QuotationViewSet(TenantQuerySetMixin, viewsets.ModelViewSet):
         "company", "customer", "created_by"
     ).prefetch_related("items").order_by("-created_at")
     serializer_class = QuotationSerializer
+    pagination_class = StandardPagination
     permission_classes = [permissions.IsAuthenticated, ActionBasedPermission]
     
     action_permissions = {
@@ -46,10 +49,45 @@ class QuotationViewSet(TenantQuerySetMixin, viewsets.ModelViewSet):
             else:
                 qs = qs.filter(created_by=user)
         # Filter theo trạng thái nếu có
-        status = self.request.query_params.get("status")
-        if status:
-            qs = qs.filter(status=status)
+        status_param = self.request.query_params.get("status")
+        if status_param:
+            qs = qs.filter(status=status_param)
+            
+        # Tìm kiếm theo tên khách, SĐT khách, mã báo giá
+        search = self.request.query_params.get("search")
+        if search:
+            from django.db.models import Q
+            qs = qs.filter(
+                Q(quotation_number__icontains=search) | 
+                Q(customer__name__icontains=search) |
+                Q(customer__phone__icontains=search)
+            )
+            
         return qs
+
+    def list(self, request, *args, **kwargs):
+        qs = self.filter_queryset(self.get_queryset())
+        
+        stats = qs.aggregate(
+            total_draft=Count('id', filter=Q(status='draft')),
+            total_sent=Count('id', filter=Q(status='sent')),
+            total_accepted=Count('id', filter=Q(status='accepted')),
+            total_amount_accepted=Sum('total_amount', filter=Q(status='accepted'))
+        )
+        
+        # Xử lý trường hợp Sum trả về None
+        if stats['total_amount_accepted'] is None:
+            stats['total_amount_accepted'] = 0
+
+        page = self.paginate_queryset(qs)
+        if page is not None:
+            serializer = self.get_serializer(page, many=True)
+            response = self.get_paginated_response(serializer.data)
+            response.data['stats'] = stats
+            return response
+
+        serializer = self.get_serializer(qs, many=True)
+        return Response({'results': serializer.data, 'stats': stats})
 
     def check_object_permission(self, user, instance):
         if user.is_superuser or user.is_company_admin or user.has_perm_code("sales.view_all"):

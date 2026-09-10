@@ -6,6 +6,7 @@ from users.models import User
 
 from users.views import TenantQuerySetMixin
 from users.permissions import ActionBasedPermission
+from core.pagination import StandardPagination
 
 from .models import DeliveryOrder, WarrantyCard
 from .serializers import DeliveryOrderSerializer, WarrantyCardSerializer
@@ -19,6 +20,7 @@ class DeliveryOrderViewSet(TenantQuerySetMixin, viewsets.ModelViewSet):
         "company", "order__customer"
     ).order_by("-created_at")
     serializer_class = DeliveryOrderSerializer
+    pagination_class = StandardPagination
     permission_classes = [permissions.IsAuthenticated, ActionBasedPermission]
     
     action_permissions = {
@@ -166,6 +168,7 @@ class WarrantyCardViewSet(TenantQuerySetMixin, viewsets.ModelViewSet):
         "company", "order", "customer"
     ).order_by("-created_at")
     serializer_class = WarrantyCardSerializer
+    pagination_class = StandardPagination
     permission_classes = [permissions.IsAuthenticated, ActionBasedPermission]
     
     action_permissions = {

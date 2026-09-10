@@ -38,6 +38,9 @@ export default function WarrantyList() {
   const { checkMaintenance, hasPermission, companySettings } = useAuth()
   const [warranties, setWarranties] = useState([])
   const [loading, setLoading] = useState(false)
+  const [currentPage, setCurrentPage] = useState(1)
+  const [pageSize, setPageSize] = useState(50)
+  const [totalCount, setTotalCount] = useState(0)
   const [searchText, setSearchText] = useState('')
   const [statusFilter, setStatusFilter] = useState(null)
 
@@ -77,21 +80,27 @@ export default function WarrantyList() {
     } catch {}
   }
 
-  const fetchWarranties = useCallback(async () => {
+  const fetchWarranties = useCallback(async (page = 1) => {
     setLoading(true)
     try {
-      const params = { page_size: companySettings?.list_page_size || 1000 }
+      const params = {
+        page: page,
+        page_size: pageSize
+      }
       if (statusFilter) params.status = statusFilter
       if (searchText) params.search = searchText
       const res = await api.get('/delivery/warranties/', { params })
-      const data = Array.isArray(res.data) ? res.data : res.data?.results ?? []
+      const data = res.data?.results ?? (Array.isArray(res.data) ? res.data : [])
+      
+      setTotalCount(res.data.count || data.length || 0)
       setWarranties(data)
+      setCurrentPage(page)
     } catch {
       message.error('Lỗi khi tải danh sách phiếu bảo hành.')
     } finally {
       setLoading(false)
     }
-  }, [statusFilter, searchText])
+  }, [statusFilter, searchText, pageSize])
 
   useEffect(() => {
     fetchWarranties()
@@ -403,7 +412,15 @@ export default function WarrantyList() {
         <List
           dataSource={warranties}
           loading={loading}
-          pagination={{ pageSize: 20, size: 'small' }}
+          pagination={{
+            current: currentPage,
+            pageSize: pageSize,
+            total: totalCount,
+            showSizeChanger: false,
+            size: 'small',
+            showTotal: (total) => `Tổng cộng ${total} phiếu`,
+            onChange: (page) => fetchWarranties(page)
+          }}
           renderItem={(r) => {
             const c = statusConfig[r.status] || { label: r.status, color: 'default' }
             return (
@@ -438,7 +455,18 @@ export default function WarrantyList() {
           columns={columns}
           rowKey="id"
           loading={loading}
-          pagination={{ pageSize: 20 }}
+          onChange={(pagination) => {
+            if (pagination.current !== currentPage) {
+              fetchWarranties(pagination.current)
+            }
+          }}
+          pagination={{
+            current: currentPage,
+            pageSize: pageSize,
+            total: totalCount,
+            showSizeChanger: false,
+            showTotal: (total, range) => `${range[0]}-${range[1]} của ${total} phiếu`,
+          }}
         />
       )}
 

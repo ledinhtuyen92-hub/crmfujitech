@@ -2,6 +2,7 @@ from rest_framework import permissions, viewsets
 
 from users.views import TenantQuerySetMixin
 from users.permissions import ActionBasedPermission
+from core.pagination import StandardPagination
 
 from .models import Factory, ProductionOrder, ProductionStep
 from .serializers import FactorySerializer, ProductionOrderSerializer, ProductionStepSerializer
@@ -42,6 +43,7 @@ class ProductionOrderViewSet(TenantQuerySetMixin, viewsets.ModelViewSet):
         "company", "order__customer"
     ).prefetch_related("steps").order_by("-created_at")
     serializer_class = ProductionOrderSerializer
+    pagination_class = StandardPagination
     permission_classes = [permissions.IsAuthenticated, ActionBasedPermission]
     
     action_permissions = {
@@ -128,6 +130,18 @@ class ProductionOrderViewSet(TenantQuerySetMixin, viewsets.ModelViewSet):
                 qs = qs.filter(status="completed", order__delivery_order__isnull=True)
             else:
                 qs = qs.filter(status=prod_status)
+                
+        # Tìm kiếm
+        search = self.request.query_params.get("search")
+        if search:
+            from django.db.models import Q
+            qs = qs.filter(
+                Q(production_order_code__icontains=search) | 
+                Q(order__order_number__icontains=search) |
+                Q(order__customer__name__icontains=search) |
+                Q(order__customer__phone__icontains=search)
+            )
+            
         return qs
 
     def perform_create(self, serializer):

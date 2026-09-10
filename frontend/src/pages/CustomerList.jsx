@@ -137,6 +137,9 @@ function CustomerList() {
   const [salesUsers, setSalesUsers] = useState([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
+  const [currentPage, setCurrentPage] = useState(1)
+  const [pageSize, setPageSize] = useState(50)
+  const [totalCount, setTotalCount] = useState(0)
 
   const getStatusItem = useCallback((key) => {
     const base = STATUS_MAP[key] || { label: key, color: 'gray' }
@@ -243,25 +246,29 @@ function CustomerList() {
   const [allTags, setAllTags] = useState([])
   const [globalHasExpectedQuantity, setGlobalHasExpectedQuantity] = useState(false)
 
-  const fetchCustomers = useCallback(async () => {
+  const fetchCustomers = useCallback(async (page = 1) => {
     await Promise.resolve()
     setLoading(true)
     setError('')
     try {
-      const params = {}
+      const params = {
+        page: page,
+        page_size: pageSize
+      }
       if (searchQuery) params.search = searchQuery
       if (statusFilter) params.status = statusFilter
       if (isInactiveFilter) params.is_inactive = true
       if (assignedToFilter) params.assigned_to = assignedToFilter
       if (isNewUnattendedFilter) {
           params.status = 'new'
+          params.is_unattended = 'true'
       }
       if (tableSort && tableSort.field) {
           let field = tableSort.field
           if (field === 'name') field = 'created_at'
           params.ordering = tableSort.order === 'ascend' ? field : `-${field}`
       }
-      params.page_size = companySettings?.list_page_size || 1000
+      
       const response = await api.get('/crm/customers/', { params })
       let data = Array.isArray(response.data)
         ? response.data
@@ -269,18 +276,19 @@ function CustomerList() {
       
       if (!Array.isArray(response.data)) {
         setGlobalHasExpectedQuantity(!!response.data?.has_expected_quantity)
+        setTotalCount(response.data.count || 0)
+      } else {
+        setTotalCount(data.length)
       }
       
-      if (isNewUnattendedFilter) {
-          data = data.filter(c => c.interaction_count === 0)
-      }
       setCustomers(data)
+      setCurrentPage(page)
     } catch {
       setError('Không thể tải danh sách khách hàng. Vui lòng thử lại sau.')
     } finally {
       setLoading(false)
     }
-  }, [searchQuery, statusFilter, isInactiveFilter, assignedToFilter, isNewUnattendedFilter, tableSort])
+  }, [searchQuery, statusFilter, isInactiveFilter, assignedToFilter, isNewUnattendedFilter, tableSort, pageSize])
 
   const fetchSalesUsers = useCallback(async () => {
     if (!isCompanyAdmin && !hasPermission('crm.assign')) return
@@ -1107,7 +1115,14 @@ function CustomerList() {
           itemLayout="horizontal"
           dataSource={customers}
           loading={loading}
-          pagination={{ pageSize: 15, showSizeChanger: false, size: "small" }}
+          pagination={{ 
+            current: currentPage,
+            pageSize: pageSize,
+            total: totalCount,
+            showSizeChanger: false, 
+            size: "small",
+            onChange: (page) => fetchCustomers(page)
+          }}
           renderItem={(record) => {
             const statusItem = getStatusItem(record.status)
             return (
@@ -1159,7 +1174,12 @@ function CustomerList() {
         />
       ) : (
         <Table scroll={{ x: 'max-content' }}
-          onChange={(pagination, filters, sorter) => setTableSort(sorter)}
+          onChange={(pagination, filters, sorter) => {
+            setTableSort(sorter)
+            if (pagination.current !== currentPage) {
+              fetchCustomers(pagination.current)
+            }
+          }}
           rowSelection={{
             selectedRowKeys,
             onChange: (newSelectedRowKeys) => setSelectedRowKeys(newSelectedRowKeys),
@@ -1168,7 +1188,13 @@ function CustomerList() {
           dataSource={customers}
           loading={loading}
           rowKey="id"
-          pagination={{ pageSize: 15, showSizeChanger: false }}
+          pagination={{ 
+            current: currentPage,
+            pageSize: pageSize,
+            total: totalCount,
+            showSizeChanger: false,
+            showTotal: (total, range) => `${range[0]}-${range[1]} của ${total} khách hàng`
+          }}
           onRow={(record) => ({
             onClick: () => handleOpenDrawer(record),
             style: { cursor: 'pointer' },

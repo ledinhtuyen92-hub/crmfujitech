@@ -70,6 +70,10 @@ export default function Inventory() {
   const [stockLevels, setStockLevels] = useState([])
   const [transactions, setTransactions] = useState([])
   const [loading, setLoading] = useState(false)
+  const [currentTxnPage, setCurrentTxnPage] = useState(1)
+  const [txnPageSize, setTxnPageSize] = useState(20)
+  const [txnTotalCount, setTxnTotalCount] = useState(0)
+  const [pendingExportsCount, setPendingExportsCount] = useState(0)
 
   // Filters
   const [searchText, setSearchText] = useState('')
@@ -231,19 +235,43 @@ export default function Inventory() {
     }
   }, [warehouseFilter, lowStockOnly, lowStockThreshold])
 
-  const fetchTransactions = useCallback(async () => {
+  const fetchTransactions = useCallback(async (page = 1) => {
     await Promise.resolve()
     setLoading(true)
     try {
-      const res = await api.get('/inventory/transactions/', { params: { page_size: companySettings?.list_page_size || 1000 } })
-      const data = Array.isArray(res.data) ? res.data : res.data?.results ?? []
+      const params = {
+        page: page,
+        page_size: txnPageSize
+      }
+      if (txnTypeFilter) params.type = txnTypeFilter
+      
+      if (txnStatusFilter) {
+        if (txnStatusFilter === 'deleted_mo') {
+          // Giao diện deleted_mo lọc đặc biệt, có thể API chưa hỗ trợ hoàn toàn, ta tạm lọc ở client hoặc bỏ qua. 
+          // Do backend chưa support, ta tạm gửi status=completed
+          params.status = 'completed'
+        } else {
+          params.status = txnStatusFilter
+        }
+      }
+      if (txnWarehouseFilter) params.warehouse = txnWarehouseFilter
+      if (txnSearchText) params.search = txnSearchText
+
+      const res = await api.get('/inventory/transactions/', { params })
+      const data = res.data?.results ?? (Array.isArray(res.data) ? res.data : [])
       setTransactions(data)
+      setTxnTotalCount(res.data?.count || data.length || 0)
+      setCurrentTxnPage(page)
+      
+      if (res.data?.stats) {
+        setPendingExportsCount(res.data.stats.pending_exports_count || 0)
+      }
     } catch {
       // ignore
     } finally {
       setLoading(false)
     }
-  }, [])
+  }, [txnPageSize, txnTypeFilter, txnStatusFilter, txnWarehouseFilter, txnSearchText])
 
   const handleUpdateMinQty = async (stockId, valueStr) => {
     try {
@@ -328,33 +356,13 @@ export default function Inventory() {
 
   // ── Filtered Transactions ─────────────────────────────────────────────
   const groupedFilteredTransactions = useMemo(() => {
-    const filtered = transactions.filter((txn) => {
-
-      let match = true
-      if (txnTypeFilter) {
-        match = match && txn.type === txnTypeFilter
-      }
-      if (txnStatusFilter) {
-        if (txnStatusFilter === 'deleted_mo') {
-          match = match && txn.type === 'export' && txn.status === 'completed' && txn.reference_order && txn.has_production_order === false
-        } else {
-          match = match && txn.status === txnStatusFilter
-        }
-      }
-      if (txnWarehouseFilter) {
-        match = match && txn.warehouse === txnWarehouseFilter
-      }
-      if (txnSearchText.trim()) {
-        const kw = txnSearchText.trim().toLowerCase()
-        const code = (txn.transaction_code || '').toLowerCase()
-        const prod = products.find((p) => p.id === txn.product)
-        const name = (prod?.name || txn.product_name || '').toLowerCase()
-        const sku = (prod?.sku || txn.product_sku || '').toLowerCase()
-        const refOrder = (txn.reference_order_number || '').toLowerCase()
-        match = match && (code.includes(kw) || name.includes(kw) || sku.includes(kw) || refOrder.includes(kw))
-      }
-      return match
-    })
+    // API đã lọc rồi nên ta chỉ nhóm lại theo transaction_code
+    let filtered = transactions
+    
+    // Nếu là bộ lọc deleted_mo đặc biệt chưa có API
+    if (txnStatusFilter === 'deleted_mo') {
+      filtered = filtered.filter(txn => txn.type === 'export' && txn.status === 'completed' && txn.reference_order && txn.has_production_order === false)
+    }
 
     const groups = {}
     filtered.forEach(txn => {
@@ -368,10 +376,10 @@ export default function Inventory() {
       groups[txn.transaction_code].items.push(txn)
     })
     return Object.values(groups)
-  }, [transactions, txnStatusFilter, txnTypeFilter, txnWarehouseFilter, txnSearchText, products])
+  }, [transactions, txnStatusFilter])
 
-  const pendingExports = transactions.filter((txn) => txn.type === 'export' && txn.status === 'pending')
-  const pendingOrdersCount = new Set(pendingExports.map(t => t.transaction_code)).size
+  // Lấy các export có trạng thái pending trực tiếp từ state pendingExportsCount thay vì count local
+  const pendingOrdersCount = pendingExportsCount
 
   // Kiểm tra xem trong lịch sử có phiếu xuất kho nào có nhà máy không
   const hasFactoryInHistory = transactions.some(t => t.factory_name)
@@ -1485,7 +1493,15 @@ export default function Inventory() {
                     <List
                       dataSource={groupedFilteredTransactions}
                       loading={loading}
-                      pagination={{ pageSize: 10, size: 'small' }}
+                      pagination={{
+                        current: currentTxnPage,
+                        pageSize: txnPageSize,
+                        total: txnTotalCount,
+                        showSizeChanger: false,
+                        size: 'small',
+                        showTotal: (total) => `Tổng cộng ${total} phiếu`,
+                        onChange: (page) => fetchTransactions(page)
+                      }}
                       renderItem={(r) => {
                         let statusTag
                         if (r.status === 'pending') statusTag = <Tag color="warning">{r.status_display || 'Chờ duyệt'}</Tag>
@@ -1587,7 +1603,18 @@ export default function Inventory() {
                       dataSource={groupedFilteredTransactions}
                       rowKey="id"
                       loading={loading}
-                      pagination={{ pageSize: 10 }}
+                      onChange={(pagination) => {
+                        if (pagination.current !== currentTxnPage) {
+                          fetchTransactions(pagination.current)
+                        }
+                      }}
+                      pagination={{
+                        current: currentTxnPage,
+                        pageSize: txnPageSize,
+                        total: txnTotalCount,
+                        showSizeChanger: false,
+                        showTotal: (total, range) => `${range[0]}-${range[1]} của ${total} phiếu`,
+                      }}
                       scroll={{ x: 'max-content' }}
                       expandable={{
                         expandedRowRender: (record) => {

@@ -4,6 +4,7 @@ from rest_framework.response import Response
 
 from users.views import TenantQuerySetMixin
 from users.permissions import ActionBasedPermission
+from core.pagination import StandardPagination
 
 from .models import Customer, CustomerContact, CustomerInteraction, CustomerTag
 from .serializers import (
@@ -40,7 +41,7 @@ class CustomerViewSet(TenantQuerySetMixin, viewsets.ModelViewSet):
         "company", "assigned_to", "created_by"
     ).prefetch_related("contacts", "interactions", "tags").order_by("-created_at")
     serializer_class = CustomerSerializer
-    pagination_class = None
+    pagination_class = StandardPagination
     permission_classes = [permissions.IsAuthenticated, ActionBasedPermission]
     
     action_permissions = {
@@ -96,6 +97,10 @@ class CustomerViewSet(TenantQuerySetMixin, viewsets.ModelViewSet):
             order_count=Count('orders', distinct=True),
             interaction_count=Count('interactions', filter=~Q(interactions__type="system"), distinct=True)
         )
+        
+        is_unattended = self.request.query_params.get("is_unattended")
+        if is_unattended and is_unattended.lower() == 'true':
+            qs = qs.filter(interaction_count=0)
         
         # Sắp xếp
         ordering = self.request.query_params.get("ordering")

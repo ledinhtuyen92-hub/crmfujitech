@@ -138,6 +138,11 @@ export default function OrderList() {
 
   // Data states
   const [orders, setOrders] = useState([])
+  const [loading, setLoading] = useState(false)
+  const [currentPage, setCurrentPage] = useState(1)
+  const [pageSize, setPageSize] = useState(50)
+  const [totalCount, setTotalCount] = useState(0)
+  const [stats, setStats] = useState({ total_revenue: 0, total_pending: 0, total_approved: 0, total_completed: 0 })
   const [customers, setCustomers] = useState([])
   const [products, setProducts] = useState([])
   const [znsModalVisible, setZnsModalVisible] = useState(false)
@@ -146,7 +151,6 @@ export default function OrderList() {
   const [receiptPrintVisible, setReceiptPrintVisible] = useState(false)
   const [previewAttachments, setPreviewAttachments] = useState([])
   const [previewVisible, setPreviewVisible] = useState(false)
-  const [loading, setLoading] = useState(false)
   const [templates, setTemplates] = useState([])
   const [companyTemplate, setCompanyTemplate] = useState(null)
   const [triggerProductionMode, setTriggerProductionMode] = useState(false)
@@ -478,25 +482,35 @@ export default function OrderList() {
   const canExportPdf = isCompanyAdmin || hasPermission('orders.export_pdf')
 
   // ── Fetch data ────────────────────────────────────────────────────────
-  const fetchOrders = useCallback(async () => {
-    await Promise.resolve()
+  const fetchOrders = useCallback(async (page = 1) => {
     setLoading(true)
     try {
-      const params = {}
+      const params = {
+        page: page,
+        page_size: pageSize
+      }
       if (statusFilter) params.status = statusFilter
       if (financialFilter) params.financial_status = financialFilter
       if (paymentTargetFilter) params.payment_target = paymentTargetFilter
       if (exportFilter) params.export_status = exportFilter
-      params.page_size = companySettings?.list_page_size || 1000
+      if (searchText) params.search = searchText
+      
       const res = await api.get('/orders/orders/', { params })
-      const data = Array.isArray(res.data) ? res.data : res.data?.results ?? []
+      const data = res.data?.results ?? (Array.isArray(res.data) ? res.data : [])
+      
+      setTotalCount(res.data.count || data.length || 0)
+      if (res.data.stats) {
+        setStats(res.data.stats)
+      }
+      
       setOrders(data)
+      setCurrentPage(page)
     } catch {
       messageApi.error('Không thể tải danh sách đơn hàng.')
     } finally {
       setLoading(false)
     }
-  }, [statusFilter, financialFilter, paymentTargetFilter, exportFilter, messageApi])
+  }, [statusFilter, financialFilter, paymentTargetFilter, exportFilter, searchText, pageSize, messageApi])
 
   const fetchCustomersAndProducts = useCallback(async () => {
     await Promise.resolve()
@@ -648,22 +662,13 @@ export default function OrderList() {
   }, [fetchCustomersAndProducts])
 
   // ── Filtered list ─────────────────────────────────────────────────────
-  const filteredOrders = orders.filter((item) => {
-    if (!searchText) return true
-    const oNum = (item.order_number || '').toLowerCase()
-    const cName = (item.customer_name || '').toLowerCase()
-    const cPhone = (item.customer_phone || '').toLowerCase()
-    const query = searchText.toLowerCase()
-    return oNum.includes(query) || cName.includes(query) || cPhone.includes(query)
-  })
+  const filteredOrders = orders
 
-  // ── Stats ─────────────────────────────────────────────────────────────
-  const totalPending = orders.filter((q) => q.status === 'pending').length
-  const totalApproved = orders.filter((q) => q.status === 'approved').length
-  const totalCompleted = orders.filter((q) => q.status === 'completed').length
-  const totalRevenue = orders
-    .filter((q) => q.status === 'approved' || q.status === 'completed')
-    .reduce((sum, q) => sum + Number(q.total_amount || 0), 0)
+  // ── Stats (Server-side) ───────────────────────────────────────────────
+  const totalPending = stats.total_pending || 0
+  const totalApproved = stats.total_approved || 0
+  const totalCompleted = stats.total_completed || 0
+  const totalRevenue = stats.total_revenue || 0
 
   // ── Handlers for modal form items ─────────────────────────────────────
   const handleAddLine = () => {
@@ -3187,7 +3192,15 @@ export default function OrderList() {
           <List
             dataSource={filteredOrders}
             loading={loading}
-            pagination={{ pageSize: 10, size: 'small', showTotal: (total) => `Tổng cộng ${total} đơn hàng` }}
+            pagination={{ 
+              current: currentPage,
+              pageSize: pageSize,
+              total: totalCount,
+              showSizeChanger: false,
+              size: 'small', 
+              showTotal: (total) => `Tổng cộng ${total} đơn hàng`,
+              onChange: (page) => fetchOrders(page)
+            }}
             renderItem={(record) => {
               const cfg = statusConfig[record.status] || { label: record.status, color: 'default' }
               return (
@@ -3231,10 +3244,17 @@ export default function OrderList() {
             rowKey="id"
             loading={loading}
             scroll={{ x: 'max-content' }}
+            onChange={(pagination) => {
+              if (pagination.current !== currentPage) {
+                fetchOrders(pagination.current)
+              }
+            }}
             pagination={{
-              pageSize: 10,
+              current: currentPage,
+              pageSize: pageSize,
+              total: totalCount,
               showSizeChanger: false,
-              showTotal: (total) => `Tổng cộng ${total} đơn hàng`,
+              showTotal: (total, range) => `${range[0]}-${range[1]} của ${total} đơn hàng`,
             }}
           />
         )}

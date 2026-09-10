@@ -39,6 +39,9 @@ export default function DeliveryList() {
   const { checkMaintenance, hasPermission, companySettings } = useAuth()
   const [deliveries, setDeliveries] = useState([])
   const [loading, setLoading] = useState(false)
+  const [currentPage, setCurrentPage] = useState(1)
+  const [pageSize, setPageSize] = useState(50)
+  const [totalCount, setTotalCount] = useState(0)
   const [searchText, setSearchText] = useState('')
   const [statusFilter, setStatusFilter] = useState(null)
 
@@ -97,22 +100,28 @@ export default function DeliveryList() {
     return null
   }
 
-  const fetchDeliveries = useCallback(async () => {
+  const fetchDeliveries = useCallback(async (page = 1) => {
     setLoading(true)
     try {
-      const params = {}
+      const params = {
+        page: page,
+        page_size: pageSize
+      }
       if (statusFilter) params.status = statusFilter
       if (searchText) params.search = searchText
-      params.page_size = companySettings?.list_page_size || 1000
+      
       const res = await api.get('/delivery/deliveries/', { params })
-      const data = Array.isArray(res.data) ? res.data : res.data?.results ?? []
+      const data = res.data?.results ?? (Array.isArray(res.data) ? res.data : [])
+      
+      setTotalCount(res.data.count || data.length || 0)
       setDeliveries(data)
+      setCurrentPage(page)
     } catch {
       message.error('Lỗi khi tải danh sách giao hàng.')
     } finally {
       setLoading(false)
     }
-  }, [statusFilter, searchText])
+  }, [statusFilter, searchText, pageSize])
 
   useEffect(() => {
     fetchDeliveries()
@@ -528,7 +537,15 @@ export default function DeliveryList() {
           rowKey="id"
           dataSource={deliveries}
           loading={loading}
-          pagination={{ pageSize: 20, size: 'small' }}
+          pagination={{
+            current: currentPage,
+            pageSize: pageSize,
+            total: totalCount,
+            showSizeChanger: false,
+            size: 'small',
+            showTotal: (total) => `Tổng cộng ${total} lệnh`,
+            onChange: (page) => fetchDeliveries(page)
+          }}
           renderItem={(r) => {
             const cfg = statusConfig[r.status] || { label: r.status, color: 'default' }
             return (
@@ -570,7 +587,18 @@ export default function DeliveryList() {
           columns={columns}
           rowKey="id"
           loading={loading}
-          pagination={{ pageSize: 20 }}
+          onChange={(pagination) => {
+            if (pagination.current !== currentPage) {
+              fetchDeliveries(pagination.current)
+            }
+          }}
+          pagination={{
+            current: currentPage,
+            pageSize: pageSize,
+            total: totalCount,
+            showSizeChanger: false,
+            showTotal: (total, range) => `${range[0]}-${range[1]} của ${total} lệnh`,
+          }}
         />
       )}
 

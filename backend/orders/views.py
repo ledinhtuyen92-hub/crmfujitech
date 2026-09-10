@@ -4,6 +4,8 @@ from rest_framework.response import Response
 
 from users.views import TenantQuerySetMixin
 from users.permissions import ActionBasedPermission
+from core.pagination import StandardPagination
+from django.db.models import Sum, Q, Count
 
 from .models import Order, OrderItem
 from .serializers import OrderItemSerializer, OrderSerializer
@@ -21,6 +23,7 @@ class OrderViewSet(TenantQuerySetMixin, viewsets.ModelViewSet):
         "company", "customer", "quotation", "created_by", "approved_by"
     ).prefetch_related("items").order_by("-created_at")
     serializer_class = OrderSerializer
+    pagination_class = StandardPagination
     permission_classes = [permissions.IsAuthenticated, ActionBasedPermission]
     
     action_permissions = {
@@ -126,6 +129,30 @@ class OrderViewSet(TenantQuerySetMixin, viewsets.ModelViewSet):
             qs = qs.filter(production_orders__status="completed", delivery_order__isnull=True)
             
         return qs
+
+    def list(self, request, *args, **kwargs):
+        qs = self.filter_queryset(self.get_queryset())
+        
+        stats = qs.aggregate(
+            total_pending=Count('id', filter=Q(status='pending')),
+            total_approved=Count('id', filter=Q(status='approved')),
+            total_completed=Count('id', filter=Q(status='completed')),
+            total_revenue=Sum('total_amount', filter=Q(status__in=['approved', 'completed']))
+        )
+        
+        # Xử lý trường hợp Sum trả về None nếu không có đơn hàng nào
+        if stats['total_revenue'] is None:
+            stats['total_revenue'] = 0
+
+        page = self.paginate_queryset(qs)
+        if page is not None:
+            serializer = self.get_serializer(page, many=True)
+            response = self.get_paginated_response(serializer.data)
+            response.data['stats'] = stats
+            return response
+
+        serializer = self.get_serializer(qs, many=True)
+        return Response({'results': serializer.data, 'stats': stats})
 
     def destroy(self, request, *args, **kwargs):
         order = self.get_object()

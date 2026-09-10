@@ -70,6 +70,9 @@ export default function ProductionList() {
 
   // Data
   const [productionOrders, setProductionOrders] = useState([])
+  const [currentPage, setCurrentPage] = useState(1)
+  const [pageSize, setPageSize] = useState(50)
+  const [totalCount, setTotalCount] = useState(0)
   const [orders, setOrders] = useState([])
   const [users, setUsers] = useState([])
   const [loading, setLoading] = useState(false)
@@ -146,22 +149,29 @@ export default function ProductionList() {
   const canDelete = hasPermission('production.delete')
 
   // ── Fetch data ────────────────────────────────────────────────────────
-  const fetchProductionOrders = useCallback(async () => {
+  const fetchProductionOrders = useCallback(async (page = 1) => {
     await Promise.resolve()
     setLoading(true)
     try {
-      const params = {}
+      const params = {
+        page: page,
+        page_size: pageSize
+      }
       if (statusFilter) params.status = statusFilter
-      params.page_size = companySettings?.list_page_size || 1000
+      if (searchText) params.search = searchText
+      
       const res = await api.get('/production/orders/', { params })
-      const data = Array.isArray(res.data) ? res.data : res.data?.results ?? []
+      const data = res.data?.results ?? (Array.isArray(res.data) ? res.data : [])
+      
+      setTotalCount(res.data.count || data.length || 0)
       setProductionOrders(data)
+      setCurrentPage(page)
     } catch {
       messageApi.error('Không thể tải danh sách lệnh sản xuất.')
     } finally {
       setLoading(false)
     }
-  }, [statusFilter, messageApi])
+  }, [statusFilter, searchText, pageSize, messageApi])
 
   const fetchOrdersAndUsers = useCallback(async () => {
     await Promise.resolve()
@@ -852,7 +862,15 @@ export default function ProductionList() {
           <List
             dataSource={filteredPOs}
             loading={loading}
-            pagination={{ pageSize: 10, size: 'small' }}
+            pagination={{
+              current: currentPage,
+              pageSize: pageSize,
+              total: totalCount,
+              showSizeChanger: false,
+              size: 'small',
+              showTotal: (total) => `Tổng cộng ${total} lệnh`,
+              onChange: (page) => fetchProductionOrders(page)
+            }}
             renderItem={(record) => {
               const cfg = statusConfig[record.status] || { label: record.status, color: 'default' }
               const total = record.steps?.length || 0
@@ -892,7 +910,18 @@ export default function ProductionList() {
             dataSource={filteredPOs}
             rowKey="id"
             loading={loading}
-            pagination={{ pageSize: 10 }}
+            onChange={(pagination) => {
+              if (pagination.current !== currentPage) {
+                fetchProductionOrders(pagination.current)
+              }
+            }}
+            pagination={{
+              current: currentPage,
+              pageSize: pageSize,
+              total: totalCount,
+              showSizeChanger: false,
+              showTotal: (total, range) => `${range[0]}-${range[1]} của ${total} lệnh`,
+            }}
           />
         )}
       </Card>

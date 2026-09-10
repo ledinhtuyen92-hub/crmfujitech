@@ -112,6 +112,10 @@ export default function QuotationList() {
   const [companyTemplate, setCompanyTemplate] = useState(null)
 
   const [loading, setLoading] = useState(false)
+  const [currentPage, setCurrentPage] = useState(1)
+  const [pageSize, setPageSize] = useState(50)
+  const [totalCount, setTotalCount] = useState(0)
+  const [stats, setStats] = useState({ total_draft: 0, total_sent: 0, total_accepted: 0, total_amount_accepted: 0 })
 
   // Filters
   const [searchText, setSearchText] = useState('')
@@ -172,23 +176,33 @@ export default function QuotationList() {
   const requireApproval = hasPermission('sales.require_approval') && !isCompanyAdmin
   const canExportPdf = isCompanyAdmin || hasPermission('sales.export_pdf')
 
-  // ── Fetch data ────────────────────────────────────────────────────────
-  const fetchQuotations = useCallback(async () => {
+  const fetchQuotations = useCallback(async (page = 1) => {
     await Promise.resolve()
     setLoading(true)
     try {
-      const params = {}
+      const params = {
+        page: page,
+        page_size: pageSize
+      }
       if (statusFilter) params.status = statusFilter
-      params.page_size = companySettings?.list_page_size || 1000
+      if (searchText) params.search = searchText
+      
       const res = await api.get('/sales/quotations/', { params })
-      const data = Array.isArray(res.data) ? res.data : res.data?.results ?? []
+      const data = res.data?.results ?? (Array.isArray(res.data) ? res.data : [])
+      
+      setTotalCount(res.data.count || data.length || 0)
+      if (res.data.stats) {
+        setStats(res.data.stats)
+      }
+      
       setQuotations(data)
+      setCurrentPage(page)
     } catch {
       messageApi.error('Không thể tải danh sách báo giá.')
     } finally {
       setLoading(false)
     }
-  }, [statusFilter, messageApi, companySettings])
+  }, [statusFilter, searchText, pageSize, messageApi])
 
   const fetchCustomersAndProducts = useCallback(async () => {
     await Promise.resolve()
@@ -248,22 +262,14 @@ export default function QuotationList() {
   }, [companySettings, companyTemplate, modalVisible, editingQuotation, form])
 
   // ── Filtered list ─────────────────────────────────────────────────────
-  const filteredQuotations = quotations.filter((item) => {
-    if (!searchText) return true
-    const qNum = (item.quotation_number || '').toLowerCase()
-    const cName = (item.customer_name || '').toLowerCase()
-    const cPhone = (item.customer_phone || '').toLowerCase()
-    const query = searchText.toLowerCase()
-    return qNum.includes(query) || cName.includes(query) || cPhone.includes(query)
-  })
+  // Đã lọc bằng Server-side, không cần lọc local nữa
+  const filteredQuotations = quotations
 
-  // ── Stats ─────────────────────────────────────────────────────────────
-  const totalDraft = quotations.filter((q) => q.status === 'draft').length
-  const totalSent = quotations.filter((q) => q.status === 'sent').length
-  const totalAccepted = quotations.filter((q) => q.status === 'accepted').length
-  const totalAmountAccepted = quotations
-    .filter((q) => q.status === 'accepted')
-    .reduce((sum, q) => sum + Number(q.total_amount || 0), 0)
+  // ── Stats (Server-side) ───────────────────────────────────────────────
+  const totalDraft = stats.total_draft || 0
+  const totalSent = stats.total_sent || 0
+  const totalAccepted = stats.total_accepted || 0
+  const totalAmountAccepted = stats.total_amount_accepted || 0
 
   // ── Helper to compute line total consistently ─────────────────────────
   const computeLineTotal = (item, templateOverride) => {
@@ -2861,7 +2867,15 @@ export default function QuotationList() {
           <List
             dataSource={filteredQuotations}
             loading={loading}
-            pagination={{ pageSize: 10, size: 'small', showTotal: (total) => `Tổng cộng ${total} báo giá` }}
+            pagination={{
+              current: currentPage,
+              pageSize: pageSize,
+              total: totalCount,
+              showSizeChanger: false,
+              size: 'small',
+              showTotal: (total) => `Tổng cộng ${total} báo giá`,
+              onChange: (page) => fetchQuotations(page)
+            }}
             renderItem={(record) => {
               const cfg = statusConfig[record.status] || statusConfig.draft
               return (
@@ -2897,10 +2911,17 @@ export default function QuotationList() {
             dataSource={filteredQuotations}
             rowKey="id"
             loading={loading}
+            onChange={(pagination) => {
+              if (pagination.current !== currentPage) {
+                fetchQuotations(pagination.current)
+              }
+            }}
             pagination={{
-              pageSize: 10,
+              current: currentPage,
+              pageSize: pageSize,
+              total: totalCount,
               showSizeChanger: false,
-              showTotal: (total) => `Tổng cộng ${total} báo giá`,
+              showTotal: (total, range) => `${range[0]}-${range[1]} của ${total} báo giá`,
             }}
           />
         )}
