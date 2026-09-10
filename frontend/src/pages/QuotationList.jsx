@@ -2979,7 +2979,7 @@ export default function QuotationList() {
       >
         <Form form={form} layout="vertical" style={{ marginTop: 16 }}>
           <Row gutter={16}>
-            <Col xs={24} md={12}>
+            <Col xs={24} md={isModuleActive('production') ? 8 : 12}>
               <Form.Item
                 name="customer"
                 label="Khách hàng"
@@ -2998,7 +2998,7 @@ export default function QuotationList() {
                 </Select>
               </Form.Item>
             </Col>
-            <Col xs={24} md={6}>
+            <Col xs={24} md={isModuleActive('production') ? 5 : 6}>
               <Form.Item name="status" label="Trạng thái">
                 <Select disabled={requireApproval && !['approved', 'sent', 'accepted'].includes(editingQuotation?.status)}>
                   <Option value="draft">Nháp</Option>
@@ -3010,15 +3010,13 @@ export default function QuotationList() {
                 </Select>
               </Form.Item>
             </Col>
-            <Col xs={24} md={6}>
+            <Col xs={24} md={isModuleActive('production') ? 5 : 6}>
               <Form.Item name="installation_date" label="Ngày thi công / lắp đặt">
                 <DatePicker style={{ width: '100%' }} format="DD/MM/YYYY" />
               </Form.Item>
             </Col>
-          </Row>
-          {isModuleActive('production') && (
-            <Row gutter={16}>
-              <Col xs={24} md={8}>
+            {isModuleActive('production') && (
+              <Col xs={24} md={6}>
                 <Form.Item name="factory" label="Nhà máy sản xuất (Dự kiến)">
                   <Select placeholder="Chọn nhà máy (tùy chọn)..." allowClear>
                     {factories.map(f => (
@@ -3027,8 +3025,8 @@ export default function QuotationList() {
                   </Select>
                 </Form.Item>
               </Col>
-            </Row>
-          )}
+            )}
+          </Row>
           <Divider style={{ margin: '12px 0' }}>
             <Space>
               <Text strong>Bảng Tính Chi Tiết Hạng Mục (Mẫu: {getEffectiveTemplate(editingQuotation)?.name || 'Tiêu chuẩn'})</Text>
