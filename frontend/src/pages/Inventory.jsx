@@ -2143,7 +2143,24 @@ export default function Inventory() {
             <Collapse
               accordion
               activeKey={activeTab}
-              onChange={(key) => setActiveTab(key || 'transactions')}
+              onChange={(key) => {
+                const newTab = (Array.isArray(key) ? key[0] : key) || 'transactions'
+                setActiveTab(newTab)
+                // Fetch data immediately on expand to avoid race condition with useEffect
+                if (newTab === 'stock') {
+                  fetchStockLevels(1)
+                  if (products.length === 0) fetchProducts()
+                } else if (newTab === 'warehouses') {
+                  fetchPaginatedWarehouses(1)
+                } else if (newTab === 'transactions' || newTab === 'pending_exports') {
+                  fetchTransactions(1)
+                  if (products.length === 0) fetchProducts()
+                } else if (newTab === 'products') {
+                  fetchProducts()
+                } else if (newTab === 'categories') {
+                  fetchCategories()
+                }
+              }}
               items={tabItems}
               style={{ background: 'transparent' }}
               bordered={false}
