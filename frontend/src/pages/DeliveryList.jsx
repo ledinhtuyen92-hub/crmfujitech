@@ -19,9 +19,13 @@ import {
   Checkbox,
   Popover,
 } from 'antd'
-import { CarOutlined, SearchOutlined, EditOutlined, EyeOutlined, PlusOutlined, DeleteOutlined, UserAddOutlined, FileTextOutlined, PrinterOutlined, CheckCircleOutlined, CloseCircleOutlined, SyncOutlined, SettingOutlined } from '@ant-design/icons'
+import { CarOutlined, SearchOutlined, EditOutlined, EyeOutlined, PlusOutlined, DeleteOutlined, UserAddOutlined, FileTextOutlined, PrinterOutlined, CheckCircleOutlined, CloseCircleOutlined, SyncOutlined, SettingOutlined, TableOutlined } from '@ant-design/icons'
 import dayjs from 'dayjs'
 import { useResponsive } from '../hooks/useResponsive'
+import { DndContext, closestCenter } from '@dnd-kit/core';
+import { restrictToVerticalAxis } from '@dnd-kit/modifiers';
+import { SortableContext, verticalListSortingStrategy, arrayMove } from '@dnd-kit/sortable';
+import SortableColumnOption from '../components/SortableColumnOption';
 
 import api from '../utils/api'
 import { useAuth } from '../contexts/AuthContext'
@@ -47,15 +51,56 @@ export default function DeliveryList() {
   const [searchText, setSearchText] = useState('')
   const [statusFilter, setStatusFilter] = useState(null)
 
-  const DEFAULT_COLUMNS = ['delivery_code', 'order_number', 'customer', 'factory', 'debt', 'status', 'shipper', 'dates', 'actions']
+  const allColumnsOptions = [
+    { label: 'Mã GH', value: 'delivery_code' },
+    { label: 'Đơn hàng', value: 'order_number' },
+    { label: 'Khách hàng', value: 'customer' },
+    { label: 'Địa chỉ giao hàng', value: 'shipping_address' },
+    { label: 'Nhà máy', value: 'factory' },
+    { label: 'Công nợ', value: 'debt' },
+    { label: 'Trạng thái', value: 'status' },
+    { label: 'Người giao', value: 'shipper' },
+    { label: 'Thời gian', value: 'dates' },
+    { label: 'Hành động', value: 'actions' },
+  ];
+
+  const DEFAULT_COLUMNS = ['delivery_code', 'order_number', 'customer', 'shipping_address', 'factory', 'debt', 'status', 'shipper', 'dates', 'actions']
+
+  const [columnOrder, setColumnOrder] = useState(() => {
+    const saved = localStorage.getItem('deliveryListColumnOrder_v1');
+    if (saved) return JSON.parse(saved);
+    return DEFAULT_COLUMNS;
+  });
+
   const [visibleColumns, setVisibleColumns] = useState(() => {
-    const saved = localStorage.getItem('deliveryListVisibleColumns')
+    const saved = localStorage.getItem('deliveryListVisibleColumns_v3')
     return saved ? JSON.parse(saved) : DEFAULT_COLUMNS
   })
 
   useEffect(() => {
-    localStorage.setItem('deliveryListVisibleColumns', JSON.stringify(visibleColumns))
+    localStorage.setItem('deliveryListVisibleColumns_v3', JSON.stringify(visibleColumns))
   }, [visibleColumns])
+
+  const handleColumnToggle = (id, checked) => {
+    if (checked) {
+      setVisibleColumns(prev => [...prev, id]);
+    } else {
+      setVisibleColumns(prev => prev.filter(c => c !== id));
+    }
+  };
+
+  const handleColumnDragEnd = (event) => {
+    const { active, over } = event;
+    if (active.id !== over?.id) {
+      setColumnOrder((items) => {
+        const oldIndex = items.indexOf(active.id);
+        const newIndex = items.indexOf(over.id);
+        const newOrder = arrayMove(items, oldIndex, newIndex);
+        localStorage.setItem('deliveryListColumnOrder_v1', JSON.stringify(newOrder));
+        return newOrder;
+      });
+    }
+  };
 
   const [modalVisible, setModalVisible] = useState(false)
   const [editingDelivery, setEditingDelivery] = useState(null)
@@ -425,6 +470,12 @@ export default function DeliveryList() {
       ),
     },
     {
+      title: 'Địa chỉ giao hàng',
+      dataIndex: 'order_shipping_address',
+      key: 'shipping_address',
+      render: (v) => <Text>{v || <Text type="secondary">Chưa có</Text>}</Text>,
+    },
+    {
       title: 'Nhà máy',
       key: 'factory',
       render: (_, r) => (
@@ -516,26 +567,33 @@ export default function DeliveryList() {
             placement="bottomRight" 
             title="Tùy chỉnh cột hiển thị" 
             content={
-              <Checkbox.Group 
-                options={[
-                  { label: 'Mã GH', value: 'delivery_code' },
-                  { label: 'Đơn hàng', value: 'order_number' },
-                  { label: 'Khách hàng', value: 'customer' },
-                  { label: 'Nhà máy', value: 'factory' },
-                  { label: 'Công nợ', value: 'debt' },
-                  { label: 'Trạng thái', value: 'status' },
-                  { label: 'Giao hàng', value: 'shipper' },
-                  { label: 'Thời gian', value: 'dates' },
-                  { label: 'Hành động', value: 'actions' },
-                ]}
-                value={visibleColumns}
-                onChange={setVisibleColumns}
-                style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}
-              />
+              <DndContext
+                collisionDetection={closestCenter}
+                onDragEnd={handleColumnDragEnd}
+                modifiers={[restrictToVerticalAxis]}
+              >
+                <SortableContext items={columnOrder} strategy={verticalListSortingStrategy}>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                    {columnOrder.map((colKey) => {
+                       const opt = allColumnsOptions.find(o => o.value === colKey);
+                       if (!opt) return null;
+                       return (
+                         <SortableColumnOption 
+                           key={colKey} 
+                           id={colKey} 
+                           label={opt.label} 
+                           checked={visibleColumns.includes(colKey)}
+                           onChange={handleColumnToggle}
+                         />
+                       );
+                    })}
+                  </div>
+                </SortableContext>
+              </DndContext>
             }
             trigger="click"
           >
-            <Button icon={<SettingOutlined />} size={isMobile ? 'middle' : 'large'} style={{ borderRadius: 8 }} />
+            <Button icon={<TableOutlined />} size={isMobile ? 'middle' : 'large'} style={{ borderRadius: 8 }} />
           </Popover>
           {canCreate && (
             <Button type="primary" icon={<PlusOutlined />} onClick={() => openModal()} size={isMobile ? 'middle' : 'large'} style={{ borderRadius: 8 }}>
@@ -622,9 +680,9 @@ export default function DeliveryList() {
           }}
         />
       ) : (
-        <Table scroll={{ x: 'max-content' }}
+        <Table scroll={{ x: 'max-content', y: 'calc(100vh - 350px)' }}
           dataSource={deliveries}
-          columns={columns.filter(col => visibleColumns.includes(col.key))}
+          columns={columnOrder.filter(k => visibleColumns.includes(k)).map(k => columns.find(c => c.key === k)).filter(Boolean)}
           rowKey="id"
           loading={loading}
           onChange={(pagination) => {

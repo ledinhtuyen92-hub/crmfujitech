@@ -140,6 +140,7 @@ class InventoryTransactionSerializer(serializers.ModelSerializer):
     target_warehouse_name = serializers.CharField(source="target_warehouse.name", read_only=True)
     created_by_name = serializers.CharField(source="created_by.full_name", read_only=True)
     reference_order_number = serializers.CharField(source="reference_order.order_number", read_only=True)
+    reference_order_factory_id = serializers.IntegerField(source="reference_order.factory_id", read_only=True, allow_null=True)
     company_info = serializers.SerializerMethodField()
     factory_name = serializers.CharField(source="factory.name", read_only=True, allow_null=True)
     has_production_order = serializers.SerializerMethodField()
@@ -166,6 +167,7 @@ class InventoryTransactionSerializer(serializers.ModelSerializer):
             "unit_cost",
             "reference_order",
             "reference_order_number",
+            "reference_order_factory_id",
             "note",
             "created_by",
             "created_by_name",
@@ -178,7 +180,7 @@ class InventoryTransactionSerializer(serializers.ModelSerializer):
         read_only_fields = [
             "id", "company", "transaction_code", "type_display", "status_display", "product_name", "product_sku",
             "warehouse_name", "target_warehouse_name", "created_by", "created_by_name", "created_at", "company_info",
-            "reference_order_number", "factory_name", "has_production_order", "production_order_code",
+            "reference_order_number", "reference_order_factory_id", "factory_name", "has_production_order", "production_order_code",
         ]
 
     def validate(self, data):

@@ -19,6 +19,7 @@ import {
   UploadOutlined,
   WarningOutlined,
   SettingOutlined,
+  TableOutlined,
 } from '@ant-design/icons'
 import {
   Alert,
@@ -53,6 +54,10 @@ import api from '../utils/api'
 import ProductTemplateTab from './inventory/ProductTemplateTab'
 import TransactionPrintView from '../components/TransactionPrintView'
 import { useResponsive } from '../hooks/useResponsive'
+import { DndContext, closestCenter } from '@dnd-kit/core';
+import { restrictToVerticalAxis } from '@dnd-kit/modifiers';
+import { SortableContext, verticalListSortingStrategy, arrayMove } from '@dnd-kit/sortable';
+import SortableColumnOption from '../components/SortableColumnOption';
 
 const { Title, Text } = Typography
 const { Option } = Select
@@ -147,14 +152,57 @@ export default function Inventory() {
   const [targetWarehouseId, setTargetWarehouseId] = useState(null)
 
   const DEFAULT_TXN_COLUMNS = ['transaction_code', 'status', 'type', 'product', 'warehouse', 'quantity', 'unit', 'note', 'factory_name', 'created_by_name', 'created_at', 'action']
+
+  const allTxnColumnsOptions = [
+    { label: 'Mã phiếu', value: 'transaction_code' },
+    { label: 'Trạng thái', value: 'status' },
+    { label: 'Loại phiếu', value: 'type' },
+    { label: 'Sản phẩm', value: 'product' },
+    { label: 'Kho', value: 'warehouse' },
+    { label: 'Số lượng', value: 'quantity' },
+    { label: 'Đơn vị tính', value: 'unit' },
+    { label: 'Ghi chú', value: 'note' },
+    { label: 'Nhà máy', value: 'factory_name' },
+    { label: 'Người thực hiện', value: 'created_by_name' },
+    { label: 'Ngày tạo', value: 'created_at' },
+    { label: 'Hành động', value: 'action' },
+  ];
+
+  const [txnColumnOrder, setTxnColumnOrder] = useState(() => {
+    const saved = localStorage.getItem('inventoryTxnColumnOrder_v1');
+    if (saved) return JSON.parse(saved);
+    return DEFAULT_TXN_COLUMNS;
+  });
+
   const [visibleTxnColumns, setVisibleTxnColumns] = useState(() => {
-    const saved = localStorage.getItem('inventoryTxnVisibleColumns')
+    const saved = localStorage.getItem('inventoryTxnVisibleColumns_v3')
     return saved ? JSON.parse(saved) : DEFAULT_TXN_COLUMNS
   })
 
   useEffect(() => {
-    localStorage.setItem('inventoryTxnVisibleColumns', JSON.stringify(visibleTxnColumns))
+    localStorage.setItem('inventoryTxnVisibleColumns_v3', JSON.stringify(visibleTxnColumns))
   }, [visibleTxnColumns])
+
+  const handleTxnColumnToggle = (id, checked) => {
+    if (checked) {
+      setVisibleTxnColumns(prev => [...prev, id]);
+    } else {
+      setVisibleTxnColumns(prev => prev.filter(c => c !== id));
+    }
+  };
+
+  const handleTxnColumnDragEnd = (event) => {
+    const { active, over } = event;
+    if (active.id !== over?.id) {
+      setTxnColumnOrder((items) => {
+        const oldIndex = items.indexOf(active.id);
+        const newIndex = items.indexOf(over.id);
+        const newOrder = arrayMove(items, oldIndex, newIndex);
+        localStorage.setItem('inventoryTxnColumnOrder_v1', JSON.stringify(newOrder));
+        return newOrder;
+      });
+    }
+  };
 
   const [txnModalVisible, setTxnModalVisible] = useState(false)
   const [txnModalMode, setTxnModalMode] = useState('import')
@@ -432,8 +480,24 @@ export default function Inventory() {
 
   const handleOpenApproveExport = (txn) => {
     setSelectedExportTxn(txn)
-    setApproveWarehouseIds({})
-    setApproveFactoryId(null)
+    
+    const txns = txn.items || [txn];
+    const orderFactoryId = txns[0]?.reference_order_factory_id;
+    let initialWarehouseIds = {};
+    
+    if (orderFactoryId) {
+      setApproveFactoryId(orderFactoryId);
+      const factory = factories.find(f => f.id === orderFactoryId);
+      if (factory && factory.linked_warehouse) {
+        txns.forEach(t => {
+          initialWarehouseIds[t.id] = factory.linked_warehouse;
+        });
+      }
+    } else {
+      setApproveFactoryId(null);
+    }
+    
+    setApproveWarehouseIds(initialWarehouseIds)
     fetchStockLevels()
     setExportApproveModalVisible(true)
   }
@@ -855,7 +919,18 @@ export default function Inventory() {
     } catch (error) {
       if (error.errorFields) return
       console.error(error.response?.data)
-      const errDetail = error.response?.data ? JSON.stringify(error.response.data) : 'Tạo phiếu kho thất bại.'
+      let errDetail = 'Tạo phiếu kho thất bại.'
+      if (error.response?.data) {
+        if (typeof error.response.data === 'string') {
+          errDetail = error.response.data
+        } else if (error.response.data.detail) {
+          errDetail = error.response.data.detail
+        } else {
+          const firstKey = Object.keys(error.response.data)[0]
+          const firstError = error.response.data[firstKey]
+          errDetail = Array.isArray(firstError) ? firstError[0] : (typeof firstError === 'string' ? firstError : JSON.stringify(firstError))
+        }
+      }
       messageApi.error(errDetail)
     } finally {
       setSubmitting(false)
@@ -1402,29 +1477,36 @@ export default function Inventory() {
                 placement="bottomRight" 
                 title="Tùy chỉnh cột hiển thị" 
                 content={
-                  <Checkbox.Group 
-                    options={[
-                      { label: 'Mã phiếu', value: 'transaction_code' },
-                      { label: 'Trạng thái', value: 'status' },
-                      { label: 'Loại phiếu', value: 'type' },
-                      { label: 'Sản phẩm', value: 'product' },
-                      { label: 'Kho', value: 'warehouse' },
-                      { label: 'Số lượng', value: 'quantity' },
-                      { label: 'Đơn vị tính', value: 'unit' },
-                      { label: 'Ghi chú', value: 'note' },
-                      ...(hasFactoryInHistory ? [{ label: 'Nhà máy', value: 'factory_name' }] : []),
-                      { label: 'Người thực hiện', value: 'created_by_name' },
-                      { label: 'Ngày tạo', value: 'created_at' },
-                      { label: 'Hành động', value: 'action' },
-                    ]}
-                    value={visibleTxnColumns}
-                    onChange={setVisibleTxnColumns}
-                    style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}
-                  />
+                  <DndContext
+                    collisionDetection={closestCenter}
+                    onDragEnd={handleTxnColumnDragEnd}
+                    modifiers={[restrictToVerticalAxis]}
+                  >
+                    <SortableContext items={txnColumnOrder} strategy={verticalListSortingStrategy}>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                        {txnColumnOrder.map((colKey) => {
+                           // For factory_name conditional display
+                           if (colKey === 'factory_name' && !hasFactoryInHistory) return null;
+
+                           const opt = allTxnColumnsOptions.find(o => o.value === colKey);
+                           if (!opt) return null;
+                           return (
+                             <SortableColumnOption 
+                               key={colKey} 
+                               id={colKey} 
+                               label={opt.label} 
+                               checked={visibleTxnColumns.includes(colKey)}
+                               onChange={handleTxnColumnToggle}
+                             />
+                           );
+                        })}
+                      </div>
+                    </SortableContext>
+                  </DndContext>
                 }
                 trigger="click"
               >
-                <Button icon={<SettingOutlined />} style={{ borderRadius: 8 }} />
+                <Button icon={<TableOutlined />} style={{ borderRadius: 8 }} />
               </Popover>
             )}
             {activeTab === 'transactions' && canCreate && (
@@ -1682,8 +1764,8 @@ export default function Inventory() {
                       }}
                     />
                   ) : (
-                    <Table scroll={{ x: 'max-content' }}
-                      columns={txnColumns.filter(col => visibleTxnColumns.includes(col.key))}
+                    <Table scroll={{ x: 'max-content', y: 'calc(100vh - 350px)' }}
+                      columns={txnColumnOrder.filter(k => visibleTxnColumns.includes(k)).map(k => txnColumns.find(c => c.key === k)).filter(Boolean)}
                       dataSource={groupedFilteredTransactions}
                       rowKey="id"
                       loading={loading}
@@ -1699,7 +1781,6 @@ export default function Inventory() {
                         showSizeChanger: false,
                         showTotal: (total, range) => `${range[0]}-${range[1]} của ${total} phiếu`,
                       }}
-                      scroll={{ x: 'max-content' }}
                       expandable={{
                         expandedRowRender: (record) => {
                           if (!record.items || record.items.length <= 1) return null;
@@ -2319,37 +2400,46 @@ export default function Inventory() {
               </Form.Item>
             </Col>
             <Col xs={24} md={12}>
-              <Form.Item name="warehouse" label={txnModalMode === 'transfer' ? 'Từ kho (Kho xuất)' : 'Kho hàng'} rules={[{ required: true, message: 'Chọn kho' }]}>
-                <Select placeholder="Chọn kho...">
-                  {warehouses.map((w) => (
-                    <Option key={w.id} value={w.id}>{w.name}</Option>
-                  ))}
-                </Select>
+              <Form.Item 
+                noStyle
+                shouldUpdate={(prev, curr) => prev.target_warehouse !== curr.target_warehouse}
+              >
+                {({ getFieldValue }) => {
+                  const targetWId = getFieldValue('target_warehouse')
+                  return (
+                    <Form.Item name="warehouse" label={txnModalMode === 'transfer' ? 'Từ kho (Kho xuất)' : 'Kho hàng'} rules={[{ required: true, message: 'Chọn kho' }]}>
+                      <Select placeholder="Chọn kho...">
+                        {warehouses.map((w) => (
+                          <Option key={w.id} value={w.id} disabled={txnModalMode === 'transfer' && w.id === targetWId}>{w.name}</Option>
+                        ))}
+                      </Select>
+                    </Form.Item>
+                  )
+                }}
               </Form.Item>
             </Col>
             {txnModalMode === 'transfer' && (
               <Col xs={24} md={12}>
                 <Form.Item 
-                  name="target_warehouse" 
-                  label="Đến kho (Kho nhập)" 
-                  dependencies={['warehouse']}
-                  rules={[
-                    { required: true, message: 'Chọn kho nhận' },
-                    ({ getFieldValue }) => ({
-                      validator(_, value) {
-                        if (!value || getFieldValue('warehouse') !== value) {
-                          return Promise.resolve();
-                        }
-                        return Promise.reject(new Error('Kho nhập phải khác kho xuất!'));
-                      },
-                    }),
-                  ]}
+                  noStyle
+                  shouldUpdate={(prev, curr) => prev.warehouse !== curr.warehouse}
                 >
-                  <Select placeholder="Chọn kho...">
-                    {warehouses.map((w) => (
-                      <Option key={w.id} value={w.id}>{w.name}</Option>
-                    ))}
-                  </Select>
+                  {({ getFieldValue }) => {
+                    const wId = getFieldValue('warehouse')
+                    return (
+                      <Form.Item 
+                        name="target_warehouse" 
+                        label="Đến kho (Kho nhập)" 
+                        rules={[{ required: true, message: 'Chọn kho nhận' }]}
+                      >
+                        <Select placeholder="Chọn kho...">
+                          {warehouses.map((w) => (
+                            <Option key={w.id} value={w.id} disabled={w.id === wId}>{w.name}</Option>
+                          ))}
+                        </Select>
+                      </Form.Item>
+                    )
+                  }}
                 </Form.Item>
               </Col>
             )}
@@ -2689,6 +2779,24 @@ export default function Inventory() {
             />
             {(() => {
               const txns = selectedExportTxn.items || [selectedExportTxn]
+              const quickOrderFactoryId = txns[0]?.reference_order_factory_id;
+              let quickLinkedWarehouse = undefined;
+              if (quickOrderFactoryId) {
+                  const factory = factories.find(f => f.id === quickOrderFactoryId);
+                  if (factory) {
+                      quickLinkedWarehouse = factory.linked_warehouse;
+                  }
+              }
+
+              // Filter warehouses: If a factory is selected, hide warehouses linked to OTHER factories
+              const filteredWarehouses = warehouses.filter(w => {
+                if (!approveFactoryId) return true;
+                const selectedFactory = factories.find(f => f.id === approveFactoryId);
+                if (selectedFactory && selectedFactory.linked_warehouse === w.id) return true;
+                const isLinkedToOtherFactory = factories.some(f => f.id !== approveFactoryId && f.linked_warehouse === w.id);
+                return !isLinkedToOtherFactory;
+              });
+
               return (
                 <>
                   {txns.length > 1 && (
@@ -2697,6 +2805,8 @@ export default function Inventory() {
                       <Select
                         style={{ width: '100%', marginTop: 8 }}
                         placeholder="--- Chọn chung 1 kho ---"
+                        disabled={!!quickLinkedWarehouse}
+                        {...(quickLinkedWarehouse ? { value: quickLinkedWarehouse } : {})}
                         onChange={(val) => {
                           const newIds = { ...approveWarehouseIds }
                           txns.forEach(t => {
@@ -2712,7 +2822,7 @@ export default function Inventory() {
                           }
                         }}
                       >
-                        {warehouses.map(w => (
+                        {filteredWarehouses.map(w => (
                           <Option key={w.id} value={w.id}>{w.name}</Option>
                         ))}
                       </Select>
@@ -2720,6 +2830,21 @@ export default function Inventory() {
                   )}
                   {txns.map((txn, index) => {
                 const prod = products.find(p => p.id === txn.product)
+                
+                // Determine if warehouse select should be locked
+                const orderFactoryId = txn.reference_order_factory_id;
+                let disableWarehouseSelect = false;
+                if (orderFactoryId) {
+                  const factory = factories.find(f => f.id === orderFactoryId);
+                  if (factory && factory.linked_warehouse) {
+                    const stock = stockLevels.find(s => Number(s.warehouse) === Number(factory.linked_warehouse) && Number(s.product) === Number(txn.product));
+                    const qty = stock ? Number(stock.quantity) : 0;
+                    if (qty >= Number(txn.quantity)) {
+                      disableWarehouseSelect = true;
+                    }
+                  }
+                }
+
                 return (
                   <div key={txn.id} style={{ marginBottom: 16, padding: 16, background: '#f8fafc', borderRadius: 8, border: '1px solid #e2e8f0' }}>
                     <Row gutter={[16, 16]}>
@@ -2741,6 +2866,7 @@ export default function Inventory() {
                         <Select
                           style={{ width: '100%', marginTop: 8 }}
                           placeholder="--- Chọn kho ---"
+                          disabled={disableWarehouseSelect}
                           value={approveWarehouseIds[txn.id]}
                           onChange={(val) => {
                             setApproveWarehouseIds(prev => ({ ...prev, [txn.id]: val }))
@@ -2750,7 +2876,7 @@ export default function Inventory() {
                             }
                           }}
                         >
-                          {warehouses.map(w => {
+                          {filteredWarehouses.map(w => {
                             const stock = stockLevels.find(s => Number(s.warehouse) === Number(w.id) && Number(s.product) === Number(txn.product))
                             const qty = stock ? Number(stock.quantity) : 0
                             const reqQty = Number(txn.quantity)
@@ -2784,7 +2910,8 @@ export default function Inventory() {
                   placeholder="--- Chọn nhà máy sản xuất ---"
                   value={approveFactoryId}
                   onChange={setApproveFactoryId}
-                  allowClear
+                  disabled={!!(selectedExportTxn.items ? selectedExportTxn.items[0]?.reference_order_factory_id : selectedExportTxn.reference_order_factory_id)}
+                  allowClear={!(selectedExportTxn.items ? selectedExportTxn.items[0]?.reference_order_factory_id : selectedExportTxn.reference_order_factory_id)}
                 >
                   {factories.map(f => (
                     <Option key={f.id} value={f.id}>
@@ -2793,7 +2920,9 @@ export default function Inventory() {
                   ))}
                 </Select>
                 <Text type="secondary" style={{ fontSize: 12, display: 'block', marginTop: 4 }}>
-                  Hệ thống sẽ chuyển vật tư và tự động sinh Lệnh Sản Xuất cho Nhà máy này.
+                  {(selectedExportTxn.items ? selectedExportTxn.items[0]?.reference_order_factory_id : selectedExportTxn.reference_order_factory_id) 
+                    ? "Đơn hàng đã được chỉ định Nhà máy này từ trước." 
+                    : "Hệ thống sẽ chuyển vật tư và tự động sinh Lệnh Sản Xuất cho Nhà máy này."}
                 </Text>
               </div>
             )}

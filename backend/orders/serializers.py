@@ -73,6 +73,7 @@ class OrderSerializer(serializers.ModelSerializer):
     has_pending_export = serializers.SerializerMethodField()
     requires_inventory_export = serializers.ReadOnlyField()
     factory_name = serializers.CharField(source="factory.name", read_only=True, default=None)
+    total_quantity = serializers.SerializerMethodField()
 
     class Meta:
         model = Order
@@ -94,6 +95,7 @@ class OrderSerializer(serializers.ModelSerializer):
             "approved_by_name",
             "status",
             "status_display",
+            "delivery_address",
             "financial_status",
             "financial_status_display",
             "payment_term",
@@ -127,6 +129,7 @@ class OrderSerializer(serializers.ModelSerializer):
             "has_production_order",
             "has_pending_export",
             "requires_inventory_export",
+            "total_quantity",
         ]
         read_only_fields = [
             "id", "company", "order_number", "status_display", "financial_status_display",
@@ -247,3 +250,40 @@ class OrderSerializer(serializers.ModelSerializer):
             ).exists()
         except Exception:
             return False
+
+    def get_total_quantity(self, obj):
+        total = 0
+        valid_product_ids = set()
+        
+        for item in obj.items.all():
+            if item.item_type != 'product':
+                continue
+                
+            is_custom_size = False
+            if isinstance(item.custom_data, dict):
+                is_custom_size = item.custom_data.get('is_custom_size', False)
+                
+            if not is_custom_size:
+                is_sales_target = False
+                if item.product and item.product.category:
+                    is_sales_target = item.product.category.is_sales_target
+                
+                if not item.product or is_sales_target:
+                    total += float(item.quantity)
+                    if item.product_id:
+                        valid_product_ids.add(item.product_id)
+        
+        for item in obj.items.all():
+            if item.item_type != 'product':
+                continue
+                
+            is_custom_size = False
+            if isinstance(item.custom_data, dict):
+                is_custom_size = item.custom_data.get('is_custom_size', False)
+                
+            if is_custom_size:
+                actual_product_id = item.custom_data.get('actual_product_id')
+                if actual_product_id in valid_product_ids:
+                    total += float(item.quantity)
+                    
+        return total

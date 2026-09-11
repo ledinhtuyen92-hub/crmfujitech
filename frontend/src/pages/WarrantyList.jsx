@@ -19,9 +19,13 @@ import {
   Checkbox,
   Popover,
 } from 'antd'
-import { SafetyCertificateOutlined, SearchOutlined, EditOutlined, EyeOutlined, PlusOutlined, DeleteOutlined, PrinterOutlined, SettingOutlined } from '@ant-design/icons'
+import { SafetyCertificateOutlined, SearchOutlined, EditOutlined, EyeOutlined, PlusOutlined, DeleteOutlined, PrinterOutlined, SettingOutlined, TableOutlined } from '@ant-design/icons'
 import dayjs from 'dayjs'
 import { useResponsive } from '../hooks/useResponsive'
+import { DndContext, closestCenter } from '@dnd-kit/core';
+import { restrictToVerticalAxis } from '@dnd-kit/modifiers';
+import { SortableContext, verticalListSortingStrategy, arrayMove } from '@dnd-kit/sortable';
+import SortableColumnOption from '../components/SortableColumnOption';
 
 import api from '../utils/api'
 import { useAuth } from '../contexts/AuthContext'
@@ -46,15 +50,52 @@ export default function WarrantyList() {
   const [searchText, setSearchText] = useState('')
   const [statusFilter, setStatusFilter] = useState(null)
 
+  const allColumnsOptions = [
+    { label: 'Mã BH', value: 'warranty_code' },
+    { label: 'Đơn hàng', value: 'order_number' },
+    { label: 'Khách hàng', value: 'customer' },
+    { label: 'Trạng thái', value: 'status' },
+    { label: 'Thời hạn', value: 'dates' },
+    { label: 'Hành động', value: 'actions' },
+  ];
+
   const DEFAULT_COLUMNS = ['warranty_code', 'order_number', 'customer', 'status', 'dates', 'actions']
+
+  const [columnOrder, setColumnOrder] = useState(() => {
+    const saved = localStorage.getItem('warrantyListColumnOrder_v1');
+    if (saved) return JSON.parse(saved);
+    return DEFAULT_COLUMNS;
+  });
+
   const [visibleColumns, setVisibleColumns] = useState(() => {
-    const saved = localStorage.getItem('warrantyListVisibleColumns')
+    const saved = localStorage.getItem('warrantyListVisibleColumns_v3')
     return saved ? JSON.parse(saved) : DEFAULT_COLUMNS
   })
 
   useEffect(() => {
-    localStorage.setItem('warrantyListVisibleColumns', JSON.stringify(visibleColumns))
+    localStorage.setItem('warrantyListVisibleColumns_v3', JSON.stringify(visibleColumns))
   }, [visibleColumns])
+
+  const handleColumnToggle = (id, checked) => {
+    if (checked) {
+      setVisibleColumns(prev => [...prev, id]);
+    } else {
+      setVisibleColumns(prev => prev.filter(c => c !== id));
+    }
+  };
+
+  const handleColumnDragEnd = (event) => {
+    const { active, over } = event;
+    if (active.id !== over?.id) {
+      setColumnOrder((items) => {
+        const oldIndex = items.indexOf(active.id);
+        const newIndex = items.indexOf(over.id);
+        const newOrder = arrayMove(items, oldIndex, newIndex);
+        localStorage.setItem('warrantyListColumnOrder_v1', JSON.stringify(newOrder));
+        return newOrder;
+      });
+    }
+  };
 
   const [modalVisible, setModalVisible] = useState(false)
   const [editingWarranty, setEditingWarranty] = useState(null)
@@ -392,23 +433,33 @@ export default function WarrantyList() {
             placement="bottomRight" 
             title="Tùy chỉnh cột hiển thị" 
             content={
-              <Checkbox.Group 
-                options={[
-                  { label: 'Mã BH', value: 'warranty_code' },
-                  { label: 'Đơn hàng', value: 'order_number' },
-                  { label: 'Khách hàng', value: 'customer' },
-                  { label: 'Trạng thái', value: 'status' },
-                  { label: 'Thời hạn', value: 'dates' },
-                  { label: 'Hành động', value: 'actions' },
-                ]}
-                value={visibleColumns}
-                onChange={setVisibleColumns}
-                style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}
-              />
+              <DndContext
+                collisionDetection={closestCenter}
+                onDragEnd={handleColumnDragEnd}
+                modifiers={[restrictToVerticalAxis]}
+              >
+                <SortableContext items={columnOrder} strategy={verticalListSortingStrategy}>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                    {columnOrder.map((colKey) => {
+                       const opt = allColumnsOptions.find(o => o.value === colKey);
+                       if (!opt) return null;
+                       return (
+                         <SortableColumnOption 
+                           key={colKey} 
+                           id={colKey} 
+                           label={opt.label} 
+                           checked={visibleColumns.includes(colKey)}
+                           onChange={handleColumnToggle}
+                         />
+                       );
+                    })}
+                  </div>
+                </SortableContext>
+              </DndContext>
             }
             trigger="click"
           >
-            <Button icon={<SettingOutlined />} size={isMobile ? 'middle' : 'large'} style={{ borderRadius: 8 }} />
+            <Button icon={<TableOutlined />} size={isMobile ? 'middle' : 'large'} style={{ borderRadius: 8 }} />
           </Popover>
           {canCreate && (
             <Button type="primary" icon={<PlusOutlined />} onClick={() => openModal()} size={isMobile ? 'middle' : 'large'} style={{ borderRadius: 8 }}>
@@ -487,9 +538,9 @@ export default function WarrantyList() {
           }}
         />
       ) : (
-        <Table scroll={{ x: 'max-content' }}
+        <Table scroll={{ x: 'max-content', y: 'calc(100vh - 350px)' }}
           dataSource={warranties}
-          columns={columns.filter(col => visibleColumns.includes(col.key))}
+          columns={columnOrder.filter(k => visibleColumns.includes(k)).map(k => columns.find(c => c.key === k)).filter(Boolean)}
           rowKey="id"
           loading={loading}
           onChange={(pagination) => {

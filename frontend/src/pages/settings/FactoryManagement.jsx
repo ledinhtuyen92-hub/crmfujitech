@@ -86,11 +86,16 @@ export default function FactoryManagement() {
 
   const handleSubmit = async (values) => {
     try {
+      const payload = { ...values }
+      if (payload.linked_warehouse === undefined) {
+        payload.linked_warehouse = null
+      }
+
       if (editingFactory) {
-        await api.patch(`production/factories/${editingFactory.id}/`, values)
+        await api.patch(`production/factories/${editingFactory.id}/`, payload)
         messageApi.success('Cập nhật nhà máy thành công.')
       } else {
-        await api.post('production/factories/', values)
+        await api.post('production/factories/', payload)
         messageApi.success('Tạo nhà máy thành công.')
       }
       setModalOpen(false)

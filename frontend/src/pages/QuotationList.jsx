@@ -1,13 +1,14 @@
-import { AlertOutlined, CheckCircleOutlined, ClockCircleOutlined, CloseCircleOutlined, DeleteOutlined, EditOutlined, FileDoneOutlined, FilePdfOutlined, FileTextOutlined, PlusOutlined, PrinterOutlined, SearchOutlined, SendOutlined, SettingOutlined, UserOutlined, CameraOutlined } from '@ant-design/icons'
+import { AlertOutlined, CheckCircleOutlined, ClockCircleOutlined, CloseCircleOutlined, DeleteOutlined, EditOutlined, FileDoneOutlined, FilePdfOutlined, FileTextOutlined, PlusOutlined, PrinterOutlined, SearchOutlined, SendOutlined, SettingOutlined, UserOutlined, CameraOutlined, TableOutlined } from '@ant-design/icons'
 import { AutoComplete, Badge, Button, Card, Checkbox, Col, DatePicker, Divider, Drawer, Form, Input, InputNumber, Modal, Popconfirm, Row, Select, Space, Table, Tag, Tooltip, Typography, message, theme, Upload, Avatar, Image, List, Popover } from 'antd' 
 import dayjs from 'dayjs'
 import React, { useCallback, useEffect, useState } from 'react'
 import { useAuth } from '../contexts/AuthContext'
 import { useLocation } from 'react-router-dom'
-import { DndContext, PointerSensor, useSensor, useSensors, KeyboardSensor } from '@dnd-kit/core';
+import { DndContext, PointerSensor, useSensor, useSensors, KeyboardSensor, closestCenter } from '@dnd-kit/core';
 import { restrictToVerticalAxis } from '@dnd-kit/modifiers';
 import { SortableContext, useSortable, verticalListSortingStrategy, arrayMove, sortableKeyboardCoordinates } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
+import SortableColumnOption from '../components/SortableColumnOption';
 
 import QuotationPrintView from '../components/QuotationPrintView'
 import api from '../utils/api'
@@ -118,15 +119,53 @@ export default function QuotationList() {
   const [totalCount, setTotalCount] = useState(0)
   const [stats, setStats] = useState({ total_draft: 0, total_sent: 0, total_accepted: 0, total_amount_accepted: 0 })
 
-  const DEFAULT_COLUMNS = ['quotation_number', 'customer_name', 'customer_phone', 'status', 'created_by_name', 'total_amount', 'action']
+  const allColumnsOptions = [
+    { label: 'Mã Báo Giá', value: 'quotation_number' },
+    { label: 'Khách hàng', value: 'customer_name' },
+    { label: 'SĐT', value: 'customer_phone' },
+    { label: 'Trạng thái', value: 'status' },
+    { label: 'Người tạo', value: 'created_by_name' },
+    { label: 'Tổng tiền', value: 'total_amount' },
+    { label: 'Hành động', value: 'action' },
+  ];
+
+  const DEFAULT_COLUMNS = ['quotation_number', 'customer_name', 'customer_phone', 'status', 'created_by_name', 'total_amount', 'action'];
+
+  const [columnOrder, setColumnOrder] = useState(() => {
+    const saved = localStorage.getItem('quotationListColumnOrder_v1');
+    if (saved) return JSON.parse(saved);
+    return DEFAULT_COLUMNS;
+  });
+
   const [visibleColumns, setVisibleColumns] = useState(() => {
-    const saved = localStorage.getItem('quotationListVisibleColumns')
+    const saved = localStorage.getItem('quotationListVisibleColumns_v3')
     return saved ? JSON.parse(saved) : DEFAULT_COLUMNS
   })
 
   useEffect(() => {
-    localStorage.setItem('quotationListVisibleColumns', JSON.stringify(visibleColumns))
+    localStorage.setItem('quotationListVisibleColumns_v3', JSON.stringify(visibleColumns))
   }, [visibleColumns])
+
+  const handleColumnToggle = (id, checked) => {
+    if (checked) {
+      setVisibleColumns(prev => [...prev, id]);
+    } else {
+      setVisibleColumns(prev => prev.filter(c => c !== id));
+    }
+  };
+
+  const handleColumnDragEnd = (event) => {
+    const { active, over } = event;
+    if (active.id !== over?.id) {
+      setColumnOrder((items) => {
+        const oldIndex = items.indexOf(active.id);
+        const newIndex = items.indexOf(over.id);
+        const newOrder = arrayMove(items, oldIndex, newIndex);
+        localStorage.setItem('quotationListColumnOrder_v1', JSON.stringify(newOrder));
+        return newOrder;
+      });
+    }
+  };
   // Filters
   const [searchText, setSearchText] = useState('')
   const [statusFilter, setStatusFilter] = useState('')
@@ -616,6 +655,7 @@ export default function QuotationList() {
     if (quotation) {
       form.setFieldsValue({
         customer: quotation.customer,
+        delivery_address: quotation.delivery_address || '',
         factory: quotation.factory,
         status: quotation.status,
         installation_date: quotation.installation_date ? dayjs(quotation.installation_date) : null,
@@ -755,6 +795,7 @@ export default function QuotationList() {
 
       const payload = {
         customer: values.customer,
+        delivery_address: values.delivery_address || '',
         factory: values.factory || null,
         status: values.status,
         installation_date: values.installation_date ? values.installation_date.format('YYYY-MM-DD') : null,
@@ -850,7 +891,10 @@ export default function QuotationList() {
       setModalVisible(false)
       fetchQuotations()
     } catch (error) {
-      if (error.errorFields) return
+      if (error.errorFields) {
+        messageApi.error('Vui lòng điền đầy đủ các thông tin bắt buộc.')
+        return
+      }
       let detailMsg = error.response?.data?.detail || error.response?.data?.message
       if (!detailMsg && typeof error.response?.data === 'string') {
         detailMsg = error.response.data
@@ -2728,24 +2772,33 @@ export default function QuotationList() {
               placement="bottomRight" 
               title="Tùy chỉnh cột hiển thị" 
               content={
-                <Checkbox.Group 
-                  options={[
-                    { label: 'Mã báo giá', value: 'quotation_number' },
-                    { label: 'Khách hàng', value: 'customer_name' },
-                    { label: 'SĐT khách hàng', value: 'customer_phone' },
-                    { label: 'Trạng thái', value: 'status' },
-                    { label: 'Người tạo', value: 'created_by_name' },
-                    { label: 'Tổng tiền', value: 'total_amount' },
-                    { label: 'Hành động', value: 'action' },
-                  ]}
-                  value={visibleColumns}
-                  onChange={setVisibleColumns}
-                  style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}
-                />
+                <DndContext
+                  collisionDetection={closestCenter}
+                  onDragEnd={handleColumnDragEnd}
+                  modifiers={[restrictToVerticalAxis]}
+                >
+                  <SortableContext items={columnOrder} strategy={verticalListSortingStrategy}>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                      {columnOrder.map((colKey) => {
+                         const opt = allColumnsOptions.find(o => o.value === colKey);
+                         if (!opt) return null;
+                         return (
+                           <SortableColumnOption 
+                             key={colKey} 
+                             id={colKey} 
+                             label={opt.label} 
+                             checked={visibleColumns.includes(colKey)}
+                             onChange={handleColumnToggle}
+                           />
+                         );
+                      })}
+                    </div>
+                  </SortableContext>
+                </DndContext>
               }
               trigger="click"
             >
-              <Button icon={<SettingOutlined />} style={{ borderRadius: 10, height: 40 }} />
+              <Button icon={<TableOutlined />} style={{ borderRadius: 10, height: 40 }} />
             </Popover>
             {canCreate && (
               <Button
@@ -2973,8 +3026,8 @@ export default function QuotationList() {
             }}
           />
         ) : (
-          <Table scroll={{ x: 'max-content' }}
-            columns={columns.filter(col => visibleColumns.includes(col.key))}
+          <Table scroll={{ x: 'max-content', y: 'calc(100vh - 350px)' }}
+            columns={columnOrder.filter(k => visibleColumns.includes(k)).map(k => columns.find(c => c.key === k)).filter(Boolean)}
             dataSource={filteredQuotations}
             rowKey="id"
             loading={loading}
@@ -3014,11 +3067,11 @@ export default function QuotationList() {
       >
         <Form form={form} layout="vertical" style={{ marginTop: 16 }}>
           <Row gutter={16}>
-            <Col xs={24} md={isModuleActive('production') ? 8 : 12}>
+            <Col xs={24} md={12}>
               <Form.Item
                 name="customer"
                 label="Khách hàng"
-                rules={[{ required: true, message: 'Vui lòng chọn khách hàng' }]}
+                rules={[{ required: companySettings?.require_order_customer, message: 'Vui lòng chọn khách hàng' }]}
               >
                 <Select
                   showSearch
@@ -3033,7 +3086,18 @@ export default function QuotationList() {
                 </Select>
               </Form.Item>
             </Col>
-            <Col xs={24} md={isModuleActive('production') ? 5 : 6}>
+            <Col xs={24} md={12}>
+              <Form.Item 
+                name="delivery_address" 
+                label="Địa chỉ giao hàng" 
+                rules={[{ required: companySettings?.require_order_delivery_address, message: 'Vui lòng nhập địa chỉ giao hàng' }]}
+              >
+                <Input placeholder="Nhập địa chỉ giao hàng cụ thể..." />
+              </Form.Item>
+            </Col>
+          </Row>
+          <Row gutter={16}>
+            <Col xs={24} md={isModuleActive('production') ? 8 : 12}>
               <Form.Item name="status" label="Trạng thái">
                 <Select disabled={requireApproval && !['approved', 'sent', 'accepted'].includes(editingQuotation?.status)}>
                   <Option value="draft">Nháp</Option>
@@ -3045,14 +3109,14 @@ export default function QuotationList() {
                 </Select>
               </Form.Item>
             </Col>
-            <Col xs={24} md={isModuleActive('production') ? 5 : 6}>
-              <Form.Item name="installation_date" label="Ngày thi công / lắp đặt">
+            <Col xs={24} md={isModuleActive('production') ? 8 : 12}>
+              <Form.Item name="installation_date" label="Ngày giao hàng dự kiến" rules={[{ required: companySettings?.require_order_installation_date, message: 'Vui lòng chọn ngày giao hàng' }]}>
                 <DatePicker style={{ width: '100%' }} format="DD/MM/YYYY" />
               </Form.Item>
             </Col>
             {isModuleActive('production') && (
-              <Col xs={24} md={6}>
-                <Form.Item name="factory" label="Nhà máy sản xuất (Dự kiến)">
+              <Col xs={24} md={8}>
+                <Form.Item name="factory" label="Nhà máy sản xuất (Dự kiến)" rules={[{ required: companySettings?.require_order_factory, message: 'Vui lòng chọn nhà máy' }]}>
                   <Select placeholder="Chọn nhà máy (tùy chọn)..." allowClear>
                     {factories.map(f => (
                       <Option key={f.id} value={f.id}>{f.name}</Option>

@@ -324,8 +324,28 @@ class CompanySettings(models.Model):
     )
     inactive_days_threshold = models.PositiveIntegerField(
         default=0,
-        verbose_name="Số ngày tính là khách ngủ đông",
-        help_text="Điền 0 để tắt chức năng tự động đánh dấu khách ngủ đông."
+        verbose_name="Ngưỡng cảnh báo khách hàng không hoạt động (ngày)",
+        help_text="Nhập 0 để tắt tính năng cảnh báo. Nếu nhập số > 0, hệ thống sẽ tự động gửi thông báo khi khách hàng không có tương tác sau số ngày này."
+    )
+    require_order_customer = models.BooleanField(
+        default=False,
+        verbose_name="Bắt buộc chọn Khách hàng",
+        help_text="Bắt buộc chọn khách hàng khi tạo báo giá và đơn hàng.",
+    )
+    require_order_installation_date = models.BooleanField(
+        default=False,
+        verbose_name="Bắt buộc chọn Ngày giao hàng dự kiến",
+        help_text="Bắt buộc nhập ngày giao hàng/lắp đặt khi tạo báo giá và đơn hàng.",
+    )
+    require_order_factory = models.BooleanField(
+        default=False,
+        verbose_name="Bắt buộc chọn Nhà máy sản xuất",
+        help_text="Bắt buộc chọn nhà máy khi tạo đơn hàng/báo giá.",
+    )
+    require_order_delivery_address = models.BooleanField(
+        default=False,
+        verbose_name="Bắt buộc nhập Địa chỉ giao hàng",
+        help_text="Bắt buộc nhập địa chỉ giao hàng khi tạo đơn hàng/báo giá.",
     )
     code_include_company_prefix = models.BooleanField(
         default=True,

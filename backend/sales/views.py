@@ -232,6 +232,7 @@ class QuotationViewSet(TenantQuerySetMixin, viewsets.ModelViewSet):
                 company=quotation.company,
                 order_number=order_number,
                 customer=quotation.customer,
+                delivery_address=quotation.delivery_address,
                 quotation=quotation,
                 factory=quotation.factory,
                 created_by=request.user,

@@ -110,6 +110,10 @@ export default function CompanyGeneralSettings() {
         timezone: settingsRes.data.timezone || 'Asia/Ho_Chi_Minh',
         list_page_size: settingsRes.data.list_page_size || 1000,
         inactive_days_threshold: settingsRes.data.inactive_days_threshold || 0,
+        require_order_customer: settingsRes.data.require_order_customer || false,
+        require_order_installation_date: settingsRes.data.require_order_installation_date || false,
+        require_order_factory: settingsRes.data.require_order_factory || false,
+        require_order_delivery_address: settingsRes.data.require_order_delivery_address || false,
         quotation_template: settingsRes.data.quotation_template || null,
         default_quotation_terms: settingsRes.data.default_quotation_terms || '',
         custom_quotation_title: settingsRes.data.custom_quotation_title || '',
@@ -456,7 +460,6 @@ export default function CompanyGeneralSettings() {
           form={form}
           layout="vertical"
           onFinish={handleSaveGeneral}
-          style={{ maxWidth: 900 }}
           onValuesChange={(changedValues) => {
             if (changedValues.code_include_date === false) {
               form.setFieldsValue({ continuous_sequence_numbering: true });
@@ -518,7 +521,7 @@ export default function CompanyGeneralSettings() {
                 <div style={{ marginBottom: 16 }}>
                   {settings?.current_quotation_sequence !== undefined && (
                     <div style={{ marginTop: 4, marginBottom: 8, display: 'flex', alignItems: 'center' }}>
-                      <Text type="secondary" style={{ flex: 1 }}>
+                      <Text type="secondary" style={{ marginRight: 16 }}>
                         [Báo giá] Đã cấp đến số: <Text strong style={{ color: '#16a34a' }}>{settings.current_quotation_sequence}</Text>{' '}
                         (Báo giá tiếp theo sẽ là số <Text strong>{settings.current_quotation_sequence + 1}</Text>)
                       </Text>
@@ -527,7 +530,7 @@ export default function CompanyGeneralSettings() {
                   )}
                   {settings?.current_order_sequence !== undefined && (
                     <div style={{ marginTop: 4, marginBottom: 8, display: 'flex', alignItems: 'center' }}>
-                      <Text type="secondary" style={{ flex: 1 }}>
+                      <Text type="secondary" style={{ marginRight: 16 }}>
                         [Đơn hàng] Đã cấp đến số: <Text strong style={{ color: '#16a34a' }}>{settings.current_order_sequence}</Text>{' '}
                         (Đơn tiếp theo sẽ là số <Text strong>{settings.current_order_sequence + 1}</Text>)
                       </Text>
@@ -590,6 +593,31 @@ export default function CompanyGeneralSettings() {
                     </Form.Item>
                   );
                 }}
+              </Form.Item>
+            </Col>
+          </Row>
+
+          <Divider dashed style={{ margin: '16px 0' }} />
+          <Title level={5} style={{ marginTop: 0, marginBottom: 16 }}>Quy tắc Báo giá / Đơn hàng</Title>
+          <Row gutter={16}>
+            <Col xs={24} sm={12} md={6}>
+              <Form.Item name="require_order_customer" valuePropName="checked" label="Bắt buộc chọn Khách hàng" help="Ngăn chặn lưu báo giá/đơn hàng nếu chưa chọn khách.">
+                <Switch checkedChildren="Bật" unCheckedChildren="Tắt" />
+              </Form.Item>
+            </Col>
+            <Col xs={24} sm={12} md={6}>
+              <Form.Item name="require_order_installation_date" valuePropName="checked" label="Bắt buộc chọn Ngày giao hàng" help="Áp dụng cho trường Ngày giao hàng dự kiến.">
+                <Switch checkedChildren="Bật" unCheckedChildren="Tắt" />
+              </Form.Item>
+            </Col>
+            <Col xs={24} sm={12} md={6}>
+              <Form.Item name="require_order_factory" valuePropName="checked" label="Bắt buộc chọn Nhà máy" help="Áp dụng cho trường Nhà máy sản xuất (Dự kiến).">
+                <Switch checkedChildren="Bật" unCheckedChildren="Tắt" />
+              </Form.Item>
+            </Col>
+            <Col xs={24} sm={12} md={6}>
+              <Form.Item name="require_order_delivery_address" valuePropName="checked" label="Bắt buộc nhập Địa chỉ giao hàng" help="Áp dụng cho trường Địa chỉ giao hàng.">
+                <Switch checkedChildren="Bật" unCheckedChildren="Tắt" />
               </Form.Item>
             </Col>
           </Row>

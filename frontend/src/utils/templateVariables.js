@@ -63,7 +63,7 @@ export const parseVariables = (text, quotationData = {}, companyData = {}, total
     '{{customer_name}}': quotationData?.customer?.name || quotationData?.customer?.representative_name || '',
     '{{customer_company}}': quotationData?.customer?.company_name || quotationData?.customer?.name || '',
     '{{customer_tax_code}}': quotationData?.customer?.tax_code || '',
-    '{{customer_address}}': [quotationData?.customer?.address, quotationData?.customer?.city].filter(Boolean).join(' - ') || '',
+    '{{customer_address}}': quotationData?.delivery_address || [quotationData?.customer?.address, quotationData?.customer?.city].filter(Boolean).join(' - ') || '',
     '{{customer_phone}}': quotationData?.customer?.phone || '',
     '{{customer_email}}': quotationData?.customer?.email || '',
     '{{customer_signature}}': (quotationData?.status === 'accepted' && quotationData?.signature_image) ? `<img src="${quotationData.signature_image}" alt="Signature" style="max-height: 80px; object-fit: contain;" />` : '',

@@ -45,7 +45,7 @@ import ZnsSendModal from '../components/ZnsSendModal'
 import { useResponsive } from '../hooks/useResponsive'
 import CustomInfoInput from '../components/CustomInfoInput'
 import { MenuOutlined } from '@ant-design/icons';
-import { DndContext, PointerSensor, useSensor, useSensors, KeyboardSensor } from '@dnd-kit/core';
+import { DndContext, PointerSensor, useSensor, useSensors, KeyboardSensor, closestCenter } from '@dnd-kit/core';
 import { restrictToVerticalAxis } from '@dnd-kit/modifiers';
 import { SortableContext, useSortable, verticalListSortingStrategy, arrayMove, sortableKeyboardCoordinates } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
@@ -120,6 +120,31 @@ const DraggableBodyRow = (props) => {
   );
 };
 
+const SortableColumnOption = ({ id, label, checked, onChange }) => {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id });
+  const style = {
+    transform: CSS.Transform.toString(transform && { ...transform, scaleY: 1 }),
+    transition,
+    opacity: isDragging ? 0.5 : 1,
+    padding: '4px 0',
+    display: 'flex',
+    alignItems: 'center',
+    gap: 8,
+    background: '#fff',
+    zIndex: isDragging ? 99 : 1,
+  };
+  return (
+    <div ref={setNodeRef} style={style}>
+      <div {...attributes} {...listeners} style={{ cursor: 'grab', display: 'flex', alignItems: 'center' }}>
+        <MenuOutlined style={{ color: '#94a3b8' }} />
+      </div>
+      <Checkbox checked={checked} onChange={(e) => onChange(id, e.target.checked)}>
+        {label}
+      </Checkbox>
+    </div>
+  );
+};
+
 // Trạng thái đơn hàng
 const statusConfig = {
   pending: { label: 'Chờ duyệt', color: 'warning', icon: <ClockCircleOutlined /> },
@@ -164,15 +189,66 @@ export default function OrderList() {
   const [deleteConfirmText, setDeleteConfirmText] = useState('')
 
   // Column Visibility
-  const DEFAULT_COLUMNS = ['order_number', 'customer_name', ...(isModuleActive('production') ? ['factory_name'] : []), 'status', 'financial_status', 'payment_target', 'people', 'total_amount', 'action']
+  const ALL_COLUMNS_OPTIONS = [
+    { label: 'Mã đơn hàng', value: 'order_number' },
+    { label: 'Khách hàng', value: 'customer_name' },
+    { label: 'Địa chỉ giao hàng', value: 'delivery_address' },
+    { label: 'Ngày GH dự kiến', value: 'installation_date' },
+    { label: 'Số lượng SP', value: 'total_quantity' },
+    ...(isModuleActive('production') ? [{ label: 'Nhà máy', value: 'factory_name' }] : []),
+    { label: 'Trạng thái', value: 'status' },
+    { label: 'Thanh toán & Công nợ', value: 'financial_status' },
+    { label: 'Đối tượng TT', value: 'payment_target' },
+    { label: 'Người tạo / duyệt', value: 'people' },
+    { label: 'Tổng tiền', value: 'total_amount' },
+    { label: 'Hành động', value: 'action' },
+  ];
+
+  const DEFAULT_COLUMNS = ['order_number', 'customer_name', ...(isModuleActive('production') ? ['factory_name'] : []), 'status', 'financial_status', 'payment_target', 'people', 'total_amount', 'action'];
+
+  const [columnOrder, setColumnOrder] = useState(() => {
+    const saved = localStorage.getItem('orderListColumnOrder_v3');
+    if (saved) return JSON.parse(saved);
+    return ALL_COLUMNS_OPTIONS.map(c => c.value);
+  });
+
   const [visibleColumns, setVisibleColumns] = useState(() => {
-    const saved = localStorage.getItem('orderListVisibleColumns_v2')
-    return saved ? JSON.parse(saved) : DEFAULT_COLUMNS
-  })
+    const saved = localStorage.getItem('orderListVisibleColumns_v3');
+    return saved ? JSON.parse(saved) : DEFAULT_COLUMNS;
+  });
 
   useEffect(() => {
-    localStorage.setItem('orderListVisibleColumns_v2', JSON.stringify(visibleColumns))
-  }, [visibleColumns])
+    localStorage.setItem('orderListVisibleColumns_v3', JSON.stringify(visibleColumns));
+  }, [visibleColumns]);
+
+  useEffect(() => {
+    // Ensure columnOrder has all current options if backend adds new modules
+    const newKeys = ALL_COLUMNS_OPTIONS.map(c => c.value).filter(k => !columnOrder.includes(k));
+    if (newKeys.length > 0) {
+      setColumnOrder(prev => [...prev, ...newKeys]);
+    }
+  }, [isModuleActive('production')]);
+
+  const handleColumnToggle = (id, checked) => {
+    if (checked) {
+      setVisibleColumns(prev => [...prev, id]);
+    } else {
+      setVisibleColumns(prev => prev.filter(c => c !== id));
+    }
+  };
+
+  const handleColumnDragEnd = (event) => {
+    const { active, over } = event;
+    if (active.id !== over?.id) {
+      setColumnOrder((items) => {
+        const oldIndex = items.indexOf(active.id);
+        const newIndex = items.indexOf(over.id);
+        const newOrder = arrayMove(items, oldIndex, newIndex);
+        localStorage.setItem('orderListColumnOrder_v3', JSON.stringify(newOrder));
+        return newOrder;
+      });
+    }
+  };
 
   // Filters
   const [searchText, setSearchText] = useState('')
@@ -2288,6 +2364,7 @@ export default function OrderList() {
     if (order) {
       form.setFieldsValue({
         customer: order.customer,
+        delivery_address: order.delivery_address || '',
         factory: order.factory,
         status: order.status,
         installation_date: order.installation_date ? dayjs(order.installation_date) : null,
@@ -2419,6 +2496,7 @@ export default function OrderList() {
 
       const payload = {
         customer: values.customer,
+        delivery_address: values.delivery_address || '',
         factory: values.factory || null,
         status: values.status,
         installation_date: values.installation_date ? values.installation_date.format('YYYY-MM-DD') : null,
@@ -2514,7 +2592,10 @@ export default function OrderList() {
       setModalVisible(false)
       fetchOrders()
     } catch (error) {
-      if (error.errorFields) return
+      if (error.errorFields) {
+        messageApi.error('Vui lòng điền đầy đủ các thông tin bắt buộc.')
+        return
+      }
       messageApi.error('Lưu đơn hàng thất bại. Vui lòng thử lại.')
     } finally {
       setSubmitting(false)
@@ -2856,6 +2937,25 @@ export default function OrderList() {
         </div>
       ),
     },
+    {
+      title: 'Địa chỉ giao hàng',
+      dataIndex: 'delivery_address',
+      key: 'delivery_address',
+      render: (val) => val ? <div style={{ maxWidth: 200, whiteSpace: 'normal', fontSize: 13 }}>{val}</div> : '-',
+    },
+    {
+      title: 'Ngày GH dự kiến',
+      dataIndex: 'installation_date',
+      key: 'installation_date',
+      render: (val) => val ? dayjs(val).format('DD/MM/YYYY') : '-',
+    },
+    {
+      title: 'Số lượng SP',
+      key: 'total_quantity',
+      render: (_, record) => {
+         return <Text strong>{Number(record.total_quantity || 0).toLocaleString()}</Text>;
+      }
+    },
     ...(isModuleActive('production') ? [{
       title: 'Nhà máy',
       dataIndex: 'factory_name',
@@ -2976,22 +3076,29 @@ export default function OrderList() {
               placement="bottomRight" 
               title="Tùy chỉnh cột hiển thị" 
               content={
-                <Checkbox.Group 
-                  options={[
-                    { label: 'Mã đơn hàng', value: 'order_number' },
-                    { label: 'Khách hàng', value: 'customer_name' },
-                    ...(isModuleActive('production') ? [{ label: 'Nhà máy', value: 'factory_name' }] : []),
-                    { label: 'Trạng thái', value: 'status' },
-                    { label: 'Thanh toán & Công nợ', value: 'financial_status' },
-                    { label: 'Đối tượng TT', value: 'payment_target' },
-                    { label: 'Người tạo / duyệt', value: 'people' },
-                    { label: 'Tổng tiền', value: 'total_amount' },
-                    { label: 'Hành động', value: 'action' },
-                  ]}
-                  value={visibleColumns}
-                  onChange={setVisibleColumns}
-                  style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}
-                />
+                <DndContext
+                  collisionDetection={closestCenter}
+                  onDragEnd={handleColumnDragEnd}
+                  modifiers={[restrictToVerticalAxis]}
+                >
+                  <SortableContext items={columnOrder} strategy={verticalListSortingStrategy}>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                      {columnOrder.map((colKey) => {
+                         const opt = ALL_COLUMNS_OPTIONS.find(o => o.value === colKey);
+                         if (!opt) return null;
+                         return (
+                           <SortableColumnOption 
+                             key={colKey} 
+                             id={colKey} 
+                             label={opt.label} 
+                             checked={visibleColumns.includes(colKey)}
+                             onChange={handleColumnToggle}
+                           />
+                         );
+                      })}
+                    </div>
+                  </SortableContext>
+                </DndContext>
               }
               trigger="click"
             >
@@ -3270,11 +3377,11 @@ export default function OrderList() {
           />
         ) : (
           <Table
-            columns={columns.filter(col => visibleColumns.includes(col.key))}
+            scroll={{ x: 'max-content', y: 'calc(100vh - 350px)' }}
+            columns={columnOrder.filter(k => visibleColumns.includes(k)).map(k => columns.find(c => c.key === k)).filter(Boolean)}
             dataSource={filteredOrders}
             rowKey="id"
             loading={loading}
-            scroll={{ x: 'max-content' }}
             onChange={(pagination) => {
               if (pagination.current !== currentPage) {
                 fetchOrders(pagination.current)
@@ -3315,11 +3422,11 @@ export default function OrderList() {
       >
         <Form form={form} layout="vertical" style={{ marginTop: 16 }}>
           <Row gutter={16}>
-            <Col xs={24} md={isModuleActive('production') ? 8 : 12}>
+            <Col xs={24} md={12}>
               <Form.Item
                 name="customer"
                 label="Khách hàng"
-                rules={[{ required: true, message: 'Vui lòng chọn khách hàng' }]}
+                rules={[{ required: companySettings?.require_order_customer, message: 'Vui lòng chọn khách hàng' }]}
               >
                 <Select
                   showSearch
@@ -3334,7 +3441,18 @@ export default function OrderList() {
                 </Select>
               </Form.Item>
             </Col>
-            <Col xs={24} md={isModuleActive('production') ? 5 : 6}>
+            <Col xs={24} md={12}>
+              <Form.Item 
+                name="delivery_address" 
+                label="Địa chỉ giao hàng" 
+                rules={[{ required: companySettings?.require_order_delivery_address, message: 'Vui lòng nhập địa chỉ giao hàng' }]}
+              >
+                <Input placeholder="Nhập địa chỉ giao hàng cụ thể..." />
+              </Form.Item>
+            </Col>
+          </Row>
+          <Row gutter={16}>
+            <Col xs={24} md={isModuleActive('production') ? 8 : 12}>
               <Form.Item name="status" label="Trạng thái">
                 <Select disabled={!canApprove || ['pending', 'rejected'].includes(editingOrder?.status)}>
                   <Option value="pending">Chờ duyệt</Option>
@@ -3345,14 +3463,14 @@ export default function OrderList() {
                 </Select>
               </Form.Item>
             </Col>
-            <Col xs={24} md={isModuleActive('production') ? 5 : 6}>
-              <Form.Item name="installation_date" label="Ngày lắp đặt dự kiến">
+            <Col xs={24} md={isModuleActive('production') ? 8 : 12}>
+              <Form.Item name="installation_date" label="Ngày giao hàng dự kiến" rules={[{ required: companySettings?.require_order_installation_date, message: 'Vui lòng chọn ngày giao hàng' }]}>
                 <DatePicker style={{ width: '100%' }} format="DD/MM/YYYY" />
               </Form.Item>
             </Col>
             {isModuleActive('production') && (
-              <Col xs={24} md={6}>
-                <Form.Item name="factory" label="Nhà máy sản xuất (Dự kiến)">
+              <Col xs={24} md={8}>
+                <Form.Item name="factory" label="Nhà máy sản xuất (Dự kiến)" rules={[{ required: companySettings?.require_order_factory, message: 'Vui lòng chọn nhà máy' }]}>
                   <Select placeholder="Chọn nhà máy (tùy chọn)..." allowClear>
                     {factories.map(f => (
                       <Option key={f.id} value={f.id}>{f.name}</Option>

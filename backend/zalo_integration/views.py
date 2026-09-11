@@ -795,7 +795,7 @@ class SocialLeadViewSet(viewsets.ModelViewSet):
         detected_count = 0
         for lead in leads:
             msgs = ZaloMessage.objects.filter(social_lead=lead, direction=ZaloMessage.DIRECTION_INBOUND).order_by("-created_at")[:50]
-            text_pool = "\n".join([m.content for m in msgs if m.content] + [lead.last_message or ""])
+            text_pool = "\n".join([m.content for m in msgs if m.content])
             # Dùng Regex trực tiếp — không qua AI để kết quả đồng bộ ngay lập tức
             phone = extract_and_process_phone_regex(lead, text_pool)
             scanned_count += 1
@@ -814,7 +814,7 @@ class SocialLeadViewSet(viewsets.ModelViewSet):
         from .models import ZaloMessage
         lead = self.get_object()
         msgs = ZaloMessage.objects.filter(social_lead=lead, direction=ZaloMessage.DIRECTION_INBOUND).order_by("-created_at")
-        text_pool = "\n".join([m.content for m in msgs if m.content] + [lead.last_message or ""])
+        text_pool = "\n".join([m.content for m in msgs if m.content])
         # Dùng Regex trực tiếp — không qua AI để kết quả đồng bộ ngay lập tức
         phone = extract_and_process_phone_regex(lead, text_pool)
         if phone or lead.detected_email or lead.detected_address:

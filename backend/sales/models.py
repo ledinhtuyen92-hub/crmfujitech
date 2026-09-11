@@ -43,6 +43,7 @@ class Quotation(models.Model):
     customer_phone_snapshot = models.CharField(max_length=50, blank=True, verbose_name="SĐT KH (snapshot)")
     customer_address_snapshot = models.TextField(blank=True, verbose_name="Địa chỉ KH (snapshot)")
     customer_city_snapshot = models.CharField(max_length=100, blank=True, verbose_name="Thành phố KH (snapshot)")
+    delivery_address = models.CharField(max_length=500, blank=True, null=True, verbose_name="Địa chỉ giao hàng")
     created_by = models.ForeignKey(
         "users.User",
         on_delete=models.SET_NULL,

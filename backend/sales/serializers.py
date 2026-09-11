@@ -174,6 +174,7 @@ class QuotationSerializer(serializers.ModelSerializer):
             "created_by_name",
             "status",
             "status_display",
+            "delivery_address",
             "installation_date",
             "notes",
             "shipping_fee",

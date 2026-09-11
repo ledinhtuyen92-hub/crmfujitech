@@ -7,6 +7,7 @@ class DeliveryOrderSerializer(serializers.ModelSerializer):
     order_number = serializers.CharField(source="order.order_number", read_only=True)
     customer_name = serializers.CharField(source="order.customer.name", read_only=True)
     customer_phone = serializers.CharField(source="order.customer.phone", read_only=True)
+    order_shipping_address = serializers.CharField(source="order.delivery_address", read_only=True)
     order_remaining_debt = serializers.FloatField(source="order.remaining_debt", read_only=True)
     order_total_amount = serializers.FloatField(source="order.total_amount", read_only=True)
     status_display = serializers.CharField(source="get_status_display", read_only=True)
@@ -34,6 +35,7 @@ class DeliveryOrderSerializer(serializers.ModelSerializer):
             "order_number",
             "customer_name",
             "customer_phone",
+            "order_shipping_address",
             "order_remaining_debt",
             "order_total_amount",
             "factory_id",

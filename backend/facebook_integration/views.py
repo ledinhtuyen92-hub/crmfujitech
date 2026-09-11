@@ -557,7 +557,7 @@ class FacebookLeadViewSet(mixins.UpdateModelMixin, mixins.DestroyModelMixin, vie
         lead = self.get_object()
         
         messages = lead.messages.filter(sender_type="customer").order_by("-created_at")
-        text_pool = "\n".join([m.text for m in messages if m.text] + [lead.last_message_preview or ""])
+        text_pool = "\n".join([m.text for m in messages if m.text])
         # Dùng Regex trực tiếp (không qua AI) để kết quả đồng bộ ngay lập tức
         phone = extract_and_process_phone_fb_regex(lead, text_pool)
         
@@ -582,7 +582,7 @@ class FacebookLeadViewSet(mixins.UpdateModelMixin, mixins.DestroyModelMixin, vie
         detected_count = 0
         for lead in leads:
             msgs = lead.messages.filter(sender_type="customer").order_by("-created_at")[:30]
-            text_pool = "\n".join([m.text for m in msgs if m.text] + [lead.last_message_preview or ""])
+            text_pool = "\n".join([m.text for m in msgs if m.text])
             phone = extract_and_process_phone_fb_regex(lead, text_pool)
             scanned_count += 1
             if phone or lead.detected_email or lead.detected_address:

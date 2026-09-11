@@ -15,7 +15,7 @@ class Command(BaseCommand):
         fb_updated = 0
         for lead in fb_leads:
             msgs = lead.messages.filter(sender_type="customer").order_by("-created_at")[:50]
-            text_pool = "\n".join([m.text for m in msgs if m.text] + [lead.last_message_preview or ""])
+            text_pool = "\n".join([m.text for m in msgs if m.text])
             before_phone, before_email, before_address = lead.detected_phone, lead.detected_email, lead.detected_address
             extract_and_process_phone_fb(lead, text_pool)
             lead.refresh_from_db()
@@ -34,7 +34,7 @@ class Command(BaseCommand):
         zalo_updated = 0
         for lead in zalo_leads:
             msgs = ZaloMessage.objects.filter(social_lead=lead, direction=ZaloMessage.DIRECTION_INBOUND).order_by("-created_at")[:50]
-            text_pool = "\n".join([m.content for m in msgs if m.content] + [lead.last_message or ""])
+            text_pool = "\n".join([m.content for m in msgs if m.content])
             before_phone, before_email, before_address = lead.detected_phone, lead.detected_email, lead.detected_address
             extract_and_process_phone(lead, text_pool)
             lead.refresh_from_db()

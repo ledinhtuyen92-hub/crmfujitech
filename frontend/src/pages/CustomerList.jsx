@@ -65,7 +65,12 @@ import {
   GlobalOutlined,
   FormOutlined,
   RobotOutlined,
+  MenuOutlined,
 } from '@ant-design/icons'
+import { DndContext, PointerSensor, useSensor, useSensors, KeyboardSensor, closestCenter } from '@dnd-kit/core';
+import { restrictToVerticalAxis } from '@dnd-kit/modifiers';
+import { SortableContext, useSortable, verticalListSortingStrategy, arrayMove } from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
 import { useNavigate } from 'react-router-dom'
 import api from '../utils/api'
 import { useAuth } from '../contexts/AuthContext'
@@ -79,6 +84,30 @@ const { Title, Text, Paragraph } = Typography
 const { Option } = Select
 const { TextArea } = Input
 
+const SortableColumnOption = ({ id, label, checked, onChange }) => {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id });
+  const style = {
+    transform: CSS.Transform.toString(transform && { ...transform, scaleY: 1 }),
+    transition,
+    opacity: isDragging ? 0.5 : 1,
+    padding: '4px 0',
+    display: 'flex',
+    alignItems: 'center',
+    gap: 8,
+    background: '#fff',
+    zIndex: isDragging ? 99 : 1,
+  };
+  return (
+    <div ref={setNodeRef} style={style}>
+      <div {...attributes} {...listeners} style={{ cursor: 'grab', display: 'flex', alignItems: 'center' }}>
+        <MenuOutlined style={{ color: '#94a3b8' }} />
+      </div>
+      <Checkbox checked={checked} onChange={(e) => onChange(id, e.target.checked)}>
+        {label}
+      </Checkbox>
+    </div>
+  );
+};
 const STATUS_MAP = {
   new: { label: 'Khách mới', color: 'blue' },
   potential: { label: 'Tìm hiểu nhu cầu', color: 'cyan' },
@@ -158,23 +187,56 @@ function CustomerList() {
   const [tableSort, setTableSort] = useState(null)
 
   // Column Visibility
-  const DEFAULT_COLUMNS = ['name', 'contact', 'source', 'address', 'status', 'priority_level', 'expected_quantity', 'tags', 'assigned_to', 'actions']
+  const allColumnsOptions = [
+    { label: 'Khách hàng', value: 'name' },
+    { label: 'Liên hệ', value: 'contact' },
+    { label: 'Nguồn', value: 'source' },
+    { label: 'Địa chỉ', value: 'address' },
+    { label: 'Trạng thái', value: 'status' },
+    { label: 'Mức độ ưu tiên', value: 'priority_level' },
+    { label: 'Số lượng SP dự kiến', value: 'expected_quantity' },
+    { label: 'Tags', value: 'tags' }, // Always included in options, but we can filter it or handle it conditionally
+    { label: 'Phụ trách (Sale)', value: 'assigned_to' },
+    { label: 'Thao tác', value: 'actions' },
+  ];
+
+  const DEFAULT_COLUMNS = ['name', 'contact', 'source', 'address', 'status', 'priority_level', 'expected_quantity', 'tags', 'assigned_to', 'actions'];
+
+  const [columnOrder, setColumnOrder] = useState(() => {
+    const saved = localStorage.getItem('customerListColumnOrder_v1');
+    if (saved) return JSON.parse(saved);
+    return DEFAULT_COLUMNS;
+  });
+
   const [visibleColumns, setVisibleColumns] = useState(() => {
-    const saved = localStorage.getItem('customerListVisibleColumns')
-    if (saved) {
-      const parsed = JSON.parse(saved)
-      // Migration: ensure expected_quantity is present if not previously saved
-      if (!parsed.includes('expected_quantity')) {
-        return [...parsed.filter(c => c !== 'actions'), 'expected_quantity', 'actions']
-      }
-      return parsed
-    }
-    return DEFAULT_COLUMNS
+    const saved = localStorage.getItem('customerListVisibleColumns_v3')
+    return saved ? JSON.parse(saved) : DEFAULT_COLUMNS
   })
 
   useEffect(() => {
-    localStorage.setItem('customerListVisibleColumns', JSON.stringify(visibleColumns))
+    localStorage.setItem('customerListVisibleColumns_v3', JSON.stringify(visibleColumns))
   }, [visibleColumns])
+
+  const handleColumnToggle = (id, checked) => {
+    if (checked) {
+      setVisibleColumns(prev => [...prev, id]);
+    } else {
+      setVisibleColumns(prev => prev.filter(c => c !== id));
+    }
+  };
+
+  const handleColumnDragEnd = (event) => {
+    const { active, over } = event;
+    if (active.id !== over?.id) {
+      setColumnOrder((items) => {
+        const oldIndex = items.indexOf(active.id);
+        const newIndex = items.indexOf(over.id);
+        const newOrder = arrayMove(items, oldIndex, newIndex);
+        localStorage.setItem('customerListColumnOrder_v1', JSON.stringify(newOrder));
+        return newOrder;
+      });
+    }
+  };
 
   // Auto Assign Toggle State
   const [autoAssignEnabled, setAutoAssignEnabled] = useState(false)
@@ -1083,23 +1145,29 @@ function CustomerList() {
                 placement="bottomRight" 
                 title="Tùy chỉnh cột hiển thị" 
                 content={
-                  <Checkbox.Group 
-                    options={[
-                      { label: 'Khách hàng', value: 'name' },
-                      { label: 'Liên hệ', value: 'contact' },
-                      { label: 'Nguồn', value: 'source' },
-                      { label: 'Địa chỉ', value: 'address' },
-                      { label: 'Trạng thái', value: 'status' },
-                      { label: 'Mức độ ưu tiên', value: 'priority_level' },
-                      { label: 'Số lượng SP dự kiến', value: 'expected_quantity' },
-                      ...(allTags.length > 0 ? [{ label: 'Tags', value: 'tags' }] : []),
-                      { label: 'Phụ trách (Sale)', value: 'assigned_to' },
-                      { label: 'Thao tác', value: 'actions' },
-                    ]}
-                    value={visibleColumns}
-                    onChange={setVisibleColumns}
-                    style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}
-                  />
+                  <DndContext
+                    collisionDetection={closestCenter}
+                    onDragEnd={handleColumnDragEnd}
+                    modifiers={[restrictToVerticalAxis]}
+                  >
+                    <SortableContext items={columnOrder} strategy={verticalListSortingStrategy}>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                        {columnOrder.map((colKey) => {
+                           const opt = allColumnsOptions.find(o => o.value === colKey);
+                           if (!opt) return null;
+                           return (
+                             <SortableColumnOption 
+                               key={colKey} 
+                               id={colKey} 
+                               label={opt.label} 
+                               checked={visibleColumns.includes(colKey)}
+                               onChange={handleColumnToggle}
+                             />
+                           );
+                        })}
+                      </div>
+                    </SortableContext>
+                  </DndContext>
                 }
                 trigger="click"
               >
@@ -1174,7 +1242,7 @@ function CustomerList() {
           }}
         />
       ) : (
-        <Table scroll={{ x: 'max-content' }}
+        <Table scroll={{ x: 'max-content', y: 'calc(100vh - 350px)' }}
           onChange={(pagination, filters, sorter) => {
             setTableSort(sorter)
             if (pagination.current !== currentPage) {
@@ -1185,7 +1253,7 @@ function CustomerList() {
             selectedRowKeys,
             onChange: (newSelectedRowKeys) => setSelectedRowKeys(newSelectedRowKeys),
           }}
-          columns={columns.filter(col => visibleColumns.includes(col.key))}
+          columns={columnOrder.filter(k => visibleColumns.includes(k)).map(k => columns.find(c => c.key === k)).filter(Boolean)}
           dataSource={customers}
           loading={loading}
           rowKey="id"

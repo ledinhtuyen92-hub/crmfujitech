@@ -9,6 +9,7 @@ import {
   PrinterOutlined,
   SearchOutlined,
   SettingOutlined,
+  TableOutlined,
   ToolOutlined,
   UserOutlined,
   EyeOutlined,
@@ -46,6 +47,10 @@ import api from '../utils/api'
 import TransactionPrintView from '../components/TransactionPrintView'
 import QuotationPrintView from '../components/QuotationPrintView'
 import { useResponsive } from '../hooks/useResponsive'
+import { DndContext, closestCenter } from '@dnd-kit/core';
+import { restrictToVerticalAxis } from '@dnd-kit/modifiers';
+import { SortableContext, verticalListSortingStrategy, arrayMove } from '@dnd-kit/sortable';
+import SortableColumnOption from '../components/SortableColumnOption';
 
 const { Title, Text } = Typography
 const { Option } = Select
@@ -78,15 +83,53 @@ export default function ProductionList() {
   const [orders, setOrders] = useState([])
   const [users, setUsers] = useState([])
 
+  const allColumnsOptions = [
+    { label: 'Mã Lệnh SX', value: 'id' },
+    { label: 'Trạng thái', value: 'status' },
+    { label: 'Nhà máy', value: 'factory' },
+    { label: 'Tiến độ công đoạn', value: 'progress' },
+    { label: 'Thời gian thực hiện', value: 'dates' },
+    { label: 'Ghi chú', value: 'notes' },
+    { label: 'Hành động', value: 'action' },
+  ];
+
   const DEFAULT_COLUMNS = ['id', 'status', 'factory', 'progress', 'dates', 'notes', 'action']
+
+  const [columnOrder, setColumnOrder] = useState(() => {
+    const saved = localStorage.getItem('productionListColumnOrder_v1');
+    if (saved) return JSON.parse(saved);
+    return DEFAULT_COLUMNS;
+  });
+
   const [visibleColumns, setVisibleColumns] = useState(() => {
-    const saved = localStorage.getItem('productionListVisibleColumns')
+    const saved = localStorage.getItem('productionListVisibleColumns_v3')
     return saved ? JSON.parse(saved) : DEFAULT_COLUMNS
   })
 
   useEffect(() => {
-    localStorage.setItem('productionListVisibleColumns', JSON.stringify(visibleColumns))
+    localStorage.setItem('productionListVisibleColumns_v3', JSON.stringify(visibleColumns))
   }, [visibleColumns])
+
+  const handleColumnToggle = (id, checked) => {
+    if (checked) {
+      setVisibleColumns(prev => [...prev, id]);
+    } else {
+      setVisibleColumns(prev => prev.filter(c => c !== id));
+    }
+  };
+
+  const handleColumnDragEnd = (event) => {
+    const { active, over } = event;
+    if (active.id !== over?.id) {
+      setColumnOrder((items) => {
+        const oldIndex = items.indexOf(active.id);
+        const newIndex = items.indexOf(over.id);
+        const newOrder = arrayMove(items, oldIndex, newIndex);
+        localStorage.setItem('productionListColumnOrder_v1', JSON.stringify(newOrder));
+        return newOrder;
+      });
+    }
+  };
   const [loading, setLoading] = useState(false)
   const [templates, setTemplates] = useState([])
   const [companyTemplate, setCompanyTemplate] = useState(null)
@@ -818,24 +861,33 @@ export default function ProductionList() {
               placement="bottomRight" 
               title="Tùy chỉnh cột hiển thị" 
               content={
-                <Checkbox.Group 
-                  options={[
-                    { label: 'Mã Lệnh SX', value: 'id' },
-                    { label: 'Trạng thái', value: 'status' },
-                    { label: 'Nhà máy', value: 'factory' },
-                    { label: 'Tiến độ công đoạn', value: 'progress' },
-                    { label: 'Thời gian thực hiện', value: 'dates' },
-                    { label: 'Ghi chú', value: 'notes' },
-                    { label: 'Hành động', value: 'action' },
-                  ]}
-                  value={visibleColumns}
-                  onChange={setVisibleColumns}
-                  style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}
-                />
+                <DndContext
+                  collisionDetection={closestCenter}
+                  onDragEnd={handleColumnDragEnd}
+                  modifiers={[restrictToVerticalAxis]}
+                >
+                  <SortableContext items={columnOrder} strategy={verticalListSortingStrategy}>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                      {columnOrder.map((colKey) => {
+                         const opt = allColumnsOptions.find(o => o.value === colKey);
+                         if (!opt) return null;
+                         return (
+                           <SortableColumnOption 
+                             key={colKey} 
+                             id={colKey} 
+                             label={opt.label} 
+                             checked={visibleColumns.includes(colKey)}
+                             onChange={handleColumnToggle}
+                           />
+                         );
+                      })}
+                    </div>
+                  </SortableContext>
+                </DndContext>
               }
               trigger="click"
             >
-              <Button icon={<SettingOutlined />} size="large" style={{ borderRadius: 10 }} />
+              <Button icon={<TableOutlined />} size="large" style={{ borderRadius: 10 }} />
             </Popover>
             {(isCompanyAdmin || hasPermission('production.manage_factory')) && (
               <Button
@@ -947,8 +999,8 @@ export default function ProductionList() {
             }}
           />
         ) : (
-          <Table scroll={{ x: 'max-content' }}
-            columns={columns.filter(col => visibleColumns.includes(col.key))}
+          <Table scroll={{ x: 'max-content', y: 'calc(100vh - 350px)' }}
+            columns={columnOrder.filter(k => visibleColumns.includes(k)).map(k => columns.find(c => c.key === k)).filter(Boolean)}
             dataSource={filteredPOs}
             rowKey="id"
             loading={loading}
