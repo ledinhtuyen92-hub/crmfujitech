@@ -512,13 +512,7 @@ export default function DeliveryList() {
           }}
         />
       )}
-      <Button
-        type="text"
-        style={{ color: '#0284c7' }}
-        icon={<FileTextOutlined />}
-        title="Xem chi tiết đơn hàng"
-        onClick={() => handleViewOrder(r)}
-      />
+
       <Button
         type="text"
         icon={canEdit ? <EditOutlined /> : <EyeOutlined />}
