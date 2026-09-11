@@ -1892,6 +1892,7 @@ export default function Inventory() {
                         current: currentStockPage,
                         total: stockTotalCount,
                         size: 'small',
+                        showTotal: (total, range) => `${range[0]}-${range[1]} của ${total} sản phẩm`,
                         onChange: (page) => fetchStockLevels(page)
                       }}
                       renderItem={(r) => {
@@ -1939,6 +1940,7 @@ export default function Inventory() {
                         current: currentStockPage,
                         total: stockTotalCount,
                         showSizeChanger: false,
+                        showTotal: (total, range) => `${range[0]}-${range[1]} của ${total} sản phẩm`,
                         onChange: (page) => fetchStockLevels(page)
                       }}
                       scroll={{ x: 'max-content' }}
