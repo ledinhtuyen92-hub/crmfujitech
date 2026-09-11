@@ -10,6 +10,8 @@ from core.pagination import StandardPagination
 
 from .models import DeliveryOrder, WarrantyCard
 from .serializers import DeliveryOrderSerializer, WarrantyCardSerializer
+from orders.serializers import OrderSerializer
+from inventory.serializers import InventoryTransactionSerializer
 
 
 class DeliveryOrderViewSet(TenantQuerySetMixin, viewsets.ModelViewSet):
@@ -31,7 +33,54 @@ class DeliveryOrderViewSet(TenantQuerySetMixin, viewsets.ModelViewSet):
         "partial_update": "delivery.edit",
         "destroy": "delivery.delete",
         "assign_shipper": "delivery.assign",
+        "order_details": "delivery.view",
+        "export_details": "delivery.view",
     }
+
+    @action(detail=True, methods=['get'])
+    def order_details(self, request, pk=None):
+        instance = self.get_object()
+        if not instance.order:
+            from rest_framework.exceptions import NotFound
+            raise NotFound("Không tìm thấy đơn hàng liên kết.")
+        # Return order details bypass standard view permissions
+        serializer = OrderSerializer(instance.order, context={'request': request})
+        return Response(serializer.data)
+
+    @action(detail=True, methods=['get'])
+    def export_details(self, request, pk=None):
+        instance = self.get_object()
+        if not instance.order:
+            from rest_framework.exceptions import NotFound
+            raise NotFound("Không tìm thấy đơn hàng liên kết.")
+            
+        from inventory.models import InventoryTransaction
+        txns = InventoryTransaction.objects.filter(
+            reference_order=instance.order, 
+            type=InventoryTransaction.TYPE_EXPORT
+        ).order_by('created_at')
+        
+        if not txns.exists():
+            from rest_framework.exceptions import NotFound
+            raise NotFound("Không tìm thấy phiếu xuất kho liên kết.")
+            
+        # Return export details bypass standard view permissions
+        first_txn = txns.first()
+        serializer = InventoryTransactionSerializer(first_txn, context={'request': request})
+        data = serializer.data
+        
+        # Inject items for frontend TransactionPrintView
+        items = []
+        for t in txns:
+            items.append({
+                "id": t.id,
+                "product_sku": t.product.sku if t.product else "",
+                "product_name": t.custom_product_name if t.custom_product_name else (t.product.name if t.product else ""),
+                "quantity": t.quantity,
+                "unit_cost": t.unit_cost,
+            })
+        data["items"] = items
+        return Response(data)
 
     def get_queryset(self):
         qs = super().get_queryset()

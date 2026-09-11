@@ -19,7 +19,7 @@ import {
   Checkbox,
   Popover,
 } from 'antd'
-import { CarOutlined, SearchOutlined, EditOutlined, EyeOutlined, PlusOutlined, DeleteOutlined, UserAddOutlined, FileTextOutlined, PrinterOutlined, CheckCircleOutlined, CloseCircleOutlined, SyncOutlined, SettingOutlined, TableOutlined } from '@ant-design/icons'
+import { CarOutlined, SearchOutlined, EditOutlined, EyeOutlined, PlusOutlined, DeleteOutlined, UserAddOutlined, FileTextOutlined, PrinterOutlined, CheckCircleOutlined, CloseCircleOutlined, SyncOutlined, SettingOutlined, TableOutlined, ExportOutlined, FilePdfOutlined } from '@ant-design/icons'
 import dayjs from 'dayjs'
 import { useResponsive } from '../hooks/useResponsive'
 import { DndContext, closestCenter } from '@dnd-kit/core';
@@ -30,6 +30,7 @@ import SortableColumnOption from '../components/SortableColumnOption';
 import api from '../utils/api'
 import { useAuth } from '../contexts/AuthContext'
 import QuotationPrintView from '../components/QuotationPrintView'
+import TransactionPrintView from '../components/TransactionPrintView'
 
 const { Title, Text } = Typography
 const { Option } = Select
@@ -121,6 +122,9 @@ export default function DeliveryList() {
   const [viewingOrder, setViewingOrder] = useState(null)
   const [activeTemplates, setActiveTemplates] = useState([])
   const [isPrinting, setIsPrinting] = useState(false)
+  
+  const [viewExportVisible, setViewExportVisible] = useState(false)
+  const [viewExportData, setViewExportData] = useState(null)
 
   const fetchShippers = async (factoryId) => {
     try {
@@ -324,11 +328,22 @@ export default function DeliveryList() {
   const handleViewOrder = async (record) => {
     if (checkMaintenance()) return
     try {
-      const res = await api.get(`/orders/orders/${record.order}/`)
+      const res = await api.get(`/delivery/deliveries/${record.id}/order_details/`)
       setViewingOrder(res.data)
       setDrawerVisible(true)
     } catch {
       message.error('Không thể tải thông tin đơn hàng.')
+    }
+  }
+
+  const handleViewExport = async (record) => {
+    if (checkMaintenance()) return
+    try {
+      const res = await api.get(`/delivery/deliveries/${record.id}/export_details/`)
+      setViewExportData(res.data)
+      setViewExportVisible(true)
+    } catch (err) {
+      message.error(err.response?.data?.detail || 'Không thể lấy thông tin phiếu xuất kho')
     }
   }
 
@@ -364,8 +379,83 @@ export default function DeliveryList() {
     }
   }
 
+  const handlePrintExportPDF = () => {
+    if (!viewExportData) return
+    const contentEl = document.querySelector('.printable-transaction-content')
+    const dNum = viewExportData.transaction_code || viewExportData.code || 'Phieu_Xuat_Kho'
+
+    if (!contentEl) {
+      const oldTitle = document.title
+      document.title = dNum
+      window.print()
+      document.title = oldTitle
+      return
+    }
+
+    const styleTags = Array.from(document.querySelectorAll('style, link[rel="stylesheet"]'))
+      .map((el) => el.outerHTML)
+      .join('\n')
+
+    const printWin = window.open('', '_blank', 'width=1000,height=800')
+    if (!printWin) {
+      const oldTitle = document.title
+      document.title = dNum
+      window.print()
+      document.title = oldTitle
+      return
+    }
+
+    printWin.document.write(`
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <meta charset="utf-8" />
+        <title>${dNum}</title>
+        ${styleTags}
+        <style>
+          @page { size: A4 portrait; margin: 10mm; }
+          * { box-sizing: border-box; }
+          html, body {
+            margin: 0 !important; padding: 0 !important;
+            background: #ffffff !important;
+            font-family: "Times New Roman", Times, serif !important;
+            -webkit-print-color-adjust: exact !important;
+            print-color-adjust: exact !important;
+          }
+          .printable-transaction-content { width: 100% !important; margin: 0 auto !important; }
+        </style>
+      </head>
+      <body>
+        ${contentEl.outerHTML}
+        <script>
+          setTimeout(() => { window.print(); window.close(); }, 400);
+        </script>
+      </body>
+      </html>
+    `)
+    printWin.document.close()
+  }
+
   const renderDeliveryActions = (r) => (
     <Space wrap size={8}>
+      <Tooltip title="Xem đơn hàng">
+        <Button
+          type="text"
+          shape="circle"
+          icon={<EyeOutlined style={{ color: '#2563eb' }} />}
+          onClick={() => handleViewOrder(r)}
+        />
+      </Tooltip>
+
+      <Tooltip title="Xem phiếu xuất kho">
+        <Button
+          type="text"
+          shape="circle"
+          icon={<ExportOutlined style={{ color: '#8b5cf6' }} />}
+          onClick={() => handleViewExport(r)}
+        />
+      </Tooltip>
+
       {canEdit && r.status === 'pending' && (
         <Button
           size="small"
@@ -407,7 +497,7 @@ export default function DeliveryList() {
           Giao lại
         </Button>
       )}
-      {hasPermission('delivery.assign') && (
+      {!r.shipper_user && r.status === 'pending' && (
         <Button
           type="text"
           style={{ color: '#10b981' }}
@@ -801,6 +891,8 @@ export default function DeliveryList() {
                 effectiveTemplate={getEffectiveTemplate(viewingOrder)}
                 isCompanyAdmin={isCompanyAdmin}
                 products={[]}
+                hidePricing={true}
+                hideCustomerInfo={true}
               />
             </div>
             {isPrinting && (
@@ -849,6 +941,32 @@ export default function DeliveryList() {
             <Option key={u.id} value={u.id}>{u.full_name} ({u.email})</Option>
           ))}
         </Select>
+      </Modal>
+
+      {/* Modal: View Export Details */}
+      <Modal
+        title="Chi tiết phiếu xuất kho"
+        open={viewExportVisible}
+        onCancel={() => setViewExportVisible(false)}
+        footer={
+          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
+            <Button onClick={() => setViewExportVisible(false)}>Đóng</Button>
+            <Button
+              type="primary"
+              icon={<FilePdfOutlined />}
+              onClick={handlePrintExportPDF}
+              style={{ background: '#dc2626', borderColor: '#dc2626' }}
+            >
+              Tải PDF / In
+            </Button>
+          </div>
+        }
+        width={Math.min(900, window.innerWidth < 768 ? window.innerWidth - 16 : window.innerWidth * 0.78)}
+        style={{ top: 20 }}
+      >
+        <div style={{ maxHeight: '80vh', overflowY: 'auto', paddingRight: 8 }}>
+          <TransactionPrintView transaction={viewExportData} company={companySettings} />
+        </div>
       </Modal>
     </section>
   )
