@@ -283,7 +283,8 @@ export default function Inventory() {
     setLoading(true)
     try {
       const params = {
-        page: page
+        page: page,
+        page_size: 25
       }
       if (warehouseFilter) params.warehouse_id = warehouseFilter
       if (lowStockOnly) {
@@ -1887,9 +1888,12 @@ export default function Inventory() {
                       dataSource={groupedFilteredStockLevels}
                       loading={loading}
                       pagination={{ 
-                        pageSize: companySettings?.list_page_size || 25,
+                        pageSize: 25,
+                        current: currentStockPage,
+                        total: stockTotalCount,
                         size: 'small',
-                        showTotal: (total, range) => `${range[0]}-${range[1]} của ${total} sản phẩm`
+                        showTotal: (total, range) => `${range[0]}-${range[1]} của ${total} sản phẩm`,
+                        onChange: (page) => fetchStockLevels(page)
                       }}
                       renderItem={(r) => {
                         const isGroup = r.items && r.items.length > 1;
@@ -1932,9 +1936,12 @@ export default function Inventory() {
                       rowKey="id"
                       loading={loading}
                       pagination={{ 
-                        pageSize: companySettings?.list_page_size || 25,
+                        pageSize: 25,
+                        current: currentStockPage,
+                        total: stockTotalCount,
                         showSizeChanger: false,
-                        showTotal: (total, range) => `${range[0]}-${range[1]} của ${total} sản phẩm`
+                        showTotal: (total, range) => `${range[0]}-${range[1]} của ${total} sản phẩm`,
+                        onChange: (page) => fetchStockLevels(page)
                       }}
                       scroll={{ x: 'max-content' }}
                       expandable={{
