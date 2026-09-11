@@ -283,8 +283,7 @@ export default function Inventory() {
     setLoading(true)
     try {
       const params = {
-        page: page,
-        page_size: companySettings?.list_page_size || 25
+        page: page
       }
       if (warehouseFilter) params.warehouse_id = warehouseFilter
       if (lowStockOnly) {
@@ -1889,11 +1888,8 @@ export default function Inventory() {
                       loading={loading}
                       pagination={{ 
                         pageSize: companySettings?.list_page_size || 25,
-                        current: currentStockPage,
-                        total: stockTotalCount,
                         size: 'small',
-                        showTotal: (total, range) => `${range[0]}-${range[1]} của ${total} sản phẩm`,
-                        onChange: (page) => fetchStockLevels(page)
+                        showTotal: (total, range) => `${range[0]}-${range[1]} của ${total} sản phẩm`
                       }}
                       renderItem={(r) => {
                         const isGroup = r.items && r.items.length > 1;
@@ -1937,11 +1933,8 @@ export default function Inventory() {
                       loading={loading}
                       pagination={{ 
                         pageSize: companySettings?.list_page_size || 25,
-                        current: currentStockPage,
-                        total: stockTotalCount,
                         showSizeChanger: false,
-                        showTotal: (total, range) => `${range[0]}-${range[1]} của ${total} sản phẩm`,
-                        onChange: (page) => fetchStockLevels(page)
+                        showTotal: (total, range) => `${range[0]}-${range[1]} của ${total} sản phẩm`
                       }}
                       scroll={{ x: 'max-content' }}
                       expandable={{
@@ -2046,6 +2039,7 @@ export default function Inventory() {
                         current: currentWarehousePage,
                         total: warehouseTotalCount,
                         size: "small",
+                        showTotal: (total, range) => `${range[0]}-${range[1]} của ${total} kho hàng`,
                         onChange: (page) => fetchPaginatedWarehouses(page)
                       }}
                       renderItem={(w) => (
@@ -2092,6 +2086,7 @@ export default function Inventory() {
                         current: currentWarehousePage,
                         total: warehouseTotalCount,
                         showSizeChanger: false,
+                        showTotal: (total, range) => `${range[0]}-${range[1]} của ${total} kho hàng`,
                         onChange: (page) => fetchPaginatedWarehouses(page)
                       }}
                       rowKey="id"
@@ -2134,7 +2129,6 @@ export default function Inventory() {
                           ),
                         },
                       ]}
-                      pagination={{ pageSize: 25 }}
                     />
                   )}
                 </div>

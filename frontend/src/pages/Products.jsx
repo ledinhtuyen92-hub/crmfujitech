@@ -89,6 +89,9 @@ export default function Products() {
   const [products, setProducts] = useState([])
   const [categories, setCategories] = useState([])
   const [loading, setLoading] = useState(false)
+  const [currentPage, setCurrentPage] = useState(1)
+  const [pageSize, setPageSize] = useState(25)
+  const [totalCounts, setTotalCounts] = useState({ product: 0, service: 0 })
 
   // Filters
   const [searchText, setSearchText] = useState('')
@@ -116,23 +119,34 @@ export default function Products() {
   const canDelete = hasPermission('products.delete')
   const canManageAIKnowledge = hasPermission('ai_agent.manage_knowledge')
 
-  // ── Fetch Data ────────────────────────────────────────────────────────
-  const fetchProducts = useCallback(async () => {
+  const fetchProducts = useCallback(async (page = 1) => {
     await Promise.resolve()
     setLoading(true)
     try {
-      const params = { include_inactive: 'true' }
+      const pType = activeTab === 'services' ? 'service' : 'product'
+      const params = { 
+        include_inactive: 'true',
+        page: page,
+        page_size: pageSize || companySettings?.list_page_size || 25,
+        product_type: pType
+      }
       if (categoryFilter) params.category_id = categoryFilter
-      params.page_size = companySettings?.list_page_size || 1000
+      if (searchText) params.search = searchText
+
       const res = await api.get('/inventory/products/', { params })
-      const data = Array.isArray(res.data) ? res.data : res.data?.results ?? []
+      const data = res.data?.results ?? (Array.isArray(res.data) ? res.data : [])
+      
       setProducts(data)
+      setCurrentPage(page)
+      
+      const count = res.data.count ?? data.length ?? 0
+      setTotalCounts(prev => ({ ...prev, [pType]: count }))
     } catch {
       messageApi.error('Không thể tải danh sách sản phẩm.')
     } finally {
       setLoading(false)
     }
-  }, [categoryFilter, messageApi])
+  }, [categoryFilter, searchText, activeTab, pageSize, companySettings?.list_page_size, messageApi])
 
   const fetchCategories = useCallback(async () => {
     await Promise.resolve()
@@ -149,11 +163,18 @@ export default function Products() {
   }, [fetchCategories])
 
   useEffect(() => {
-    if (activeTab === 'products' || activeTab === 'services') fetchProducts()
-    else if (activeTab === 'categories') fetchCategories()
-  }, [activeTab, fetchProducts, fetchCategories])
+    if (companySettings?.list_page_size) {
+      setPageSize(companySettings.list_page_size)
+    }
+  }, [companySettings?.list_page_size])
 
-  // ── Filtered Products ─────────────────────────────────────────────────
+  useEffect(() => {
+    setCurrentPage(1)
+    if (activeTab === 'products' || activeTab === 'services') fetchProducts(1)
+    else if (activeTab === 'categories') fetchCategories()
+  }, [activeTab, categoryFilter, searchText, fetchProducts, fetchCategories])
+
+  // ── Filtered Products (Not used for table anymore, kept for reference) ─────────────────────────────────────────────────
   const filteredProducts = products.filter((item) => {
     if (!searchText) return true
     const name = (item.name || '').toLowerCase()
@@ -221,7 +242,7 @@ export default function Products() {
         messageApi.success('Thêm sản phẩm mới thành công!')
       }
       setProductModalVisible(false)
-      fetchProducts()
+      fetchProducts(currentPage)
     } catch (error) {
       if (error.errorFields) return
       const errDetail = error.response?.data?.detail || JSON.stringify(error.response?.data) || 'Vui lòng kiểm tra lại thông tin.'
@@ -236,7 +257,7 @@ export default function Products() {
     try {
       await api.delete(`/inventory/products/${id}/?include_inactive=true`)
       messageApi.success('Đã xoá sản phẩm.')
-      fetchProducts()
+      fetchProducts(currentPage)
     } catch {
       messageApi.error('Không thể xoá sản phẩm này vì đang được sử dụng trong đơn hàng hoặc báo giá.')
     }
@@ -486,11 +507,18 @@ export default function Products() {
     }
   ];
 
-  const renderProductMobileList = (dataSource) => (
+  const renderProductMobileList = (dataSource, total) => (
     <List
       dataSource={dataSource}
       loading={loading}
-      pagination={{ pageSize: 25, showSizeChanger: false, size: "small" }}
+      pagination={{ 
+        current: currentPage,
+        pageSize: pageSize,
+        total: total,
+        showSizeChanger: false, 
+        size: "small",
+        onChange: (page) => fetchProducts(page)
+      }}
       renderItem={(r) => {
         const imgUrl = r.image_url || r.image
         const cat = categories.find((c) => c.id === r.category)
@@ -549,10 +577,10 @@ export default function Products() {
   const tabItems = [
     {
       key: 'products',
-      label: isMobile ? <Text strong>Hàng hóa ({products.filter(p => p.product_type !== 'service').length})</Text> : (
+      label: isMobile ? <Text strong>Hàng hóa ({totalCounts.product})</Text> : (
         <Space>
           <InboxOutlined />
-          <span>Hàng hóa ({products.filter(p => p.product_type !== 'service').length})</span>
+          <span>Hàng hóa ({totalCounts.product})</span>
         </Space>
       ),
       children: (
@@ -674,14 +702,21 @@ export default function Products() {
                 </div>
               </Col>
             </Row>
-            {isMobile ? renderProductMobileList(products.filter(p => p.product_type !== 'service' && (p.name?.toLowerCase().includes(searchText.toLowerCase()) || p.sku?.toLowerCase().includes(searchText.toLowerCase())))) : (
+            {isMobile ? renderProductMobileList(products, totalCounts.product) : (
               <Table
                 columns={productColumns}
-                dataSource={products.filter(p => p.product_type !== 'service' && (p.name?.toLowerCase().includes(searchText.toLowerCase()) || p.sku?.toLowerCase().includes(searchText.toLowerCase())))}
+                dataSource={products}
                 rowKey="id"
                 loading={loading}
                 scroll={{ x: 1200 }}
-                pagination={{ pageSize: 25 }}
+                pagination={{ 
+                  current: currentPage,
+                  pageSize: pageSize,
+                  total: totalCounts.product,
+                  showSizeChanger: false,
+                  showTotal: (total, range) => `${range[0]}-${range[1]} của ${total} hàng hóa`,
+                  onChange: (page) => fetchProducts(page)
+                }}
               />
             )}
           </div>
@@ -690,10 +725,10 @@ export default function Products() {
     },
     {
       key: 'services',
-      label: isMobile ? <Text strong>Dịch vụ ({products.filter(p => p.product_type === 'service').length})</Text> : (
+      label: isMobile ? <Text strong>Dịch vụ ({totalCounts.service})</Text> : (
         <Space>
           <ShopOutlined />
-          <span>Dịch vụ ({products.filter(p => p.product_type === 'service').length})</span>
+          <span>Dịch vụ ({totalCounts.service})</span>
         </Space>
       ),
       children: (
@@ -815,14 +850,21 @@ export default function Products() {
                 </div>
               </Col>
             </Row>
-          {isMobile ? renderProductMobileList(products.filter(p => p.product_type === 'service' && (p.name?.toLowerCase().includes(searchText.toLowerCase()) || p.sku?.toLowerCase().includes(searchText.toLowerCase())))) : (
+          {isMobile ? renderProductMobileList(products, totalCounts.service) : (
             <Table
               columns={productColumns}
-              dataSource={products.filter(p => p.product_type === 'service' && (p.name?.toLowerCase().includes(searchText.toLowerCase()) || p.sku?.toLowerCase().includes(searchText.toLowerCase())))}
+              dataSource={products}
               rowKey="id"
               loading={loading}
               scroll={{ x: 1200 }}
-              pagination={{ pageSize: 25 }}
+              pagination={{ 
+                current: currentPage,
+                pageSize: pageSize,
+                total: totalCounts.service,
+                showSizeChanger: false,
+                showTotal: (total, range) => `${range[0]}-${range[1]} của ${total} dịch vụ`,
+                onChange: (page) => fetchProducts(page)
+              }}
             />
           )}
           </div>
