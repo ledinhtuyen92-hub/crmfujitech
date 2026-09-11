@@ -657,8 +657,16 @@ class InventoryTransactionViewSet(TenantQuerySetMixin, viewsets.ModelViewSet):
             raise PermissionDenied("Bạn không có quyền nhập kho.")
         if txn_type == "adjust" and "inventory.adjust" not in user_perms:
             raise PermissionDenied("Bạn không có quyền điều chỉnh tồn kho.")
-        if txn_type == "transfer" and "inventory.transfer" not in user_perms:
-            raise PermissionDenied("Bạn không có quyền điều chuyển kho.")
+        if txn_type == "transfer":
+            if "inventory.transfer" not in user_perms:
+                raise PermissionDenied("Bạn không có quyền điều chuyển kho.")
+            target_warehouse = serializer.validated_data.get("target_warehouse")
+            if not target_warehouse:
+                from rest_framework import serializers as drf_serializers
+                raise drf_serializers.ValidationError({"target_warehouse": "Vui lòng chọn kho nhận."})
+            if warehouse == target_warehouse:
+                from rest_framework import serializers as drf_serializers
+                raise drf_serializers.ValidationError({"target_warehouse": "Kho nhận phải khác kho xuất."})
         if txn_type == "export" and not reference_order and "inventory.manual_export" not in user_perms:
             raise PermissionDenied("Bạn không có quyền tạo xuất kho thủ công.")
 

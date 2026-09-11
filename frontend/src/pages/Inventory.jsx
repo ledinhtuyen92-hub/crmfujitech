@@ -2329,7 +2329,22 @@ export default function Inventory() {
             </Col>
             {txnModalMode === 'transfer' && (
               <Col xs={24} md={12}>
-                <Form.Item name="target_warehouse" label="Đến kho (Kho nhập)" rules={[{ required: true, message: 'Chọn kho nhận' }]}>
+                <Form.Item 
+                  name="target_warehouse" 
+                  label="Đến kho (Kho nhập)" 
+                  dependencies={['warehouse']}
+                  rules={[
+                    { required: true, message: 'Chọn kho nhận' },
+                    ({ getFieldValue }) => ({
+                      validator(_, value) {
+                        if (!value || getFieldValue('warehouse') !== value) {
+                          return Promise.resolve();
+                        }
+                        return Promise.reject(new Error('Kho nhập phải khác kho xuất!'));
+                      },
+                    }),
+                  ]}
+                >
                   <Select placeholder="Chọn kho...">
                     {warehouses.map((w) => (
                       <Option key={w.id} value={w.id}>{w.name}</Option>
