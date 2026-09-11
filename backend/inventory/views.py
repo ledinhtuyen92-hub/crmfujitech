@@ -382,7 +382,8 @@ class WarehouseViewSet(TenantQuerySetMixin, viewsets.ModelViewSet):
     queryset = Warehouse.objects.select_related("company").order_by("name")
     serializer_class = WarehouseSerializer
     permission_classes = [permissions.IsAuthenticated, ActionBasedPermission]
-    pagination_class = None
+    from core.pagination import OptionalPagination
+    pagination_class = OptionalPagination
     
     action_permissions = {
         "list": ["inventory.manage_warehouse", "inventory.view", "production.manage_factory"],
@@ -496,6 +497,25 @@ class StockLevelViewSet(mixins.UpdateModelMixin, mixins.DestroyModelMixin, views
                 Q(product__code__icontains=search_query)
             )
         return qs
+
+    def list(self, request, *args, **kwargs):
+        queryset = self.filter_queryset(self.get_queryset())
+        
+        page_size = request.query_params.get(self.paginator.page_size_query_param)
+        if page_size:
+            from django.db.models import Min
+            # Group by product to prevent splitting a product's warehouses across pages
+            grouped_qs = queryset.values('product').annotate(min_id=Min('id')).order_by('product__name', 'product__sku')
+            
+            page = self.paginate_queryset(grouped_qs)
+            if page is not None:
+                product_ids = [item['product'] for item in page]
+                actual_items = queryset.filter(product__in=product_ids).order_by("product__name", "warehouse__name")
+                serializer = self.get_serializer(actual_items, many=True)
+                return self.get_paginated_response(serializer.data)
+                
+        serializer = self.get_serializer(queryset, many=True)
+        return Response(serializer.data)
 
     def perform_destroy(self, instance):
         if instance.quantity > 0:

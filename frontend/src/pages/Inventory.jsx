@@ -77,6 +77,11 @@ export default function Inventory() {
   const [txnPageSize, setTxnPageSize] = useState(25)
   const [txnTotalCount, setTxnTotalCount] = useState(0)
   const [pendingExportsCount, setPendingExportsCount] = useState(0)
+  const [currentStockPage, setCurrentStockPage] = useState(1)
+  const [stockTotalCount, setStockTotalCount] = useState(0)
+  const [paginatedWarehouses, setPaginatedWarehouses] = useState([])
+  const [currentWarehousePage, setCurrentWarehousePage] = useState(1)
+  const [warehouseTotalCount, setWarehouseTotalCount] = useState(0)
 
   // Filters
   const [searchText, setSearchText] = useState('')
@@ -225,11 +230,14 @@ export default function Inventory() {
     }
   }, [])
 
-  const fetchStockLevels = useCallback(async () => {
+  const fetchStockLevels = useCallback(async (page = 1) => {
     await Promise.resolve()
     setLoading(true)
     try {
-      const params = {}
+      const params = {
+        page: page,
+        page_size: companySettings?.list_page_size || 25
+      }
       if (warehouseFilter) params.warehouse_id = warehouseFilter
       if (lowStockOnly) {
         params.low_stock = 'true'
@@ -237,16 +245,38 @@ export default function Inventory() {
           params.low_stock_threshold = lowStockThreshold
         }
       }
-      params.page_size = companySettings?.list_page_size || 1000
+      if (stockSearchText) params.search = stockSearchText
       const res = await api.get('/inventory/stock-levels/', { params })
       const data = Array.isArray(res.data) ? res.data : res.data?.results ?? []
       setStockLevels(data)
+      setStockTotalCount(res.data?.count || data.length || 0)
+      setCurrentStockPage(page)
     } catch {
       // ignore
     } finally {
       setLoading(false)
     }
-  }, [warehouseFilter, lowStockOnly, lowStockThreshold])
+  }, [warehouseFilter, lowStockOnly, lowStockThreshold, companySettings?.list_page_size, stockSearchText])
+
+  const fetchPaginatedWarehouses = useCallback(async (page = 1) => {
+    await Promise.resolve()
+    setLoading(true)
+    try {
+      const params = {
+        page: page,
+        page_size: companySettings?.list_page_size || 25
+      }
+      const res = await api.get('/inventory/warehouses/', { params })
+      const data = Array.isArray(res.data) ? res.data : res.data?.results ?? []
+      setPaginatedWarehouses(data)
+      setWarehouseTotalCount(res.data?.count || data.length || 0)
+      setCurrentWarehousePage(page)
+    } catch {
+      // ignore
+    } finally {
+      setLoading(false)
+    }
+  }, [companySettings?.list_page_size])
 
   const fetchTransactions = useCallback(async (page = 1) => {
     await Promise.resolve()
@@ -322,14 +352,17 @@ export default function Inventory() {
     if (activeTab === 'products') fetchProducts()
     else if (activeTab === 'categories') fetchCategories()
     else if (activeTab === 'stock') {
-      fetchStockLevels()
+      fetchStockLevels(1)
       if (products.length === 0) fetchProducts()
+    }
+    else if (activeTab === 'warehouses') {
+      fetchPaginatedWarehouses(1)
     }
     else if (activeTab === 'transactions' || activeTab === 'pending_exports') {
-      fetchTransactions()
+      fetchTransactions(1)
       if (products.length === 0) fetchProducts()
     }
-  }, [activeTab, fetchProducts, fetchCategories, fetchStockLevels, fetchTransactions, products.length])
+  }, [activeTab, fetchProducts, fetchCategories, fetchStockLevels, fetchPaginatedWarehouses, fetchTransactions, products.length])
 
   // ── Filtered Products ─────────────────────────────────────────────────
   const filteredProducts = products.filter((item) => {
@@ -1773,7 +1806,13 @@ export default function Inventory() {
                     <List
                       dataSource={groupedFilteredStockLevels}
                       loading={loading}
-                      pagination={{ pageSize: 25, size: 'small' }}
+                      pagination={{ 
+                        pageSize: companySettings?.list_page_size || 25,
+                        current: currentStockPage,
+                        total: stockTotalCount,
+                        size: 'small',
+                        onChange: (page) => fetchStockLevels(page)
+                      }}
                       renderItem={(r) => {
                         const isGroup = r.items && r.items.length > 1;
                         return (
@@ -1814,7 +1853,13 @@ export default function Inventory() {
                       dataSource={groupedFilteredStockLevels}
                       rowKey="id"
                       loading={loading}
-                      pagination={{ pageSize: 25 }}
+                      pagination={{ 
+                        pageSize: companySettings?.list_page_size || 25,
+                        current: currentStockPage,
+                        total: stockTotalCount,
+                        showSizeChanger: false,
+                        onChange: (page) => fetchStockLevels(page)
+                      }}
                       scroll={{ x: 'max-content' }}
                       expandable={{
                         expandedRowRender: (record) => {
@@ -1911,8 +1956,15 @@ export default function Inventory() {
                   )}
                   {isMobile ? (
                     <List
-                      dataSource={warehouses}
-                      pagination={{ pageSize: 25, size: "small" }}
+                      dataSource={paginatedWarehouses}
+                      loading={loading}
+                      pagination={{ 
+                        pageSize: companySettings?.list_page_size || 25,
+                        current: currentWarehousePage,
+                        total: warehouseTotalCount,
+                        size: "small",
+                        onChange: (page) => fetchPaginatedWarehouses(page)
+                      }}
                       renderItem={(w) => (
                         <List.Item style={{ padding: '16px', borderBottom: '1px solid #f0f0f0', display: 'block', background: '#fff' }}>
                           <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8, alignItems: 'center' }}>
@@ -1950,7 +2002,15 @@ export default function Inventory() {
                     />
                   ) : (
                     <Table scroll={{ x: 'max-content' }}
-                      dataSource={warehouses}
+                      dataSource={paginatedWarehouses}
+                      loading={loading}
+                      pagination={{ 
+                        pageSize: companySettings?.list_page_size || 25,
+                        current: currentWarehousePage,
+                        total: warehouseTotalCount,
+                        showSizeChanger: false,
+                        onChange: (page) => fetchPaginatedWarehouses(page)
+                      }}
                       rowKey="id"
                       columns={[
                         { title: 'Tên kho hàng', dataIndex: 'name', key: 'name', render: (v) => <Text strong style={{ fontSize: 15 }}>{v}</Text> },
