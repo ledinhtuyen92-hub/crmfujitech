@@ -1242,7 +1242,8 @@ function CustomerList() {
           }}
         />
       ) : (
-        <Table scroll={{ x: 'max-content', y: 'calc(100vh - 350px)' }}
+        <Table scroll={{ x: 'max-content' }}
+            sticky={{ offsetHeader: 0, getContainer: () => document.getElementById('main-content-scroll') }}
           onChange={(pagination, filters, sorter) => {
             setTableSort(sorter)
             if (pagination.current !== currentPage) {

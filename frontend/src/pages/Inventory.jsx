@@ -1764,7 +1764,8 @@ export default function Inventory() {
                       }}
                     />
                   ) : (
-                    <Table scroll={{ x: 'max-content', y: 'calc(100vh - 350px)' }}
+                    <Table scroll={{ x: 'max-content' }}
+            sticky={{ offsetHeader: 0, getContainer: () => document.getElementById('main-content-scroll') }}
                       columns={txnColumnOrder.filter(k => visibleTxnColumns.includes(k)).map(k => txnColumns.find(c => c.key === k)).filter(Boolean)}
                       dataSource={groupedFilteredTransactions}
                       rowKey="id"

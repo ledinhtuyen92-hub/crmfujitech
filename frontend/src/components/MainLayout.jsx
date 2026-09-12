@@ -863,6 +863,7 @@ function MainLayout({ children, isDarkMode, toggleTheme }) {
         </Header>
 
         <Content
+          id="main-content-scroll"
           style={{
             margin: '0',
             padding: location.pathname.includes('/inbox') ? 0 : '24px',

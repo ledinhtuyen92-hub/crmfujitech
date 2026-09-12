@@ -3026,7 +3026,8 @@ export default function QuotationList() {
             }}
           />
         ) : (
-          <Table scroll={{ x: 'max-content', y: 'calc(100vh - 350px)' }}
+          <Table scroll={{ x: 'max-content' }}
+            sticky={{ offsetHeader: 0, getContainer: () => document.getElementById('main-content-scroll') }}
             columns={columnOrder.filter(k => visibleColumns.includes(k)).map(k => columns.find(c => c.key === k)).filter(Boolean)}
             dataSource={filteredQuotations}
             rowKey="id"
