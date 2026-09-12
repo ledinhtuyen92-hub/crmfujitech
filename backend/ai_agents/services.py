@@ -231,12 +231,15 @@ def call_gemini(api_key, agent, system_prompt, conversation_history):
     if not raw_text:
         raise ValueError("Gemini trả về response rỗng (có thể do safety filter hoặc quá tải)")
     
-    # Xử lý trường hợp Gemini bọc JSON trong ```json...```
-    if raw_text.startswith('```'):
-        lines = raw_text.split('\n')
-        raw_text = '\n'.join(lines[1:-1]) if len(lines) > 2 else raw_text
-    
-    return json.loads(raw_text), usage
+    import re
+    match = re.search(r'\{.*\}', raw_text, re.DOTALL)
+    if match:
+        raw_text = match.group(0)
+        
+    try:
+        return json.loads(raw_text), usage
+    except Exception as e:
+        raise ValueError(f"Gemini JSON Parse Error: {e}. Raw text: {raw_text[:200]}")
 
 def call_anthropic(api_key, agent, system_prompt, conversation_history):
     client = anthropic.Anthropic(api_key=api_key)
