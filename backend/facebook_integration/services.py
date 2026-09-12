@@ -809,10 +809,11 @@ def process_fb_webhook_message(entry: dict):
             lead.has_unread_message = True
             lead.unread_count = (lead.unread_count or 0) + 1
             lead.has_ai_followed_up = False
+            lead.save(update_fields=["last_message_at", "last_message_preview", "has_unread_message", "unread_count", "has_ai_followed_up"])
         else:
             lead.has_unread_message = False
             lead.unread_count = 0
-        lead.save(update_fields=["last_message_at", "last_message_preview", "has_unread_message", "unread_count", "has_ai_followed_up"])
+            lead.save(update_fields=["last_message_at", "last_message_preview", "has_unread_message", "unread_count"])
 
         # Lưu tin nhắn
         attachments = message_data.get("attachments", []) if message_data else []

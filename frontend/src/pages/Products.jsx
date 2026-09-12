@@ -127,7 +127,7 @@ export default function Products() {
       const params = { 
         include_inactive: 'true',
         page: page,
-        page_size: pageSize || companySettings?.list_page_size || 25,
+        page_size: 25,
         product_type: pType
       }
       if (categoryFilter) params.category_id = categoryFilter
@@ -146,7 +146,7 @@ export default function Products() {
     } finally {
       setLoading(false)
     }
-  }, [categoryFilter, searchText, activeTab, pageSize, companySettings?.list_page_size, messageApi])
+  }, [categoryFilter, searchText, activeTab, pageSize, messageApi])
 
   const fetchCategories = useCallback(async () => {
     await Promise.resolve()
@@ -162,11 +162,6 @@ export default function Products() {
     fetchCategories()
   }, [fetchCategories])
 
-  useEffect(() => {
-    if (companySettings?.list_page_size) {
-      setPageSize(companySettings.list_page_size)
-    }
-  }, [companySettings?.list_page_size])
 
   useEffect(() => {
     setCurrentPage(1)
