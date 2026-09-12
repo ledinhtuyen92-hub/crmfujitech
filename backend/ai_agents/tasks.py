@@ -339,7 +339,7 @@ def process_ai_reply_zalo(lead_id, is_followup=False, trigger_msg_id=None):
             lead.is_ai_active = False
             lead.has_unread_message = True
             
-        lead.save()
+        lead.save(update_fields=['ai_tags', 'ai_summary', 'last_message', 'is_ai_active', 'has_unread_message'])
 
         # 5. Gửi tin nhắn (có Human Typing)
         reply_text = result.get('reply')
@@ -647,7 +647,7 @@ def process_ai_reply_facebook(lead_id, is_followup=False, trigger_msg_id=None):
             lead.is_ai_active = False
             lead.has_unread_message = True
             
-        lead.save()
+        lead.save(update_fields=['ai_tags', 'ai_summary', 'last_message_preview', 'is_ai_active', 'has_unread_message'])
 
         # 5. Gửi tin nhắn (có Human Typing)
         reply_text = result.get('reply')
@@ -1468,4 +1468,11 @@ def _apply_extracted_info(lead, phone, email, address, platform):
                 updated = True
                 
     if updated:
-        lead.save()
+        update_f = ["detected_email", "detected_address", "updated_at"]
+        if hasattr(lead, 'detected_phone') and lead.detected_phone:
+            update_f.append("detected_phone")
+        if hasattr(lead, 'is_customer_converted') and lead.is_customer_converted:
+            update_f.append("is_customer_converted")
+        if hasattr(lead, 'customer_id') and lead.customer_id:
+            update_f.append("customer")
+        lead.save(update_fields=list(set(update_f)))
