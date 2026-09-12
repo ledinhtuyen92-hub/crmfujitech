@@ -48,6 +48,7 @@ class ProductionOrderSerializer(serializers.ModelSerializer):
     factory_name = serializers.CharField(source="factory.name", read_only=True, default=None)
     delivery_status = serializers.SerializerMethodField()
     export_transaction_code = serializers.SerializerMethodField()
+    export_transaction_status = serializers.SerializerMethodField()
 
     class Meta:
         model = ProductionOrder
@@ -58,6 +59,7 @@ class ProductionOrderSerializer(serializers.ModelSerializer):
             "production_order_code",
             "order_number",
             "export_transaction_code",
+            "export_transaction_status",
             "factory",
             "factory_name",
             "status",
@@ -99,4 +101,14 @@ class ProductionOrderSerializer(serializers.ModelSerializer):
             ).order_by('-created_at').first()
             if txn:
                 return txn.transaction_code
+        return None
+
+    def get_export_transaction_status(self, obj):
+        if obj.order:
+            from inventory.models import InventoryTransaction
+            txn = InventoryTransaction.objects.filter(
+                reference_order=obj.order, type=InventoryTransaction.TYPE_EXPORT
+            ).order_by('-created_at').first()
+            if txn:
+                return txn.status
         return None

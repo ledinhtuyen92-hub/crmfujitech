@@ -171,11 +171,41 @@ export default function ProductionList() {
     }
   }
 
-  const handleCreateDeliveryOrder = async (orderId) => {
+  const handleCreateDeliveryOrder = async (record) => {
     if (checkMaintenance()) return
+    
+    // Kiểm tra lệnh xuất kho đã duyệt chưa
+    if (record.export_transaction_code && record.export_transaction_status !== 'approved') {
+      Modal.warning({
+        title: 'Chưa duyệt lệnh xuất kho',
+        content: (
+          <div>
+            Lệnh xuất kho <strong>{record.export_transaction_code}</strong> liên kết với đơn hàng này chưa được duyệt. 
+            <br/><br/>
+            Vui lòng duyệt lệnh xuất kho trước khi tạo lệnh giao hàng.
+          </div>
+        ),
+        okText: 'Đóng',
+      });
+      return;
+    } else if (!record.export_transaction_code) {
+      Modal.warning({
+        title: 'Chưa có lệnh xuất kho',
+        content: (
+          <div>
+            Đơn hàng này chưa có lệnh xuất kho. 
+            <br/><br/>
+            Vui lòng tạo và duyệt lệnh xuất kho trước khi tạo lệnh giao hàng.
+          </div>
+        ),
+        okText: 'Đóng',
+      });
+      return;
+    }
+
     try {
       setLoading(true)
-      await api.post('/delivery/deliveries/', { order: orderId, status: 'pending' })
+      await api.post('/delivery/deliveries/', { order: record.order, status: 'pending' })
       messageApi.success('Đã tạo phiếu giao hàng thành công!')
       fetchProductionOrders()
     } catch (err) {
@@ -780,7 +810,7 @@ export default function ProductionList() {
                     type="primary" 
                     danger 
                     size="small" 
-                    onClick={() => handleCreateDeliveryOrder(r.order)}
+                    onClick={() => handleCreateDeliveryOrder(r)}
                     style={{ fontSize: 11, height: 22, padding: '0 6px' }}
                   >
                     Hàng chưa được giao
