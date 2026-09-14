@@ -475,27 +475,36 @@ class StockLevelViewSet(mixins.UpdateModelMixin, mixins.DestroyModelMixin, views
         if user.is_superuser and user.company_id is None:
             return super().get_queryset()
         qs = self.queryset.filter(product__company=user.company)
+        
         # Filter cảnh báo tồn kho thấp
         if self.request.query_params.get("low_stock") == "true":
             threshold_str = self.request.query_params.get("low_stock_threshold")
-            if threshold_str is not None and threshold_str.isdigit():
-                threshold = int(threshold_str)
-                # Thoả mãn 1 trong 2: bé hơn ngưỡng chung VÀ/HOẶC bé hơn ngưỡng riêng của sản phẩm đó
-                low_stock_ids = [s.id for s in qs if s.quantity <= threshold or s.is_low_stock]
-            else:
-                # Lọc thủ công vì is_low_stock là property
-                low_stock_ids = [s.id for s in qs if s.is_low_stock]
-            qs = qs.filter(id__in=low_stock_ids)
+            try:
+                threshold = int(threshold_str) if threshold_str else 0
+            except ValueError:
+                threshold = 0
+            
+            from django.db.models import F, Case, When, Value, IntegerField
+            qs = qs.annotate(
+                effective_min=Case(
+                    When(min_quantity__isnull=False, min_quantity__gt=0, then=F('min_quantity')),
+                    default=Value(threshold),
+                    output_field=IntegerField()
+                )
+            ).filter(quantity__lte=F('effective_min'))
+
         warehouse_id = self.request.query_params.get("warehouse_id")
         if warehouse_id:
             qs = qs.filter(warehouse_id=warehouse_id)
+            
         search_query = self.request.query_params.get("search")
         if search_query:
             from django.db.models import Q
             qs = qs.filter(
                 Q(product__name__icontains=search_query) |
-                Q(product__code__icontains=search_query)
+                Q(product__sku__icontains=search_query)
             )
+            
         return qs
 
     def list(self, request, *args, **kwargs):

@@ -38,6 +38,7 @@ import dayjs from 'dayjs'
 import React, { useCallback, useEffect, useState, useRef } from 'react'
 import { useLocation } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
+import useDebounce from '../hooks/useDebounce'
 import api from '../utils/api'
 import QuotationPrintView from '../components/QuotationPrintView'
 import ReceiptPrintView from '../components/ReceiptPrintView'
@@ -169,6 +170,30 @@ export default function OrderList() {
   const [totalCount, setTotalCount] = useState(0)
   const [stats, setStats] = useState({ total_revenue: 0, total_pending: 0, total_approved: 0, total_completed: 0 })
   const [customers, setCustomers] = useState([])
+  const [fetchingCustomers, setFetchingCustomers] = useState(false)
+  const debounceFetcherCustomersRef = useRef(null)
+  const injectedCustomerRef = useRef(null)
+
+  const fetchCustomerOptions = useCallback((search = '') => {
+    setFetchingCustomers(true)
+    api.get('/crm/customers/', { params: { search, page_size: 25 } })
+      .then(res => {
+        const data = Array.isArray(res.data) ? res.data : res.data?.results ?? []
+        if (injectedCustomerRef.current && !data.find(c => c.id === injectedCustomerRef.current.id)) {
+          data.unshift(injectedCustomerRef.current);
+        }
+        setCustomers(data)
+      })
+      .catch(() => setCustomers([]))
+      .finally(() => setFetchingCustomers(false))
+  }, [])
+
+  const handleCustomerSearch = useCallback((val) => {
+    if (debounceFetcherCustomersRef.current) clearTimeout(debounceFetcherCustomersRef.current)
+    debounceFetcherCustomersRef.current = setTimeout(() => {
+      fetchCustomerOptions(val)
+    }, 400)
+  }, [fetchCustomerOptions])
   const [products, setProducts] = useState([])
   const [znsModalVisible, setZnsModalVisible] = useState(false)
   const [printingOrder, setPrintingOrder] = useState(null)
@@ -251,7 +276,7 @@ export default function OrderList() {
   };
 
   // Filters
-  const [searchText, setSearchText] = useState('')
+  const [searchInput, searchQuery, handleSearchChange] = useDebounce('', 400)
   const [statusFilter, setStatusFilter] = useState('')
   const [financialFilter, setFinancialFilter] = useState('')
   const [paymentTargetFilter, setPaymentTargetFilter] = useState('')
@@ -569,7 +594,7 @@ export default function OrderList() {
       if (financialFilter) params.financial_status = financialFilter
       if (paymentTargetFilter) params.payment_target = paymentTargetFilter
       if (exportFilter) params.export_status = exportFilter
-      if (searchText) params.search = searchText
+      if (searchQuery) params.search = searchQuery
       
       const res = await api.get('/orders/orders/', { params })
       const data = res.data?.results ?? (Array.isArray(res.data) ? res.data : [])
@@ -586,19 +611,22 @@ export default function OrderList() {
     } finally {
       setLoading(false)
     }
-  }, [statusFilter, financialFilter, paymentTargetFilter, exportFilter, searchText, pageSize, messageApi])
+  }, [statusFilter, financialFilter, paymentTargetFilter, exportFilter, searchQuery, pageSize, messageApi])
 
   const fetchCustomersAndProducts = useCallback(async () => {
     await Promise.resolve()
     try {
       const [custRes, prodRes, tmplRes, myCompTmplRes, factoryRes] = await Promise.all([
-        api.get('/crm/customers/').catch(() => ({ data: [] })),
-        api.get('/inventory/products/').catch(() => ({ data: [] })),
+        api.get('/crm/customers/', { params: { page_size: 25 } }).catch(() => ({ data: [] })),
+        api.get('/inventory/products/', { params: { page_size: 10000 } }).catch(() => ({ data: [] })),
         api.get('/sales/quotation-templates/active/').catch(() => ({ data: [] })),
         api.get('/sales/quotation-templates/my-company-template/').catch(() => ({ data: null })),
-        api.get('/production/factories/').catch(() => ({ data: [] })),
+        api.get('/production/factories/', { params: { page_size: 10000 } }).catch(() => ({ data: [] })),
       ])
       const custData = Array.isArray(custRes.data) ? custRes.data : custRes.data?.results ?? []
+      if (injectedCustomerRef.current && !custData.find(c => c.id === injectedCustomerRef.current.id)) {
+        custData.unshift(injectedCustomerRef.current);
+      }
       const prodData = Array.isArray(prodRes.data) ? prodRes.data : prodRes.data?.results ?? []
       const factoryData = Array.isArray(factoryRes.data) ? factoryRes.data : factoryRes.data?.results ?? []
       setCustomers(custData)
@@ -2358,9 +2386,27 @@ export default function OrderList() {
   }
 
   // ── Open Modal ────────────────────────────────────────────────────────
-  const openModal = (order = null) => {
+  const openModal = (order = null, prefillCustomerId = null, prefillCustomerData = null) => {
     if (checkMaintenance()) return
     setEditingOrder(order)
+    if (order && order.customer && order.customer_info?.name) {
+      const injected = { id: order.customer, name: order.customer_info.name, phone: order.customer_info.phone || '' }
+      injectedCustomerRef.current = injected
+      setCustomers(prev => {
+        if (!prev.find(c => c.id === order.customer)) {
+          return [...prev, injected]
+        }
+        return prev
+      })
+    } else if (prefillCustomerId && prefillCustomerData) {
+      injectedCustomerRef.current = prefillCustomerData
+      setCustomers(prev => {
+        if (!prev.find(c => c.id === prefillCustomerId)) {
+          return [...prev, prefillCustomerData]
+        }
+        return prev
+      })
+    }
     if (order) {
       form.setFieldsValue({
         customer: order.customer,
@@ -3255,8 +3301,8 @@ export default function OrderList() {
             <Input
               placeholder="Tìm theo mã đơn hàng, tên khách hàng..."
               prefix={<SearchOutlined style={{ color: '#94a3b8' }} />}
-              value={searchText}
-              onChange={(e) => setSearchText(e.target.value)}
+              value={searchInput}
+              onChange={handleSearchChange}
               allowClear
               style={{ borderRadius: 8 }}
             />
@@ -3432,7 +3478,11 @@ export default function OrderList() {
                 <Select
                   showSearch
                   placeholder="Chọn hoặc tìm kiếm khách hàng..."
-                  optionFilterProp="children"
+                  filterOption={false}
+                  onSearch={handleCustomerSearch}
+                  notFoundContent={fetchingCustomers ? null : 'No data'}
+                  loading={fetchingCustomers}
+                  onFocus={() => { if (customers.length === 0) fetchCustomerOptions() }}
                 >
                   {customers.map((c) => (
                     <Option key={c.id} value={c.id}>

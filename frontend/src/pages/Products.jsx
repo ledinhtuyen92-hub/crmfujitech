@@ -47,6 +47,7 @@ import {
 import dayjs from 'dayjs'
 import { useCallback, useEffect, useState, useRef } from 'react'
 import { useAuth } from '../contexts/AuthContext'
+import useDebounce from '../hooks/useDebounce'
 import api from '../utils/api'
 import ProductTemplateTab from './inventory/ProductTemplateTab'
 import { useResponsive } from '../hooks/useResponsive'
@@ -94,7 +95,7 @@ export default function Products() {
   const [totalCounts, setTotalCounts] = useState({ product: 0, service: 0 })
 
   // Filters
-  const [searchText, setSearchText] = useState('')
+  const [searchInput, searchQuery, handleSearchChange] = useDebounce('', 400)
   const [categoryFilter, setCategoryFilter] = useState('')
 
   // Modals
@@ -131,7 +132,7 @@ export default function Products() {
         product_type: pType
       }
       if (categoryFilter) params.category_id = categoryFilter
-      if (searchText) params.search = searchText
+      if (searchQuery) params.search = searchQuery
 
       const res = await api.get('/inventory/products/', { params })
       const data = res.data?.results ?? (Array.isArray(res.data) ? res.data : [])
@@ -146,7 +147,7 @@ export default function Products() {
     } finally {
       setLoading(false)
     }
-  }, [categoryFilter, searchText, activeTab, pageSize, messageApi])
+  }, [categoryFilter, searchQuery, activeTab, pageSize, messageApi])
 
   const fetchCategories = useCallback(async () => {
     await Promise.resolve()
@@ -167,14 +168,14 @@ export default function Products() {
     setCurrentPage(1)
     if (activeTab === 'products' || activeTab === 'services') fetchProducts(1)
     else if (activeTab === 'categories') fetchCategories()
-  }, [activeTab, categoryFilter, searchText, fetchProducts, fetchCategories])
+  }, [activeTab, categoryFilter, searchQuery, fetchProducts, fetchCategories])
 
   // ── Filtered Products (Not used for table anymore, kept for reference) ─────────────────────────────────────────────────
   const filteredProducts = products.filter((item) => {
-    if (!searchText) return true
+    if (!searchQuery) return true
     const name = (item.name || '').toLowerCase()
     const sku = (item.sku || '').toLowerCase()
-    const query = searchText.toLowerCase()
+    const query = searchQuery.toLowerCase()
     return name.includes(query) || sku.includes(query)
   })
 

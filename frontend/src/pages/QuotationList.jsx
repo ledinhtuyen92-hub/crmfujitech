@@ -1,8 +1,9 @@
 import { AlertOutlined, CheckCircleOutlined, ClockCircleOutlined, CloseCircleOutlined, DeleteOutlined, EditOutlined, FileDoneOutlined, FilePdfOutlined, FileTextOutlined, PlusOutlined, PrinterOutlined, SearchOutlined, SendOutlined, SettingOutlined, UserOutlined, CameraOutlined, TableOutlined } from '@ant-design/icons'
 import { AutoComplete, Badge, Button, Card, Checkbox, Col, DatePicker, Divider, Drawer, Form, Input, InputNumber, Modal, Popconfirm, Row, Select, Space, Table, Tag, Tooltip, Typography, message, theme, Upload, Avatar, Image, List, Popover } from 'antd' 
 import dayjs from 'dayjs'
-import React, { useCallback, useEffect, useState } from 'react'
+import React, { useCallback, useEffect, useState, useRef } from 'react'
 import { useAuth } from '../contexts/AuthContext'
+import useDebounce from '../hooks/useDebounce'
 import { useLocation } from 'react-router-dom'
 import { DndContext, PointerSensor, useSensor, useSensors, KeyboardSensor, closestCenter } from '@dnd-kit/core';
 import { restrictToVerticalAxis } from '@dnd-kit/modifiers';
@@ -109,6 +110,30 @@ export default function QuotationList() {
   // Data states
   const [quotations, setQuotations] = useState([])
   const [customers, setCustomers] = useState([])
+  const [fetchingCustomers, setFetchingCustomers] = useState(false)
+  const debounceFetcherCustomersRef = useRef(null)
+  const injectedCustomerRef = useRef(null)
+
+  const fetchCustomerOptions = useCallback((search = '') => {
+    setFetchingCustomers(true)
+    api.get('/crm/customers/', { params: { search, page_size: 25 } })
+      .then(res => {
+        const data = Array.isArray(res.data) ? res.data : res.data?.results ?? []
+        if (injectedCustomerRef.current && !data.find(c => c.id === injectedCustomerRef.current.id)) {
+          data.unshift(injectedCustomerRef.current);
+        }
+        setCustomers(data)
+      })
+      .catch(() => setCustomers([]))
+      .finally(() => setFetchingCustomers(false))
+  }, [])
+
+  const handleCustomerSearch = useCallback((val) => {
+    if (debounceFetcherCustomersRef.current) clearTimeout(debounceFetcherCustomersRef.current)
+    debounceFetcherCustomersRef.current = setTimeout(() => {
+      fetchCustomerOptions(val)
+    }, 400)
+  }, [fetchCustomerOptions])
   const [products, setProducts] = useState([])
   const [factories, setFactories] = useState([])
   const [companyTemplate, setCompanyTemplate] = useState(null)
@@ -167,7 +192,7 @@ export default function QuotationList() {
     }
   };
   // Filters
-  const [searchText, setSearchText] = useState('')
+  const [searchInput, searchQuery, handleSearchChange] = useDebounce('', 400)
   const [statusFilter, setStatusFilter] = useState('')
 
   // Modal Add / Edit
@@ -234,7 +259,7 @@ export default function QuotationList() {
         page_size: pageSize
       }
       if (statusFilter) params.status = statusFilter
-      if (searchText) params.search = searchText
+      if (searchQuery) params.search = searchQuery
       
       const res = await api.get('/sales/quotations/', { params })
       const data = res.data?.results ?? (Array.isArray(res.data) ? res.data : [])
@@ -251,7 +276,7 @@ export default function QuotationList() {
     } finally {
       setLoading(false)
     }
-  }, [statusFilter, searchText, pageSize, messageApi])
+  }, [statusFilter, searchQuery, pageSize, messageApi])
 
   const fetchCustomersAndProducts = useCallback(async () => {
     await Promise.resolve()
@@ -263,6 +288,9 @@ export default function QuotationList() {
         api.get('/production/factories/').catch(() => ({ data: [] })),
       ])
       const custData = Array.isArray(custRes.data) ? custRes.data : custRes.data?.results ?? []
+      if (injectedCustomerRef.current && !custData.find(c => c.id === injectedCustomerRef.current.id)) {
+        custData.unshift(injectedCustomerRef.current);
+      }
       const prodData = Array.isArray(prodRes.data) ? prodRes.data : prodRes.data?.results ?? []
       const factoryData = Array.isArray(factoryRes.data) ? factoryRes.data : factoryRes.data?.results ?? []
       setCustomers(custData)
@@ -284,6 +312,7 @@ export default function QuotationList() {
 
   useEffect(() => {
     const stateCustId = location.state?.createForCustomer
+    const stateCustData = location.state?.customerData
     const params = new URLSearchParams(location.search)
     const queryCustId = params.get('customerId')
     const searchQuery = params.get('search')
@@ -295,7 +324,7 @@ export default function QuotationList() {
     const targetId = stateCustId || queryCustId
     if (targetId) {
       const numId = Number(targetId) || targetId
-      openModal(null, numId)
+      openModal(null, numId, stateCustData)
       window.history.replaceState({}, '', '/quotations')
     }
   }, [location.state, location.search])
@@ -647,9 +676,27 @@ export default function QuotationList() {
   }
 
   // ── Open Modal ────────────────────────────────────────────────────────
-  const openModal = (quotation = null, prefillCustomerId = null) => {
+  const openModal = (quotation = null, prefillCustomerId = null, prefillCustomerData = null) => {
     if (checkMaintenance()) return
     setEditingQuotation(quotation)
+    if (quotation && quotation.customer && quotation.customer_info?.name) {
+      const injected = { id: quotation.customer, name: quotation.customer_info.name, phone: quotation.customer_info.phone || '' }
+      injectedCustomerRef.current = injected
+      setCustomers(prev => {
+        if (!prev.find(c => c.id === quotation.customer)) {
+          return [...prev, injected]
+        }
+        return prev
+      })
+    } else if (prefillCustomerId && prefillCustomerData) {
+      injectedCustomerRef.current = prefillCustomerData
+      setCustomers(prev => {
+        if (!prev.find(c => c.id === prefillCustomerId)) {
+          return [...prev, prefillCustomerData]
+        }
+        return prev
+      })
+    }
     const defaultTerms = companySettings?.default_quotation_terms || companyTemplate?.company_default_terms || companyTemplate?.footer_content || 'Thanh toán 50% sau khi ký hợp đồng, 50% sau khi nghiệm thu thi công.'
     const defaultPaymentTerms = 'Thanh toán 50% tạm ứng ngay sau khi xác nhận đơn hàng, 50% còn lại thanh toán sau khi bàn giao nghiệm thu.'
     if (quotation) {
@@ -1899,7 +1946,10 @@ export default function QuotationList() {
                             }
                             updated[idx] = item;
                             for (let i = idx + 1; i < prev.length; i++) {
-                              if (!sameGroup(prev, idx, i)) break;
+                              const ni = prev[i];
+                              const isSameGroup = (ni.product && ni.product === prev[idx].product) ||
+                                (!ni.product && !prev[idx].product && ni.product_name === prev[idx].product_name && (!!ni.product_name || ni.custom_data?.is_custom_size !== undefined || ni.custom_data?.is_child));
+                              if (!isSameGroup) break;
                               updated[i] = { ...updated[i], product: item.product, product_name: item.product_name, product_image: item.product_image };
                             }
                             return updated;
@@ -2952,8 +3002,8 @@ export default function QuotationList() {
             <Input
               placeholder="Tìm theo mã báo giá, tên, SĐT khách hàng..."
               prefix={<SearchOutlined style={{ color: '#94a3b8' }} />}
-              value={searchText}
-              onChange={(e) => setSearchText(e.target.value)}
+              value={searchInput}
+              onChange={handleSearchChange}
               allowClear
               style={{ borderRadius: 8 }}
             />
@@ -3077,7 +3127,11 @@ export default function QuotationList() {
                 <Select
                   showSearch
                   placeholder="Chọn hoặc tìm kiếm khách hàng..."
-                  optionFilterProp="children"
+                  filterOption={false}
+                  onSearch={handleCustomerSearch}
+                  notFoundContent={fetchingCustomers ? null : 'No data'}
+                  loading={fetchingCustomers}
+                  onFocus={() => { if (customers.length === 0) fetchCustomerOptions() }}
                 >
                   {customers.map((c) => (
                     <Option key={c.id} value={c.id}>

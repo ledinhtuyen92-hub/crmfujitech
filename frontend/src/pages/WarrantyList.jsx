@@ -29,6 +29,7 @@ import SortableColumnOption from '../components/SortableColumnOption';
 
 import api from '../utils/api'
 import { useAuth } from '../contexts/AuthContext'
+import useDebounce from '../hooks/useDebounce'
 import WarrantyPrintView from '../components/WarrantyPrintView'
 
 const { Title, Text } = Typography
@@ -47,7 +48,7 @@ export default function WarrantyList() {
   const [currentPage, setCurrentPage] = useState(1)
   const [pageSize, setPageSize] = useState(25)
   const [totalCount, setTotalCount] = useState(0)
-  const [searchText, setSearchText] = useState('')
+  const [searchInput, searchQuery, handleSearchChange] = useDebounce('', 400)
   const [statusFilter, setStatusFilter] = useState(null)
 
   const allColumnsOptions = [
@@ -141,7 +142,7 @@ export default function WarrantyList() {
         page_size: pageSize
       }
       if (statusFilter) params.status = statusFilter
-      if (searchText) params.search = searchText
+      if (searchQuery) params.search = searchQuery
       const res = await api.get('/delivery/warranties/', { params })
       const data = res.data?.results ?? (Array.isArray(res.data) ? res.data : [])
       
@@ -153,7 +154,7 @@ export default function WarrantyList() {
     } finally {
       setLoading(false)
     }
-  }, [statusFilter, searchText, pageSize])
+  }, [statusFilter, searchQuery, pageSize])
 
   useEffect(() => {
     fetchWarranties()
@@ -475,8 +476,8 @@ export default function WarrantyList() {
             <Input
               placeholder="Tìm kiếm mã BH, khách hàng, SĐT..."
               prefix={<SearchOutlined />}
-              value={searchText}
-              onChange={(e) => setSearchText(e.target.value)}
+              value={searchInput}
+              onChange={handleSearchChange}
               allowClear
             />
           </Col>

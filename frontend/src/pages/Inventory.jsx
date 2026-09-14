@@ -47,7 +47,7 @@ import {
   Popover,
 } from 'antd'
 import dayjs from 'dayjs'
-import { useCallback, useEffect, useState, useMemo, useRef } from 'react'
+import { useCallback, useEffect, useState, useMemo, useRef, startTransition } from 'react'
 import { useLocation } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
 import api from '../utils/api'
@@ -101,11 +101,31 @@ export default function Inventory() {
     }
   }, [location.search])
   const [stockSearchText, setStockSearchText] = useState('')
+  const [stockSearchQuery, setStockSearchQuery] = useState('')
+  const stockSearchTimeoutRef = useRef(null)
+  const handleStockSearchChange = (e) => {
+    const val = e.target.value;
+    setStockSearchText(val);
+    if (stockSearchTimeoutRef.current) clearTimeout(stockSearchTimeoutRef.current);
+    stockSearchTimeoutRef.current = setTimeout(() => {
+      startTransition(() => setStockSearchQuery(val));
+    }, 400);
+  }
   const [categoryFilter, setCategoryFilter] = useState('')
   const [warehouseFilter, setWarehouseFilter] = useState('')
   const [lowStockOnly, setLowStockOnly] = useState(false)
   const [lowStockThreshold, setLowStockThreshold] = useState(null)
   const [txnSearchText, setTxnSearchText] = useState('')
+  const [txnSearchQuery, setTxnSearchQuery] = useState('')
+  const txnSearchTimeoutRef = useRef(null)
+  const handleTxnSearchChange = (e) => {
+    const val = e.target.value;
+    setTxnSearchText(val);
+    if (txnSearchTimeoutRef.current) clearTimeout(txnSearchTimeoutRef.current);
+    txnSearchTimeoutRef.current = setTimeout(() => {
+      startTransition(() => setTxnSearchQuery(val));
+    }, 400);
+  }
   const [txnTypeFilter, setTxnTypeFilter] = useState('')
   const [txnStatusFilter, setTxnStatusFilter] = useState('')
   const [txnWarehouseFilter, setTxnWarehouseFilter] = useState('')
@@ -207,6 +227,7 @@ export default function Inventory() {
   const [txnModalVisible, setTxnModalVisible] = useState(false)
   const [txnModalMode, setTxnModalMode] = useState('import')
   const [txnForm] = Form.useForm()
+  const [modalStockLevels, setModalStockLevels] = useState([]) // unfiltered stock for the txn modal product dropdown
 
   const [exportApproveModalVisible, setExportApproveModalVisible] = useState(false)
   const [selectedExportTxn, setSelectedExportTxn] = useState(null)
@@ -411,6 +432,47 @@ export default function Inventory() {
       if (products.length === 0) fetchProducts()
     }
   }, [activeTab, fetchProducts, fetchCategories, fetchStockLevels, fetchPaginatedWarehouses, fetchTransactions, products.length])
+
+
+  // Trigger server-side search for stock levels when search query changes
+  useEffect(() => {
+    if (activeTab !== 'stock') return
+    setLoading(true)
+    const params = { page: 1, page_size: 25 }
+    if (warehouseFilter) params.warehouse_id = warehouseFilter
+    if (lowStockOnly) params.low_stock = 'true'
+    if (stockSearchQuery) params.search = stockSearchQuery
+    api.get('/inventory/stock-levels/', { params })
+      .then(res => {
+        const data = Array.isArray(res.data) ? res.data : res.data?.results ?? []
+        setStockLevels(data)
+        setStockTotalCount(res.data?.count || data.length || 0)
+        setCurrentStockPage(1)
+      })
+      .catch(() => {})
+      .finally(() => setLoading(false))
+  }, [stockSearchQuery])
+
+  // Trigger server-side search for transactions when search query changes
+  useEffect(() => {
+    if (activeTab !== 'transactions' && activeTab !== 'pending_exports') return
+    setLoading(true)
+    const params = { page: 1, page_size: txnPageSize }
+    if (txnTypeFilter) params.type = txnTypeFilter
+    if (txnStatusFilter && txnStatusFilter !== 'deleted_mo') params.status = txnStatusFilter
+    if (txnWarehouseFilter) params.warehouse = txnWarehouseFilter
+    if (txnSearchQuery) params.search = txnSearchQuery
+    api.get('/inventory/transactions/', { params })
+      .then(res => {
+        const data = res.data?.results ?? (Array.isArray(res.data) ? res.data : [])
+        setTransactions(data)
+        setTxnTotalCount(res.data?.count || data.length || 0)
+        setCurrentTxnPage(1)
+        if (res.data?.stats) setPendingExportsCount(res.data.stats.pending_exports_count || 0)
+      })
+      .catch(() => {})
+      .finally(() => setLoading(false))
+  }, [txnSearchQuery])
 
   // ── Filtered Products ─────────────────────────────────────────────────
   const filteredProducts = products.filter((item) => {
@@ -828,9 +890,14 @@ export default function Inventory() {
       type: defaultType, 
       items: [{ product: null, quantity: 1, unit_cost: 0 }]
     })
-    // For export/adjust/transfer we need stock levels to filter available products
+    // For export/adjust/transfer we need ALL stock levels (no search filter) for product dropdown
     if (defaultType !== 'import') {
-      fetchStockLevels()
+      api.get('/inventory/stock-levels/', { params: { page_size: 10000 } })
+        .then(res => {
+          const data = Array.isArray(res.data) ? res.data : res.data?.results ?? []
+          setModalStockLevels(data)
+        })
+        .catch(() => {})
     }
     // Ensure products are loaded
     if (products.length === 0) {
@@ -1596,7 +1663,7 @@ export default function Inventory() {
                             placeholder="Tìm mã phiếu, mã ĐH, SP..."
                             prefix={<SearchOutlined style={{ color: '#94a3b8' }} />}
                             value={txnSearchText}
-                            onChange={(e) => setTxnSearchText(e.target.value)}
+                            onChange={handleTxnSearchChange}
                             allowClear
                             style={{ borderRadius: 8, width: '100%' }}
                           />
@@ -1850,7 +1917,7 @@ export default function Inventory() {
                         placeholder="Tìm theo tên sản phẩm hoặc mã SKU..."
                         prefix={<SearchOutlined style={{ color: '#94a3b8' }} />}
                         value={stockSearchText}
-                        onChange={(e) => setStockSearchText(e.target.value)}
+                        onChange={handleStockSearchChange}
                         allowClear
                         style={{ borderRadius: 8 }}
                       />
@@ -2482,8 +2549,8 @@ export default function Inventory() {
                               let availableProds = products.filter(p => p.product_type !== 'service');
                               
                               if ((txnType === 'adjust' || txnType === 'export' || txnType === 'transfer') && wId) {
-                                const stockPIds = stockLevels.filter(s => Number(s.warehouse) === Number(wId)).map(s => s.product);
-                                // Only filter if stockLevels is loaded; fallback to all products if empty
+                                const stockPIds = modalStockLevels.filter(s => Number(s.warehouse) === Number(wId)).map(s => s.product);
+                                // Only filter if modalStockLevels is loaded; fallback to all products if empty
                                 if (stockPIds.length > 0) {
                                   availableProds = availableProds.filter(p => stockPIds.includes(p.id));
                                 }
@@ -2504,6 +2571,51 @@ export default function Inventory() {
                                   </Select>
                                 </Form.Item>
                               )
+                            }}
+                          </Form.Item>
+                          {/* Tồn kho hint bên dưới ô chọn sản phẩm */}
+                          <Form.Item
+                            noStyle
+                            shouldUpdate={(prev, curr) => {
+                              const pname = 'items';
+                              return (
+                                prev.warehouse !== curr.warehouse ||
+                                prev.type !== curr.type ||
+                                JSON.stringify(prev[pname]) !== JSON.stringify(curr[pname])
+                              );
+                            }}
+                          >
+                            {({ getFieldValue }) => {
+                              const txnType = getFieldValue('type');
+                              const wId = getFieldValue('warehouse');
+                              const pId = getFieldValue(['items', name, 'product']);
+                              if (!pId || !wId || txnType === 'import') return null;
+                              const stock = modalStockLevels.find(
+                                s => Number(s.product) === Number(pId) && Number(s.warehouse) === Number(wId)
+                              );
+                              const qty = stock ? Number(stock.quantity) : null;
+                              const prod = products.find(p => p.id === pId);
+                              const unit = prod?.unit || 'cái';
+                              if (qty === null) return null;
+                              const isLow = qty <= (stock?.min_quantity || 0);
+                              return (
+                                <div style={{
+                                  marginTop: 4,
+                                  padding: '3px 10px',
+                                  borderRadius: 6,
+                                  background: isLow ? '#fef2f2' : '#f0fdf4',
+                                  border: `1px solid ${isLow ? '#fca5a5' : '#86efac'}`,
+                                  display: 'inline-flex',
+                                  alignItems: 'center',
+                                  gap: 6,
+                                  fontSize: 12,
+                                  color: isLow ? '#dc2626' : '#16a34a',
+                                  fontWeight: 600,
+                                }}>
+                                  
+                                  <span>Tồn kho hiện tại: <strong>{qty.toLocaleString('vi-VN')}</strong> {unit}</span>
+                                </div>
+                              );
                             }}
                           </Form.Item>
                         </Col>
@@ -2528,7 +2640,7 @@ export default function Inventory() {
                                         const wId = getFieldValue('warehouse');
                                         const pId = getFieldValue(['items', name, 'product']);
                                         if (value > 0 && wId && pId && (txnModalMode === 'export' || txnModalMode === 'transfer')) {
-                                          const stock = stockLevels.find(s => s.warehouse === wId && s.product === pId);
+                                          const stock = modalStockLevels.find(s => Number(s.warehouse) === Number(wId) && Number(s.product) === Number(pId));
                                           const maxS = stock ? stock.quantity : 0;
                                           if (value > maxS) {
                                             return Promise.reject(new Error(`Tồn kho: ${maxS}`));

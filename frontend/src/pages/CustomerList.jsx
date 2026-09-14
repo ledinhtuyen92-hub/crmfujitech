@@ -74,6 +74,7 @@ import { CSS } from '@dnd-kit/utilities';
 import { useNavigate } from 'react-router-dom'
 import api from '../utils/api'
 import { useAuth } from '../contexts/AuthContext'
+import useDebounce from '../hooks/useDebounce'
 import { useResponsive } from '../hooks/useResponsive'
 import dayjs from 'dayjs'
 
@@ -432,7 +433,7 @@ function CustomerList() {
 
   const handleCreateQuotationFromCustomer = (record, e) => {
     e?.stopPropagation()
-    navigate('/quotations', { state: { createForCustomer: record.id } })
+    navigate('/quotations', { state: { createForCustomer: record.id, customerData: record } })
   }
 
   const handleViewQuotations = (record, e) => {

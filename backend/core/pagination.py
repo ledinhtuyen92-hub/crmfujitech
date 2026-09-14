@@ -8,7 +8,7 @@ class InboxPagination(PageNumberPagination):
 class StandardPagination(PageNumberPagination):
     page_size = 25
     page_size_query_param = 'page_size'
-    max_page_size = 1000
+    max_page_size = 10000
 
 class OptionalPagination(PageNumberPagination):
     """Phân trang tùy chọn: Chỉ phân trang nếu request có gửi lên tham số page_size."""

@@ -30,6 +30,7 @@ import SortableColumnOption from '../components/SortableColumnOption';
 
 import api from '../utils/api'
 import { useAuth } from '../contexts/AuthContext'
+import useDebounce from '../hooks/useDebounce'
 import QuotationPrintView from '../components/QuotationPrintView'
 import TransactionPrintView from '../components/TransactionPrintView'
 
@@ -50,7 +51,7 @@ export default function DeliveryList() {
   const [currentPage, setCurrentPage] = useState(1)
   const [pageSize, setPageSize] = useState(25)
   const [totalCount, setTotalCount] = useState(0)
-  const [searchText, setSearchText] = useState('')
+  const [searchInput, searchQuery, handleSearchChange] = useDebounce('', 400)
   const [statusFilter, setStatusFilter] = useState(null)
 
   const allColumnsOptions = [
@@ -170,7 +171,7 @@ export default function DeliveryList() {
         page_size: pageSize
       }
       if (statusFilter) params.status = statusFilter
-      if (searchText) params.search = searchText
+      if (searchQuery) params.search = searchQuery
       
       const res = await api.get('/delivery/deliveries/', { params })
       const data = res.data?.results ?? (Array.isArray(res.data) ? res.data : [])
@@ -183,7 +184,7 @@ export default function DeliveryList() {
     } finally {
       setLoading(false)
     }
-  }, [statusFilter, searchText, pageSize])
+  }, [statusFilter, searchQuery, pageSize])
 
   useEffect(() => {
     fetchDeliveries()
@@ -694,8 +695,8 @@ export default function DeliveryList() {
             <Input
               placeholder="Tìm kiếm mã GH, đơn hàng, người giao..."
               prefix={<SearchOutlined />}
-              value={searchText}
-              onChange={(e) => setSearchText(e.target.value)}
+              value={searchInput}
+              onChange={handleSearchChange}
               allowClear
             />
           </Col>

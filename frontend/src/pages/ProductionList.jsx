@@ -43,6 +43,7 @@ import dayjs from 'dayjs'
 import { useCallback, useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
+import useDebounce from '../hooks/useDebounce'
 import api from '../utils/api'
 import TransactionPrintView from '../components/TransactionPrintView'
 import QuotationPrintView from '../components/QuotationPrintView'
@@ -135,7 +136,7 @@ export default function ProductionList() {
   const [companyTemplate, setCompanyTemplate] = useState(null)
 
   // Filters
-  const [searchText, setSearchText] = useState('')
+  const [searchInput, searchQuery, handleSearchChange] = useDebounce('', 400)
   const [statusFilter, setStatusFilter] = useState('')
 
   // Modal Add / Edit Production Order
@@ -244,7 +245,7 @@ export default function ProductionList() {
         page_size: pageSize
       }
       if (statusFilter) params.status = statusFilter
-      if (searchText) params.search = searchText
+      if (searchQuery) params.search = searchQuery
       
       const res = await api.get('/production/orders/', { params })
       const data = res.data?.results ?? (Array.isArray(res.data) ? res.data : [])
@@ -257,7 +258,7 @@ export default function ProductionList() {
     } finally {
       setLoading(false)
     }
-  }, [statusFilter, searchText, pageSize, messageApi])
+  }, [statusFilter, searchQuery, pageSize, messageApi])
 
   const fetchOrdersAndUsers = useCallback(async () => {
     await Promise.resolve()
@@ -480,9 +481,9 @@ export default function ProductionList() {
 
   // ── Filtered list ─────────────────────────────────────────────────────
   const filteredPOs = productionOrders.filter((item) => {
-    if (!searchText) return true
+    if (!searchQuery) return true
     const oNum = (item.order_number || '').toLowerCase()
-    const query = searchText.toLowerCase()
+    const query = searchQuery.toLowerCase()
     return oNum.includes(query)
   })
 
@@ -956,8 +957,8 @@ export default function ProductionList() {
             <Input
               placeholder="Tìm theo mã đơn hàng liên kết..."
               prefix={<SearchOutlined style={{ color: '#94a3b8' }} />}
-              value={searchText}
-              onChange={(e) => setSearchText(e.target.value)}
+              value={searchInput}
+              onChange={handleSearchChange}
               allowClear
               style={{ borderRadius: 8 }}
             />
