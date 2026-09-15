@@ -101,6 +101,12 @@ class CustomerViewSet(TenantQuerySetMixin, viewsets.ModelViewSet):
         is_unattended = self.request.query_params.get("is_unattended")
         if is_unattended and is_unattended.lower() == 'true':
             qs = qs.filter(interaction_count=0)
+            
+        tags = self.request.query_params.get("tags")
+        if tags:
+            tag_ids = [int(t) for t in tags.split(',') if t.isdigit()]
+            if tag_ids:
+                qs = qs.filter(tags__id__in=tag_ids).distinct()
         
         # Sắp xếp
         ordering = self.request.query_params.get("ordering")
@@ -110,7 +116,12 @@ class CustomerViewSet(TenantQuerySetMixin, viewsets.ModelViewSet):
                 if ordering.endswith('created_at'):
                     qs = qs.order_by(ordering)
                 else:
-                    qs = qs.order_by(ordering, '-created_at')
+                    from django.db.models import F
+                    if ordering.startswith('-'):
+                        field = ordering[1:]
+                        qs = qs.order_by(F(field).desc(nulls_last=True), '-created_at')
+                    else:
+                        qs = qs.order_by(F(ordering).asc(nulls_last=True), '-created_at')
         return qs
 
     def list(self, request, *args, **kwargs):

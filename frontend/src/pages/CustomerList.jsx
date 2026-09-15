@@ -180,7 +180,8 @@ function CustomerList() {
   }, [getPipelineLabel, pipelineStatusLabels])
 
   // Filters
-  const [searchQuery, setSearchQuery] = useState('')
+  const [searchInput, searchQuery, handleSearchChange] = useDebounce('', 400)
+  const [tagsFilter, setTagsFilter] = useState([])
   const [statusFilter, setStatusFilter] = useState('')
   const [isInactiveFilter, setIsInactiveFilter] = useState(false)
   const [assignedToFilter, setAssignedToFilter] = useState('')
@@ -319,6 +320,7 @@ function CustomerList() {
         page_size: pageSize
       }
       if (searchQuery) params.search = searchQuery
+      if (tagsFilter && tagsFilter.length > 0) params.tags = tagsFilter.join(',')
       if (statusFilter) params.status = statusFilter
       if (isInactiveFilter) params.is_inactive = true
       if (assignedToFilter) params.assigned_to = assignedToFilter
@@ -326,7 +328,7 @@ function CustomerList() {
           params.status = 'new'
           params.is_unattended = 'true'
       }
-      if (tableSort && tableSort.field) {
+      if (tableSort && tableSort.field && tableSort.order) {
           let field = tableSort.field
           if (field === 'name') field = 'created_at'
           params.ordering = tableSort.order === 'ascend' ? field : `-${field}`
@@ -351,7 +353,7 @@ function CustomerList() {
     } finally {
       setLoading(false)
     }
-  }, [searchQuery, statusFilter, isInactiveFilter, assignedToFilter, isNewUnattendedFilter, tableSort, pageSize])
+  }, [searchQuery, statusFilter, isInactiveFilter, assignedToFilter, isNewUnattendedFilter, tableSort, pageSize, tagsFilter])
 
   const fetchSalesUsers = useCallback(async () => {
     if (!isCompanyAdmin && !hasPermission('crm.assign')) return
@@ -1071,17 +1073,17 @@ function CustomerList() {
 
       {/* Filter Bar */}
       <Card style={{ marginBottom: 16 }} bodyStyle={{ padding: 16 }}>
-        <Row gutter={16} align="middle">
-          <Col xs={24} sm={12} md={(hasPermission('crm.assign') || hasPermission('crm.auto_assign') || hasPermission('crm.view_all')) ? 5 : 7} style={{ marginBottom: 8 }}>
+        <Row gutter={[16, 16]} align="middle">
+          <Col xs={24} sm={12} md={5} style={{ marginBottom: 8 }}>
             <Input
               placeholder="Tìm theo tên hoặc SĐT..."
               prefix={<SearchOutlined style={{ color: '#bfbfbf' }} />}
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
+              value={searchInput}
+              onChange={handleSearchChange}
               allowClear
             />
           </Col>
-          <Col xs={24} sm={12} md={(hasPermission('crm.assign') || hasPermission('crm.auto_assign') || hasPermission('crm.view_all')) ? 4 : 5} style={{ marginBottom: 8 }}>
+          <Col xs={24} sm={12} md={4} style={{ marginBottom: 8 }}>
             <Select
               placeholder="Lọc theo trạng thái"
               style={{ width: '100%' }}
