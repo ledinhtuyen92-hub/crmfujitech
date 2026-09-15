@@ -578,9 +578,11 @@ export default function DeliveryList() {
     },
     {
       title: 'Địa chỉ giao hàng',
-      dataIndex: 'order_shipping_address',
       key: 'shipping_address',
-      render: (v) => <Text>{v || <Text type="secondary">Chưa có</Text>}</Text>,
+      render: (_, r) => {
+        const addr = r.shipping_address || r.order_shipping_address;
+        return <Text>{addr || <Text type="secondary">Chưa có</Text>}</Text>;
+      },
     },
     {
       title: 'Nhà máy',
@@ -833,6 +835,9 @@ export default function DeliveryList() {
               {availableOrders.map(o => (
                 <Option key={o.id} value={o.id}>{o.order_number} - {o.customer_name}</Option>
               ))}
+              {editingDelivery && !availableOrders.find(o => o.id === editingDelivery.order) && (
+                <Option key={editingDelivery.order} value={editingDelivery.order}>{editingDelivery.order_number}</Option>
+              )}
             </Select>
           </Form.Item>
           <Form.Item name="status" label="Trạng thái">
