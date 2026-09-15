@@ -647,7 +647,7 @@ export default function DeliveryList() {
       key: 'dates',
       render: (_, r) => (
         <div style={{ fontSize: 12 }}>
-          {r.expected_date && <div>Dự kiến: {dayjs(r.expected_date).format('DD/MM/YYYY')}</div>}
+          {r.expected_date && <div>Giao hàng: {dayjs(r.expected_date).format('DD/MM/YYYY')}</div>}
           {r.actual_date && <div style={{ color: '#16a34a' }}>Thực tế: {dayjs(r.actual_date).format('DD/MM/YYYY')}</div>}
         </div>
       ),
@@ -864,7 +864,7 @@ export default function DeliveryList() {
           </Form.Item>
           <Row gutter={16}>
             <Col xs={24} md={12}>
-              <Form.Item name="expected_date" label="Ngày dự kiến">
+              <Form.Item name="expected_date" label="Ngày giao hàng">
                 <DatePicker format="DD/MM/YYYY" style={{ width: '100%' }} disabled={!canEdit} />
               </Form.Item>
             </Col>
