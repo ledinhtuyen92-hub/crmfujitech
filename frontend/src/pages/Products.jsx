@@ -690,8 +690,8 @@ export default function Products() {
                   <Input
                     placeholder="Tìm theo tên, mã SKU..."
                     prefix={<SearchOutlined style={{ color: '#94a3b8' }} />}
-                    value={searchText}
-                    onChange={(e) => setSearchText(e.target.value)}
+                    value={searchInput}
+                    onChange={handleSearchChange}
                     allowClear
                     style={{ borderRadius: 8 }}
                   />
@@ -838,8 +838,8 @@ export default function Products() {
                   <Input
                     placeholder="Tìm theo tên dịch vụ, mã SKU..."
                     prefix={<SearchOutlined style={{ color: '#94a3b8' }} />}
-                    value={searchText}
-                    onChange={(e) => setSearchText(e.target.value)}
+                    value={searchInput}
+                    onChange={handleSearchChange}
                     allowClear
                     style={{ borderRadius: 8 }}
                   />
