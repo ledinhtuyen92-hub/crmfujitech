@@ -503,7 +503,7 @@ export default function DeliveryList() {
           Giao lại
         </Button>
       )}
-      {!r.shipper_user && r.status === 'pending' && (
+      {!r.shipper_name && r.status === 'pending' && (
         <Button
           type="text"
           style={{ color: '#10b981' }}
