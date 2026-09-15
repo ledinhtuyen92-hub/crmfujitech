@@ -217,33 +217,46 @@ export default function OrderList() {
   const ALL_COLUMNS_OPTIONS = [
     { label: 'Mã đơn hàng', value: 'order_number' },
     { label: 'Khách hàng', value: 'customer_name' },
+    ...(isModuleActive('production') ? [{ label: 'Nhà máy', value: 'factory_name' }] : []),
     { label: 'Địa chỉ giao hàng', value: 'delivery_address' },
     { label: 'Ngày GH dự kiến', value: 'installation_date' },
     { label: 'Số lượng SP', value: 'total_quantity' },
-    ...(isModuleActive('production') ? [{ label: 'Nhà máy', value: 'factory_name' }] : []),
-    { label: 'Trạng thái', value: 'status' },
+    { label: 'Tổng tiền', value: 'total_amount' },
     { label: 'Thanh toán & Công nợ', value: 'financial_status' },
+    { label: 'Trạng thái', value: 'status' },
     { label: 'Đối tượng TT', value: 'payment_target' },
     { label: 'Người tạo / duyệt', value: 'people' },
-    { label: 'Tổng tiền', value: 'total_amount' },
     { label: 'Hành động', value: 'action' },
   ];
 
-  const DEFAULT_COLUMNS = ['order_number', 'customer_name', ...(isModuleActive('production') ? ['factory_name'] : []), 'status', 'financial_status', 'payment_target', 'people', 'total_amount', 'action'];
+  const DEFAULT_COLUMNS = [
+    'order_number',
+    'customer_name',
+    ...(isModuleActive('production') ? ['factory_name'] : []),
+    'delivery_address',
+    'installation_date',
+    'total_quantity',
+    'total_amount',
+    'financial_status',
+    'status',
+    'payment_target',
+    'people',
+    'action'
+  ];
 
   const [columnOrder, setColumnOrder] = useState(() => {
-    const saved = localStorage.getItem('orderListColumnOrder_v3');
+    const saved = localStorage.getItem('orderListColumnOrder_v4');
     if (saved) return JSON.parse(saved);
     return ALL_COLUMNS_OPTIONS.map(c => c.value);
   });
 
   const [visibleColumns, setVisibleColumns] = useState(() => {
-    const saved = localStorage.getItem('orderListVisibleColumns_v3');
+    const saved = localStorage.getItem('orderListVisibleColumns_v4');
     return saved ? JSON.parse(saved) : DEFAULT_COLUMNS;
   });
 
   useEffect(() => {
-    localStorage.setItem('orderListVisibleColumns_v3', JSON.stringify(visibleColumns));
+    localStorage.setItem('orderListVisibleColumns_v4', JSON.stringify(visibleColumns));
   }, [visibleColumns]);
 
   useEffect(() => {
@@ -269,7 +282,7 @@ export default function OrderList() {
         const oldIndex = items.indexOf(active.id);
         const newIndex = items.indexOf(over.id);
         const newOrder = arrayMove(items, oldIndex, newIndex);
-        localStorage.setItem('orderListColumnOrder_v3', JSON.stringify(newOrder));
+        localStorage.setItem('orderListColumnOrder_v4', JSON.stringify(newOrder));
         return newOrder;
       });
     }
