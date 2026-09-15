@@ -10,6 +10,8 @@ class DeliveryOrderSerializer(serializers.ModelSerializer):
     order_shipping_address = serializers.CharField(source="order.delivery_address", read_only=True)
     order_remaining_debt = serializers.FloatField(source="order.remaining_debt", read_only=True)
     order_total_amount = serializers.FloatField(source="order.total_amount", read_only=True)
+    order_sales_name = serializers.SerializerMethodField()
+    order_sales_phone = serializers.SerializerMethodField()
     status_display = serializers.CharField(source="get_status_display", read_only=True)
     has_warranty = serializers.SerializerMethodField()
     factory_id = serializers.SerializerMethodField()
@@ -26,6 +28,20 @@ class DeliveryOrderSerializer(serializers.ModelSerializer):
         prod = obj.order.production_orders.first()
         return prod.factory.name if prod and prod.factory else None
 
+    def get_order_sales_name(self, obj):
+        if obj.order and obj.order.customer and obj.order.customer.assigned_to:
+            return obj.order.customer.assigned_to.full_name or obj.order.customer.assigned_to.username
+        if obj.order and obj.order.created_by:
+            return obj.order.created_by.full_name or obj.order.created_by.username
+        return None
+
+    def get_order_sales_phone(self, obj):
+        if obj.order and obj.order.customer and obj.order.customer.assigned_to:
+            return getattr(obj.order.customer.assigned_to, 'phone', None)
+        if obj.order and obj.order.created_by:
+            return getattr(obj.order.created_by, 'phone', None)
+        return None
+
     class Meta:
         model = DeliveryOrder
         fields = [
@@ -38,6 +54,8 @@ class DeliveryOrderSerializer(serializers.ModelSerializer):
             "order_shipping_address",
             "order_remaining_debt",
             "order_total_amount",
+            "order_sales_name",
+            "order_sales_phone",
             "factory_id",
             "factory_name",
             "delivery_code",

@@ -91,6 +91,15 @@ class CustomerViewSet(TenantQuerySetMixin, viewsets.ModelViewSet):
             from django.db.models import Q
             qs = qs.filter(Q(name__icontains=search) | Q(phone__icontains=search))
             
+        # Lọc theo Tags trước khi annotate để tránh lỗi GROUP BY với ManyToMany
+        tags = self.request.query_params.get("tags")
+        if tags:
+            tag_ids = [int(t) for t in tags.split(',') if t.isdigit()]
+            print("DEBUG TAGS PARAM:", tags, "TAG IDS:", tag_ids)
+            if tag_ids:
+                qs = qs.filter(tags__id__in=tag_ids).distinct()
+                print("DEBUG QS COUNT:", qs.count())
+
         from django.db.models import Count, Q
         qs = qs.annotate(
             quotation_count=Count('quotations', distinct=True),
@@ -101,12 +110,6 @@ class CustomerViewSet(TenantQuerySetMixin, viewsets.ModelViewSet):
         is_unattended = self.request.query_params.get("is_unattended")
         if is_unattended and is_unattended.lower() == 'true':
             qs = qs.filter(interaction_count=0)
-            
-        tags = self.request.query_params.get("tags")
-        if tags:
-            tag_ids = [int(t) for t in tags.split(',') if t.isdigit()]
-            if tag_ids:
-                qs = qs.filter(tags__id__in=tag_ids).distinct()
         
         # Sắp xếp
         ordering = self.request.query_params.get("ordering")

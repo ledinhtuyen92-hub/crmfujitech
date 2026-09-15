@@ -58,6 +58,7 @@ export default function DeliveryList() {
     { label: 'Mã GH', value: 'delivery_code' },
     { label: 'Đơn hàng', value: 'order_number' },
     { label: 'Khách hàng', value: 'customer' },
+    { label: 'Phụ trách (Sale)', value: 'sales' },
     { label: 'Địa chỉ giao hàng', value: 'shipping_address' },
     { label: 'Nhà máy', value: 'factory' },
     { label: 'Công nợ', value: 'debt' },
@@ -67,21 +68,24 @@ export default function DeliveryList() {
     { label: 'Hành động', value: 'actions' },
   ];
 
-  const DEFAULT_COLUMNS = ['delivery_code', 'order_number', 'customer', 'shipping_address', 'factory', 'debt', 'status', 'shipper', 'dates', 'actions']
+  const DEFAULT_COLUMNS = [
+    'delivery_code', 'order_number', 'customer', 'sales', 'shipping_address', 
+    'factory', 'debt', 'status', 'shipper', 'dates', 'actions'
+  ];
 
   const [columnOrder, setColumnOrder] = useState(() => {
-    const saved = localStorage.getItem('deliveryListColumnOrder_v1');
+    const saved = localStorage.getItem('deliveryListColumnOrder_v4');
     if (saved) return JSON.parse(saved);
     return DEFAULT_COLUMNS;
   });
 
   const [visibleColumns, setVisibleColumns] = useState(() => {
-    const saved = localStorage.getItem('deliveryListVisibleColumns_v3')
+    const saved = localStorage.getItem('deliveryListVisibleColumns_v6')
     return saved ? JSON.parse(saved) : DEFAULT_COLUMNS
   })
 
   useEffect(() => {
-    localStorage.setItem('deliveryListVisibleColumns_v3', JSON.stringify(visibleColumns))
+    localStorage.setItem('deliveryListVisibleColumns_v6', JSON.stringify(visibleColumns))
   }, [visibleColumns])
 
   const handleColumnToggle = (id, checked) => {
@@ -552,6 +556,23 @@ export default function DeliveryList() {
           <Text strong>{r.customer_name}</Text>
           <br />
           <Text type="secondary" style={{ fontSize: 12 }}>{r.customer_phone}</Text>
+        </div>
+      ),
+    },
+    {
+      title: 'Phụ trách (Sale)',
+      key: 'sales',
+      render: (_, r) => (
+        <div>
+          {r.order_sales_name ? (
+            <>
+              <Text strong style={{ color: '#0369a1' }}>{r.order_sales_name}</Text>
+              <br />
+              <Text type="secondary" style={{ fontSize: 12 }}>{r.order_sales_phone}</Text>
+            </>
+          ) : (
+            <Text type="secondary">Không có</Text>
+          )}
         </div>
       ),
     },

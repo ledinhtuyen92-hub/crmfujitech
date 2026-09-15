@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from 'react'
+import { useEffect, useState, useCallback, useRef } from 'react'
 import {
   Alert,
   Avatar,
@@ -159,6 +159,34 @@ const INTERACTION_RESULTS = {
   closed: { label: 'Đã chốt', color: 'processing' },
 }
 
+const DebouncedSearchInput = ({ value, onChange, placeholder, prefix, allowClear }) => {
+  const [localValue, setLocalValue] = useState(value || '');
+  const timerRef = useRef(null);
+
+  useEffect(() => {
+    setLocalValue(value || '');
+  }, [value]);
+
+  const handleChange = (e) => {
+    const val = e.target.value;
+    setLocalValue(val);
+    if (timerRef.current) clearTimeout(timerRef.current);
+    timerRef.current = setTimeout(() => {
+      onChange(val);
+    }, 400);
+  };
+
+  return (
+    <Input
+      placeholder={placeholder}
+      prefix={prefix}
+      value={localValue}
+      onChange={handleChange}
+      allowClear={allowClear}
+    />
+  );
+};
+
 function CustomerList() {
   const { isCompanyAdmin, hasPermission, checkMaintenance, isModuleActive, pipelineStatusLabels = {}, getPipelineLabel, refreshSettings, companySettings } = useAuth()
   const { isMobile } = useResponsive()
@@ -180,7 +208,7 @@ function CustomerList() {
   }, [getPipelineLabel, pipelineStatusLabels])
 
   // Filters
-  const [searchInput, searchQuery, handleSearchChange] = useDebounce('', 400)
+  const [searchQuery, setSearchQuery] = useState('')
   const [tagsFilter, setTagsFilter] = useState([])
   const [statusFilter, setStatusFilter] = useState('')
   const [isInactiveFilter, setIsInactiveFilter] = useState(false)
@@ -334,6 +362,7 @@ function CustomerList() {
           params.ordering = tableSort.order === 'ascend' ? field : `-${field}`
       }
       
+      console.log('FETCHING CUSTOMERS WITH PARAMS:', params);
       const response = await api.get('/crm/customers/', { params })
       let data = Array.isArray(response.data)
         ? response.data
@@ -1022,7 +1051,7 @@ function CustomerList() {
 
         <Space wrap style={{ flex: 1, justifyContent: 'flex-end' }}>
           {isCompanyAdmin && (
-            <Tooltip title="Khi BẬT, hệ thống tự động chia đều khách hàng mới cho Sale có ít khách nhất">
+            <Tooltip title="Khi BẬT, hệ thống tự động chia khách hàng mới cho Sale có ít khách nhất">
               <Space style={{ background: '#eff6ff', padding: '4px 12px', borderRadius: 8, border: '1px solid #bfdbfe', marginRight: 4 }}>
                 <Text strong style={{ fontSize: 13, color: '#1e40af' }}>Tự động chia khách:</Text>
                 <Switch
@@ -1035,6 +1064,16 @@ function CustomerList() {
               </Space>
             </Tooltip>
           )}
+
+          <Space style={{ background: '#fef2f2', padding: '4px 12px', borderRadius: 8, border: '1px solid #fecaca', marginRight: 4 }}>
+            <Checkbox 
+              checked={isInactiveFilter} 
+              onChange={(e) => setIsInactiveFilter(e.target.checked)}
+              style={{ color: '#ef4444', fontWeight: 500 }}
+            >
+              KH không hoạt động
+            </Checkbox>
+          </Space>
 
           {(isModuleActive('zalo') && (isCompanyAdmin || hasPermission('zalo.send_zns'))) && (
             <Button 
@@ -1074,16 +1113,16 @@ function CustomerList() {
       {/* Filter Bar */}
       <Card style={{ marginBottom: 16 }} bodyStyle={{ padding: 16 }}>
         <Row gutter={[16, 16]} align="middle">
-          <Col xs={24} sm={12} md={5} style={{ marginBottom: 8 }}>
-            <Input
+          <Col xs={24} sm={12} md={hasPermission('crm.assign') || hasPermission('crm.auto_assign') || hasPermission('crm.view_all') ? 12 : 8} lg={hasPermission('crm.assign') || hasPermission('crm.auto_assign') || hasPermission('crm.view_all') ? 6 : 8} xl={hasPermission('crm.assign') || hasPermission('crm.auto_assign') || hasPermission('crm.view_all') ? 6 : 8} xxl={hasPermission('crm.assign') || hasPermission('crm.auto_assign') || hasPermission('crm.view_all') ? 5 : 7} style={{ marginBottom: 8 }}>
+            <DebouncedSearchInput
               placeholder="Tìm theo tên hoặc SĐT..."
               prefix={<SearchOutlined style={{ color: '#bfbfbf' }} />}
-              value={searchInput}
-              onChange={handleSearchChange}
+              value={searchQuery}
+              onChange={setSearchQuery}
               allowClear
             />
           </Col>
-          <Col xs={24} sm={12} md={4} style={{ marginBottom: 8 }}>
+          <Col xs={24} sm={12} md={hasPermission('crm.assign') || hasPermission('crm.auto_assign') || hasPermission('crm.view_all') ? 12 : 8} lg={hasPermission('crm.assign') || hasPermission('crm.auto_assign') || hasPermission('crm.view_all') ? 6 : 8} xl={hasPermission('crm.assign') || hasPermission('crm.auto_assign') || hasPermission('crm.view_all') ? 6 : 8} xxl={hasPermission('crm.assign') || hasPermission('crm.auto_assign') || hasPermission('crm.view_all') ? 4 : 5} style={{ marginBottom: 8 }}>
             <Select
               placeholder="Lọc theo trạng thái"
               style={{ width: '100%' }}
@@ -1092,7 +1131,7 @@ function CustomerList() {
               allowClear
             >
               <Option value="">Tất cả trạng thái</Option>
-              {Object.entries(STATUS_MAP).map(([key, item]) => {
+              {Object.entries(STATUS_MAP).map(([key]) => {
                 const sItem = getStatusItem(key)
                 return (
                   <Option key={key} value={key}>
@@ -1102,16 +1141,27 @@ function CustomerList() {
               })}
             </Select>
           </Col>
-          <Col xs={24} sm={12} md={3} style={{ marginBottom: 8, display: 'flex', alignItems: 'center' }}>
-            <Checkbox 
-              checked={isInactiveFilter} 
-              onChange={(e) => setIsInactiveFilter(e.target.checked)}
+          <Col xs={24} sm={12} md={hasPermission('crm.assign') || hasPermission('crm.auto_assign') || hasPermission('crm.view_all') ? 12 : 8} lg={hasPermission('crm.assign') || hasPermission('crm.auto_assign') || hasPermission('crm.view_all') ? 6 : 8} xl={hasPermission('crm.assign') || hasPermission('crm.auto_assign') || hasPermission('crm.view_all') ? 6 : 8} xxl={hasPermission('crm.assign') || hasPermission('crm.auto_assign') || hasPermission('crm.view_all') ? 5 : 6} style={{ marginBottom: 8 }}>
+            <Select
+              mode="multiple"
+              placeholder="Lọc theo tags"
+              style={{ width: '100%' }}
+              value={tagsFilter}
+              onChange={(val) => setTagsFilter(val)}
+              allowClear
+              showSearch
+              optionFilterProp="children"
+              maxTagCount="responsive"
             >
-              <Tag color="error" style={{ margin: 0 }}>Không hoạt động</Tag>
-            </Checkbox>
+              {allTags.map((tag) => (
+                <Option key={tag.id} value={tag.id}>
+                  <Tag color={tag.color || 'blue'}>{tag.name}</Tag>
+                </Option>
+              ))}
+            </Select>
           </Col>
           {(hasPermission('crm.assign') || hasPermission('crm.auto_assign') || hasPermission('crm.view_all')) && (
-            <Col xs={24} sm={12} md={4} style={{ marginBottom: 8 }}>
+            <Col xs={24} sm={12} md={12} lg={6} xl={6} xxl={4} style={{ marginBottom: 8 }}>
               <Select
                 placeholder="Lọc theo Sale phụ trách"
                 style={{ width: '100%' }}
@@ -1131,7 +1181,7 @@ function CustomerList() {
               </Select>
             </Col>
           )}
-          <Col xs={24} sm={12} md={(hasPermission('crm.assign') || hasPermission('crm.auto_assign') || hasPermission('crm.view_all')) ? 8 : 9} style={{ textAlign: isMobile ? 'left' : 'right', marginBottom: 8 }}>
+          <Col xs={24} md={24} lg={24} xl={24} xxl={6} style={{ textAlign: isMobile ? 'left' : 'right', marginBottom: 8 }}>
             <Space wrap>
               <Button 
                 type={isNewUnattendedFilter ? "primary" : "default"}
@@ -1141,7 +1191,7 @@ function CustomerList() {
               >
                 Khách mới chưa chăm
               </Button>
-              <Button onClick={fetchCustomers} icon={<ReloadOutlined />}>
+              <Button onClick={() => fetchCustomers(1)} icon={<ReloadOutlined />}>
                 Làm mới
               </Button>
               <Popover 
@@ -1246,9 +1296,13 @@ function CustomerList() {
         />
       ) : (
         <Table scroll={{ x: 'max-content' }}
-            sticky={{ offsetHeader: 0, getContainer: () => document.getElementById('main-content-scroll') }}
+          sticky={{ offsetHeader: 0, getContainer: () => document.getElementById('main-content-scroll') }}
           onChange={(pagination, filters, sorter) => {
-            setTableSort(sorter)
+            const currentSortStr = tableSort && tableSort.field ? `${tableSort.field}-${tableSort.order}` : '';
+            const newSortStr = sorter && sorter.field ? `${sorter.field}-${sorter.order}` : '';
+            if (currentSortStr !== newSortStr) {
+              setTableSort(sorter);
+            }
             if (pagination.current !== currentPage) {
               fetchCustomers(pagination.current)
             }
