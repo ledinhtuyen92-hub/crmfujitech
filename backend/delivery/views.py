@@ -95,6 +95,7 @@ class DeliveryOrderViewSet(TenantQuerySetMixin, viewsets.ModelViewSet):
                 base_q = Q(order__created_by=user)
                 if managed_deps.exists():
                     base_q |= Q(order__created_by__department__in=managed_deps)
+                    base_q |= Q(shipper_user__department__in=managed_deps)
                 
                 if user.has_perm_code("delivery.shipper"):
                     base_q |= Q(shipper_user=user)

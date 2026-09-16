@@ -42,6 +42,14 @@ class DeliveryOrderSerializer(serializers.ModelSerializer):
             return getattr(obj.order.created_by, 'phone', None)
         return None
 
+    def to_representation(self, instance):
+        ret = super().to_representation(instance)
+        if not ret.get('shipper_name') and instance.shipper_user_id:
+            ret['shipper_name'] = instance.shipper_user.full_name or instance.shipper_user.username
+            if not ret.get('shipper_phone') and hasattr(instance.shipper_user, 'phone'):
+                ret['shipper_phone'] = instance.shipper_user.phone
+        return ret
+
     class Meta:
         model = DeliveryOrder
         fields = [

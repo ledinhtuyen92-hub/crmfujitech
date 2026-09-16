@@ -19,6 +19,7 @@ import {
   Checkbox,
   Popover,
   Tooltip,
+  AutoComplete,
 } from 'antd'
 import { CarOutlined, SearchOutlined, EditOutlined, EyeOutlined, PlusOutlined, DeleteOutlined, UserAddOutlined, FileTextOutlined, PrinterOutlined, CheckCircleOutlined, CloseCircleOutlined, SyncOutlined, SettingOutlined, TableOutlined, ExportOutlined, FilePdfOutlined } from '@ant-design/icons'
 import dayjs from 'dayjs'
@@ -198,12 +199,14 @@ export default function DeliveryList() {
   const openModal = (record = null) => {
     if (checkMaintenance()) return
     setEditingDelivery(record)
+    fetchShippers(record ? record.factory_id : null)
     if (record) {
       form.setFieldsValue({
         order: record.order,
         status: record.status,
         shipper_name: record.shipper_name,
         shipper_phone: record.shipper_phone,
+        shipper_user: record.shipper_user,
         shipping_address: record.shipping_address,
         expected_date: record.expected_date ? dayjs(record.expected_date) : null,
         actual_date: record.actual_date ? dayjs(record.actual_date) : null,
@@ -225,6 +228,7 @@ export default function DeliveryList() {
         status: values.status,
         shipper_name: values.shipper_name,
         shipper_phone: values.shipper_phone,
+        shipper_user: values.shipper_user,
         shipping_address: values.shipping_address,
         expected_date: values.expected_date ? values.expected_date.format('YYYY-MM-DD') : null,
         actual_date: values.actual_date ? values.actual_date.format('YYYY-MM-DD') : null,
@@ -819,6 +823,9 @@ export default function DeliveryList() {
         okButtonProps={{ disabled: !canEdit }}
       >
         <Form form={form} layout="vertical">
+          <Form.Item name="shipper_user" hidden>
+            <Input />
+          </Form.Item>
           <Form.Item name="order" label="Đơn hàng liên kết" rules={[{ required: !editingDelivery, message: 'Vui lòng chọn đơn hàng' }]}>
             <Select 
               disabled={!!editingDelivery || !canEdit} 
@@ -855,7 +862,27 @@ export default function DeliveryList() {
           <Row gutter={16}>
             <Col xs={24} md={12}>
               <Form.Item name="shipper_name" label="Người giao hàng (Shipper)">
-                <Input disabled={!canEdit} />
+                <AutoComplete
+                  disabled={!canEdit}
+                  options={shippers.map(s => ({ value: s.full_name || s.username, label: s.full_name || s.username, shipper: s }))}
+                  onSelect={(val, option) => {
+                    form.setFieldsValue({ 
+                      shipper_phone: option.shipper.phone,
+                      shipper_user: option.shipper.id
+                    })
+                  }}
+                  onChange={(val) => {
+                    const selected = shippers.find(s => (s.full_name || s.username) === val)
+                    if (!selected) {
+                      form.setFieldsValue({ shipper_user: null })
+                    } else {
+                      form.setFieldsValue({ shipper_user: selected.id, shipper_phone: selected.phone })
+                    }
+                  }}
+                  filterOption={(inputValue, option) =>
+                    option.value.toUpperCase().indexOf(inputValue.toUpperCase()) !== -1
+                  }
+                />
               </Form.Item>
             </Col>
             <Col xs={24} md={12}>
