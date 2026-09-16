@@ -134,6 +134,23 @@ class Customer(models.Model):
         related_name="created_customers",
         verbose_name="Người tạo",
     )
+
+    # Kế hoạch chăm sóc khách hàng
+    follow_up_time = models.DateTimeField(
+        null=True, blank=True,
+        verbose_name="Hẹn lịch chăm sóc"
+    )
+    follow_up_remind_before_minutes = models.IntegerField(
+        null=True, blank=True,
+        verbose_name="Tuỳ chỉnh nhắc nhở trước (phút)",
+        help_text="Nếu để trống, sẽ lấy theo mặc định của công ty."
+    )
+    follow_up_reminded = models.BooleanField(
+        default=False,
+        verbose_name="Đã nhắc nhở"
+    )
+
+    created_at = models.DateTimeField(auto_now_add=True, verbose_name="Ngày tạo")
     expected_quantity = models.IntegerField(
         null=True,
         blank=True,
@@ -166,6 +183,13 @@ class Customer(models.Model):
 
     def __str__(self):
         return f"{self.name} ({self.phone})"
+
+    def save(self, *args, **kwargs):
+        if self.pk:
+            orig = Customer.objects.get(pk=self.pk)
+            if orig.follow_up_time != self.follow_up_time:
+                self.follow_up_reminded = False
+        super().save(*args, **kwargs)
 
 
 class CustomerContact(models.Model):

@@ -327,6 +327,11 @@ class CompanySettings(models.Model):
         verbose_name="Ngưỡng cảnh báo khách hàng không hoạt động (ngày)",
         help_text="Nhập 0 để tắt tính năng cảnh báo. Nếu nhập số > 0, hệ thống sẽ tự động gửi thông báo khi khách hàng không có tương tác sau số ngày này."
     )
+    follow_up_remind_before_hours = models.PositiveIntegerField(
+        default=24,
+        verbose_name="Thời gian nhắc trước lịch hẹn chăm sóc (giờ)",
+        help_text="Số giờ nhắc trước khi đến lịch hẹn chăm sóc khách hàng. Mặc định là 24 giờ."
+    )
     require_order_customer = models.BooleanField(
         default=False,
         verbose_name="Bắt buộc chọn Khách hàng",

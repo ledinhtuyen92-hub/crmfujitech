@@ -110,6 +110,7 @@ export default function CompanyGeneralSettings() {
         timezone: settingsRes.data.timezone || 'Asia/Ho_Chi_Minh',
         list_page_size: settingsRes.data.list_page_size || 1000,
         inactive_days_threshold: settingsRes.data.inactive_days_threshold || 0,
+        follow_up_remind_before_hours: settingsRes.data.follow_up_remind_before_hours || 24,
         require_order_customer: settingsRes.data.require_order_customer || false,
         require_order_installation_date: settingsRes.data.require_order_installation_date || false,
         require_order_factory: settingsRes.data.require_order_factory || false,
@@ -761,6 +762,15 @@ export default function CompanyGeneralSettings() {
                 name="inactive_days_threshold"
                 label="Số ngày tính là khách ngủ đông"
                 help="Tính từ ngày mua hàng gần nhất (hoặc ngày tạo khách). Điền 0 để tắt tự động đánh dấu."
+              >
+                <InputNumber min={0} style={{ width: '100%' }} />
+              </Form.Item>
+            </Col>
+            <Col xs={24} md={12}>
+              <Form.Item
+                name="follow_up_remind_before_hours"
+                label="Thời gian nhắc trước lịch hẹn chăm sóc (giờ)"
+                help="VD: Điền 24 để hệ thống báo trước 24 giờ. Điền 0 để tắt thông báo."
               >
                 <InputNumber min={0} style={{ width: '100%' }} />
               </Form.Item>

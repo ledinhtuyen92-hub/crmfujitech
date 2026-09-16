@@ -58,3 +58,66 @@ def check_and_update_inactive_customers():
                     
     logger.info(f"Finished check_and_update_inactive_customers. Total updated: {total_updated}")
     return total_updated
+
+@shared_task
+def check_follow_up_appointments():
+    """
+    Quét mỗi 15 phút: Tìm khách hàng có follow_up_time sắp tới
+    để gửi thông báo cho Sale phụ trách. Tuỳ chỉnh thời gian nhắc có thể
+    ở mức Company hoặc ghi đè ở mức Customer.
+    """
+    from notifications.models import Notification
+    
+    logger.info("Starting check_follow_up_appointments...")
+    settings = CompanySettings.objects.all()
+    now = timezone.now()
+    max_future = now + timedelta(days=30) # Chỉ quét các lịch hẹn trong 30 ngày tới để tối ưu
+    total_notified = 0
+
+    for setting in settings:
+        company = setting.company
+        company_hours_before = setting.follow_up_remind_before_hours
+        
+        # Tìm khách hàng có lịch chăm sóc chưa được nhắc nhở,
+        # và thời gian hẹn nằm ở tương lai (đến tối đa 30 ngày)
+        customers = Customer.objects.filter(
+            company=company,
+            follow_up_time__isnull=False,
+            follow_up_reminded=False,
+            follow_up_time__gte=now,
+            follow_up_time__lte=max_future,
+            assigned_to__isnull=False
+        )
+        
+        for customer in customers:
+            # Ưu tiên lấy cấu hình nhắc nhở của riêng khách hàng này, nếu không thì lấy mặc định công ty
+            if customer.follow_up_remind_before_minutes is not None:
+                mins_before = customer.follow_up_remind_before_minutes
+            else:
+                if not company_hours_before:
+                    continue # Công ty không cấu hình nhắc nhở mặc định
+                mins_before = company_hours_before * 60
+                
+            # Nếu thiết lập là 0 phút thì báo đúng giờ
+            target_time = customer.follow_up_time - timedelta(minutes=mins_before)
+            
+            # Nếu thời điểm hiện tại đã đạt tới hoặc vượt qua mốc target_time
+            if now >= target_time:
+                # Tạo thông báo cho Sale phụ trách
+                message = f"Sắp đến lịch chăm sóc khách hàng {customer.name} vào lúc {customer.follow_up_time.strftime('%H:%M %d/%m/%Y')}."
+                Notification.objects.create(
+                    recipient=customer.assigned_to,
+                    company=company,
+                    type=Notification.TYPE_CRM_ASSIGNED,
+                    title="Nhắc nhở lịch chăm sóc khách hàng",
+                    message=message,
+                    link=f"/customers/{customer.id}"
+                )
+                
+                # Đánh dấu đã nhắc nhở
+                customer.follow_up_reminded = True
+                customer.save(update_fields=['follow_up_reminded'])
+                total_notified += 1
+            
+    logger.info(f"Finished check_follow_up_appointments. Total notified: {total_notified}")
+    return total_notified

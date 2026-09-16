@@ -284,6 +284,11 @@ try:
             "task": "crm.tasks.check_and_update_inactive_customers",
             "schedule": crontab(minute=0, hour=0),
         },
+        # Nhắc nhở hẹn lịch chăm sóc khách hàng (chạy mỗi 15 phút)
+        "crm-check-follow-up-appointments": {
+            "task": "crm.tasks.check_follow_up_appointments",
+            "schedule": crontab(minute="*/15"),
+        },
         # Tự động follow-up khách hàng nếu không phản hồi sau 24h (chạy mỗi 15 phút)
         "ai-agents-drip-followup": {
             "task": "ai_agents.drip_followup",

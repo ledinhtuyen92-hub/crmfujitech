@@ -11,6 +11,7 @@ import {
   Drawer,
   Form,
   Input,
+  InputNumber,
   Modal,
   Popconfirm,
   Row,
@@ -458,7 +459,19 @@ function CustomerList() {
       birthday: record.birthday ? dayjs(record.birthday) : null,
       priority_level: record.priority_level || 'p4',
       expected_quantity: record.expected_quantity,
+      follow_up_time: record.follow_up_time ? dayjs(record.follow_up_time) : null,
     })
+
+    let remindVal = record.follow_up_remind_before_minutes;
+    let unit = 'minutes';
+    if (remindVal !== null && remindVal !== undefined) {
+      if (remindVal > 0 && remindVal % 1440 === 0) { remindVal = remindVal / 1440; unit = 'days'; }
+      else if (remindVal > 0 && remindVal % 60 === 0) { remindVal = remindVal / 60; unit = 'hours'; }
+      form.setFieldsValue({ remind_value: remindVal, remind_unit: unit })
+    } else {
+      form.setFieldsValue({ remind_value: null, remind_unit: 'minutes' })
+    }
+
     setIsModalVisible(true)
   }
 
@@ -481,11 +494,27 @@ function CustomerList() {
   const handleSaveCustomer = async (values) => {
     setSubmitting(true)
     try {
+      const { status, remind_value, remind_unit, ...rest } = values
+      
       const payload = {
-        ...values,
+        ...rest,
         birthday: values.birthday ? values.birthday.format('YYYY-MM-DD') : null,
         expected_quantity: values.expected_quantity ? parseInt(values.expected_quantity) : null,
+        follow_up_time: values.follow_up_time ? (dayjs.isDayjs(values.follow_up_time) ? values.follow_up_time.toISOString() : dayjs(values.follow_up_time).toISOString()) : null,
       }
+
+      if (!editingCustomer || !editingCustomer.has_order) {
+        payload.status = status
+      }
+      
+      let remind_minutes = null;
+      if (remind_value !== null && remind_value !== undefined && remind_value !== '') {
+        if (remind_unit === 'days') remind_minutes = remind_value * 1440;
+        else if (remind_unit === 'hours') remind_minutes = remind_value * 60;
+        else remind_minutes = remind_value;
+      }
+      payload.follow_up_remind_before_minutes = remind_minutes;
+
       if (editingCustomer) {
         await api.patch(`/crm/customers/${editingCustomer.id}/`, payload)
         message.success('Cập nhật khách hàng thành công!')
@@ -496,7 +525,16 @@ function CustomerList() {
       setIsModalVisible(false)
       fetchCustomers()
     } catch (err) {
-      const msg = err.response?.data?.phone?.[0] || err.response?.data?.detail || 'Có lỗi xảy ra, vui lòng kiểm tra lại.'
+      const data = err.response?.data
+      let msg = 'Có lỗi xảy ra, vui lòng kiểm tra lại.'
+      if (data) {
+        if (typeof data === 'string') msg = data
+        else if (data.detail) msg = data.detail
+        else {
+          const firstKey = Object.keys(data)[0]
+          if (firstKey) msg = `${firstKey}: ${Array.isArray(data[firstKey]) ? data[firstKey][0] : data[firstKey]}`
+        }
+      }
       message.error(msg)
     } finally {
       setSubmitting(false)
@@ -1478,6 +1516,35 @@ function CustomerList() {
                 <Input type="number" min={0} placeholder="Nhập số lượng..." />
               </Form.Item>
             </Col>
+          </Row>
+
+          <Row gutter={16}>
+            <Col xs={24} md={8}>
+              <Form.Item name="follow_up_time" label="Hẹn lịch chăm sóc">
+                <DatePicker 
+                  showTime={{ format: 'HH:mm' }} 
+                  format="DD/MM/YYYY HH:mm" 
+                  style={{ width: '100%' }} 
+                  placeholder="Chọn ngày giờ"
+                />
+              </Form.Item>
+            </Col>
+            <Col xs={24} md={8}>
+              <Form.Item label="Nhắc nhở trước">
+                <Space.Compact style={{ width: '100%' }}>
+                  <Form.Item name="remind_value" noStyle>
+                    <InputNumber style={{ width: '60%' }} placeholder="Mặc định..." min={0} />
+                  </Form.Item>
+                  <Form.Item name="remind_unit" noStyle initialValue="minutes">
+                    <Select style={{ width: '40%' }}>
+                      <Option value="minutes">Phút</Option>
+                      <Option value="hours">Giờ</Option>
+                      <Option value="days">Ngày</Option>
+                    </Select>
+                  </Form.Item>
+                </Space.Compact>
+              </Form.Item>
+            </Col>
             <Col xs={24} md={8}>
               <Form.Item name="tag_ids" label="Gắn Tags">
             <Select
@@ -1808,6 +1875,25 @@ function CustomerList() {
                       <Col xs={24} md={12}>
                         <Form.Item label="Ngày tạo">
                           <Input value={new Date(currentCustomer.created_at).toLocaleString('vi-VN')} readOnly />
+                        </Form.Item>
+                      </Col>
+                    </Row>
+                    <Row gutter={16}>
+                      <Col xs={24} md={12}>
+                        <Form.Item label="Hẹn lịch chăm sóc">
+                          <Input 
+                            value={currentCustomer.follow_up_time ? dayjs(currentCustomer.follow_up_time).format('HH:mm DD/MM/YYYY') : '—'} 
+                            readOnly 
+                            style={{ color: currentCustomer.follow_up_time && dayjs(currentCustomer.follow_up_time).isBefore(dayjs()) ? 'red' : 'inherit' }}
+                          />
+                        </Form.Item>
+                      </Col>
+                      <Col xs={24} md={12}>
+                        <Form.Item label="Trạng thái nhắc nhở">
+                          <Input 
+                            value={!currentCustomer.follow_up_time ? '—' : (currentCustomer.follow_up_reminded ? 'Đã nhắc' : 'Chưa nhắc (Đang chờ)')} 
+                            readOnly 
+                          />
                         </Form.Item>
                       </Col>
                     </Row>
