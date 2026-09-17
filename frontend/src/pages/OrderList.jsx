@@ -199,6 +199,9 @@ export default function OrderList() {
   const [printingOrder, setPrintingOrder] = useState(null)
   const [printingReceipt, setPrintingReceipt] = useState(null)
   const [receiptPrintVisible, setReceiptPrintVisible] = useState(false)
+  const [updateAttachmentModalVisible, setUpdateAttachmentModalVisible] = useState(false)
+  const [updatingReceipt, setUpdatingReceipt] = useState(null)
+  const [updateReceiptFileList, setUpdateReceiptFileList] = useState([])
   const [previewAttachments, setPreviewAttachments] = useState([])
   const [previewVisible, setPreviewVisible] = useState(false)
   const [templates, setTemplates] = useState([])
@@ -484,6 +487,28 @@ export default function OrderList() {
   
   const handleRemoveReceiptFile = (file) => {
     setReceiptFileList(prev => prev.filter(item => item.uid !== file.uid))
+  }
+
+  const handleSubmitUpdateAttachments = async () => {
+    setReceiptSubmitting(true)
+    try {
+      const finalUrls = updateReceiptFileList.map(f => f.url)
+      
+      await api.patch(`/finance/receipts/${updatingReceipt.id}/`, {
+        attachments: finalUrls
+      })
+      messageApi.success('Bổ sung chứng từ thành công!')
+      setUpdateAttachmentModalVisible(false)
+      setUpdatingReceipt(null)
+      setUpdateReceiptFileList([])
+      fetchOrders()
+      const { data } = await api.get(`/orders/orders/${selectedOrder.id}/`)
+      setSelectedOrder(data)
+    } catch (err) {
+      messageApi.error('Lỗi khi cập nhật chứng từ')
+    } finally {
+      setReceiptSubmitting(false)
+    }
   }
 
   const handleCreateReceipt = async (values) => {
@@ -4014,6 +4039,26 @@ export default function OrderList() {
                                 Xem chứng từ ({record.attachments.length})
                               </Button>
                             )}
+                            {hasPermission('finance.create_receipt') && (
+                              <Button
+                                type="link"
+                                size="small"
+                                icon={<UploadOutlined />}
+                                onClick={() => {
+                                  setUpdatingReceipt(record)
+                                  const initialList = (record.attachments || []).map((url, idx) => ({
+                                    uid: `existing_${idx}`,
+                                    name: `Chung_tu_${idx + 1}`,
+                                    status: 'done',
+                                    url: url
+                                  }))
+                                  setUpdateReceiptFileList(initialList)
+                                  setUpdateAttachmentModalVisible(true)
+                                }}
+                              >
+                                Bổ sung
+                              </Button>
+                            )}
                             {hasPermission('finance.delete') && (
                               <Popconfirm
                                 title="Xác nhận xóa phiếu thu này?"
@@ -4187,6 +4232,78 @@ export default function OrderList() {
           ))}
         </Image.PreviewGroup>
       </div>
+
+      {/* Modal Bổ sung chứng từ */}
+      <Modal
+        title={`Bổ sung chứng từ cho phiếu ${updatingReceipt?.receipt_code}`}
+        open={updateAttachmentModalVisible}
+        onCancel={() => {
+          setUpdateAttachmentModalVisible(false)
+          setUpdatingReceipt(null)
+          setUpdateReceiptFileList([])
+        }}
+        onOk={handleSubmitUpdateAttachments}
+        confirmLoading={receiptSubmitting}
+        okText="Lưu lại"
+        cancelText="Hủy"
+      >
+        <div style={{ marginBottom: 16 }}>
+          <input
+            type="file"
+            multiple
+            accept="image/*,.pdf"
+            style={{ display: 'none' }}
+            ref={el => window._receiptUploadRef = el}
+            onChange={async (e) => {
+              const files = Array.from(e.target.files)
+              if (!files.length) return
+              e.target.value = '' // reset immediately
+              
+              messageApi.loading({ content: 'Đang tải file...', key: 'uploading' })
+              for (const file of files) {
+                const formData = new FormData()
+                formData.append('file', file)
+                try {
+                  const res = await api.postForm('/core/upload/', formData)
+                  if (res.data && res.data.url) {
+                    setUpdateReceiptFileList(prev => [...prev, {
+                      uid: file.name + Math.random(),
+                      name: file.name,
+                      status: 'done',
+                      url: res.data.url
+                    }])
+                  }
+                } catch {
+                  messageApi.error('Lỗi khi tải ảnh: ' + file.name)
+                }
+              }
+              messageApi.success({ content: 'Tải file hoàn tất!', key: 'uploading', duration: 2 })
+            }}
+          />
+          <Button icon={<UploadOutlined />} onClick={() => window._receiptUploadRef?.click()} type="primary">
+            Chọn hình ảnh / tài liệu
+          </Button>
+        </div>
+
+        <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
+          {updateReceiptFileList.map((file, index) => (
+             <div key={file.uid || index} style={{ position: 'relative', width: 80, height: 80, border: '1px solid #d9d9d9', borderRadius: 8, padding: 4, display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
+                {file.url && file.url.endsWith('.pdf') ? (
+                  <FileTextOutlined style={{ fontSize: 32, color: '#1677ff' }} />
+                ) : (
+                  <Image src={file.url} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                )}
+                <Button 
+                   size="small" 
+                   danger 
+                   icon={<CloseCircleOutlined />} 
+                   style={{ position: 'absolute', top: -10, right: -10, padding: 0, width: 20, height: 20, minWidth: 20, borderRadius: '50%' }}
+                   onClick={() => setUpdateReceiptFileList(prev => prev.filter(f => f.uid !== file.uid))}
+                />
+             </div>
+          ))}
+        </div>
+      </Modal>
 
       {selectedOrder && selectedOrder.customer && (
         <ZnsSendModal
