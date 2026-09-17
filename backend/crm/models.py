@@ -149,6 +149,10 @@ class Customer(models.Model):
         default=False,
         verbose_name="Đã nhắc nhở"
     )
+    follow_up_completed = models.BooleanField(
+        default=False,
+        verbose_name="Đã hoàn thành chăm sóc"
+    )
 
     created_at = models.DateTimeField(auto_now_add=True, verbose_name="Ngày tạo")
     expected_quantity = models.IntegerField(
@@ -189,6 +193,7 @@ class Customer(models.Model):
             orig = Customer.objects.get(pk=self.pk)
             if orig.follow_up_time != self.follow_up_time:
                 self.follow_up_reminded = False
+                self.follow_up_completed = False
         super().save(*args, **kwargs)
 
 

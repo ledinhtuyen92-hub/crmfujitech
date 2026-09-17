@@ -125,6 +125,7 @@ class CustomerSerializer(serializers.ModelSerializer):
             "follow_up_time",
             "follow_up_remind_before_minutes",
             "follow_up_reminded",
+            "follow_up_completed",
             "quotation_count",
             "order_count",
             "interaction_count",

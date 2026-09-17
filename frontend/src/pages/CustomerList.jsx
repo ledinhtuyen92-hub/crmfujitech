@@ -67,6 +67,9 @@ import {
   FormOutlined,
   RobotOutlined,
   MenuOutlined,
+  AlertOutlined,
+  CloseOutlined,
+  CheckCircleOutlined,
 } from '@ant-design/icons'
 import { DndContext, PointerSensor, useSensor, useSensors, KeyboardSensor, closestCenter } from '@dnd-kit/core';
 import { restrictToVerticalAxis } from '@dnd-kit/modifiers';
@@ -215,7 +218,14 @@ function CustomerList() {
   const [isInactiveFilter, setIsInactiveFilter] = useState(false)
   const [assignedToFilter, setAssignedToFilter] = useState('')
   const [isNewUnattendedFilter, setIsNewUnattendedFilter] = useState(false)
+  const [isUpcomingFollowUpFilter, setIsUpcomingFollowUpFilter] = useState(false)
   const [tableSort, setTableSort] = useState(null)
+
+  // Upcoming Follow-ups State
+  const [upcomingFollowUpsCount, setUpcomingFollowUpsCount] = useState(0)
+  const [showUpcomingBanner, setShowUpcomingBanner] = useState(() => {
+    return sessionStorage.getItem('dismissedUpcomingBanner') !== 'true'
+  })
 
   // Column Visibility
   const allColumnsOptions = [
@@ -339,6 +349,35 @@ function CustomerList() {
   const [allTags, setAllTags] = useState([])
   const [globalHasExpectedQuantity, setGlobalHasExpectedQuantity] = useState(false)
 
+  const fetchUpcomingFollowUpsCount = useCallback(async () => {
+    try {
+      const res = await api.get('/crm/customers/', { params: { is_upcoming_follow_up: 'true', limit: 1 } })
+      if (res.data.count !== undefined) {
+        setUpcomingFollowUpsCount(res.data.count)
+      } else if (Array.isArray(res.data)) {
+        setUpcomingFollowUpsCount(res.data.length)
+      }
+    } catch {
+      // ignore
+    }
+  }, [])
+
+  useEffect(() => {
+    fetchUpcomingFollowUpsCount()
+  }, [fetchUpcomingFollowUpsCount])
+
+  const handleCompleteFollowUp = async (record, e) => {
+    e?.stopPropagation()
+    try {
+      await api.patch(`/crm/customers/${record.id}/complete-follow-up/`)
+      message.success('Đã đánh dấu hoàn thành chăm sóc')
+      fetchCustomers(currentPage)
+      fetchUpcomingFollowUpsCount()
+    } catch (err) {
+      message.error('Lỗi khi đánh dấu hoàn thành chăm sóc')
+    }
+  }
+
   const fetchCustomers = useCallback(async (page = 1) => {
     await Promise.resolve()
     setLoading(true)
@@ -356,6 +395,9 @@ function CustomerList() {
       if (isNewUnattendedFilter) {
           params.status = 'new'
           params.is_unattended = 'true'
+      }
+      if (isUpcomingFollowUpFilter) {
+          params.is_upcoming_follow_up = 'true'
       }
       if (tableSort && tableSort.field && tableSort.order) {
           let field = tableSort.field
@@ -383,7 +425,7 @@ function CustomerList() {
     } finally {
       setLoading(false)
     }
-  }, [searchQuery, statusFilter, isInactiveFilter, assignedToFilter, isNewUnattendedFilter, tableSort, pageSize, tagsFilter])
+  }, [searchQuery, statusFilter, isInactiveFilter, assignedToFilter, isNewUnattendedFilter, isUpcomingFollowUpFilter, tableSort, pageSize, tagsFilter])
 
   const fetchSalesUsers = useCallback(async () => {
     if (!isCompanyAdmin && !hasPermission('crm.assign')) return
@@ -981,6 +1023,16 @@ function CustomerList() {
       align: 'right',
       render: (_, record) => (
         <Space size="small">
+          {record.follow_up_time && !record.follow_up_completed && (
+            <Tooltip title="Hoàn thành chăm sóc khách hàng">
+              <Button
+                size="small"
+                icon={<CheckCircleOutlined />}
+                style={{ borderColor: '#52c41a', color: '#52c41a' }}
+                onClick={(e) => handleCompleteFollowUp(record, e)}
+              />
+            </Tooltip>
+          )}
           <Tooltip title="Tạo báo giá">
             <Button
               size="small"
@@ -1146,6 +1198,45 @@ function CustomerList() {
 
       {error && (
         <Alert message={error} type="error" showIcon style={{ marginBottom: 16 }} />
+      )}
+
+      {showUpcomingBanner && upcomingFollowUpsCount > 0 && (
+        <div style={{ marginBottom: 20, padding: '16px 24px', background: '#fff1f0', border: '1px solid #ffa39e', borderRadius: 8, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <div style={{ display: 'flex', alignItems: 'flex-start', gap: 16 }}>
+            <div style={{ background: '#f5222d', borderRadius: '50%', width: 40, height: 40, display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 4px 10px rgba(245, 34, 45, 0.3)' }}>
+              <AlertOutlined style={{ color: '#fff', fontSize: 20 }} />
+            </div>
+            <Space direction="vertical" size={0}>
+              <Text strong style={{ color: '#cf1322', fontSize: 16 }}>
+                Bạn có {upcomingFollowUpsCount} khách hàng sắp hoặc đã đến lịch hẹn chăm sóc!
+              </Text>
+              <Text type="secondary" style={{ color: '#a8071a', fontSize: 13 }}>
+                Vui lòng xem danh sách và thực hiện chăm sóc đúng hẹn.
+              </Text>
+            </Space>
+          </div>
+          <Space>
+            {isUpcomingFollowUpFilter ? (
+              <Button 
+                onClick={() => { setIsUpcomingFollowUpFilter(false) }}
+              >
+                Bỏ lọc
+              </Button>
+            ) : (
+              <Button 
+                type="primary" 
+                danger 
+                onClick={() => { setIsUpcomingFollowUpFilter(true) }}
+              >
+                Xem danh sách
+              </Button>
+            )}
+            <Button type="text" onClick={() => {
+              setShowUpcomingBanner(false)
+              sessionStorage.setItem('dismissedUpcomingBanner', 'true')
+            }} icon={<CloseOutlined />} />
+          </Space>
+        </div>
       )}
 
       {/* Filter Bar */}

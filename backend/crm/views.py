@@ -78,6 +78,25 @@ class CustomerViewSet(TenantQuerySetMixin, viewsets.ModelViewSet):
         is_inactive = self.request.query_params.get("is_inactive")
         if is_inactive:
             qs = qs.filter(is_inactive=(is_inactive.lower() == 'true'))
+            
+        # Lọc khách hàng có lịch hẹn chăm sóc sắp tới hoặc quá hạn
+        is_upcoming_follow_up = self.request.query_params.get("is_upcoming_follow_up")
+        if is_upcoming_follow_up == 'true':
+            from django.utils import timezone
+            from django.db.models.expressions import RawSQL
+            
+            now = timezone.now()
+            user = self.request.user
+            default_minutes = user.company.settings.follow_up_remind_before_hours * 60 if hasattr(user.company, 'settings') else 24 * 60
+            
+            qs = qs.annotate(
+                remind_at=RawSQL("follow_up_time - interval '1 minute' * COALESCE(follow_up_remind_before_minutes, %s)", (default_minutes,))
+            ).filter(
+                follow_up_time__isnull=False,
+                follow_up_completed=False,
+                remind_at__lte=now
+            )
+
         # Filter theo assigned_to nếu có query param (dành cho manager)
         assigned_to = self.request.query_params.get("assigned_to")
         if assigned_to:
@@ -475,6 +494,19 @@ class CustomerViewSet(TenantQuerySetMixin, viewsets.ModelViewSet):
         customer.save(update_fields=['priority_level', 'expected_quantity', 'updated_at'])
         
         return Response(CustomerSerializer(customer, context={"request": request}).data)
+
+    @action(detail=True, methods=["patch"], url_path="complete-follow-up")
+    def complete_follow_up(self, request, pk=None):
+        """
+        PATCH /api/crm/customers/{id}/complete-follow-up/
+        Đánh dấu lịch chăm sóc hiện tại là đã hoàn thành.
+        """
+        customer = self.get_object()
+        customer.follow_up_completed = True
+        # Save to trigger any signal, but mainly to update the completed status
+        customer.save(update_fields=['follow_up_completed', 'updated_at'])
+        
+        return Response({"detail": "Đã đánh dấu hoàn thành chăm sóc."}, status=status.HTTP_200_OK)
 
 
 class CustomerContactViewSet(viewsets.ModelViewSet):
