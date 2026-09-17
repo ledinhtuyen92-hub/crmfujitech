@@ -223,9 +223,7 @@ function CustomerList() {
 
   // Upcoming Follow-ups State
   const [upcomingFollowUpsCount, setUpcomingFollowUpsCount] = useState(0)
-  const [showUpcomingBanner, setShowUpcomingBanner] = useState(() => {
-    return sessionStorage.getItem('dismissedUpcomingBanner') !== 'true'
-  })
+  const [showUpcomingBanner, setShowUpcomingBanner] = useState(true)
 
   // Column Visibility
   const allColumnsOptions = [
@@ -353,9 +351,9 @@ function CustomerList() {
     try {
       const res = await api.get('/crm/customers/', { params: { is_upcoming_follow_up: 'true', limit: 1 } })
       if (res.data.count !== undefined) {
-        setUpcomingFollowUpsCount(res.data.count)
+        setUpcomingFollowUpsCount(res.data.count); if(res.data.count > 0) setShowUpcomingBanner(true)
       } else if (Array.isArray(res.data)) {
-        setUpcomingFollowUpsCount(res.data.length)
+        setUpcomingFollowUpsCount(res.data.length); if(res.data.length > 0) setShowUpcomingBanner(true)
       }
     } catch {
       // ignore
@@ -1233,7 +1231,7 @@ function CustomerList() {
             )}
             <Button type="text" onClick={() => {
               setShowUpcomingBanner(false)
-              sessionStorage.setItem('dismissedUpcomingBanner', 'true')
+              
             }} icon={<CloseOutlined />} />
           </Space>
         </div>
