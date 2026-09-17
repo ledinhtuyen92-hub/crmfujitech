@@ -370,6 +370,41 @@ class InternalAnnouncementViewSet(viewsets.ModelViewSet):
                         user_ids.append(int(d))
             announcement.target_users.set(user_ids)
             
+        # [FEATURE] Bắn quả chuông cho các nhân viên liên quan
+        target_users = set()
+        if announcement.is_all_company:
+            for u in self.request.user.company.users.exclude(id=self.request.user.id):
+                target_users.add(u)
+        else:
+            # Filter users theo phòng ban
+            from users.models import User
+            dept_users = User.objects.filter(
+                company=self.request.user.company,
+                department__in=announcement.departments.all()
+            ).exclude(id=self.request.user.id)
+            for u in dept_users:
+                target_users.add(u)
+            
+            specific_users = announcement.target_users.exclude(id=self.request.user.id)
+            for u in specific_users:
+                target_users.add(u)
+            
+        notifications_to_create = []
+        for u in target_users:
+            notifications_to_create.append(
+                Notification(
+                    company=self.request.user.company,
+                    recipient=u,
+                    sender=self.request.user,
+                    type=Notification.TYPE_SYSTEM_UPDATE,
+                    title=f"Có thông báo nội bộ mới: {announcement.title}",
+                    message=announcement.content[:100] + "..." if len(announcement.content) > 100 else announcement.content,
+                    link="/announcements"
+                )
+            )
+        if notifications_to_create:
+            Notification.objects.bulk_create(notifications_to_create)
+
     def perform_update(self, serializer):
         priority = self.request.data.get("priority", "normal")
         is_pinned = str(self.request.data.get("is_pinned", "false")).lower() == "true"
@@ -441,44 +476,6 @@ class InternalAnnouncementViewSet(viewsets.ModelViewSet):
                     else:
                         user_ids.append(int(d))
             announcement.target_users.set(user_ids)
-        elif announcement.is_all_company:
-            announcement.target_users.clear()
-            
-        # [FEATURE] Bắn quả chuông cho các nhân viên liên quan
-        target_users = set()
-        if announcement.is_all_company:
-            for u in self.request.user.company.users.exclude(id=self.request.user.id):
-                target_users.add(u)
-        else:
-            # Filter users theo phòng ban
-            from users.models import User
-            dept_users = User.objects.filter(
-                company=self.request.user.company,
-                department__in=announcement.departments.all()
-            ).exclude(id=self.request.user.id)
-            for u in dept_users:
-                target_users.add(u)
-            
-            specific_users = announcement.target_users.exclude(id=self.request.user.id)
-            for u in specific_users:
-                target_users.add(u)
-            
-        notifications_to_create = []
-        for u in target_users:
-            notifications_to_create.append(
-                Notification(
-                    company=self.request.user.company,
-                    recipient=u,
-                    sender=self.request.user,
-                    type=Notification.TYPE_SYSTEM_UPDATE,
-                    title=f"Có thông báo nội bộ mới: {announcement.title}",
-                    message=announcement.content[:100] + "..." if len(announcement.content) > 100 else announcement.content,
-                    link="/announcements"
-                )
-            )
-        if notifications_to_create:
-            Notification.objects.bulk_create(notifications_to_create)
-
     @action(detail=True, methods=["post"])
     def mark_read(self, request, pk=None):
         announcement = self.get_object()
