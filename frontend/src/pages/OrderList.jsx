@@ -4176,21 +4176,54 @@ export default function OrderList() {
             <TextArea rows={2} placeholder="Nhập ghi chú giao dịch, số UNC..." />
           </Form.Item>
           <Form.Item label="Chứng từ đính kèm (Ảnh UNC, v.v...)">
-            <Upload
-              listType="picture-card"
-              multiple
-              fileList={receiptFileList}
-              beforeUpload={handleUploadReceipt}
-              onRemove={handleRemoveReceiptFile}
-              accept="image/*,.pdf"
-            >
-              {receiptUploading ? <Spin /> : (
-                <div>
-                  <PlusOutlined />
-                  <div style={{ marginTop: 8 }}>Tải lên</div>
-                </div>
-              )}
-            </Upload>
+            <div style={{ marginBottom: 16 }}>
+              <input
+                type="file"
+                multiple
+                accept="image/*,.pdf"
+                style={{ display: 'none' }}
+                ref={el => window._createReceiptUploadRef = el}
+                onChange={(e) => {
+                  const files = Array.from(e.target.files)
+                  if (!files.length) return
+                  
+                  const newFiles = files.map(file => ({
+                    uid: file.name + Math.random(),
+                    name: file.name,
+                    status: 'done',
+                    url: URL.createObjectURL(file),
+                    fileObj: file
+                  }))
+                  
+                  setReceiptFileList(prev => [...prev, ...newFiles])
+                  e.target.value = ''
+                }}
+              />
+              <Button icon={<UploadOutlined />} onClick={() => window._createReceiptUploadRef?.click()} type="primary">
+                Chọn hình ảnh / tài liệu
+              </Button>
+            </div>
+
+            <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
+              {receiptFileList.map((file, index) => (
+                 <div key={file.uid || index} style={{ position: 'relative', width: 80, height: 80 }}>
+                    <div style={{ width: '100%', height: '100%', border: '1px solid #d9d9d9', borderRadius: 8, padding: 4, display: 'flex', justifyContent: 'center', alignItems: 'center', overflow: 'hidden' }}>
+                      {file.url && file.url.endsWith('.pdf') ? (
+                        <FileTextOutlined style={{ fontSize: 32, color: '#1677ff' }} />
+                      ) : (
+                        <Image src={file.url} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                      )}
+                    </div>
+                    <Button 
+                       size="small" 
+                       danger 
+                       icon={<CloseCircleOutlined />} 
+                       style={{ position: 'absolute', top: -8, right: -8, padding: 0, width: 20, height: 20, minWidth: 20, borderRadius: '50%', zIndex: 10 }}
+                       onClick={() => setReceiptFileList(prev => prev.filter(f => f.uid !== file.uid))}
+                    />
+                 </div>
+              ))}
+            </div>
           </Form.Item>
         </Form>
       </Modal>
