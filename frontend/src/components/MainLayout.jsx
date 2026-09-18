@@ -57,6 +57,7 @@ import {
   ApiOutlined,
   RobotOutlined, BookOutlined,
   FacebookOutlined,
+  CloudUploadOutlined,
 } from '@ant-design/icons'
 import { useAuth } from '../contexts/AuthContext'
 
@@ -140,6 +141,11 @@ function MainLayout({ children, isDarkMode, toggleTheme }) {
           key: '/admin/settings',
           icon: <SettingOutlined />,
           label: <Link to="/admin/settings">Cấu hình Gói & Hạn mức</Link>,
+        },
+        {
+          key: '/admin/backup-settings',
+          icon: <CloudUploadOutlined />,
+          label: <Link to="/admin/backup-settings">Backup & Restore</Link>,
         },
         {
           key: '/admin/quotation-templates',

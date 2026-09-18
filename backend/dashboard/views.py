@@ -495,3 +495,92 @@ def debt_stats(request):
             for item in monthly
         ]
     })
+
+from rest_framework import viewsets
+from rest_framework.decorators import action
+from .models import SystemBackupConfig, BackupHistoryLog
+from .serializers import SystemBackupConfigSerializer, BackupHistoryLogSerializer
+
+class SystemBackupConfigViewSet(viewsets.ModelViewSet):
+    queryset = SystemBackupConfig.objects.all()
+    serializer_class = SystemBackupConfigSerializer
+    permission_classes = [permissions.IsAdminUser]
+
+    def get_object(self):
+        obj, created = SystemBackupConfig.objects.get_or_create(id=1)
+        return obj
+
+    def list(self, request, *args, **kwargs):
+        # Vì chỉ có 1 cấu hình hệ thống, method list sẽ trả về object duy nhất thay vì array
+        instance = self.get_object()
+        serializer = self.get_serializer(instance)
+        return Response(serializer.data)
+    
+    @action(detail=False, methods=['post'])
+    def trigger_backup(self, request):
+        # Tính năng chạy backup ngay lập tức
+        from core.tasks import run_automated_backup
+        run_automated_backup.delay()
+        return Response({"status": "success", "message": "Tiến trình backup đã được bắt đầu dưới nền."})
+
+    @action(detail=False, methods=['get'])
+    def list_r2_backups(self, request):
+        config = self.get_object()
+        if not config.r2_endpoint_url or not config.r2_access_key or not config.r2_secret_key:
+            return Response({"error": "Chưa cấu hình Cloudflare R2."}, status=400)
+        
+        import boto3
+        from botocore.client import Config
+        
+        try:
+            s3_client = boto3.client(
+                's3',
+                endpoint_url=config.r2_endpoint_url,
+                aws_access_key_id=config.r2_access_key,
+                aws_secret_access_key=config.r2_secret_key,
+                config=Config(signature_version='s3v4'),
+                region_name='auto'
+            )
+            response = s3_client.list_objects_v2(Bucket=config.r2_bucket_name)
+            files = []
+            if 'Contents' in response:
+                for obj in response['Contents']:
+                    if obj['Key'].endswith('.tar.gz'):
+                        files.append({
+                            'key': obj['Key'],
+                            'size': obj['Size'],
+                            'last_modified': obj['LastModified'].isoformat()
+                        })
+                # Sắp xếp mới nhất lên đầu
+                files = sorted(files, key=lambda x: x['last_modified'], reverse=True)
+            return Response(files)
+        except Exception as e:
+            return Response({"error": str(e)}, status=500)
+
+    @action(detail=False, methods=['post'])
+    def trigger_restore(self, request):
+        password = request.data.get('password')
+        filename = request.data.get('filename')
+
+        if not password or not filename:
+            return Response({"error": "Thiếu thông tin mật khẩu hoặc tên file."}, status=400)
+        
+        # Xác thực mật khẩu
+        if not request.user.check_password(password):
+            return Response({"error": "Mật khẩu quản trị không chính xác."}, status=403)
+        
+        # Gọi tiến trình khôi phục
+        from core.tasks import run_restore_task
+        run_restore_task.delay(filename)
+        return Response({"status": "success", "message": "Đã bắt đầu tiến trình khôi phục dữ liệu dưới nền."})
+
+
+class BackupHistoryLogViewSet(viewsets.ReadOnlyModelViewSet):
+    queryset = BackupHistoryLog.objects.all()
+    serializer_class = BackupHistoryLogSerializer
+    permission_classes = [permissions.IsAdminUser]
+
+    @action(detail=False, methods=['delete'])
+    def clear_logs(self, request):
+        count, _ = BackupHistoryLog.objects.all().delete()
+        return Response({"status": "success", "message": f"Đã xoá {count} bản ghi lịch sử."})

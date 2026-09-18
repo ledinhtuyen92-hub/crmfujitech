@@ -29,6 +29,7 @@ import ApprovalList from './pages/ApprovalList'
 import RegisterCompany from './pages/RegisterCompany'
 import AdminDashboard from './pages/admin/AdminDashboard'
 import AdminSettings from './pages/admin/AdminSettings'
+import SystemBackupSettings from './pages/admin/SystemBackupSettings'
 import CompanyManagement from './pages/admin/CompanyManagement'
 import SystemUserManagement from './pages/admin/SystemUserManagement'
 import QuotationTemplateManagement from './pages/admin/QuotationTemplateManagement'
@@ -344,6 +345,14 @@ function App() {
                 element={
                   <SuperAdminRoute>
                     <AdminSettings />
+                  </SuperAdminRoute>
+                }
+              />
+              <Route
+                path="/admin/backup-settings"
+                element={
+                  <SuperAdminRoute>
+                    <SystemBackupSettings />
                   </SuperAdminRoute>
                 }
               />

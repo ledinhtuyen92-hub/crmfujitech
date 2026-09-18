@@ -18,7 +18,20 @@ app.config_from_object("django.conf:settings", namespace="CELERY")
 # Tự động discover tasks từ tất cả INSTALLED_APPS
 app.autodiscover_tasks()
 
+# Đăng ký thủ công các task nằm trong core/
+app.conf.imports = ('core.tasks',)
+
 
 @app.task(bind=True, ignore_result=True)
 def debug_task(self):
     print(f"Request: {self.request!r}")
+
+from celery.schedules import crontab
+
+app.conf.beat_schedule = {
+    'check-automated-backup-every-hour': {
+        'task': 'core.tasks.schedule_check_backup',
+        'schedule': crontab(minute='0'),  # Chạy vào phút 0 của mỗi giờ
+    },
+}
+

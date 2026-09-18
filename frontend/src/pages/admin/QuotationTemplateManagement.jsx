@@ -206,7 +206,7 @@ export default function QuotationTemplateManagement() {
   ]
 
   return (
-    <div style={{ padding: '0 24px 24px 24px', maxWidth: 1400, margin: '0 auto' }}>
+    <div style={{ padding: '4px 0' }}>
       {contextHolder}
       
       <div style={{ marginBottom: 24, display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>

@@ -4,6 +4,12 @@ from . import views
 
 app_name = "dashboard"
 
+from rest_framework.routers import DefaultRouter
+
+router = DefaultRouter()
+router.register(r'backup-config', views.SystemBackupConfigViewSet, basename='backup-config')
+router.register(r'backup-history', views.BackupHistoryLogViewSet, basename='backup-history')
+
 urlpatterns = [
     path("summary/", views.summary, name="summary"),
     path("revenue-chart/", views.revenue_chart, name="revenue-chart"),
@@ -12,3 +18,6 @@ urlpatterns = [
     path("top-sellers/", views.top_sellers, name="top-sellers"),
     path("debt-stats/", views.debt_stats, name="debt-stats"),
 ]
+
+urlpatterns += router.urls
+

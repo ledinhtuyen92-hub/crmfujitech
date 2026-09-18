@@ -254,6 +254,13 @@ export default function AdminDashboard() {
           >
             Cấu hình Gói & Hạn mức
           </Button>
+          <Button
+            size="large"
+            style={{ background: 'rgba(255,255,255,0.1)', color: '#fff', border: '1px solid rgba(255,255,255,0.2)', fontWeight: 600 }}
+            onClick={() => navigate('/admin/backup-settings')}
+          >
+            Backup & Restore
+          </Button>
         </Space>
       </div>
 
