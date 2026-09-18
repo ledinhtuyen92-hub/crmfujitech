@@ -22,9 +22,9 @@ echo "==================================================="
 cd $PROJECT_DIR || exit 1
 
 # 1. Dong bo Du lieu (Database -> JSON) va day len GitHub
-echo "=> Dang trich xuat Database ra file sync_data.json..."
-# Chay dumpdata trong container
-docker exec -i crm_web python manage.py dumpdata -e contenttypes -e auth.Permission -e sessions -e admin.logentry --indent 2 -o sync_data.json
+echo "=> Dang trich xuat Database ra file sync_data.json bang script xu ly UTF-8..."
+# Chay dump_sync_data.py trong container de chong loi font va cap quyen root de ghi file
+docker exec -u root crm_web python dump_sync_data.py
 
 # Cau hinh an toan cho Git (truong hop chay qua cron hoac vps moi)
 git config --global --add safe.directory $PROJECT_DIR
