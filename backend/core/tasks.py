@@ -69,7 +69,10 @@ def run_automated_backup():
         json_data = out.getvalue()
         parsed_json = json.loads(json_data)
         
-        sync_file = os.path.join(settings.BASE_DIR, 'sync_data.json')
+        import tempfile
+        temp_dir = tempfile.gettempdir()
+        
+        sync_file = os.path.join(temp_dir, 'sync_data.json')
         with codecs.open(sync_file, 'w', encoding='utf-8') as f:
             json.dump(parsed_json, f, ensure_ascii=False, indent=2)
         logs.append(f"   Thành công: Trích xuất {len(parsed_json)} bản ghi.")
@@ -77,7 +80,7 @@ def run_automated_backup():
         # 2. Đóng gói Dữ liệu & Media
         logs.append("2. Đang nén file dữ liệu (DB) và thư mục Media...")
         date_str = datetime.now().strftime("%Y%m%d_%H%M%S")
-        backup_tar = os.path.join(settings.BASE_DIR, f'crm_full_backup_{date_str}.tar.gz')
+        backup_tar = os.path.join(temp_dir, f'crm_full_backup_{date_str}.tar.gz')
         media_dir = os.path.join(settings.BASE_DIR, 'media')
         
         with tarfile.open(backup_tar, "w:gz") as tar:
