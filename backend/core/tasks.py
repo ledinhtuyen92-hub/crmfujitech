@@ -171,7 +171,10 @@ def run_restore_task(filename):
     log = BackupHistoryLog.objects.create(status='processing', action_type='restore', logs=f"Bắt đầu khôi phục từ file {filename}...")
     logs = [log.logs]
     
-    temp_dir = os.path.join(settings.BASE_DIR, 'tmp_restore')
+    import tempfile
+    import uuid
+    # Tạo một thư mục tạm duy nhất cho mỗi tiến trình khôi phục
+    temp_dir = os.path.join(tempfile.gettempdir(), f'tmp_restore_{uuid.uuid4().hex[:8]}')
     os.makedirs(temp_dir, exist_ok=True)
     tar_path = os.path.join(temp_dir, filename)
     
