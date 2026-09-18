@@ -18,6 +18,7 @@ const DEFAULT_LAYOUT_BLOCKS = [
 export default function QuotationPrintView({ quotation, type = 'quotation', documentType = 'quotation', effectiveTemplate, hidePricing = false, hideCustomerInfo = false, renderCustomerSignature, products = [] }) {
   const [scale, setScale] = useState(1);
   const [showPageBreaks, setShowPageBreaks] = useState(false);
+  const [showSignatures, setShowSignatures] = useState(true);
   const [zoomedHeight, setZoomedHeight] = useState(0);
   const contentRef = useRef(null);
 
@@ -144,6 +145,10 @@ export default function QuotationPrintView({ quotation, type = 'quotation', docu
           Dự kiến in: <span style={{ color: '#16a34a' }}>{estimatedPages} trang A4</span>
         </span>
         <div style={{ marginLeft: 16, paddingLeft: 16, borderLeft: '1px solid #cbd5e1', display: 'flex', alignItems: 'center', gap: 8 }}>
+          <span style={{ fontWeight: 600, color: '#334155' }}>Hiển thị chữ ký/dấu:</span>
+          <Switch size="small" checked={showSignatures} onChange={setShowSignatures} />
+        </div>
+        <div style={{ marginLeft: 16, paddingLeft: 16, borderLeft: '1px solid #cbd5e1', display: 'flex', alignItems: 'center', gap: 8 }}>
           <span style={{ fontWeight: 600, color: '#334155' }}>Xem trước cắt trang:</span>
           <Switch size="small" checked={showPageBreaks} onChange={setShowPageBreaks} />
         </div>
@@ -175,6 +180,7 @@ export default function QuotationPrintView({ quotation, type = 'quotation', docu
           documentType={documentType !== 'quotation' ? documentType : type}
           hidePricing={hidePricing}
           hideCustomerInfo={hideCustomerInfo}
+          hideSignatures={!showSignatures}
         />
       </div>
     </div>

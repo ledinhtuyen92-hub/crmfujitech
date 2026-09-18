@@ -128,7 +128,7 @@ const computeProductSTT = (data, index, field = 'product') => {
  * QuotationRenderer takes the layout_config JSON and actual data (customer, items, totals)
  * and renders the final read-only HTML view.
  */
-export default function QuotationRenderer({ layoutConfig, layoutStyle, data, renderCustomerSignature, documentType = 'quotation', hidePricing = false, hideCustomerInfo = false }) {
+export default function QuotationRenderer({ layoutConfig, layoutStyle, data, renderCustomerSignature, documentType = 'quotation', hidePricing = false, hideCustomerInfo = false, hideSignatures = false }) {
   if (!layoutConfig || !Array.isArray(layoutConfig.blocks)) {
     return <div style={{ padding: 20, textAlign: 'center' }}>Mẫu báo giá chưa được thiết kế.</div>;
   }
@@ -712,13 +712,17 @@ export default function QuotationRenderer({ layoutConfig, layoutStyle, data, ren
                 <div style={{ fontSize: 11, color: '#64748b', fontStyle: 'italic', marginBottom: 12 }}>(Ký, đóng dấu & ghi rõ họ tên)</div>
                 
                 <div style={{ minHeight: 140, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'flex-start', paddingTop: 10, position: 'relative' }}>
-                  {block.props.signatures?.[idx]?.includes('{{customer_signature}}') && renderCustomerSignature ? (
-                    renderCustomerSignature()
-                  ) : block.props.signatures?.[idx] ? (
-                    <div 
-                      dangerouslySetInnerHTML={{ __html: parseVariables(block.props.signatures[idx], data, company).replace(/\n{3,}/g, '\n\n').replace(/\n/g, '<br/>') }} 
-                      style={{ display: 'block', textAlign: 'center', whiteSpace: 'pre-wrap', position: 'relative', width: '100%', lineHeight: '1.2' }}
-                    />
+                  {!hideSignatures ? (
+                    block.props.signatures?.[idx]?.includes('{{customer_signature}}') && renderCustomerSignature ? (
+                      renderCustomerSignature()
+                    ) : block.props.signatures?.[idx] ? (
+                      <div 
+                        dangerouslySetInnerHTML={{ __html: parseVariables(block.props.signatures[idx], data, company).replace(/\n{3,}/g, '\n\n').replace(/\n/g, '<br/>') }} 
+                        style={{ display: 'block', textAlign: 'center', whiteSpace: 'pre-wrap', position: 'relative', width: '100%', lineHeight: '1.2' }}
+                      />
+                    ) : (
+                      <div style={{ height: 115 }} />
+                    )
                   ) : (
                     <div style={{ height: 115 }} />
                   )}
