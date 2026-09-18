@@ -126,7 +126,7 @@ server {
     }
 
     # Chuyen huong cac request API ve Django Backend (Docker port 8000)
-    location ~ ^/(api|admin|media|static)/ {
+    location ~ ^/(api|sys-admin|media|static)/ {
         proxy_pass http://127.0.0.1:8000;
         proxy_set_header Host \$host;
         proxy_set_header X-Real-IP \$remote_addr;
