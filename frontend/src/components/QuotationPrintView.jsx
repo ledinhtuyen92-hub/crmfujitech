@@ -80,7 +80,7 @@ export default function QuotationPrintView({ quotation, type = 'quotation', docu
         product_image: item.product_image || catalogImage,
         fallback_product_image: catalogImage,
         spec: item.spec || (prodObj ? prodObj.description : ''),
-        unit: item.unit || (prodObj ? prodObj.unit : 'cái')
+        unit: item.custom_data?.unit || item.unit || (prodObj ? prodObj.unit : (item.item_type === 'service' ? 'lần' : 'cái'))
       };
     }),
     // Totals

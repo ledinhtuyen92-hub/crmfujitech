@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { AutoComplete, Input, Button, message } from 'antd';
 import { PlusOutlined, DeleteOutlined } from '@ant-design/icons';
 import { useAuth } from '../contexts/AuthContext';
@@ -6,24 +6,61 @@ import { useAuth } from '../contexts/AuthContext';
 export default function CustomInfoInput({ value, onChange, placeholder, style, enableTemplate = true, templateKey = 'default' }) {
   const { user, patchCompanySettings } = useAuth();
   const [adding, setAdding] = useState(false);
+  
+  const [localValue, setLocalValue] = useState(value ?? '');
+  const timerRef = useRef(null);
+  const localValueRef = useRef(localValue);
+
+  // Sync when parent value changes
+  useEffect(() => {
+    const incoming = value ?? '';
+    setLocalValue(incoming);
+    localValueRef.current = incoming;
+  }, [value]);
+
+  const commitValue = (val) => {
+    if (timerRef.current) clearTimeout(timerRef.current);
+    onChange(val);
+  };
+
+  const handleChange = (newVal) => {
+    setLocalValue(newVal);
+    localValueRef.current = newVal;
+    
+    if (timerRef.current) clearTimeout(timerRef.current);
+    timerRef.current = setTimeout(() => {
+      onChange(newVal);
+    }, 400); // fast debounce
+  };
+
+  const handleSelect = (val) => {
+    setLocalValue(val);
+    localValueRef.current = val;
+    commitValue(val);
+  };
+
+  const handleBlur = () => {
+    if (timerRef.current) clearTimeout(timerRef.current);
+    onChange(localValueRef.current);
+  };
 
   if (enableTemplate === false) {
     return (
       <Input
         placeholder={placeholder}
         style={style}
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
+        value={localValue}
+        onChange={(e) => handleChange(e.target.value)}
+        onBlur={handleBlur}
       />
     );
   }
   
-  // Xử lý cả dạng mảng (cũ) và dạng object (mới)
+  // Handle both old array format and new object format
   const rawTemplates = user?.custom_info_templates;
   const isArray = Array.isArray(rawTemplates);
   let currentKeyOptions = [];
   if (isArray) {
-    // Nếu vẫn là array cũ, gán tạm cho key 'default'
     currentKeyOptions = templateKey === 'default' ? rawTemplates : [];
   } else if (rawTemplates && typeof rawTemplates === 'object') {
     currentKeyOptions = rawTemplates[templateKey] || [];
@@ -63,7 +100,7 @@ export default function CustomInfoInput({ value, onChange, placeholder, style, e
 
   const options = currentKeyOptions.map(item => ({
     value: item,
-    title: '', // Ẩn tooltip mặc định của Ant Design
+    title: '',
     label: (
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <span>{item}</span>
@@ -78,8 +115,10 @@ export default function CustomInfoInput({ value, onChange, placeholder, style, e
   return (
     <AutoComplete
       style={{ width: '100%', ...style }}
-      value={value}
-      onChange={onChange}
+      value={localValue}
+      onChange={handleChange}
+      onSelect={handleSelect}
+      onBlur={handleBlur}
       options={options}
       placeholder={placeholder || "Thêm thông tin..."}
       filterOption={(inputValue, option) => {
@@ -103,8 +142,8 @@ export default function CustomInfoInput({ value, onChange, placeholder, style, e
               icon={<PlusOutlined />}
               loading={adding}
               onClick={() => {
-                if (value) {
-                  addTemplate(value);
+                if (localValueRef.current) {
+                  addTemplate(localValueRef.current);
                 } else {
                   message.warning('Vui lòng nhập nội dung trước khi lưu');
                 }

@@ -45,6 +45,7 @@ import ReceiptPrintView from '../components/ReceiptPrintView'
 import ZnsSendModal from '../components/ZnsSendModal'
 import { useResponsive } from '../hooks/useResponsive'
 import CustomInfoInput from '../components/CustomInfoInput'
+import { DebouncedInput, DebouncedInputNumber, DebouncedTextArea } from '../components/DebouncedInput'
 import { MenuOutlined } from '@ant-design/icons';
 import { DndContext, PointerSensor, useSensor, useSensors, KeyboardSensor, closestCenter } from '@dnd-kit/core';
 import { restrictToVerticalAxis } from '@dnd-kit/modifiers';
@@ -1348,7 +1349,7 @@ export default function OrderList() {
                       )}
                     {enableProductDescription && (
                       !record.product ? (
-                        <TextArea 
+                        <DebouncedTextArea 
                           size="small"
                           placeholder="Mô tả sản phẩm (tùy chọn)..."
                           autoSize={{ minRows: 1, maxRows: 3 }}
@@ -1476,21 +1477,21 @@ export default function OrderList() {
           dataIndex: 'quantity',
           width: 70,
           align: 'center',
-          render: (val, record, idx) => <InputNumber style={{ width: '100%', textAlign: 'center' }} value={val} onChange={(v) => handleLineChange(idx, 'quantity', v)} />,
+          render: (val, record, idx) => <DebouncedInputNumber style={{ width: '100%', textAlign: 'center' }} value={val} onChange={(v) => handleLineChange(idx, 'quantity', v)} />,
         },
         {
           title: 'ĐVT',
           dataIndex: 'unit',
           width: 70,
           align: 'center',
-          render: (val, record, idx) => <Input style={{ textAlign: 'center' }} value={val ?? 'bộ'} onChange={(e) => handleLineChange(idx, 'unit', e.target.value)} />,
+          render: (val, record, idx) => <DebouncedInput style={{ textAlign: 'center' }} value={val ?? 'bộ'} onChange={(e) => handleLineChange(idx, 'unit', e.target.value)} />,
         },
         {
           title: 'ĐƠN GIÁ/BỘ',
           dataIndex: 'unit_price',
           width: 130,
           align: 'right',
-          render: (val, record, idx) => <InputNumber min={0} step={1000} style={{ width: '100%' }} formatter={(v) => `${v}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',')} parser={(v) => v.replace(/\$\s?|(,*)/g, '')} value={val} onChange={(v) => handleLineChange(idx, 'unit_price', v)} />,
+          render: (val, record, idx) => <DebouncedInputNumber min={0} step={1000} style={{ width: '100%' }} formatter={(v) => `${v}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',')} parser={(v) => v.replace(/\$\s?|(,*)/g, '')} value={val} onChange={(v) => handleLineChange(idx, 'unit_price', v)} />,
         },
         {
           title: 'TỔNG TIỀN',
@@ -1651,7 +1652,7 @@ export default function OrderList() {
                     )}
                     {enableProductDescription && (
                       !record.product ? (
-                        <TextArea 
+                        <DebouncedTextArea 
                           size="small"
                           placeholder="Mô tả sản phẩm (tùy chọn)..."
                           autoSize={{ minRows: 1, maxRows: 3 }}
@@ -1697,19 +1698,19 @@ export default function OrderList() {
           title: 'Rộng (m)',
           dataIndex: 'width',
           width: 90,
-          render: (val, record, idx) => <InputNumber min={0} step={0.1} style={{ width: '100%' }} value={val} onChange={(v) => handleLineChange(idx, 'width', v)} />,
+          render: (val, record, idx) => <DebouncedInputNumber min={0} step={0.1} style={{ width: '100%' }} value={val} onChange={(v) => handleLineChange(idx, 'width', v)} />,
         },
         {
           title: 'Cao (m)',
           dataIndex: 'height',
           width: 90,
-          render: (val, record, idx) => <InputNumber min={0} step={0.1} style={{ width: '100%' }} value={val} onChange={(v) => handleLineChange(idx, 'height', v)} />,
+          render: (val, record, idx) => <DebouncedInputNumber min={0} step={0.1} style={{ width: '100%' }} value={val} onChange={(v) => handleLineChange(idx, 'height', v)} />,
         },
         {
           title: 'D.Tích (m²)',
           dataIndex: 'area',
           width: 90,
-          render: (val, record, idx) => <InputNumber min={0} step={0.1} style={{ width: '100%' }} value={val} onChange={(v) => handleLineChange(idx, 'area', v)} />,
+          render: (val, record, idx) => <DebouncedInputNumber min={0} step={0.1} style={{ width: '100%' }} value={val} onChange={(v) => handleLineChange(idx, 'area', v)} />,
         }
       )
     } else if (tmplCode === 'GLASS_ALUMINUM') {
@@ -1718,13 +1719,13 @@ export default function OrderList() {
           title: 'Rộng (m)',
           dataIndex: 'width',
           width: 80,
-          render: (val, record, idx) => <InputNumber min={0} step={0.1} style={{ width: '100%' }} value={val} onChange={(v) => handleLineChange(idx, 'width', v)} />,
+          render: (val, record, idx) => <DebouncedInputNumber min={0} step={0.1} style={{ width: '100%' }} value={val} onChange={(v) => handleLineChange(idx, 'width', v)} />,
         },
         {
           title: 'Cao (m)',
           dataIndex: 'height',
           width: 80,
-          render: (val, record, idx) => <InputNumber min={0} step={0.1} style={{ width: '100%' }} value={val} onChange={(v) => handleLineChange(idx, 'height', v)} />,
+          render: (val, record, idx) => <DebouncedInputNumber min={0} step={0.1} style={{ width: '100%' }} value={val} onChange={(v) => handleLineChange(idx, 'height', v)} />,
         },
         {
           title: 'Quy cách / Hệ nhôm',
@@ -1760,19 +1761,19 @@ export default function OrderList() {
           title: 'Dài (cm)',
           dataIndex: 'length',
           width: 80,
-          render: (val, record, idx) => <InputNumber min={0} style={{ width: '100%' }} value={val} onChange={(v) => handleLineChange(idx, 'length', v)} />,
+          render: (val, record, idx) => <DebouncedInputNumber min={0} style={{ width: '100%' }} value={val} onChange={(v) => handleLineChange(idx, 'length', v)} />,
         },
         {
           title: 'Rộng (cm)',
           dataIndex: 'width',
           width: 80,
-          render: (val, record, idx) => <InputNumber min={0} style={{ width: '100%' }} value={val} onChange={(v) => handleLineChange(idx, 'width', v)} />,
+          render: (val, record, idx) => <DebouncedInputNumber min={0} style={{ width: '100%' }} value={val} onChange={(v) => handleLineChange(idx, 'width', v)} />,
         },
         {
           title: 'Cao (cm)',
           dataIndex: 'height',
           width: 80,
-          render: (val, record, idx) => <InputNumber min={0} style={{ width: '100%' }} value={val} onChange={(v) => handleLineChange(idx, 'height', v)} />,
+          render: (val, record, idx) => <DebouncedInputNumber min={0} style={{ width: '100%' }} value={val} onChange={(v) => handleLineChange(idx, 'height', v)} />,
         },
         {
           title: 'Chất liệu / Quy cách',
@@ -1905,19 +1906,19 @@ export default function OrderList() {
         title: 'SL',
         dataIndex: 'quantity',
         width: 70,
-        render: (val, record, idx) => <InputNumber style={{ width: '100%' }} value={val} onChange={(v) => handleLineChange(idx, 'quantity', v)} />,
+        render: (val, record, idx) => <DebouncedInputNumber style={{ width: '100%' }} value={val} onChange={(v) => handleLineChange(idx, 'quantity', v)} />,
       },
       {
         title: 'Đơn giá (VNĐ)',
         dataIndex: 'unit_price',
         width: 130,
-        render: (val, record, idx) => <InputNumber min={0} step={1000} style={{ width: '100%' }} formatter={(v) => `${v}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',')} parser={(v) => v.replace(/\$\s?|(,*)/g, '')} value={val} onChange={(v) => handleLineChange(idx, 'unit_price', v)} />,
+        render: (val, record, idx) => <DebouncedInputNumber min={0} step={1000} style={{ width: '100%' }} formatter={(v) => `${v}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',')} parser={(v) => v.replace(/\$\s?|(,*)/g, '')} value={val} onChange={(v) => handleLineChange(idx, 'unit_price', v)} />,
       },
       {
         title: 'CK(%)',
         dataIndex: 'discount_percent',
         width: 70,
-        render: (val, record, idx) => <InputNumber min={0} max={100} style={{ width: '100%' }} value={val} onChange={(v) => handleLineChange(idx, 'discount_percent', v)} />,
+        render: (val, record, idx) => <DebouncedInputNumber min={0} max={100} style={{ width: '100%' }} value={val} onChange={(v) => handleLineChange(idx, 'discount_percent', v)} />,
       },
       {
         title: 'Thành tiền',
@@ -2175,18 +2176,21 @@ export default function OrderList() {
     return applyColFeatures(baseCols);
   };
 
-  const getServiceItemColumns = () => {
-    const effectiveTmpl = getEffectiveTemplate(editingOrder)
-    const tmplCode = effectiveTmpl?.code || 'STANDARD'
-    const isLandscape = tmplCode === 'production_landscape_a4' || effectiveTmpl?.layout_config?.paper_orientation === 'landscape'
+    const getServiceItemColumns = () => {
+    const effectiveTmpl = getEffectiveTemplate(typeof editingQuotation !== 'undefined' ? editingQuotation : (typeof editingOrder !== 'undefined' ? editingOrder : null));
+    const serviceTableBlock = effectiveTmpl?.layout_config?.blocks?.find(b => b.type === 'service_table');
+    const allowedCategories = serviceTableBlock?.props?.allowedCategories || [];
+    
+    const tmplCode = effectiveTmpl?.code || 'STANDARD';
+    const isLandscape = tmplCode === 'production_landscape_a4' || effectiveTmpl?.layout_config?.paper_orientation === 'landscape';
 
-    const serviceBlock = effectiveTmpl?.layout_config?.blocks?.find(b => b.type === 'service_table');
-    const enableServiceImage = serviceBlock?.props?.enableProductImage !== false;
+    const enableServiceImage = serviceTableBlock?.props?.enableProductImage !== false;
 
     let baseCols = [
       {
         title: '',
         key: 'sort',
+        id: 'sort',
         width: 40,
         align: 'center',
         render: () => <DragHandle />,
@@ -2194,6 +2198,7 @@ export default function OrderList() {
       {
         title: 'STT',
         key: 'stt',
+        id: 'stt',
         width: 60,
         align: 'center',
         render: (_, __, idx) => idx + 1,
@@ -2202,6 +2207,7 @@ export default function OrderList() {
         title: 'TÊN DỊCH VỤ / CHI PHÍ',
         dataIndex: 'product_name',
         key: 'product_name',
+        id: 'name',
         width: 250,
         render: (text, record, index) => (
           <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'nowrap' }}>
@@ -2212,181 +2218,340 @@ export default function OrderList() {
               style={{ flex: 1, minWidth: 150 }}
               value={text}
               onChange={(val) => handleServiceLineChange(index, 'product_name', val)}
-              options={groupProducts(products.filter(p => p.product_type === 'service'))}
+              options={groupProducts(products.filter((p) => {
+                if (p.product_type !== 'service') return false;
+                if (allowedCategories.length === 0) return true;
+                return allowedCategories.includes(p.category_name);
+              }))}
               filterOption={(inputValue, option) => (option?.value || '').toUpperCase().includes(inputValue.toUpperCase())}
               placeholder="Chọn hoặc nhập tên dịch vụ"
             />
             {enableServiceImage && (
               <div style={{ position: 'relative', display: 'inline-block' }}>
-      <Button icon={<CameraOutlined />} size="small" type="dashed" title="Tải ảnh lên"  />
-      <input 
-        type="file" 
-        accept="image/*" 
-        style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', opacity: 0, cursor: 'pointer' }}
-        onChange={async (e) => {
-          const file = e.target.files?.[0];
-          if (!file) return;
-          
-                  try {
-                    const formData = new FormData();
-                    formData.append('image', file);
-                    const res = await api.postForm('/sales/quotations/upload-item-image/', formData);
-                    handleServiceLineChange(index, 'product_image', res.data.url);
-                    messageApi.success("Đã tải ảnh thành công!");
-                    
-                  } catch (e) {
-                    const errDetail = e.response?.data?.error || "Vui lòng thử lại";
-                    messageApi.error(`Tải ảnh thất bại: ${errDetail}`);
-                    
-                  }
-                
-          e.target.value = '';
-        }}
-      />
-    </div>
+                <Button icon={<CameraOutlined />} size="small" type="dashed" title="Tải ảnh lên"  />
+                <input 
+                  type="file" 
+                  accept="image/*" 
+                  style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', opacity: 0, cursor: 'pointer' }}
+                  onChange={async (e) => {
+                    const file = e.target.files?.[0];
+                    if (!file) return;
+                    try {
+                      const formData = new FormData();
+                      formData.append('image', file);
+                      const res = await api.postForm('/sales/quotations/upload-item-image/', formData);
+                      handleServiceLineChange(index, 'product_image', res.data.url);
+                      messageApi.success("Đã tải ảnh thành công!");
+                    } catch (e) {
+                      const errDetail = e.response?.data?.error || "Vui lòng thử lại";
+                      messageApi.error(`Tải ảnh thất bại: ${errDetail}`);
+                    }
+                    e.target.value = '';
+                  }}
+                />
+              </div>
             )}
           </div>
         ),
       }
-    ]
+    ];
 
     if (isLandscape) {
       baseCols.push(
         {
           title: 'KÝ HIỆU',
           dataIndex: 'symbol',
+          id: 'symbol',
           width: 100,
           align: 'center',
-          render: (val, record, idx) => <CustomInfoInput templateKey="symbol" style={{ textAlign: 'center', fontWeight: 600, color: '#2563eb' }} placeholder="VD: D1.1" value={record.symbol || ''} onChange={(v) => handleServiceLineChange(idx, 'symbol', v)} />,
+          render: (val, record, idx) => <DebouncedInput style={{ textAlign: 'center', fontWeight: 600, color: '#2563eb' }} placeholder="VD: D1.1" value={record.symbol || ''} onChange={(e) => handleServiceLineChange(idx, 'symbol', e.target.value)} />,
         },
         {
           title: 'GHI CHÚ KỸ THUẬT',
-          dataIndex: 'note',
+          dataIndex: 'spec',
+          id: 'specs',
           width: 170,
-          render: (val, record, idx) => <CustomInfoInput templateKey="note" placeholder="Chi tiết..." value={val || ''} onChange={(v) => handleServiceLineChange(idx, 'note', v)} />,
+          render: (val, record, idx) => <DebouncedInput placeholder="Chi tiết..." value={val || ''} onChange={(e) => handleServiceLineChange(idx, 'spec', e.target.value)} />,
         },
         {
           title: 'SL',
           dataIndex: 'quantity',
+          id: 'qty',
           width: 70,
           align: 'center',
-          render: (val, record, idx) => <InputNumber style={{ width: '100%', textAlign: 'center' }} value={val} onChange={(v) => handleServiceLineChange(idx, 'quantity', v)} />,
+          render: (val, record, idx) => <DebouncedInputNumber style={{ width: '100%', textAlign: 'center' }} value={val} onChange={(v) => handleServiceLineChange(idx, 'quantity', v)} />,
         },
         {
           title: 'ĐVT',
           dataIndex: 'unit',
+          id: 'unit',
           width: 70,
           align: 'center',
-          render: (val, record, idx) => <Input style={{ textAlign: 'center' }} value={val ?? 'lần'} onChange={(e) => handleServiceLineChange(idx, 'unit', e.target.value)} />,
+          render: (val, record, idx) => <DebouncedInput style={{ textAlign: 'center' }} value={val ?? 'lần'} onChange={(e) => handleServiceLineChange(idx, 'unit', e.target.value)} />,
         }
-      )
+      );
     } else {
       baseCols.push(
         {
-          title: 'GHI CHÚ',
-          dataIndex: 'note',
+          title: 'GHI CHÚ KỸ THUẬT',
+          dataIndex: 'spec',
+          id: 'specs',
           width: 170,
-          render: (val, record, idx) => <CustomInfoInput templateKey="note" placeholder="Chi tiết..." value={val || ''} onChange={(v) => handleServiceLineChange(idx, 'note', v)} />,
+          render: (val, record, idx) => <DebouncedInput placeholder="Chi tiết..." value={val || ''} onChange={(e) => handleServiceLineChange(idx, 'spec', e.target.value)} />,
         },
         {
           title: 'ĐVT',
           dataIndex: 'unit',
+          id: 'unit',
           width: 70,
           align: 'center',
-          render: (val, record, idx) => <Input style={{ textAlign: 'center' }} value={val ?? 'lần'} onChange={(e) => handleServiceLineChange(idx, 'unit', e.target.value)} />,
+          render: (val, record, idx) => <DebouncedInput style={{ textAlign: 'center' }} value={val ?? 'lần'} onChange={(e) => handleServiceLineChange(idx, 'unit', e.target.value)} />,
         },
         {
           title: 'SL',
           dataIndex: 'quantity',
+          id: 'qty',
           width: 70,
           align: 'center',
-          render: (val, record, idx) => <InputNumber style={{ width: '100%', textAlign: 'center' }} value={val} onChange={(v) => handleServiceLineChange(idx, 'quantity', v)} />,
+          render: (val, record, idx) => <DebouncedInputNumber style={{ width: '100%', textAlign: 'center' }} value={val} onChange={(v) => handleServiceLineChange(idx, 'quantity', v)} />,
         }
-      )
+      );
     }
 
     baseCols.push(
       {
+        title: 'GHI CHÚ',
+        dataIndex: 'note',
+        id: 'note',
+        width: 130,
+        render: (val, record, idx) => <DebouncedInput placeholder="Ghi chú khác..." value={val || ''} onChange={(e) => handleServiceLineChange(idx, 'note', e.target.value)} />,
+      },
+      {
         title: 'ĐƠN GIÁ',
         dataIndex: 'unit_price',
+        id: 'price',
         width: 130,
         align: 'right',
-        render: (val, record, idx) => <InputNumber min={0} step={1000} style={{ width: '100%' }} formatter={(v) => `${v}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',')} parser={(v) => v.replace(/\$\s?|(,*)/g, '')} value={val} onChange={(v) => handleServiceLineChange(idx, 'unit_price', v)} />,
+        render: (val, record, idx) => <DebouncedInputNumber min={0} step={1000} style={{ width: '100%' }} formatter={(v) => `${v}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',')} parser={(v) => v.replace(/\$\s?|(,*)/g, '')} value={val} onChange={(v) => handleServiceLineChange(idx, 'unit_price', v)} />,
       }
-    )
+    );
 
     if (!isLandscape) {
       baseCols.push(
         {
           title: 'CK (%)',
           dataIndex: 'discount_percent',
+          id: 'discount',
           width: 75,
           align: 'center',
-          render: (val, record, idx) => <InputNumber min={0} max={100} style={{ width: '100%', textAlign: 'center' }} value={val} onChange={(v) => handleServiceLineChange(idx, 'discount_percent', v)} />,
+          render: (val, record, idx) => <DebouncedInputNumber min={0} max={100} style={{ width: '100%', textAlign: 'center' }} value={val} onChange={(v) => handleServiceLineChange(idx, 'discount_percent', v)} />,
         }
-      )
+      );
     }
 
     baseCols.push(
       {
         title: 'TỔNG TIỀN',
         key: 'total',
+        id: 'total',
         width: 130,
         align: 'right',
         render: (_, record) => {
-          const total = computeServiceLineTotal(record)
-          return <Text strong style={{ color: '#16a34a', fontSize: 14 }}>{total.toLocaleString('vi-VN')} đ</Text>
+          const total = computeServiceLineTotal(record);
+          return <Text strong style={{ color: '#16a34a', fontSize: 14 }}>{total.toLocaleString('vi-VN')} đ</Text>;
         },
       },
       {
         title: '',
         key: 'action',
+        id: 'action',
         width: 50,
         align: 'center',
         render: (_, __, index) => (
-          <Tooltip title="Xoá dòng"><Button type="text" danger shape="circle" icon={<DeleteOutlined />} onClick={() => handleRemoveServiceLine(index)} /></Tooltip>
+          <Popconfirm title="Xoá dòng này?" onConfirm={() => {
+            const newList = [...serviceItems];
+            newList.splice(index, 1);
+            setServiceItems(newList);
+          }}>
+            <Button type="text" danger icon={<DeleteOutlined />} />
+          </Popconfirm>
         ),
       }
-    )
+    );
 
-    const getColId = (col) => col.key || col.dataIndex;
+    // --- Inject Custom Columns from Template ---
+    const customColumns = (serviceTableBlock?.props?.columns || []).filter(col => typeof col === 'object' && (col.id.startsWith('custom_') || col.id.startsWith('group_')));
+
+    const renderCustomCell = (colDef, val, record, idx) => {
+      if (colDef.allowedCategories && colDef.allowedCategories.length > 0) {
+        const filteredProducts = products.filter(p => colDef.allowedCategories.includes(p.category_name));
+        const options = groupProducts(filteredProducts, false);
+        return (
+          <AutoComplete
+            options={options}
+            style={{ width: '100%', minWidth: 100 }}
+            value={record.custom_data?.[colDef.id] || ''}
+            onChange={(v) => {
+              const newData = { ...(record.custom_data || {}) };
+              newData[colDef.id] = v;
+              handleServiceLineChange(idx, 'custom_data', newData);
+            }}
+            placeholder={`Chọn ${colDef.title.toLowerCase()}...`}
+            filterOption={(inputValue, option) =>
+              (option.value || '').toUpperCase().indexOf(inputValue.toUpperCase()) !== -1
+            }
+          />
+        );
+      }
+      return (
+        <CustomInfoInput 
+          placeholder={`Nhập ${colDef.title.toLowerCase()}...`}
+          value={record.custom_data?.[colDef.id] || ''} 
+          onChange={(v) => {
+            const newData = { ...(record.custom_data || {}) };
+            newData[colDef.id] = v;
+            handleServiceLineChange(idx, 'custom_data', newData);
+          }} 
+          enableTemplate={colDef.enableTemplate !== false}
+        />
+      );
+    };
+
+    if (customColumns.length > 0) {
+      customColumns.forEach(col => {
+        if (col.id.startsWith('group_') && col.children && col.children.length > 0) {
+          baseCols.push({
+            title: col.title,
+            key: col.id,
+            id: col.id,
+            children: col.children.map(child => ({
+              title: child.title,
+              dataIndex: child.id,
+              key: child.id,
+              id: child.id,
+              width: 100,
+              render: (val, record, idx) => renderCustomCell(child, val, record, idx),
+            }))
+          });
+        } else {
+          baseCols.push({
+            title: col.title,
+            dataIndex: col.id,
+            key: col.id,
+            id: col.id,
+            width: 100,
+            render: (val, record, idx) => renderCustomCell(col, val, record, idx),
+          });
+        }
+      });
+    }
+
     const getColConfig = (colId) => {
       let found = null;
-      for (const c of (serviceBlock?.props?.columns || [])) {
+      for (const c of (serviceTableBlock?.props?.columns || [])) {
         if (typeof c === 'object') {
           if (c.id === colId) { found = c; break; }
+          if (c.children && Array.isArray(c.children)) {
+            const child = c.children.find(ch => ch.id === colId);
+            if (child) { found = child; break; }
+          }
         } else if (c === colId) {
-          found = { id: c }; break;
+          found = { id: c };
+          break;
         }
       }
       return found || {};
     };
 
-    const applyServiceColFeatures = (cols) => {
+    const applyColFeatures = (cols) => {
       return cols.map(col => {
-        const colId = getColId(col);
+        const colId = col.id || col.key || col.dataIndex;
         const colCfg = getColConfig(colId);
         let finalTitle = col.title;
         if (colCfg && colCfg.title) {
           finalTitle = colCfg.title;
         }
 
-        const origRender = col.render;
-        return { 
-          ...col, 
+        if (col.children) {
+          return { ...col, title: finalTitle, children: applyColFeatures(col.children) };
+        }
+        
+        let finalWidth = col.width;
+        if (colCfg.allowImageUpload === true && colId !== 'action' && colId !== 'name') {
+          if (!finalWidth || finalWidth < 125) finalWidth = 125;
+        }
+
+        return {
+          ...col,
           title: finalTitle,
-          render: origRender ? (val, record, idx) => {
-            const origResult = origRender(val, record, idx);
-            if (React.isValidElement(origResult) && origResult.type === CustomInfoInput) {
-              return React.cloneElement(origResult, { enableTemplate: colCfg?.enableTemplate !== false });
+          width: finalWidth,
+          shouldCellUpdate: (record, prevRecord) => JSON.stringify(record) !== JSON.stringify(prevRecord),
+          render: (val, record, idx) => {
+            const innerChildren = col.render ? col.render(val, record, idx) : val;
+            
+            if (colCfg.allowImageUpload) {
+              const imgKey = `img_${colId}`;
+              const imgUrl = record.custom_data?.[imgKey];
+              return (
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6, position: 'relative' }}>
+                  {imgUrl && (
+                    <div style={{ position: 'relative' }}>
+                      <Image src={imgUrl} alt="uploaded" style={{ width: 32, height: 32, objectFit: 'cover', borderRadius: 4, border: '1px solid #cbd5e1' }} />
+                      <CloseCircleOutlined 
+                        style={{ position: 'absolute', top: -6, right: -6, color: '#ef4444', cursor: 'pointer', background: '#fff', borderRadius: '50%', fontSize: 12 }} 
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          const cd = record.custom_data || {};
+                          handleServiceLineChange(idx, 'custom_data', { ...cd, [imgKey]: null });
+                        }} 
+                      />
+                    </div>
+                  )}
+                  <div style={{ flex: 1 }}>{innerChildren}</div>
+                  <div style={{ position: 'relative', display: 'inline-block' }}>
+                    <Button icon={<CameraOutlined />} size="small" type={imgUrl ? "primary" : "dashed"} title="Tải ảnh lên"  />
+                    <input 
+                      type="file" 
+                      accept="image/*" 
+                      style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', opacity: 0, cursor: 'pointer' }}
+                      onChange={async (e) => {
+                        const file = e.target.files?.[0];
+                        if (!file) return;
+                        
+                        const key = `upload-${colId}-${idx}`;
+                        messageApi.open({ key, type: 'loading', content: 'Đang tải ảnh lên...', duration: 0 });
+                        try {
+                          const formData = new FormData();
+                          formData.append('image', file);
+                          const res = await api.postForm('/sales/quotations/upload-item-image/', formData);
+                          const cd = record.custom_data || {};
+                          handleServiceLineChange(idx, 'custom_data', { ...cd, [imgKey]: res.data.url });
+                          messageApi.open({ key, type: 'success', content: 'Tải ảnh thành công!', duration: 2 });
+                        } catch (e) {
+                          messageApi.open({ key, type: 'error', content: 'Tải ảnh thất bại', duration: 3 });
+                        }
+                        e.target.value = '';
+                      }}
+                    />
+                  </div>
+                </div>
+              );
             }
-            return origResult;
-          } : undefined
+            return innerChildren;
+          }
         };
       });
     };
 
-    return applyServiceColFeatures(baseCols)
+    // Chỉ hiển thị các cột được thiết lập trong template (trừ những cột cố định như sort, stt, action)
+    const activeColumnIds = (serviceTableBlock?.props?.columns || []).map(c => typeof c === 'object' ? c.id : c);
+    const filteredBaseCols = baseCols.filter(c => {
+      if (c.id === 'sort' || c.id === 'stt' || c.id === 'action') return true;
+      if (c.children) return true;
+      return activeColumnIds.includes(c.id);
+    });
+
+    return applyColFeatures(filteredBaseCols);
   }
 
   const handleAddServiceLine = () => {
@@ -2516,9 +2681,13 @@ export default function OrderList() {
               product_name: it.product_name || '',
               unit_price: Number(it.unit_price || 0),
               quantity: Number(it.quantity || 1),
+              unit: it.custom_data?.unit || it.unit || 'lần',
               discount_percent: Number(it.discount_percent || 0),
+              spec: it.spec || '',
               note: it.note || '',
+              symbol: it.custom_data?.symbol || it.symbol || '',
               product_image: it.product_image || '',
+              custom_data: it.custom_data || {},
             }))
           )
         } else {
@@ -2671,10 +2840,14 @@ export default function OrderList() {
           length: 0,
           thickness: 0,
           area: 0,
-          spec: '',
-          warranty: '',
+          spec: srv.spec || '',
+          warranty: srv.warranty || '',
           product_image: srv.product_image || '',
-          custom_data: { unit: 'lần' },
+          custom_data: {
+            ...(srv.custom_data || {}),
+            unit: srv.unit || srv.custom_data?.unit || 'lần',
+            symbol: srv.symbol || srv.custom_data?.symbol || '',
+          },
           quantity: Number(srv.quantity || 1),
           discount_percent: Number(srv.discount_percent || 0),
           note: srv.note || '',
