@@ -29,10 +29,10 @@ def schedule_check_backup():
     if config.schedule_type == 'hourly':
         should_run = True
     elif config.schedule_type == 'daily':
-        if now.hour == config.schedule_time.hour:
+        if now.hour == config.schedule_time.hour and now.minute == config.schedule_time.minute:
             should_run = True
     elif config.schedule_type == 'weekly':
-        if now.weekday() == (config.schedule_day_of_week or 6) and now.hour == config.schedule_time.hour:
+        if now.weekday() == (config.schedule_day_of_week or 6) and now.hour == config.schedule_time.hour and now.minute == config.schedule_time.minute:
             should_run = True
 
     if should_run:

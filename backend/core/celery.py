@@ -31,7 +31,7 @@ from celery.schedules import crontab
 app.conf.beat_schedule = {
     'check-automated-backup-every-hour': {
         'task': 'core.tasks.schedule_check_backup',
-        'schedule': crontab(minute='0'),  # Chạy vào phút 0 của mỗi giờ
+        'schedule': crontab(minute='*'),  # Chạy mỗi phút
     },
 }
 
