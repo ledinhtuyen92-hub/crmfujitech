@@ -294,6 +294,11 @@ try:
             "task": "ai_agents.drip_followup",
             "schedule": crontab(minute="*/15"),
         },
+        # Chạy kiểm tra lịch backup mỗi phút
+        "check-automated-backup-every-minute": {
+            "task": "core.tasks.schedule_check_backup",
+            "schedule": crontab(minute="*"),
+        },
     }
 except ImportError:
     pass  # Celery chưa được cài — bỏ qua, không crash Django

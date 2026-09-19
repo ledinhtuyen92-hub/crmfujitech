@@ -26,12 +26,3 @@ app.conf.imports = ('core.tasks',)
 def debug_task(self):
     print(f"Request: {self.request!r}")
 
-from celery.schedules import crontab
-
-app.conf.beat_schedule = {
-    'check-automated-backup-every-hour': {
-        'task': 'core.tasks.schedule_check_backup',
-        'schedule': crontab(minute='*'),  # Chạy mỗi phút
-    },
-}
-
