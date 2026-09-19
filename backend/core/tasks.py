@@ -42,6 +42,55 @@ def schedule_check_backup():
     
     return "Not scheduled to run now."
 
+def sync_media_to_r2(config, s3_client, logs):
+    import mimetypes
+    from django.conf import settings
+    logs.append("4. Đang đồng bộ Media lên Cloudflare R2 (Incremental Sync)...")
+    media_dir = settings.MEDIA_ROOT
+    if not os.path.exists(media_dir):
+        logs.append("   [Bỏ qua] Thư mục media trống.")
+        return
+        
+    bucket = config.r2_bucket_name
+    prefix = 'media_sync/'
+    
+    remote_files = {}
+    try:
+        paginator = s3_client.get_paginator('list_objects_v2')
+        for page in paginator.paginate(Bucket=bucket, Prefix=prefix):
+            if 'Contents' in page:
+                for obj in page['Contents']:
+                    remote_files[obj['Key']] = obj['Size']
+    except Exception as e:
+        logs.append(f"   [Cảnh báo] Lỗi khi lấy danh sách file trên R2: {str(e)}")
+        
+    uploaded_count = 0
+    skipped_count = 0
+    
+    for root, dirs, files in os.walk(media_dir):
+        for file in files:
+            local_path = os.path.join(root, file)
+            rel_path = os.path.relpath(local_path, media_dir)
+            s3_key = prefix + rel_path.replace('\\', '/')
+            
+            local_size = os.path.getsize(local_path)
+            
+            if s3_key not in remote_files or remote_files[s3_key] != local_size:
+                try:
+                    content_type = mimetypes.guess_type(local_path)[0] or 'application/octet-stream'
+                    s3_client.upload_file(
+                        local_path, 
+                        bucket, 
+                        s3_key,
+                        ExtraArgs={'ContentType': content_type}
+                    )
+                    uploaded_count += 1
+                except Exception as e:
+                    logs.append(f"   [Cảnh báo] Không thể upload {rel_path}: {str(e)}")
+            else:
+                skipped_count += 1
+                
+    logs.append(f"   Thành công: Đã upload {uploaded_count} file mới. Đã bỏ qua {skipped_count} file cũ.")
 
 @shared_task
 def run_automated_backup():
@@ -74,19 +123,14 @@ def run_automated_backup():
             json.dump(parsed_json, f, ensure_ascii=False, indent=2)
         logs.append(f"   Thành công: Trích xuất {len(parsed_json)} bản ghi.")
 
-        # 2. Đóng gói Dữ liệu & Media
-        logs.append("2. Đang nén file dữ liệu (DB) và thư mục Media...")
+        # 2. Đóng gói Dữ liệu (chỉ có DB)
+        logs.append("2. Đang nén file dữ liệu (DB)...")
         date_str = datetime.now().strftime("%Y%m%d_%H%M%S")
-        backup_tar = os.path.join(temp_dir, f'crm_full_backup_{date_str}.tar.gz')
-        media_dir = os.path.join(settings.BASE_DIR, 'media')
+        backup_tar = os.path.join(temp_dir, f'crm_db_backup_{date_str}.tar.gz')
         
         with tarfile.open(backup_tar, "w:gz") as tar:
-            # Add database
             if os.path.exists(sync_file):
                 tar.add(sync_file, arcname=os.path.basename(sync_file))
-            # Add media
-            if os.path.exists(media_dir):
-                tar.add(media_dir, arcname=os.path.basename(media_dir))
         logs.append(f"   Thành công: Đã tạo file nén {os.path.basename(backup_tar)}")
 
         # 3. Upload lên Cloudflare R2 / S3
@@ -108,14 +152,18 @@ def run_automated_backup():
             
             # Cấu hình Retention Policy
             logs.append(f"   Đang kiểm tra và dọn dẹp các bản sao lưu cũ (giữ lại {config.keep_latest_count})...")
-            response = s3_client.list_objects_v2(Bucket=config.r2_bucket_name)
+            response = s3_client.list_objects_v2(Bucket=config.r2_bucket_name, Prefix='crm_db_backup_')
             if 'Contents' in response:
                 objects = sorted(response['Contents'], key=lambda x: x['LastModified'], reverse=True)
                 objects_to_delete = objects[config.keep_latest_count:]
                 if objects_to_delete:
                     delete_keys = [{'Key': obj['Key']} for obj in objects_to_delete]
                     s3_client.delete_objects(Bucket=config.r2_bucket_name, Delete={'Objects': delete_keys})
-                    logs.append(f"   Đã xoá {len(delete_keys)} file cũ.")
+                    logs.append(f"   Đã xoá {len(delete_keys)} file DB cũ.")
+            
+            # 4. Sync Media incrementally
+            sync_media_to_r2(config, s3_client, logs)
+            
         else:
             logs.append("3. [Bỏ qua] Không có cấu hình R2/S3.")
 
@@ -125,7 +173,7 @@ def run_automated_backup():
         # Dọn dẹp file tạm
         if os.path.exists(backup_tar):
             os.remove(backup_tar)
-            logs.append("4. Đã dọn dẹp file tạm.")
+            logs.append("5. Đã dọn dẹp file tạm.")
 
         log.status = 'success'
         log.end_time = timezone.now()
@@ -148,6 +196,116 @@ def run_automated_backup():
         if excess_logs.exists():
             excess_ids = list(excess_logs.values_list('id', flat=True))
             BackupHistoryLog.objects.filter(id__in=excess_ids).delete()
+
+def garbage_collect_media(logs):
+    from django.apps import apps
+    from django.db.models import FileField, ImageField
+    from django.conf import settings
+    import os
+    
+    logs.append("3. Đang dọn dẹp file rác (Garbage Collection)...")
+    
+    media_dir = settings.MEDIA_ROOT
+    if not os.path.exists(media_dir):
+        logs.append("   [Bỏ qua] Thư mục media trống.")
+        return
+        
+    referenced_files = set()
+    
+    for model in apps.get_models():
+        file_fields = [f for f in model._meta.fields if isinstance(f, (FileField, ImageField))]
+        if file_fields:
+            try:
+                for instance in model.objects.all():
+                    for field in file_fields:
+                        val = getattr(instance, field.name)
+                        if val and hasattr(val, 'name') and val.name:
+                            referenced_files.add(val.name)
+            except Exception:
+                pass
+                
+    try:
+        from sales.models import Quotation, Order
+        def extract_media_from_json(data):
+            if isinstance(data, dict):
+                for k, v in data.items():
+                    if isinstance(v, str) and v.startswith('uploads/'):
+                        referenced_files.add(v)
+                    elif isinstance(v, str) and '/media/uploads/' in v:
+                        try:
+                            path = v.split('/media/')[1]
+                            referenced_files.add(path)
+                        except:
+                            pass
+                    extract_media_from_json(v)
+            elif isinstance(data, list):
+                for item in data:
+                    extract_media_from_json(item)
+
+        for q in Quotation.objects.all():
+            if q.custom_data:
+                extract_media_from_json(q.custom_data)
+        for o in Order.objects.all():
+            if o.custom_data:
+                extract_media_from_json(o.custom_data)
+    except Exception:
+        pass
+        
+    deleted_count = 0
+    for root, dirs, files in os.walk(media_dir):
+        for file in files:
+            local_path = os.path.join(root, file)
+            rel_path = os.path.relpath(local_path, media_dir)
+            rel_path_normalized = rel_path.replace('\\', '/')
+            
+            if rel_path_normalized not in referenced_files:
+                try:
+                    os.remove(local_path)
+                    deleted_count += 1
+                except:
+                    pass
+                    
+    logs.append(f"   Thành công: Đã dọn dẹp {deleted_count} file mồ côi.")
+
+def sync_media_from_r2(config, s3_client, logs):
+    from django.conf import settings
+    import os
+    logs.append("4. Đang kéo file từ Cloudflare R2 về VPS (Media Pull)...")
+    
+    media_dir = settings.MEDIA_ROOT
+    os.makedirs(media_dir, exist_ok=True)
+    
+    bucket = config.r2_bucket_name
+    prefix = 'media_sync/'
+    
+    downloaded_count = 0
+    skipped_count = 0
+    
+    try:
+        paginator = s3_client.get_paginator('list_objects_v2')
+        for page in paginator.paginate(Bucket=bucket, Prefix=prefix):
+            if 'Contents' in page:
+                for obj in page['Contents']:
+                    s3_key = obj['Key']
+                    if s3_key.endswith('/'): continue
+                    
+                    rel_path = s3_key[len(prefix):]
+                    local_path = os.path.join(media_dir, rel_path.replace('/', os.sep))
+                    remote_size = obj['Size']
+                    
+                    if os.path.exists(local_path):
+                        local_size = os.path.getsize(local_path)
+                        if local_size == remote_size:
+                            skipped_count += 1
+                            continue
+                            
+                    os.makedirs(os.path.dirname(local_path), exist_ok=True)
+                    s3_client.download_file(bucket, s3_key, local_path)
+                    downloaded_count += 1
+                    
+        logs.append(f"   Thành công: Đã kéo {downloaded_count} file mới. Đã bỏ qua {skipped_count} file cũ.")
+    except Exception as e:
+        logs.append(f"   [Cảnh báo] Lỗi khi pull media từ R2: {str(e)}")
 
 @shared_task
 def run_restore_task(filename):
@@ -176,7 +334,7 @@ def run_restore_task(filename):
     tar_path = os.path.join(temp_dir, filename)
     
     try:
-        logs.append("1. Đang tải file từ Cloudflare R2...")
+        logs.append("1. Đang tải file DB từ Cloudflare R2...")
         log.save()
         s3_client = boto3.client(
             's3',
@@ -188,45 +346,22 @@ def run_restore_task(filename):
         )
         s3_client.download_file(config.r2_bucket_name, filename, tar_path)
         
-        logs.append("2. Đang giải nén dữ liệu...")
+        logs.append("2. Đang giải nén Database...")
         log.save()
         with tarfile.open(tar_path, "r:gz") as tar:
             tar.extractall(path=temp_dir)
             
         json_path = os.path.join(temp_dir, 'sync_data.json')
-        media_extracted = os.path.join(temp_dir, 'media')
         
-        logs.append("3. Đang ghi đè thư mục Hình ảnh (Media)...")
-        log.save()
-        if os.path.exists(media_extracted):
-            if os.path.exists(settings.MEDIA_ROOT):
-                # Xoá nội dung bên trong thay vì xoá thư mục gốc (tránh lỗi Device busy do Docker mount)
-                for item in os.listdir(settings.MEDIA_ROOT):
-                    item_path = os.path.join(settings.MEDIA_ROOT, item)
-                    if os.path.isfile(item_path) or os.path.islink(item_path):
-                        os.unlink(item_path)
-                    elif os.path.isdir(item_path):
-                        shutil.rmtree(item_path)
-            else:
-                os.makedirs(settings.MEDIA_ROOT, exist_ok=True)
-                
-            # Copy từng file/thư mục con để tránh lỗi phân quyền (Operation not permitted) trên thư mục gốc
-            for item in os.listdir(media_extracted):
-                s = os.path.join(media_extracted, item)
-                d = os.path.join(settings.MEDIA_ROOT, item)
-                if os.path.isdir(s):
-                    shutil.copytree(s, d, dirs_exist_ok=True)
-                else:
-                    shutil.copy2(s, d)
-            
-        logs.append("4. Đang xoá dữ liệu hiện tại (Flush DB)...")
-        log.save()
-        call_command('flush', '--no-input')
-        
-        logs.append("5. Đang nạp lại dữ liệu cũ (Load DB)...")
-        log.save()
         if os.path.exists(json_path):
+            call_command('flush', '--no-input')
             call_command('loaddata', json_path)
+            
+        garbage_collect_media(logs)
+        log.save()
+        
+        sync_media_from_r2(config, s3_client, logs)
+        log.save()
             
         logs.append("Thành công: Đã phục hồi dữ liệu hoàn tất!")
         log.status = 'success'
