@@ -36,10 +36,6 @@ def schedule_check_backup():
             should_run = True
 
     if should_run:
-        # Tránh việc gọi nhiều lần trong cùng 1 giờ bằng cách kiểm tra log gần nhất
-        last_log = BackupHistoryLog.objects.order_by('-start_time').first()
-        if last_log and (now - last_log.start_time).total_seconds() < 3600:
-            return "Already ran in this hour."
         run_automated_backup.delay()
         return "Triggered automated backup."
     
