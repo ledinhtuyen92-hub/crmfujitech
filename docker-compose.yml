@@ -96,11 +96,11 @@ services:
       dockerfile: Dockerfile
     container_name: crm_celery_beat
     restart: unless-stopped
-    command: celery -A core beat -l info
+    command: celery -A core beat -l info -s /tmp/celerybeat-schedule
     # Ghi đè HEALTHCHECK của Dockerfile (nó gọi localhost:8000 — container này không chạy web server).
     # Beat sync file schedule mỗi 180s → mtime quá 600s nghĩa là beat đã chết.
     healthcheck:
-      test: ["CMD-SHELL", "test -f /app/celerybeat-schedule && [ $$(( $$(date +%s) - $$(stat -c %Y /app/celerybeat-schedule) )) -lt 600 ] || exit 1"]
+      test: ["CMD-SHELL", "test -f /tmp/celerybeat-schedule && [ $$(( $$(date +%s) - $$(stat -c %Y /tmp/celerybeat-schedule) )) -lt 600 ] || exit 1"]
       interval: 60s
       timeout: 15s
       start_period: 60s
