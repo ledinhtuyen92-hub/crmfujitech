@@ -96,6 +96,7 @@ class OrderSerializer(serializers.ModelSerializer):
             "status",
             "status_display",
             "delivery_address",
+            "delivery_map_link",
             "financial_status",
             "financial_status_display",
             "payment_term",

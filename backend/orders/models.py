@@ -54,6 +54,7 @@ class Order(models.Model):
     customer_address_snapshot = models.TextField(blank=True, verbose_name="Địa chỉ KH (snapshot)")
     customer_city_snapshot = models.CharField(max_length=100, blank=True, verbose_name="Thành phố KH (snapshot)")
     delivery_address = models.CharField(max_length=500, blank=True, null=True, verbose_name="Địa chỉ giao hàng")
+    delivery_map_link = models.CharField(max_length=1000, blank=True, null=True, verbose_name="Định vị giao hàng")
     quotation = models.ForeignKey(
         "sales.Quotation",
         on_delete=models.SET_NULL,

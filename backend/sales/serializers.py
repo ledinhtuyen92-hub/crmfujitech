@@ -175,6 +175,7 @@ class QuotationSerializer(serializers.ModelSerializer):
             "status",
             "status_display",
             "delivery_address",
+            "delivery_map_link",
             "installation_date",
             "notes",
             "shipping_fee",

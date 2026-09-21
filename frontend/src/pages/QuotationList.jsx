@@ -199,6 +199,7 @@ export default function QuotationList() {
   // Modal Add / Edit
   const [modalVisible, setModalVisible] = useState(false)
   const [editingQuotation, setEditingQuotation] = useState(null)
+  const [showMapLink, setShowMapLink] = useState(false)
   const [form] = Form.useForm()
   const [submitting, setSubmitting] = useState(false)
 
@@ -704,6 +705,7 @@ export default function QuotationList() {
       form.setFieldsValue({
         customer: quotation.customer,
         delivery_address: quotation.delivery_address || '',
+        delivery_map_link: quotation.delivery_map_link || '',
         factory: quotation.factory,
         status: quotation.status,
         installation_date: quotation.installation_date ? dayjs(quotation.installation_date) : null,
@@ -720,6 +722,7 @@ export default function QuotationList() {
         notes: quotation.notes,
         discount_total: Number(quotation.discount_total || 0),
       })
+      setShowMapLink(!!quotation.delivery_map_link)
       if (quotation.items && quotation.items.length > 0) {
         // Sort items by id to ensure they are displayed in the exact order they were inserted
         const sortedItems = [...quotation.items].sort((a, b) => a.id - b.id)
@@ -3349,9 +3352,24 @@ export default function QuotationList() {
                 name="delivery_address" 
                 label="Địa chỉ giao hàng" 
                 rules={[{ required: companySettings?.require_order_delivery_address, message: 'Vui lòng nhập địa chỉ giao hàng' }]}
+                style={{ marginBottom: showMapLink ? 8 : 24 }}
               >
                 <Input placeholder="Nhập địa chỉ giao hàng cụ thể..." />
               </Form.Item>
+              {!showMapLink ? (
+                <div style={{ marginTop: -16, marginBottom: 24 }}>
+                  <Button type="dashed" size="small" icon={<PlusOutlined />} onClick={() => setShowMapLink(true)}>
+                    Thêm định vị giao hàng
+                  </Button>
+                </div>
+              ) : (
+                <Form.Item 
+                  name="delivery_map_link" 
+                  rules={[{ type: 'url', message: 'Vui lòng nhập đường dẫn hợp lệ' }]}
+                >
+                  <Input placeholder="Dán link Google Maps (tuỳ chọn)" allowClear />
+                </Form.Item>
+              )}
             </Col>
           </Row>
           <Row gutter={16}>

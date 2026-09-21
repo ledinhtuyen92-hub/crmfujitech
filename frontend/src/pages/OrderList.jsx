@@ -303,6 +303,7 @@ export default function OrderList() {
   // Modal Add / Edit
   const [modalVisible, setModalVisible] = useState(false)
   const [editingOrder, setEditingOrder] = useState(null)
+  const [showMapLink, setShowMapLink] = useState(false)
   const [form] = Form.useForm()
   const [submitting, setSubmitting] = useState(false)
 
@@ -2622,6 +2623,7 @@ export default function OrderList() {
       form.setFieldsValue({
         customer: order.customer,
         delivery_address: order.delivery_address || '',
+        delivery_map_link: order.delivery_map_link || '',
         factory: order.factory,
         status: order.status,
         installation_date: order.installation_date ? dayjs(order.installation_date) : null,
@@ -2638,6 +2640,7 @@ export default function OrderList() {
         vat_rate: Number(order.vat_rate || 0),
         payment_target: order.payment_target || undefined,
       })
+      setShowMapLink(!!order.delivery_map_link)
       if (order.items && order.items.length > 0) {
         // Sort items by id to ensure they are displayed in the exact order they were inserted
         const sortedItems = [...order.items].sort((a, b) => a.id - b.id)
@@ -3206,7 +3209,18 @@ export default function OrderList() {
       title: 'Địa chỉ giao hàng',
       dataIndex: 'delivery_address',
       key: 'delivery_address',
-      render: (val) => val ? <div style={{ maxWidth: 200, whiteSpace: 'normal', fontSize: 13 }}>{val}</div> : '-',
+      render: (val, r) => (
+        <div style={{ maxWidth: 200, whiteSpace: 'normal', fontSize: 13 }}>
+          {val || '-'}
+          {r.delivery_map_link && (
+            <div style={{ marginTop: 4 }}>
+              <a href={r.delivery_map_link} target="_blank" rel="noopener noreferrer" style={{ fontSize: 12 }}>
+                📍 Xem bản đồ
+              </a>
+            </div>
+          )}
+        </div>
+      ),
     },
     {
       title: 'Ngày GH dự kiến',
@@ -3716,9 +3730,24 @@ export default function OrderList() {
                 name="delivery_address" 
                 label="Địa chỉ giao hàng" 
                 rules={[{ required: companySettings?.require_order_delivery_address, message: 'Vui lòng nhập địa chỉ giao hàng' }]}
+                style={{ marginBottom: showMapLink ? 8 : 24 }}
               >
                 <Input placeholder="Nhập địa chỉ giao hàng cụ thể..." />
               </Form.Item>
+              {!showMapLink ? (
+                <div style={{ marginTop: -16, marginBottom: 24 }}>
+                  <Button type="dashed" size="small" icon={<PlusOutlined />} onClick={() => setShowMapLink(true)}>
+                    Thêm định vị giao hàng
+                  </Button>
+                </div>
+              ) : (
+                <Form.Item 
+                  name="delivery_map_link" 
+                  rules={[{ type: 'url', message: 'Vui lòng nhập đường dẫn hợp lệ' }]}
+                >
+                  <Input placeholder="Dán link Google Maps (tuỳ chọn)" allowClear />
+                </Form.Item>
+              )}
             </Col>
           </Row>
           <Row gutter={16}>
