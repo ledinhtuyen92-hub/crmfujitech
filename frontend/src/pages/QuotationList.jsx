@@ -851,6 +851,7 @@ export default function QuotationList() {
       const payload = {
         customer: values.customer,
         delivery_address: values.delivery_address || '',
+        delivery_map_link: values.delivery_map_link || '',
         factory: values.factory || null,
         status: values.status,
         installation_date: values.installation_date ? values.installation_date.format('YYYY-MM-DD') : null,
