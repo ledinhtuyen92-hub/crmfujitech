@@ -1,4 +1,4 @@
-import { AlertOutlined, CheckCircleOutlined, ClockCircleOutlined, CloseCircleOutlined, DeleteOutlined, EditOutlined, FileDoneOutlined, FileTextOutlined, MessageOutlined, MinusCircleOutlined, PlusOutlined, PrinterOutlined, SearchOutlined, UploadOutlined, PictureOutlined, CameraOutlined, TableOutlined, ToolOutlined } from '@ant-design/icons'
+import { AlertOutlined, CheckCircleOutlined, ClockCircleOutlined, CloseCircleOutlined, DeleteOutlined, EditOutlined, FileDoneOutlined, FileTextOutlined, MessageOutlined, MinusCircleOutlined, PlusOutlined, PrinterOutlined, SearchOutlined, UploadOutlined, PictureOutlined, CameraOutlined, TableOutlined, ToolOutlined, EnvironmentOutlined } from '@ant-design/icons'
 import {
   AutoComplete,
   Badge,
@@ -3216,7 +3216,7 @@ export default function OrderList() {
           {r.delivery_map_link && (
             <div style={{ marginTop: 4 }}>
               <a href={r.delivery_map_link} target="_blank" rel="noopener noreferrer" style={{ fontSize: 12 }}>
-                📍 Xem bản đồ
+                <EnvironmentOutlined /> Xem bản đồ
               </a>
             </div>
           )}
