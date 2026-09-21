@@ -21,7 +21,7 @@ import {
   Tooltip,
   AutoComplete,
 } from 'antd'
-import { CarOutlined, SearchOutlined, EditOutlined, EyeOutlined, PlusOutlined, DeleteOutlined, UserAddOutlined, FileTextOutlined, PrinterOutlined, CheckCircleOutlined, CloseCircleOutlined, SyncOutlined, SettingOutlined, TableOutlined, ExportOutlined, FilePdfOutlined } from '@ant-design/icons'
+import { CarOutlined, SearchOutlined, EditOutlined, EyeOutlined, PlusOutlined, DeleteOutlined, UserAddOutlined, FileTextOutlined, PrinterOutlined, CheckCircleOutlined, CloseCircleOutlined, SyncOutlined, SettingOutlined, TableOutlined, ExportOutlined, FilePdfOutlined, EnvironmentOutlined } from '@ant-design/icons'
 import dayjs from 'dayjs'
 import { useResponsive } from '../hooks/useResponsive'
 import { DndContext, closestCenter } from '@dnd-kit/core';
@@ -112,6 +112,7 @@ export default function DeliveryList() {
 
   const [modalVisible, setModalVisible] = useState(false)
   const [editingDelivery, setEditingDelivery] = useState(null)
+  const [showMapLink, setShowMapLink] = useState(false)
   const [form] = Form.useForm()
   const [submitting, setSubmitting] = useState(false)
   const [availableOrders, setAvailableOrders] = useState([])
@@ -208,13 +209,16 @@ export default function DeliveryList() {
         shipper_phone: record.shipper_phone,
         shipper_user: record.shipper_user,
         shipping_address: record.shipping_address,
+        delivery_map_link: record.delivery_map_link || '',
         expected_date: record.expected_date ? dayjs(record.expected_date) : null,
         actual_date: record.actual_date ? dayjs(record.actual_date) : null,
         notes: record.notes,
       })
+      setShowMapLink(!!record.delivery_map_link)
     } else {
       form.resetFields()
-      form.setFieldsValue({ status: 'pending' })
+      form.setFieldsValue({ status: 'pending', delivery_map_link: '' })
+      setShowMapLink(false)
     }
     setModalVisible(true)
   }
@@ -230,6 +234,7 @@ export default function DeliveryList() {
         shipper_phone: values.shipper_phone,
         shipper_user: values.shipper_user,
         shipping_address: values.shipping_address,
+        delivery_map_link: values.delivery_map_link || '',
         expected_date: values.expected_date ? values.expected_date.format('YYYY-MM-DD') : null,
         actual_date: values.actual_date ? values.actual_date.format('YYYY-MM-DD') : null,
         notes: values.notes,
@@ -585,7 +590,18 @@ export default function DeliveryList() {
       key: 'shipping_address',
       render: (_, r) => {
         const addr = r.shipping_address || r.order_shipping_address;
-        return <Text>{addr || <Text type="secondary">Chưa có</Text>}</Text>;
+        return (
+          <div style={{ maxWidth: 200, whiteSpace: 'normal', fontSize: 13 }}>
+            {addr || <Text type="secondary">Chưa có</Text>}
+            {r.delivery_map_link && (
+              <div style={{ marginTop: 4 }}>
+                <a href={r.delivery_map_link} target="_blank" rel="noopener noreferrer" style={{ fontSize: 12 }}>
+                  <EnvironmentOutlined /> Xem bản đồ
+                </a>
+              </div>
+            )}
+          </div>
+        );
       },
     },
     {
@@ -891,9 +907,23 @@ export default function DeliveryList() {
               </Form.Item>
             </Col>
           </Row>
-          <Form.Item name="shipping_address" label="Địa chỉ giao hàng">
+          <Form.Item name="shipping_address" label="Địa chỉ giao hàng" style={{ marginBottom: showMapLink ? 8 : 24 }}>
             <Input.TextArea rows={2} disabled={!canEdit} />
           </Form.Item>
+          {!showMapLink ? (
+            <div style={{ marginTop: -16, marginBottom: 24 }}>
+              <Button type="dashed" size="small" icon={<PlusOutlined />} onClick={() => setShowMapLink(true)} disabled={!canEdit}>
+                Thêm định vị giao hàng
+              </Button>
+            </div>
+          ) : (
+            <Form.Item 
+              name="delivery_map_link" 
+              rules={[{ type: 'url', message: 'Vui lòng nhập đường dẫn hợp lệ' }]}
+            >
+              <Input placeholder="Dán link Google Maps (tuỳ chọn)" allowClear disabled={!canEdit} />
+            </Form.Item>
+          )}
           <Row gutter={16}>
             <Col xs={24} md={12}>
               <Form.Item name="expected_date" label="Ngày giao hàng">

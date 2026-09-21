@@ -52,6 +52,7 @@ class DeliveryOrder(models.Model):
         verbose_name="Nhân viên giao hàng",
     )
     shipping_address = models.TextField(blank=True, verbose_name="Địa chỉ giao hàng")
+    delivery_map_link = models.CharField(max_length=1000, blank=True, null=True, verbose_name="Định vị giao hàng")
     
     expected_date = models.DateField(null=True, blank=True, verbose_name="Ngày dự kiến giao")
     actual_date = models.DateField(null=True, blank=True, verbose_name="Ngày giao thực tế")

@@ -74,6 +74,7 @@ class DeliveryOrderSerializer(serializers.ModelSerializer):
             "shipper_name",
             "shipper_phone",
             "shipping_address",
+            "delivery_map_link",
             "expected_date",
             "actual_date",
             "notes",
