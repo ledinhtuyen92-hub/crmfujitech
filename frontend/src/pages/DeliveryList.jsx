@@ -590,12 +590,13 @@ export default function DeliveryList() {
       key: 'shipping_address',
       render: (_, r) => {
         const addr = r.shipping_address || r.order_shipping_address;
+        const mapLink = r.delivery_map_link || r.order_delivery_map_link;
         return (
           <div style={{ maxWidth: 200, whiteSpace: 'normal', fontSize: 13 }}>
             {addr || <Text type="secondary">Chưa có</Text>}
-            {r.delivery_map_link && (
+            {mapLink && (
               <div style={{ marginTop: 4 }}>
-                <a href={r.delivery_map_link} target="_blank" rel="noopener noreferrer" style={{ fontSize: 12 }}>
+                <a href={mapLink} target="_blank" rel="noopener noreferrer" style={{ fontSize: 12 }}>
                   <EnvironmentOutlined /> Xem bản đồ
                 </a>
               </div>
