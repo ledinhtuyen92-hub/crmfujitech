@@ -602,7 +602,8 @@ def employee_stats(request):
         debt_calc=F("total_amount") - F("paid")
     )
     
-    # 2. Số đơn chốt, doanh thu, công nợ, số khách hàng chốt
+    # 2. Số đơn chốt, doanh thu, công nợ, số khách hàng chốt, số SP chốt
+    from orders.models import OrderItem
     order_stats_query = (
         order_qs
         .values('created_by_id')
@@ -610,7 +611,8 @@ def employee_stats(request):
             total_orders=Count('id'),
             revenue=Sum('total_amount'),
             debt=Sum('debt_calc'),
-            unique_customers=Count('customer_id', distinct=True)
+            unique_customers=Count('customer_id', distinct=True),
+            products_sold=Sum('items__quantity', filter=Q(items__item_type='product'))
         )
     )
     
@@ -619,15 +621,16 @@ def employee_stats(request):
             item['total_orders'], 
             item['revenue'], 
             item['debt'], 
-            item['unique_customers']
+            item['unique_customers'],
+            item['products_sold'] or 0
         ) 
         for item in order_stats_query
     }
     
     for u in users_list:
         assigned = assigned_counts.get(u.id, 0)
-        o_stats = order_stats.get(u.id, (0, 0, 0, 0))
-        total_orders, revenue, debt, unique_customers = o_stats
+        o_stats = order_stats.get(u.id, (0, 0, 0, 0, 0))
+        total_orders, revenue, debt, unique_customers, products_sold = o_stats
         
         conversion_rate = (unique_customers / assigned * 100) if assigned > 0 else 0
         
@@ -637,6 +640,7 @@ def employee_stats(request):
             "department": u.department.name if u.department else None,
             "assigned_customers": assigned,
             "closed_orders": total_orders,
+            "products_sold": int(products_sold),
             "revenue": float(revenue or 0),
             "debt": float(debt or 0),
             "conversion_rate": round(conversion_rate, 2)

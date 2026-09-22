@@ -116,28 +116,35 @@ const employeeStatsColumns = [
     render: (val) => <Text>{val}</Text>
   },
   {
-    title: 'Số đơn chốt',
+    title: 'Đơn hàng trong kỳ',
     dataIndex: 'closed_orders',
     key: 'closed_orders',
     align: 'center',
     render: (val) => <Text style={{ color: '#0ea5e9', fontWeight: 'bold' }}>{val}</Text>
   },
   {
-    title: 'Tỷ lệ chốt',
+    title: 'Số lượng SP chốt',
+    dataIndex: 'products_sold',
+    key: 'products_sold',
+    align: 'center',
+    render: (val) => <Text style={{ color: '#7c3aed', fontWeight: 'bold' }}>{val ?? 0} SP</Text>
+  },
+  {
+    title: 'Tỷ lệ chốt Sales',
     dataIndex: 'conversion_rate',
     key: 'conversion_rate',
     align: 'center',
     render: (val) => <Text style={{ color: val > 0 ? '#10b981' : '#64748b' }}>{val}%</Text>
   },
   {
-    title: 'Doanh thu',
+    title: 'Doanh thu trong kỳ',
     dataIndex: 'revenue',
     key: 'revenue',
     align: 'right',
     render: (amount) => <Text strong style={{ color: '#2563eb' }}>{Number(amount).toLocaleString('vi-VN')} đ</Text>,
   },
   {
-    title: 'Công nợ',
+    title: 'Nợ phải thu',
     dataIndex: 'debt',
     key: 'debt',
     align: 'right',
