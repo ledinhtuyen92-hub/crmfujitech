@@ -30,19 +30,52 @@ def get_date_range(time_filter):
     today = timezone.localtime().date()
     if time_filter == "today":
         return today, today
+    elif time_filter == "yesterday":
+        yesterday = today - timedelta(days=1)
+        return yesterday, yesterday
     elif time_filter == "week":
         start = today - timedelta(days=today.weekday())
         return start, today
+    elif time_filter == "last_week":
+        start = today - timedelta(days=today.weekday() + 7)
+        end = start + timedelta(days=6)
+        return start, end
     elif time_filter == "month":
         start = today.replace(day=1)
         return start, today
+    elif time_filter == "last_month":
+        first_day_this_month = today.replace(day=1)
+        end = first_day_this_month - timedelta(days=1)
+        start = end.replace(day=1)
+        return start, end
     elif time_filter == "quarter":
         quarter = (today.month - 1) // 3 + 1
         start = today.replace(month=3 * quarter - 2, day=1)
         return start, today
+    elif time_filter == "last_quarter":
+        current_quarter = (today.month - 1) // 3 + 1
+        if current_quarter == 1:
+            last_quarter = 4
+            year = today.year - 1
+        else:
+            last_quarter = current_quarter - 1
+            year = today.year
+        start_month = 3 * last_quarter - 2
+        start = today.replace(year=year, month=start_month, day=1)
+        
+        # Calculate end of last quarter
+        if start_month == 10:
+            end = today.replace(year=year, month=12, day=31)
+        else:
+            end = today.replace(year=year, month=start_month + 3, day=1) - timedelta(days=1)
+        return start, end
     elif time_filter == "year":
         start = today.replace(month=1, day=1)
         return start, today
+    elif time_filter == "last_year":
+        start = today.replace(year=today.year - 1, month=1, day=1)
+        end = today.replace(year=today.year - 1, month=12, day=31)
+        return start, end
     return None, None
 
 
@@ -258,7 +291,7 @@ def revenue_chart(request):
     )
     order_qs = apply_dashboard_scope(order_qs, request, user, user_field="created_by")
 
-    use_daily = time_filter in ["today", "week", "month"]
+    use_daily = time_filter in ["today", "yesterday", "week", "last_week", "month", "last_month"]
     trunc_func = TruncDay("created_at") if use_daily else TruncMonth("created_at")
     date_format = "%Y-%m-%d" if use_daily else "%Y-%m"
 
@@ -474,7 +507,7 @@ def debt_stats(request):
     
     monthly_qs = debt_qs.filter(created_at__date__gte=start_date)
     
-    use_daily = time_filter in ["today", "week", "month"]
+    use_daily = time_filter in ["today", "yesterday", "week", "last_week", "month", "last_month"]
     trunc_func = TruncDay("created_at") if use_daily else TruncMonth("created_at")
     date_format = "%Y-%m-%d" if use_daily else "%Y-%m"
     monthly = (

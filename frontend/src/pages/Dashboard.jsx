@@ -258,12 +258,17 @@ function Dashboard() {
   ]
 
   const timeFilterOptions = [
+    { label: 'Tất cả', value: 'all' },
+    { label: 'Hôm qua', value: 'yesterday' },
     { label: 'Hôm nay', value: 'today' },
+    { label: 'Tuần trước', value: 'last_week' },
     { label: 'Tuần này', value: 'week' },
+    { label: 'Tháng trước', value: 'last_month' },
     { label: 'Tháng này', value: 'month' },
+    { label: 'Quý trước', value: 'last_quarter' },
     { label: 'Quý này', value: 'quarter' },
+    { label: 'Năm ngoái', value: 'last_year' },
     { label: 'Năm nay', value: 'year' },
-    { label: 'Toàn thời gian', value: 'all' },
   ]
 
   return (
@@ -309,24 +314,15 @@ function Dashboard() {
               />
             )}
           </Space>
-          {isMobile ? (
+          <div style={{ display: 'flex', alignItems: 'center', width: isMobile ? '100%' : 'auto' }}>
+            {!isMobile && <Text style={{ marginRight: 8, whiteSpace: 'nowrap' }}>Thời gian:</Text>}
             <Select 
               value={timeFilter}
               onChange={setTimeFilter}
               options={timeFilterOptions}
-              style={{ width: '100%', minWidth: 200, height: 40, boxShadow: '0 2px 8px rgba(0,0,0,0.05)' }}
+              style={{ width: isMobile ? '100%' : 160, height: 40, boxShadow: '0 2px 8px rgba(0,0,0,0.05)' }}
             />
-          ) : (
-            <div style={{ maxWidth: '100%', overflowX: 'auto', paddingBottom: 4 }}>
-              <Segmented 
-                options={timeFilterOptions} 
-                value={timeFilter} 
-                onChange={setTimeFilter} 
-                size="large"
-                style={{ boxShadow: '0 2px 8px rgba(0,0,0,0.05)' }}
-              />
-            </div>
-          )}
+          </div>
         </Space>
         </Col>
       </Row>
