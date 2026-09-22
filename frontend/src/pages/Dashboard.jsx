@@ -94,6 +94,56 @@ const contractColumns = [
       return <Tag color={colorMap[status] ?? 'default'}>{labelMap[status] ?? status}</Tag>
     },
   },
+  },
+]
+
+const employeeStatsColumns = [
+  {
+    title: 'Nhân viên',
+    dataIndex: 'name',
+    key: 'name',
+    render: (text) => <Text strong>{text}</Text>
+  },
+  {
+    title: 'Phòng ban',
+    dataIndex: 'department',
+    key: 'department',
+  },
+  {
+    title: 'Số data cấp',
+    dataIndex: 'assigned_customers',
+    key: 'assigned_customers',
+    align: 'center',
+    render: (val) => <Text>{val}</Text>
+  },
+  {
+    title: 'Số đơn chốt',
+    dataIndex: 'closed_orders',
+    key: 'closed_orders',
+    align: 'center',
+    render: (val) => <Text style={{ color: '#0ea5e9', fontWeight: 'bold' }}>{val}</Text>
+  },
+  {
+    title: 'Tỷ lệ chốt',
+    dataIndex: 'conversion_rate',
+    key: 'conversion_rate',
+    align: 'center',
+    render: (val) => <Text style={{ color: val > 0 ? '#10b981' : '#64748b' }}>{val}%</Text>
+  },
+  {
+    title: 'Doanh thu',
+    dataIndex: 'revenue',
+    key: 'revenue',
+    align: 'right',
+    render: (amount) => <Text strong style={{ color: '#2563eb' }}>{Number(amount).toLocaleString('vi-VN')} đ</Text>,
+  },
+  {
+    title: 'Công nợ',
+    dataIndex: 'debt',
+    key: 'debt',
+    align: 'right',
+    render: (amount) => <Text style={{ color: '#ef4444' }}>{Number(amount).toLocaleString('vi-VN')} đ</Text>,
+  },
 ]
 
 function Dashboard() {
@@ -111,6 +161,7 @@ function Dashboard() {
   const [latestOrders, setLatestOrders] = useState([])
   const [topSellers, setTopSellers] = useState([])
   const [debtStats, setDebtStats] = useState({ total_debt: 0, chart_data: [] })
+  const [employeeStats, setEmployeeStats] = useState([])
 
   const canScopeMyDept = isCompanyAdmin || hasPermission('dashboard.scope_my_department')
   const canScopeAnyDept = isCompanyAdmin || hasPermission('dashboard.scope_any_department')
@@ -120,6 +171,7 @@ function Dashboard() {
   const [scopeFilter, setScopeFilter] = useState(defaultScope)
   const [departmentId, setDepartmentId] = useState(null)
   const [departments, setDepartments] = useState([])
+  const [selectedEmployee, setSelectedEmployee] = useState(null)
 
   useEffect(() => {
     if (isSuperAdmin) return
@@ -146,17 +198,19 @@ function Dashboard() {
       const limitParam = timeFilter !== 'all' ? `&limit=100` : `?limit=100`
       const limitFilterParam = `?time_filter=${timeFilter}&limit=100${scopeParams}`
 
-      const [summaryRes, revenueRes, sellersRes, ordersRes, debtRes] = await Promise.all([
+      const [summaryRes, revenueRes, sellersRes, ordersRes, debtRes, employeeStatsRes] = await Promise.all([
         fetchSafe(`dashboard/summary/${filterParam}`, {}),
         fetchSafe(`dashboard/revenue-chart/${filterParam}`, []),
         fetchSafe(`dashboard/top-sellers/${limitFilterParam}`, []),
         fetchSafe(`orders/orders/`, { results: [] }),
-        fetchSafe(`dashboard/debt-stats/${filterParam}`, { total_debt: 0, chart_data: [] })
+        fetchSafe(`dashboard/debt-stats/${filterParam}`, { total_debt: 0, chart_data: [] }),
+        fetchSafe(`dashboard/employee-stats/${filterParam}`, [])
       ])
 
       setSummary(summaryRes.data)
       setRevenueData(revenueRes.data)
       setDebtStats(debtRes.data)
+      setEmployeeStats(employeeStatsRes.data)
       
       const colors = ['#2563eb', '#0f766e', '#f59e0b', '#7c3aed', '#ef4444', '#64748b', '#ec4899', '#8b5cf6', '#14b8a6', '#f97316']
       setTopSellers(sellersRes.data.map((item, idx) => ({
@@ -552,6 +606,40 @@ function Dashboard() {
           </Card>
         </Col>
       </Row>
+
+      {scopeFilter !== 'personal' && (
+        <Row gutter={[16, 16]} style={{ marginTop: 16 }}>
+          <Col xs={24}>
+            <Card 
+              title="Báo cáo chi tiết theo nhân viên (Sales)" 
+              bordered={false} 
+              style={cardStyle} 
+              loading={loading}
+              extra={
+                <Select
+                  allowClear
+                  showSearch
+                  placeholder="Lọc nhân viên"
+                  style={{ width: 200 }}
+                  value={selectedEmployee}
+                  onChange={setSelectedEmployee}
+                  options={employeeStats.map(e => ({ label: e.name, value: e.id }))}
+                  filterOption={(input, option) => (option?.label ?? '').toLowerCase().includes(input.toLowerCase())}
+                />
+              }
+            >
+              <Table
+                columns={employeeStatsColumns}
+                dataSource={selectedEmployee ? employeeStats.filter(e => e.id === selectedEmployee) : employeeStats}
+                rowKey="id"
+                pagination={false}
+                size="middle"
+                scroll={{ x: 'max-content' }}
+              />
+            </Card>
+          </Col>
+        </Row>
+      )}
 
       <Row gutter={[16, 16]} style={{ marginTop: 16 }}>
         <Col xs={24}>

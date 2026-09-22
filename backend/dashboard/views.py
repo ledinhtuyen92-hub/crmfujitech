@@ -529,6 +529,100 @@ def debt_stats(request):
         ]
     })
 
+@api_view(["GET"])
+@permission_classes([permissions.IsAuthenticated])
+def employee_stats(request):
+    """
+    Trả về báo cáo chi tiết năng lực Sales của từng nhân viên.
+    Query param: ?time_filter=...&scope=...&department_id=...
+    """
+    from users.models import User
+    from crm.models import Customer
+    from orders.models import Order
+    from django.db.models import Sum, Count, Q
+    
+    user = request.user
+    time_filter = request.query_params.get("time_filter", "month")
+    start_date, end_date = get_date_range(time_filter)
+    
+    # Lấy danh sách nhân viên theo scope
+    users_qs = User.objects.filter(is_active=True).filter(_company_filter(user))
+    users_qs = apply_dashboard_scope(users_qs, request, user, user_field=None)
+    
+    # Tính số data cấp (customers assigned)
+    customer_filters = Q()
+    if start_date:
+        customer_filters &= Q(created_at__date__gte=start_date)
+    if end_date:
+        customer_filters &= Q(created_at__date__lte=end_date)
+        
+    # Đơn chốt (approved, completed)
+    order_filters = Q(status__in=[Order.STATUS_APPROVED, Order.STATUS_COMPLETED])
+    if start_date:
+        order_filters &= Q(created_at__date__gte=start_date)
+    if end_date:
+        order_filters &= Q(created_at__date__lte=end_date)
+
+    stats = []
+    users_list = list(users_qs)
+    if not users_list:
+        return Response([])
+
+    user_ids = [u.id for u in users_list]
+    
+    # 1. Số data cấp
+    assigned_counts = dict(
+        Customer.objects.filter(customer_filters, assigned_to_id__in=user_ids)
+        .values('assigned_to_id')
+        .annotate(total=Count('id'))
+        .values_list('assigned_to_id', 'total')
+    )
+    
+    # 2. Số đơn chốt, doanh thu, công nợ, số khách hàng chốt
+    order_stats_query = (
+        Order.objects.filter(order_filters, created_by_id__in=user_ids)
+        .values('created_by_id')
+        .annotate(
+            total_orders=Count('id'),
+            revenue=Sum('total_amount'),
+            debt=Sum('remaining_debt'),
+            unique_customers=Count('customer_id', distinct=True)
+        )
+    )
+    
+    order_stats = {
+        item['created_by_id']: (
+            item['total_orders'], 
+            item['revenue'], 
+            item['debt'], 
+            item['unique_customers']
+        ) 
+        for item in order_stats_query
+    }
+    
+    for u in users_list:
+        assigned = assigned_counts.get(u.id, 0)
+        o_stats = order_stats.get(u.id, (0, 0, 0, 0))
+        total_orders, revenue, debt, unique_customers = o_stats
+        
+        conversion_rate = (unique_customers / assigned * 100) if assigned > 0 else 0
+        
+        stats.append({
+            "id": u.id,
+            "name": u.full_name or u.username,
+            "department": u.department.name if u.department else None,
+            "assigned_customers": assigned,
+            "closed_orders": total_orders,
+            "revenue": float(revenue or 0),
+            "debt": float(debt or 0),
+            "conversion_rate": round(conversion_rate, 2)
+        })
+        
+    # Sắp xếp theo doanh thu giảm dần
+    stats.sort(key=lambda x: x["revenue"], reverse=True)
+    
+    return Response(stats)
+
 from rest_framework import viewsets
 from rest_framework.decorators import action
 from .models import SystemBackupConfig, BackupHistoryLog

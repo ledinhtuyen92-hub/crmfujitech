@@ -17,6 +17,7 @@ urlpatterns = [
     path("top-customers/", views.top_customers, name="top-customers"),
     path("top-sellers/", views.top_sellers, name="top-sellers"),
     path("debt-stats/", views.debt_stats, name="debt-stats"),
+    path("employee-stats/", views.employee_stats, name="employee-stats"),
 ]
 
 urlpatterns += router.urls
