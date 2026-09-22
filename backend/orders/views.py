@@ -148,6 +148,10 @@ class OrderViewSet(TenantQuerySetMixin, viewsets.ModelViewSet):
         # Xử lý trường hợp Sum trả về None nếu không có đơn hàng nào
         if stats['total_revenue'] is None:
             stats['total_revenue'] = 0
+        
+        # Đếm tổng số đơn đang chờ duyệt từ queryset gốc (không bị ảnh hưởng bởi filter hiện tại)
+        base_qs = self.get_queryset()
+        stats['global_pending'] = base_qs.filter(status='pending').count()
 
         page = self.paginate_queryset(qs)
         if page is not None:

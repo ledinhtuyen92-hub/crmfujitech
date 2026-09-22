@@ -169,7 +169,7 @@ export default function OrderList() {
   const [currentPage, setCurrentPage] = useState(1)
   const [pageSize, setPageSize] = useState(25)
   const [totalCount, setTotalCount] = useState(0)
-  const [stats, setStats] = useState({ total_revenue: 0, total_pending: 0, total_approved: 0, total_completed: 0 })
+  const [stats, setStats] = useState({ total_revenue: 0, total_pending: 0, total_approved: 0, total_completed: 0, global_pending: 0 })
   const [customers, setCustomers] = useState([])
   const [fetchingCustomers, setFetchingCustomers] = useState(false)
   const debounceFetcherCustomersRef = useRef(null)
@@ -3528,7 +3528,7 @@ export default function OrderList() {
       </Row>
 
       {/* ── Pending Orders Notification ───────────────────────────────── */}
-      {totalPending > 0 && (
+      {(stats.global_pending || 0) > 0 && (
         <div style={{ marginBottom: 16, padding: '16px 20px', background: 'linear-gradient(135deg, #fff1f2 0%, #ffe4e6 100%)', borderRadius: 12, border: '1px solid #fecdd3', display: 'flex', alignItems: 'center', justifyContent: 'space-between', boxShadow: '0 4px 12px rgba(225, 29, 72, 0.1)' }}>
           <Space size={16}>
             <div style={{ background: '#f43f5e', borderRadius: '50%', width: 40, height: 40, display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 4px 10px rgba(244, 63, 94, 0.3)' }}>
@@ -3536,7 +3536,7 @@ export default function OrderList() {
             </div>
             <Space direction="vertical" size={0}>
               <Text strong style={{ color: '#be123c', fontSize: 16 }}>
-                Bạn có {totalPending} đơn hàng đang chờ phê duyệt!
+                Bạn có {stats.global_pending} đơn hàng đang chờ phê duyệt!
               </Text>
               <Text type="secondary" style={{ color: '#9f1239', fontSize: 13 }}>
                 Vui lòng kiểm tra và phê duyệt để tiếp tục xử lý đơn hàng.
