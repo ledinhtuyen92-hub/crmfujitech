@@ -631,7 +631,12 @@ function Dashboard() {
                 columns={employeeStatsColumns}
                 dataSource={selectedEmployee ? employeeStats.filter(e => e.id === selectedEmployee) : employeeStats}
                 rowKey="id"
-                pagination={false}
+                pagination={{
+                  defaultPageSize: 10,
+                  showSizeChanger: true,
+                  pageSizeOptions: ['10', '20', '50', '100'],
+                  showTotal: (total, range) => `${range[0]}-${range[1]} / ${total} nhân viên`
+                }}
                 size="middle"
                 scroll={{ x: 'max-content' }}
               />
