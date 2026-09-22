@@ -94,7 +94,6 @@ const contractColumns = [
       return <Tag color={colorMap[status] ?? 'default'}>{labelMap[status] ?? status}</Tag>
     },
   },
-  },
 ]
 
 const employeeStatsColumns = [
