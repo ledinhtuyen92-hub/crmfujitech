@@ -578,14 +578,31 @@ def employee_stats(request):
         .values_list('assigned_to_id', 'total')
     )
     
+    from finance.models import PaymentReceipt
+    from django.db.models.functions import Coalesce
+    from django.db.models import OuterRef, Subquery, F, DecimalField
+
+    receipts_subquery = PaymentReceipt.objects.filter(
+        order=OuterRef("pk")
+    ).values("order").annotate(
+        total_paid=Sum("amount")
+    ).values("total_paid")
+    
+    order_qs = Order.objects.filter(order_filters, created_by_id__in=user_ids)
+    order_qs = order_qs.annotate(
+        paid=Coalesce(Subquery(receipts_subquery), 0.0, output_field=DecimalField())
+    ).annotate(
+        debt_calc=F("total_amount") - F("paid")
+    )
+    
     # 2. Số đơn chốt, doanh thu, công nợ, số khách hàng chốt
     order_stats_query = (
-        Order.objects.filter(order_filters, created_by_id__in=user_ids)
+        order_qs
         .values('created_by_id')
         .annotate(
             total_orders=Count('id'),
             revenue=Sum('total_amount'),
-            debt=Sum('remaining_debt'),
+            debt=Sum('debt_calc'),
             unique_customers=Count('customer_id', distinct=True)
         )
     )
