@@ -616,7 +616,7 @@ function Dashboard() {
         </Col>
       </Row>
 
-      {(canScopeCompany || canScopeAnyDept || canScopeMyDept) && scopeFilter !== 'personal' && (
+      {(canScopeCompany || canScopeAnyDept) && scopeFilter !== 'personal' && (
         <Row gutter={[16, 16]} style={{ marginTop: 16 }}>
           <Col xs={24}>
             <Card 
