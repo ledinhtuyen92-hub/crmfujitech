@@ -181,16 +181,17 @@ def summary(request):
         order_qs = order_qs.filter(created_at__date__gte=start_date, created_at__date__lte=end_date)
 
     revenue_in_period = order_qs.filter(
-        status__in=["approved", "in_production", "completed"]
+        status__in=["approved", "completed"]
     ).aggregate(total=Sum("total_amount"))["total"] or 0
 
     order_stats = order_qs.aggregate(
-        total=Count("id"),
         pending=Count("id", filter=Q(status="pending")),
         approved=Count("id", filter=Q(status="approved")),
         rejected=Count("id", filter=Q(status="rejected")),
         completed=Count("id", filter=Q(status="completed")),
     )
+    # Tổng đơn chốt (approved + completed)
+    order_stats["total"] = order_stats["approved"] + order_stats["completed"]
     order_stats["revenue_in_period"] = float(revenue_in_period)
 
     valid_product_ids = list(Product.objects.filter(category__is_sales_target=True).values_list('id', flat=True))
@@ -201,7 +202,7 @@ def summary(request):
     sales_target_cond = accessory_sales_cond | main_sales_cond
     order_items_qs = OrderItem.objects.filter(order__in=order_qs, item_type="product").filter(sales_target_cond)
     won_products = order_items_qs.filter(
-        order__status__in=["approved", "in_production", "completed"]
+        order__status__in=["approved", "completed"]
     ).aggregate(total=Sum("quantity"))["total"] or 0
     completed_products = order_items_qs.filter(
         order__status="completed"
@@ -284,9 +285,10 @@ def revenue_chart(request):
 
     cf = _company_filter(user)
 
+    # Chỉ tính doanh thu của đơn hàng đã được duyệt hoặc hoàn thành
     order_qs = Order.objects.filter(
         cf,
-        status__in=["approved", "in_production", "completed"],
+        status__in=["approved", "completed"],
         created_at__date__gte=start_date,
         created_at__date__lte=end_date,
     )
@@ -362,7 +364,7 @@ def top_customers(request):
     limit = min(int(request.query_params.get("limit", 5)), 20)
     cf = _company_filter(user)
 
-    order_qs = Order.objects.filter(cf, status__in=["approved", "in_production", "completed"])
+    order_qs = Order.objects.filter(cf, status__in=["approved", "completed"])
     order_qs = apply_dashboard_scope(order_qs, request, user, user_field="created_by")
 
     top = (
@@ -409,7 +411,7 @@ def top_sellers(request):
     
     order_qs = Order.objects.filter(
         created_by=OuterRef('pk'), 
-        status__in=["approved", "in_production", "completed"]
+        status__in=["approved", "completed"]
     )
     if start_date and end_date:
         order_qs = order_qs.filter(created_at__date__gte=start_date, created_at__date__lte=end_date)
@@ -425,7 +427,7 @@ def top_sellers(request):
     sales_target_cond = accessory_sales_cond | main_sales_cond
     product_qs = OrderItem.objects.filter(
         order__created_by=OuterRef('pk'),
-        order__status__in=["approved", "in_production", "completed"],
+        order__status__in=["approved", "completed"],
         item_type='product'
     ).filter(sales_target_cond)
     if start_date and end_date:
@@ -473,7 +475,7 @@ def debt_stats(request):
     time_filter = request.query_params.get("time_filter", "month")
     start_date, end_date = get_date_range(time_filter)
 
-    order_qs = Order.objects.filter(cf).exclude(status__in=["cancelled", "rejected"])
+    order_qs = Order.objects.filter(cf).filter(status__in=["approved", "completed"])
     
     if start_date and end_date:
         order_qs = order_qs.filter(created_at__date__gte=start_date, created_at__date__lte=end_date)
