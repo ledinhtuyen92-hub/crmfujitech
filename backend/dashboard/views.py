@@ -433,8 +433,8 @@ def top_sellers(request):
         
     product_count_subquery = product_qs.values('order__created_by').annotate(t=Sum('quantity')).values('t')
 
-    # Lấy toàn bộ nhân viên có phát sinh đơn hàng, không phân biệt phòng ban
-    users = User.objects.filter(cf, is_active=True, is_superuser=False)
+    # Lấy nhân viên thuộc phòng ban có bật Thống kê Doanh số Sales
+    users = User.objects.filter(cf, is_active=True, is_superuser=False, department__is_sales_department=True)
     users = apply_dashboard_scope(users, request, user, user_field=None)
     users = users.annotate(
         total_revenue=Coalesce(Subquery(revenue_subquery), Decimal('0.0'), output_field=DecimalField()),
@@ -546,8 +546,12 @@ def employee_stats(request):
     time_filter = request.query_params.get("time_filter", "month")
     start_date, end_date = get_date_range(time_filter)
     
-    # Lấy danh sách nhân viên theo scope
-    users_qs = User.objects.filter(is_active=True).filter(_company_filter(user))
+    # Lấy danh sách nhân viên theo scope và thuộc phòng Sales
+    users_qs = User.objects.filter(
+        is_active=True, 
+        is_superuser=False, 
+        department__is_sales_department=True
+    ).filter(_company_filter(user))
     users_qs = apply_dashboard_scope(users_qs, request, user, user_field=None)
     
     # Tính số data cấp (customers assigned)
