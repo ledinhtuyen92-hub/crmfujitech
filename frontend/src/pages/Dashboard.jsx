@@ -635,6 +635,7 @@ function Dashboard() {
                   defaultPageSize: 10,
                   showSizeChanger: true,
                   pageSizeOptions: ['10', '20', '50', '100'],
+                  hideOnSinglePage: false,
                   showTotal: (total, range) => `${range[0]}-${range[1]} / ${total} nhân viên`
                 }}
                 size="middle"
