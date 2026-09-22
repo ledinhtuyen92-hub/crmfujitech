@@ -2819,11 +2819,23 @@ export default function OrderList() {
         }
       }
 
-      for (const it of validItems) {
-        const prodObj = products.find((p) => p.id === it.product)
+      // Build parent product map: for each custom_size item, use the nearest parent's product_id
+      const resolveParentProduct = (items, idx) => {
+        if (!items[idx]?.custom_data?.is_custom_size) return items[idx]?.product ?? null
+        for (let k = idx - 1; k >= 0; k--) {
+          if (!items[k]?.custom_data?.is_custom_size) return items[k]?.product ?? null
+        }
+        return items[idx]?.product ?? null
+      }
+
+      for (let idx = 0; idx < validItems.length; idx++) {
+        const it = validItems[idx]
+        const isCustomSize = it.custom_data?.is_custom_size === true
+        const effectiveProductId = isCustomSize ? resolveParentProduct(validItems, idx) : it.product
+        const prodObj = products.find((p) => p.id === effectiveProductId)
         await api.post('/orders/order-items/', {
           order: orderId,
-          product: it.product,
+          product: effectiveProductId,
           product_name: it.product_name || (prodObj ? prodObj.name : 'Sản phẩm'),
           unit_price: Number(it.unit_price || 0),
           width: Number(it.width || 0),
