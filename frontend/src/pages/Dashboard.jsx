@@ -293,7 +293,7 @@ function Dashboard() {
               <Select
                 value={scopeFilter}
                 onChange={setScopeFilter}
-                style={{ width: isMobile ? '100%' : 200, height: 40 }}
+                style={{ width: isMobile ? '100%' : 200, height: 40, textAlign: 'left' }}
                 options={[
                   { label: <Space><UserOutlined style={{ color: '#8b5cf6' }} /> Cá nhân</Space>, value: 'personal' },
                   ...(canScopeMyDept || canScopeAnyDept || canScopeCompany ? [{ label: <Space><TeamOutlined style={{ color: '#0ea5e9' }} /> Phòng ban của tôi</Space>, value: 'my_department' }] : []),
@@ -308,7 +308,7 @@ function Dashboard() {
                 placeholder="Chọn phòng ban"
                 value={departmentId}
                 onChange={setDepartmentId}
-                style={{ width: isMobile ? '100%' : 200, height: 40 }}
+                style={{ width: isMobile ? '100%' : 200, height: 40, textAlign: 'left' }}
                 allowClear
                 options={departments.map(d => ({ label: d.name, value: d.id }))}
               />
@@ -320,7 +320,7 @@ function Dashboard() {
               value={timeFilter}
               onChange={setTimeFilter}
               options={timeFilterOptions}
-              style={{ width: isMobile ? '100%' : 160, height: 40, boxShadow: '0 2px 8px rgba(0,0,0,0.05)' }}
+              style={{ width: isMobile ? '100%' : 160, height: 40, boxShadow: '0 2px 8px rgba(0,0,0,0.05)', textAlign: 'left' }}
             />
           </div>
         </Space>
