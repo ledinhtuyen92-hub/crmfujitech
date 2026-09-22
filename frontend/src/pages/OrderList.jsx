@@ -3537,7 +3537,7 @@ export default function OrderList() {
         bodyStyle={{ padding: 16 }}
       >
         <Row gutter={[16, 16]} align="middle">
-          <Col xs={24} sm={12} md={6}>
+          <Col xs={24} sm={12} md={5}>
             <Input
               placeholder="Tìm theo mã đơn hàng, tên khách hàng..."
               prefix={<SearchOutlined style={{ color: '#94a3b8' }} />}
@@ -3562,7 +3562,7 @@ export default function OrderList() {
               <Option value="completed"><Badge status="success" text="Hoàn thành" /></Option>
             </Select>
           </Col>
-          <Col xs={24} sm={12} md={5}>
+          <Col xs={24} sm={12} md={4}>
             <Select
               placeholder="Thanh toán & Công nợ"
               value={financialFilter || undefined}
@@ -3577,7 +3577,7 @@ export default function OrderList() {
               <Option value="pending_credit"><Badge status="error" text="Đang chờ duyệt kho nợ" /></Option>
             </Select>
           </Col>
-          <Col xs={24} sm={12} md={4}>
+          <Col xs={24} sm={12} md={3}>
             <Select
               placeholder="Đối tượng TT"
               value={paymentTargetFilter || undefined}
@@ -3589,7 +3589,7 @@ export default function OrderList() {
               <Option value="company">Công ty</Option>
             </Select>
           </Col>
-          <Col xs={24} sm={12} md={5}>
+          <Col xs={24} sm={12} md={4}>
             <Select
               placeholder="Vận hành Kho"
               value={exportFilter || undefined}
@@ -3601,7 +3601,7 @@ export default function OrderList() {
               <Option value="pending_export"><Badge status="error" text="Đang đợi duyệt xuất kho" /></Option>
             </Select>
           </Col>
-          <Col xs={24} sm={12} md={5}>
+          <Col xs={24} sm={12} md={4}>
             <Select
               placeholder="Sale phụ trách"
               value={salesFilter || undefined}
