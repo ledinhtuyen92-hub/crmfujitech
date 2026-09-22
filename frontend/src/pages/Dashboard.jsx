@@ -337,6 +337,9 @@ function Dashboard() {
               <Text type="secondary" style={{ fontFamily: "'Inter', sans-serif" }}>
                 Tổng quan hiệu quả kinh doanh và tình hình hoạt động của công ty
               </Text>
+              <Text type="danger" style={{ fontFamily: "'Inter', sans-serif", fontSize: 12, marginTop: -4 }}>
+                * Lưu ý: Các số liệu thống kê dưới đây chỉ tính trên những đơn hàng Đã duyệt hoặc Hoàn thành
+              </Text>
           </Space>
         </Col>
         <Col xs={24} md={12} style={{ textAlign: isMobile ? 'left' : 'right' }}>
