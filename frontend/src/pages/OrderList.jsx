@@ -299,6 +299,8 @@ export default function OrderList() {
   const [financialFilter, setFinancialFilter] = useState('')
   const [paymentTargetFilter, setPaymentTargetFilter] = useState('')
   const [exportFilter, setExportFilter] = useState('')
+  const [salesFilter, setSalesFilter] = useState('')
+  const [salesUsers, setSalesUsers] = useState([])
 
   // Modal Add / Edit
   const [modalVisible, setModalVisible] = useState(false)
@@ -642,6 +644,7 @@ export default function OrderList() {
       if (financialFilter) params.financial_status = financialFilter
       if (paymentTargetFilter) params.payment_target = paymentTargetFilter
       if (exportFilter) params.export_status = exportFilter
+      if (salesFilter) params.created_by = salesFilter
       if (searchQuery) params.search = searchQuery
       
       const res = await api.get('/orders/orders/', { params })
@@ -659,17 +662,18 @@ export default function OrderList() {
     } finally {
       setLoading(false)
     }
-  }, [statusFilter, financialFilter, paymentTargetFilter, exportFilter, searchQuery, pageSize, messageApi])
+  }, [statusFilter, financialFilter, paymentTargetFilter, exportFilter, salesFilter, searchQuery, pageSize, messageApi])
 
   const fetchCustomersAndProducts = useCallback(async () => {
     await Promise.resolve()
     try {
-      const [custRes, prodRes, tmplRes, myCompTmplRes, factoryRes] = await Promise.all([
+      const [custRes, prodRes, tmplRes, myCompTmplRes, factoryRes, usersRes] = await Promise.all([
         api.get('/crm/customers/', { params: { page_size: 25 } }).catch(() => ({ data: [] })),
         api.get('/inventory/products/', { params: { page_size: 10000 } }).catch(() => ({ data: [] })),
         api.get('/sales/quotation-templates/active/').catch(() => ({ data: [] })),
         api.get('/sales/quotation-templates/my-company-template/').catch(() => ({ data: null })),
         api.get('/production/factories/', { params: { page_size: 10000 } }).catch(() => ({ data: [] })),
+        api.get('/users/users/', { params: { page_size: 10000 } }).catch(() => ({ data: [] })),
       ])
       const custData = Array.isArray(custRes.data) ? custRes.data : custRes.data?.results ?? []
       if (injectedCustomerRef.current && !custData.find(c => c.id === injectedCustomerRef.current.id)) {
@@ -677,9 +681,11 @@ export default function OrderList() {
       }
       const prodData = Array.isArray(prodRes.data) ? prodRes.data : prodRes.data?.results ?? []
       const factoryData = Array.isArray(factoryRes.data) ? factoryRes.data : factoryRes.data?.results ?? []
+      const usersData = Array.isArray(usersRes.data) ? usersRes.data : usersRes.data?.results ?? []
       setCustomers(custData)
       setProducts(prodData)
       setFactories(factoryData)
+      setSalesUsers(usersData)
       setTemplates(tmplRes.data || [])
       if (myCompTmplRes?.data) {
         setCompanyTemplate(myCompTmplRes.data)
@@ -3593,6 +3599,23 @@ export default function OrderList() {
             >
               <Option value="rejected"><Badge status="error" text="Chưa có lệnh XK" /></Option>
               <Option value="pending_export"><Badge status="error" text="Đang đợi duyệt xuất kho" /></Option>
+            </Select>
+          </Col>
+          <Col xs={24} sm={12} md={5}>
+            <Select
+              placeholder="Sale phụ trách"
+              value={salesFilter || undefined}
+              onChange={(val) => setSalesFilter(val || '')}
+              allowClear
+              showSearch
+              filterOption={(input, option) =>
+                (option?.children ?? '').toLowerCase().includes(input.toLowerCase())
+              }
+              style={{ width: '100%' }}
+            >
+              {salesUsers.map(u => (
+                <Option key={u.id} value={u.id}>{u.full_name || u.email}</Option>
+              ))}
             </Select>
           </Col>
         </Row>

@@ -58,6 +58,11 @@ class OrderViewSet(TenantQuerySetMixin, viewsets.ModelViewSet):
         order_status = self.request.query_params.get("status")
         if order_status:
             qs = qs.filter(status=order_status)
+            
+        # Filter theo người tạo / phụ trách
+        created_by = self.request.query_params.get("created_by")
+        if created_by:
+            qs = qs.filter(created_by_id=created_by)
 
         # Filter theo thanh toán & công nợ
         fin_status = self.request.query_params.get("financial_status")
