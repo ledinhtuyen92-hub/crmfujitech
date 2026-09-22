@@ -602,17 +602,26 @@ def employee_stats(request):
         debt_calc=F("total_amount") - F("paid")
     )
     
-    # 2. Số đơn chốt, doanh thu, công nợ, số khách hàng chốt, số SP chốt
+    # 2. Số đơn chốt, doanh thu, công nợ, số khách hàng chốt, số SP chốt (đúng logic is_sales_target)
     from orders.models import OrderItem
+    from inventory.models import Product as InventoryProduct
+    
+    valid_product_ids = list(InventoryProduct.objects.filter(category__is_sales_target=True).values_list('id', flat=True))
+    is_accessory_cond = Q(items__custom_data__is_custom_size=True)
+    is_main_cond = Q(items__custom_data__is_custom_size=False) | ~Q(items__custom_data__has_key='is_custom_size')
+    accessory_sales_cond = is_accessory_cond & Q(items__custom_data__actual_product_id__in=valid_product_ids)
+    main_sales_cond = is_main_cond & (Q(items__product__category__is_sales_target=True) | Q(items__product__isnull=True))
+    sales_target_cond = (accessory_sales_cond | main_sales_cond) & Q(items__item_type='product')
+    
     order_stats_query = (
         order_qs
         .values('created_by_id')
         .annotate(
-            total_orders=Count('id'),
-            revenue=Sum('total_amount'),
-            debt=Sum('debt_calc'),
+            total_orders=Count('id', distinct=True),
+            revenue=Sum('total_amount', distinct=True),
+            debt=Sum('debt_calc', distinct=True),
             unique_customers=Count('customer_id', distinct=True),
-            products_sold=Sum('items__quantity', filter=Q(items__item_type='product'))
+            products_sold=Sum('items__quantity', filter=sales_target_cond)
         )
     )
     
