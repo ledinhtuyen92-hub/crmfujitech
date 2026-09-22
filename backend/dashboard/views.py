@@ -234,14 +234,15 @@ def summary(request):
     employee_count = employee_qs.count()
 
     # ── Tính Win Rate ───────────────────────────────────────────
-    # Tính theo số lượng báo giá đã được chuyển thành đơn hàng (Đã duyệt/Hoàn thành)
-    total_quotes = (quotation_stats.get("sent") or 0) + (quotation_stats.get("accepted") or 0) + (quotation_stats.get("rejected") or 0)
-    won_quotes = quotation_stats.get("won") or 0
-    total_quotes = max(total_quotes, won_quotes) # Đảm bảo tỷ lệ không quá 100%
+    # Tính theo số lượng khách hàng chốt đơn / Số data cấp
+    assigned_customers = customer_stats.get("total") or 0
+    unique_customers_won = order_qs.filter(
+        status__in=["approved", "completed"]
+    ).values("customer_id").distinct().count()
     
     win_rate = 0
-    if total_quotes > 0:
-        win_rate = (won_quotes / total_quotes) * 100
+    if assigned_customers > 0:
+        win_rate = (unique_customers_won / assigned_customers) * 100
 
     return Response({
         "customers": customer_stats,
