@@ -2801,10 +2801,22 @@ export default function OrderList() {
         messageApi.success('Tạo đơn hàng mới thành công!')
       }
 
-      if (editingOrder && editingOrder.items) {
-        await Promise.all(
-          editingOrder.items.map((it) => api.delete(`/orders/order-items/${it.id}/`).catch(() => {}))
-        )
+      if (editingOrder) {
+        // Fetch fresh items from server to avoid stale data causing duplicates
+        try {
+          const freshOrder = await api.get(`/orders/orders/${orderId}/`)
+          const freshItems = freshOrder.data.items || []
+          await Promise.all(
+            freshItems.map((it) => api.delete(`/orders/order-items/${it.id}/`).catch(() => {}))
+          )
+        } catch {
+          // fallback to editingOrder.items if fetch fails
+          if (editingOrder.items) {
+            await Promise.all(
+              editingOrder.items.map((it) => api.delete(`/orders/order-items/${it.id}/`).catch(() => {}))
+            )
+          }
+        }
       }
 
       for (const it of validItems) {
