@@ -886,10 +886,21 @@ export default function QuotationList() {
       }
 
       // Add / replace items
-      if (editingQuotation && editingQuotation.items) {
-        await Promise.all(
-          editingQuotation.items.map((it) => api.delete(`/sales/quotation-items/${it.id}/`).catch(() => {}))
-        )
+      if (editingQuotation) {
+        // Fetch fresh items from server to avoid stale data causing duplicates
+        try {
+          const freshQuotation = await api.get(`/sales/quotations/${quotationId}/`)
+          const freshItems = freshQuotation.data.items || []
+          await Promise.all(
+            freshItems.map((it) => api.delete(`/sales/quotation-items/${it.id}/`).catch(() => {}))
+          )
+        } catch {
+          if (editingQuotation.items) {
+            await Promise.all(
+              editingQuotation.items.map((it) => api.delete(`/sales/quotation-items/${it.id}/`).catch(() => {}))
+            )
+          }
+        }
       }
 
       for (const it of validItems) {
