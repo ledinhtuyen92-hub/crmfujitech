@@ -375,6 +375,10 @@ class UserViewSet(TenantQuerySetMixin, viewsets.ModelViewSet):
                     Q(department__factory__isnull=True) |
                     Q(department__factory_id=factory_id)
                 )
+                
+        is_sales = self.request.query_params.get("is_sales")
+        if str(is_sales).lower() == 'true':
+            qs = qs.filter(department__is_sales_department=True)
             
         return qs
 

@@ -673,7 +673,7 @@ export default function OrderList() {
         api.get('/sales/quotation-templates/active/').catch(() => ({ data: [] })),
         api.get('/sales/quotation-templates/my-company-template/').catch(() => ({ data: null })),
         api.get('/production/factories/', { params: { page_size: 10000 } }).catch(() => ({ data: [] })),
-        api.get('/users/users/', { params: { page_size: 10000 } }).catch(() => ({ data: [] })),
+        api.get('/users/users/', { params: { page_size: 10000, is_sales: true } }).catch(() => ({ data: [] })),
       ])
       const custData = Array.isArray(custRes.data) ? custRes.data : custRes.data?.results ?? []
       if (injectedCustomerRef.current && !custData.find(c => c.id === injectedCustomerRef.current.id)) {
