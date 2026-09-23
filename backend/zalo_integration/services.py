@@ -674,7 +674,7 @@ def sync_zns_templates_from_zalo(oa_config):
         oa_config.refresh_from_db()
 
     # Lấy danh sách mẫu (status=1 là ENABLE/APPROVED)
-    url_all = "https://business.openapi.zalo.me/template/all?offset=0&limit=100&status=1"
+    url_all = "https://business.openapi.zalo.me/template/all?offset=0&limit=100&filterPreset=0"
     try:
         res = requests.get(
             url_all,
