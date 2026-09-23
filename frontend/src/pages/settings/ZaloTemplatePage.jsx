@@ -4,7 +4,7 @@ import {
   message, Modal, Row, Select, Space, Switch, Table, Tag, Typography, Tooltip, List
 } from 'antd'
 import {
-  FileTextOutlined, PlusOutlined, EditOutlined, DeleteOutlined, InfoCircleOutlined
+  FileTextOutlined, PlusOutlined, EditOutlined, DeleteOutlined, InfoCircleOutlined, CloudSyncOutlined
 } from '@ant-design/icons'
 import dayjs from 'dayjs'
 import api from '../../utils/api'
@@ -22,6 +22,7 @@ export default function ZaloTemplatePage() {
   const [loading, setLoading] = useState(false)
   const [modalVisible, setModalVisible] = useState(false)
   const [saving, setSaving] = useState(false)
+  const [syncing, setSyncing] = useState(false)
   const [editingTemplate, setEditingTemplate] = useState(null)
   const [form] = Form.useForm()
 
@@ -74,6 +75,20 @@ export default function ZaloTemplatePage() {
       fetchTemplates()
     } catch {
       message.error('Không thể xóa mẫu ZNS.')
+    }
+  }
+
+  const handleSyncTemplates = async () => {
+    if (maintenanceMode) { message.warning('⚠️ Hệ thống đang bảo trì. Chức năng tạm khóa!'); return }
+    setSyncing(true)
+    try {
+      const res = await api.post('/zalo/templates/sync/')
+      message.success(res.data?.detail || 'Đồng bộ thành công!')
+      fetchTemplates()
+    } catch (err) {
+      message.error(err.response?.data?.detail || 'Lỗi khi đồng bộ từ Zalo.')
+    } finally {
+      setSyncing(false)
     }
   }
 
@@ -206,14 +221,23 @@ export default function ZaloTemplatePage() {
           <Text type="secondary">Đồng bộ các mẫu tin nhắn ZNS đã được Zalo OA xét duyệt để gửi cho khách hàng</Text>
         </div>
         {canManageTemplates && (
-          <Button
-            type="primary"
-            icon={<PlusOutlined />}
-            onClick={() => handleOpenModal()}
-            style={{ background: '#0068ff', borderColor: '#0068ff' }}
-          >
-            Thêm Mẫu ZNS
-          </Button>
+          <Space>
+            <Button
+              icon={<CloudSyncOutlined />}
+              onClick={handleSyncTemplates}
+              loading={syncing}
+            >
+              Đồng bộ từ Zalo
+            </Button>
+            <Button
+              type="primary"
+              icon={<PlusOutlined />}
+              onClick={() => handleOpenModal()}
+              style={{ background: '#0068ff', borderColor: '#0068ff' }}
+            >
+              Thêm Mẫu ZNS
+            </Button>
+          </Space>
         )}
       </div>
 

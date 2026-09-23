@@ -1046,6 +1046,7 @@ class ZaloMessageTemplateViewSet(viewsets.ModelViewSet):
         "destroy": "zalo.manage_templates",
         "send_zns": "zalo.send_zns",
         "bulk_send": "zalo.send_zns",
+        "sync": "zalo.manage_templates",
     }
 
     def get_queryset(self):
@@ -1057,6 +1058,37 @@ class ZaloMessageTemplateViewSet(viewsets.ModelViewSet):
 
     def perform_create(self, serializer):
         serializer.save(company=self.request.user.company)
+
+    @action(detail=False, methods=["post"], url_path="sync")
+    def sync(self, request):
+        """Đồng bộ Mẫu ZNS từ Zalo."""
+        from .services import sync_zns_templates_from_zalo
+        from .models import ZaloOaConfig
+        import logging
+        logger = logging.getLogger(__name__)
+
+        oa_config = ZaloOaConfig.objects.filter(company=request.user.company, is_active=True).first()
+        if not oa_config:
+            return Response(
+                {"detail": "Vui lòng kết nối Zalo OA và đảm bảo đang ở trạng thái Hoạt động trước khi đồng bộ."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        try:
+            synced_count = sync_zns_templates_from_zalo(oa_config)
+            return Response(
+                {"detail": f"Đã đồng bộ {synced_count} mẫu ZNS từ Zalo thành công."},
+                status=status.HTTP_200_OK,
+            )
+        except ValueError as e:
+            return Response({"detail": str(e)}, status=status.HTTP_400_BAD_REQUEST)
+        except Exception as e:
+            logger.error(f"[ZaloSyncTemplates API] Lỗi: {e}")
+            return Response(
+                {"detail": "Có lỗi xảy ra khi đồng bộ từ Zalo. Vui lòng thử lại sau."},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
+
 
     @action(detail=False, methods=["post"], url_path="send")
     def send_zns(self, request):

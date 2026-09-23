@@ -661,6 +661,96 @@ def send_zns_message(log_id: int) -> bool:
     return log.status == ZaloMessageLog.STATUS_SENT
 
 
+def sync_zns_templates_from_zalo(oa_config):
+    """
+    Gọi Zalo API để lấy toàn bộ danh sách Mẫu ZNS đã được duyệt.
+    Sau đó đồng bộ vào database.
+    """
+    if not oa_config or not oa_config.is_active:
+        raise ValueError("Zalo OA không tồn tại hoặc đã bị vô hiệu hóa.")
+
+    if oa_config.is_token_near_expiry:
+        refresh_zalo_access_token(oa_config)
+        oa_config.refresh_from_db()
+
+    # Lấy danh sách mẫu (status=1 là ENABLE/APPROVED)
+    url_all = "https://business.openapi.zalo.me/template/all?offset=0&limit=100&status=1"
+    try:
+        res = requests.get(
+            url_all,
+            headers={"access_token": oa_config.access_token},
+            timeout=20,
+        )
+        data = res.json()
+        
+        # Xử lý trường hợp token bị thu hồi hoặc hết hạn mà DB chưa cập nhật
+        if data.get("error") == -124:
+            logger.warning(f"[ZaloSyncTemplates] Token invalid (-124) for OA {oa_config.id}. Forcing refresh...")
+            if refresh_zalo_access_token(oa_config, trigger="auto"):
+                oa_config.refresh_from_db()
+                res = requests.get(
+                    url_all,
+                    headers={"access_token": oa_config.access_token},
+                    timeout=20,
+                )
+                data = res.json()
+            else:
+                raise ValueError("Refresh token Zalo đã hết hạn hoặc không hợp lệ. Vui lòng kết nối lại Zalo OA.")
+
+        if data.get("error") != 0:
+            raise ValueError(f"Lỗi khi lấy danh sách mẫu từ Zalo: {data.get('message')} ({data.get('error')})")
+        
+        templates = data.get("data", [])
+    except Exception as e:
+        logger.error(f"[ZaloSyncTemplates] Lỗi: {e}")
+        raise ValueError(f"Không thể kết nối Zalo API: {e}")
+
+    from zalo_integration.models import ZaloMessageTemplate
+    company = oa_config.company
+    
+    synced_count = 0
+    for t_data in templates:
+        template_id = str(t_data.get("templateId"))
+        template_name = t_data.get("templateName", "")
+        
+        # Chỉ fetch chi tiết nếu cần thiết (ví dụ lấy params)
+        url_info = f"https://business.openapi.zalo.me/template/info?template_id={template_id}"
+        try:
+            info_res = requests.get(
+                url_info,
+                headers={"access_token": oa_config.access_token},
+                timeout=10,
+            )
+            info_data = info_res.json()
+            if info_data.get("error") == 0:
+                t_info = info_data.get("data", {})
+                list_params = t_info.get("listParams", [])
+                preview_url = t_info.get("previewUrl", "")
+                
+                # Tạo schema JSON
+                params_schema = {}
+                for p in list_params:
+                    params_schema[p.get("name")] = f"{p.get('name')} ({p.get('type')})"
+                
+                # Cập nhật hoặc tạo mới
+                ZaloMessageTemplate.objects.update_or_create(
+                    company=company,
+                    zalo_template_id=template_id,
+                    defaults={
+                        "name": template_name,
+                        "content_preview": preview_url,
+                        "params_schema": params_schema,
+                        "is_active": True,
+                    }
+                )
+                synced_count += 1
+        except Exception as e:
+            logger.error(f"[ZaloSyncTemplates] Lỗi fetch info template {template_id}: {e}")
+            continue
+
+    return synced_count
+
+
 # ── Live Chat (Inbox) ────────────────────────────────────────────────────────
 
 def upload_file_to_zalo(oa_config, file_obj) -> str:
