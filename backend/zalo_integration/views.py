@@ -1067,27 +1067,35 @@ class ZaloMessageTemplateViewSet(viewsets.ModelViewSet):
         import logging
         logger = logging.getLogger(__name__)
 
-        oa_config = ZaloOaConfig.objects.filter(company=request.user.company, is_active=True).first()
-        if not oa_config:
+        oa_configs = ZaloOaConfig.objects.filter(company=request.user.company, is_active=True)
+        if not oa_configs.exists():
             return Response(
                 {"detail": "Vui lòng kết nối Zalo OA và đảm bảo đang ở trạng thái Hoạt động trước khi đồng bộ."},
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        try:
-            synced_count = sync_zns_templates_from_zalo(oa_config)
-            return Response(
-                {"detail": f"Đã đồng bộ {synced_count} mẫu ZNS từ Zalo thành công."},
-                status=status.HTTP_200_OK,
-            )
-        except ValueError as e:
-            return Response({"detail": str(e)}, status=status.HTTP_400_BAD_REQUEST)
-        except Exception as e:
-            logger.error(f"[ZaloSyncTemplates API] Lỗi: {e}")
-            return Response(
-                {"detail": "Có lỗi xảy ra khi đồng bộ từ Zalo. Vui lòng thử lại sau."},
-                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            )
+        last_error = None
+        for config in oa_configs:
+            if not config.access_token:
+                continue
+            try:
+                synced_count = sync_zns_templates_from_zalo(config)
+                return Response(
+                    {"detail": f"Đã đồng bộ {synced_count} mẫu ZNS từ Zalo thành công (thông qua OA {config.oa_name})."},
+                    status=status.HTTP_200_OK,
+                )
+            except ValueError as e:
+                last_error = str(e)
+                logger.warning(f"[ZaloSyncTemplates] Failed using OA {config.id}: {last_error}")
+            except Exception as e:
+                last_error = "Có lỗi xảy ra khi đồng bộ từ Zalo. Vui lòng thử lại sau."
+                logger.error(f"[ZaloSyncTemplates API] Lỗi với OA {config.id}: {e}")
+        
+        # Nếu tất cả OA đều fail hoặc không có token
+        if not last_error:
+            last_error = "Chưa có OA nào được đăng nhập lấy Token."
+            
+        return Response({"detail": last_error}, status=status.HTTP_400_BAD_REQUEST)
 
 
     @action(detail=False, methods=["post"], url_path="send")
