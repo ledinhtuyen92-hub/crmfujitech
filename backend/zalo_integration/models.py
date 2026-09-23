@@ -163,10 +163,15 @@ class ZaloOaConfig(models.Model):
 
     @property
     def is_token_near_expiry(self):
-        """True nếu token còn dưới 2 giờ để sống (cần refresh)."""
+        """True nếu token còn dưới 30 phút để sống (cần refresh).
+        
+        Lưu ý: Zalo cấp access_token sống 1 giờ và refresh_token là single-use.
+        Cửa sổ 30 phút đảm bảo Celery không refresh ngay sau khi OAuth vừa lấy token mới.
+        """
         if not self.token_expires_at:
             return True
-        return timezone.now() >= (self.token_expires_at - timedelta(hours=2))
+        return timezone.now() >= (self.token_expires_at - timedelta(minutes=30))
+
 
 
 # ── Model: Lịch sử Refresh Token ─────────────────────────────────────────────

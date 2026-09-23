@@ -3,7 +3,7 @@ zalo_integration/tasks.py
 Celery background tasks cho module Zalo Integration.
 
 Lịch chạy (cấu hình trong settings.py CELERY_BEAT_SCHEDULE):
-- refresh_all_zalo_tokens   : Mỗi 12 giờ
+- refresh_all_zalo_tokens   : Mỗi 1 giờ (kiểm tra nếu token còn < 30 phút thì mới refresh)
 - cleanup_stale_leads       : 3 giờ sáng mỗi ngày
 - send_zns_task             : On-demand (triggered bởi user action)
 """
@@ -23,8 +23,11 @@ logger = logging.getLogger(__name__)
 def refresh_all_zalo_tokens(self):
     """
     Quét tất cả ZaloOaConfig còn active.
-    Nếu token sắp hết hạn (< 2 giờ) hoặc đã hết hạn -> gọi Zalo API để refresh.
+    Nếu token sắp hết hạn (< 30 phút) hoặc đã hết hạn -> gọi Zalo API để refresh.
     Chạy mỗi giờ qua Celery Beat.
+    
+    Lưu ý: Zalo cấp access_token sống 1 giờ và refresh_token là single-use.
+    Cửa sổ 30 phút đảm bảo không refresh ngay sau khi OAuth vừa lấy token mới.
     """
     from zalo_integration.models import ZaloOaConfig
     from zalo_integration.services import refresh_zalo_access_token
@@ -52,7 +55,7 @@ def refresh_all_zalo_tokens(self):
         else:
             logger.info(f"[ZaloTask:RefreshTokens] OA '{config.oa_name}': chưa có token_expires_at -> cần refresh")
 
-        # Refresh nếu: chưa có expires_at, hoặc token còn dưới 2 giờ, hoặc đã hết hạn
+        # Refresh nếu: chưa có expires_at, hoặc token còn dưới 30 phút, hoặc đã hết hạn
         if config.is_token_near_expiry:
             logger.info(f"[ZaloTask:RefreshTokens] → Token cần refresh, đang gọi Zalo API cho OA: '{config.oa_name}'...")
             success = refresh_zalo_access_token(config)
