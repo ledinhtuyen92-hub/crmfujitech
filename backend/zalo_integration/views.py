@@ -33,6 +33,7 @@ from .serializers import (
     SocialLeadUpdateSerializer,
     ZaloMessageLogSerializer,
     ZaloMessageTemplateSerializer,
+    ZaloOaConfigMiniSerializer,
     ZaloOaConfigSerializer,
     ZaloOaConfigWriteSerializer,
     ZaloMessageSerializer,
@@ -1050,18 +1051,30 @@ class ZaloMessageTemplateViewSet(viewsets.ModelViewSet):
     }
 
     def get_queryset(self):
-        qs = ZaloMessageTemplate.objects.filter(company=self.request.user.company)
+        qs = ZaloMessageTemplate.objects.filter(
+            company=self.request.user.company
+        ).select_related("oa_config")
         is_active = self.request.query_params.get("is_active")
         if is_active is not None:
             qs = qs.filter(is_active=is_active.lower() == "true")
         return qs.order_by("-created_at")
+
+    @action(detail=False, methods=["get"], url_path="oa-list")
+    def oa_list(self, request):
+        """Trả về danh sách Zalo OA đang hoạt động để dùng cho dropdown chọn OA trong form mẫu ZNS."""
+        from .models import ZaloOaConfig
+        oas = ZaloOaConfig.objects.filter(
+            company=request.user.company, is_active=True
+        ).only("id", "oa_name", "oa_id", "is_active")
+        serializer = ZaloOaConfigMiniSerializer(oas, many=True)
+        return Response(serializer.data)
 
     def perform_create(self, serializer):
         serializer.save(company=self.request.user.company)
 
     @action(detail=False, methods=["post"], url_path="sync")
     def sync(self, request):
-        """Đồng bộ Mẫu ZNS từ Zalo."""
+        """Dồng bộ Mẫu ZNS từ tất cả OA đang hoạt động của công ty."""
         from .services import sync_zns_templates_from_zalo
         from .models import ZaloOaConfig
         import logging
@@ -1074,28 +1087,25 @@ class ZaloMessageTemplateViewSet(viewsets.ModelViewSet):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        last_error = None
-        for config in oa_configs:
-            if not config.access_token:
-                continue
+        total_synced = 0
+        errors = []
+        for oa_config in oa_configs:
             try:
-                synced_count = sync_zns_templates_from_zalo(config)
-                return Response(
-                    {"detail": f"Đã đồng bộ {synced_count} mẫu ZNS từ Zalo thành công (thông qua OA {config.oa_name})."},
-                    status=status.HTTP_200_OK,
-                )
+                count = sync_zns_templates_from_zalo(oa_config)
+                total_synced += count
             except ValueError as e:
-                last_error = str(e)
-                logger.warning(f"[ZaloSyncTemplates] Failed using OA {config.id}: {last_error}")
+                errors.append(f"OA '{oa_config.oa_name}': {e}")
             except Exception as e:
-                last_error = "Có lỗi xảy ra khi đồng bộ từ Zalo. Vui lòng thử lại sau."
-                logger.error(f"[ZaloSyncTemplates API] Lỗi với OA {config.id}: {e}")
-        
-        # Nếu tất cả OA đều fail hoặc không có token
-        if not last_error:
-            last_error = "Chưa có OA nào được đăng nhập lấy Token."
-            
-        return Response({"detail": last_error}, status=status.HTTP_400_BAD_REQUEST)
+                logger.error(f"[ZaloSyncTemplates API] Lỗi OA {oa_config.id}: {e}")
+                errors.append(f"OA '{oa_config.oa_name}': Lỗi không xác định.")
+
+        if total_synced == 0 and errors:
+            return Response({"detail": "; ".join(errors)}, status=status.HTTP_400_BAD_REQUEST)
+
+        detail_msg = f"Đã đồng bộ {total_synced} mẫu ZNS từ Zalo thành công."
+        if errors:
+            detail_msg += f" (Một số OA gặp lỗi: {'; '.join(errors)})"
+        return Response({"detail": detail_msg}, status=status.HTTP_200_OK)
 
 
     @action(detail=False, methods=["post"], url_path="send")

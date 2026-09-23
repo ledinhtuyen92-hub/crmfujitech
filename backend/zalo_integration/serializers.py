@@ -256,17 +256,31 @@ class ConvertLeadSerializer(serializers.Serializer):
 
 # ── ZaloMessageTemplate ───────────────────────────────────────────────────────
 
+class ZaloOaConfigMiniSerializer(serializers.ModelSerializer):
+    """Serializer gọn để dùng cho dropdown chọn OA khi tạo/sửa mẫu ZNS."""
+    class Meta:
+        model = ZaloOaConfig
+        fields = ["id", "oa_name", "oa_id", "is_active"]
+
+
 class ZaloMessageTemplateSerializer(serializers.ModelSerializer):
     template_type_display = serializers.CharField(source="get_template_type_display", read_only=True)
+    oa_name = serializers.CharField(source="oa_config.oa_name", read_only=True, default=None)
+    oa_config = serializers.PrimaryKeyRelatedField(
+        queryset=ZaloOaConfig.objects.all(),
+        allow_null=True,
+        required=False,
+    )
 
     class Meta:
         model = ZaloMessageTemplate
         fields = [
             "id", "name", "zalo_template_id", "template_type",
             "template_type_display", "content_preview", "params_schema",
+            "oa_config", "oa_name",
             "is_active", "created_at", "updated_at",
         ]
-        read_only_fields = ["id", "company", "created_at", "updated_at", "template_type_display"]
+        read_only_fields = ["id", "company", "created_at", "updated_at", "template_type_display", "oa_name"]
 
 
 class SendZNSSerializer(serializers.Serializer):

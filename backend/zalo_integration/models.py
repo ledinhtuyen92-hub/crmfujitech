@@ -429,6 +429,15 @@ class ZaloMessageTemplate(models.Model):
         related_name="zalo_message_templates",
         verbose_name="Công ty",
     )
+    oa_config = models.ForeignKey(
+        "ZaloOaConfig",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="templates",
+        verbose_name="Zalo OA gửi",
+        help_text="Tài khoản Zalo OA được dùng để gửi mẫu tin này. Phải khớp với OA đã đăng ký mẫu trên Zalo Cloud.",
+    )
     name = models.CharField(
         max_length=255,
         verbose_name="Tên mẫu (nội bộ)",

@@ -590,7 +590,20 @@ def send_zns_message(log_id: int) -> bool:
         logger.error(f"[ZaloZNS] Log #{log_id} không tồn tại.")
         return False
 
-    oa_config = ZaloOaConfig.objects.filter(company=log.company, is_active=True).first()
+    # Ưu tiên dùng OA gắn với mẫu ZNS (để đảm bảo đúng chủ sở hữu)
+    oa_config = None
+    if log.template and log.template.oa_config_id:
+        oa_config = ZaloOaConfig.objects.filter(id=log.template.oa_config_id, is_active=True).first()
+        if not oa_config:
+            log.status = ZaloMessageLog.STATUS_FAILED
+            log.error_message = (
+                f"Zalo OA gắn với mẫu '{log.template.name}' đã bị vô hiệu hóa hoặc bị xóa. "
+                "Vui lòng vào Quản lý Mẫu ZNS để cập nhật lại Zalo OA cho mẫu này."
+            )
+            log.save(update_fields=["status", "error_message"])
+            return False
+    if not oa_config:
+        oa_config = ZaloOaConfig.objects.filter(company=log.company, is_active=True).first()
     if not oa_config:
         log.status = ZaloMessageLog.STATUS_FAILED
         log.error_message = "Không tìm thấy cấu hình Zalo OA đang hoạt động."
@@ -732,7 +745,7 @@ def sync_zns_templates_from_zalo(oa_config):
                 for p in list_params:
                     params_schema[p.get("name")] = f"{p.get('name')} ({p.get('type')})"
                 
-                # Cập nhật hoặc tạo mới
+                # Cập nhật hoặc tạo mới — gán thẳng OA chủ sở hữu
                 ZaloMessageTemplate.objects.update_or_create(
                     company=company,
                     zalo_template_id=template_id,
@@ -741,6 +754,7 @@ def sync_zns_templates_from_zalo(oa_config):
                         "content_preview": preview_url,
                         "params_schema": params_schema,
                         "is_active": True,
+                        "oa_config": oa_config,
                     }
                 )
                 synced_count += 1
