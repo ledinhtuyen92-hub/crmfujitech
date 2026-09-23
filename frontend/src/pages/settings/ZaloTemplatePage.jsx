@@ -19,6 +19,7 @@ export default function ZaloTemplatePage() {
   const { isMobile } = useResponsive()
   const canManageTemplates = hasPermission('zalo.manage_templates') || hasPermission('zalo.config')
   const [templates, setTemplates] = useState([])
+  const [oaList, setOaList] = useState([])
   const [loading, setLoading] = useState(false)
   const [modalVisible, setModalVisible] = useState(false)
   const [saving, setSaving] = useState(false)
@@ -40,8 +41,18 @@ export default function ZaloTemplatePage() {
     }
   }
 
+  const fetchOaList = async () => {
+    try {
+      const res = await api.get('/zalo/templates/oa-list/')
+      setOaList(Array.isArray(res.data) ? res.data : [])
+    } catch (e) {
+      console.error('Không thể tải danh sách Zalo OA:', e)
+    }
+  }
+
   useEffect(() => {
     fetchTemplates()
+    fetchOaList()
   }, [])
 
   const handleOpenModal = (template = null) => {
@@ -54,6 +65,7 @@ export default function ZaloTemplatePage() {
         template_type: template.template_type,
         content_preview: template.content_preview,
         params_schema: JSON.stringify(template.params_schema, null, 2),
+        oa_config: template.oa_config || null,
         is_active: template.is_active,
       })
     } else {
@@ -61,7 +73,8 @@ export default function ZaloTemplatePage() {
       form.setFieldsValue({
         is_active: true,
         template_type: 'custom',
-        params_schema: '{\n  "ten_khach_hang": "Tên khách hàng",\n  "ma_don_hang": "Mã đơn hàng"\n}'
+        params_schema: '{\n  "ten_khach_hang": "Tên khách hàng",\n  "ma_don_hang": "Mã đơn hàng"\n}',
+        oa_config: oaList.length === 1 ? oaList[0].id : null,
       })
     }
     setModalVisible(true)
@@ -141,6 +154,14 @@ export default function ZaloTemplatePage() {
       dataIndex: 'zalo_template_id',
       key: 'zalo_template_id',
       render: (text) => <Tag color="blue">{text}</Tag>,
+    },
+    {
+      title: 'OA Gửi',
+      dataIndex: 'oa_name',
+      key: 'oa_name',
+      render: (oaName) => oaName
+        ? <Tag color="geekblue" style={{ fontWeight: 500 }}>{oaName}</Tag>
+        : <Tag color="warning">Chưa gán OA</Tag>,
     },
     {
       title: 'Loại mẫu',
@@ -344,6 +365,25 @@ export default function ZaloTemplatePage() {
               </Form.Item>
             </Col>
           </Row>
+
+          <Form.Item
+            name="oa_config"
+            label="Zalo OA Gửi"
+            rules={[{ required: true, message: 'Vui lòng chọn Zalo OA sẽ gửi mẫu tin này' }]}
+          >
+            <Select
+              placeholder="Chọn Zalo OA gửi mẫu tin này"
+              allowClear
+              optionLabelProp="label"
+            >
+              {oaList.map(oa => (
+                <Option key={oa.id} value={oa.id} label={oa.oa_name}>
+                  {oa.oa_name}
+                  {oa.oa_id && <span style={{ marginLeft: 8, color: '#888', fontSize: 12 }}>({oa.oa_id})</span>}
+                </Option>
+              ))}
+            </Select>
+          </Form.Item>
 
           <Form.Item name="template_type" label="Loại mẫu (Mục đích)">
             <Select>
