@@ -492,7 +492,7 @@ export default function ZnsCampaignPage() {
 
   // ── Render ────────────────────────────────────────────────────────────────
   return (
-    <div style={{ padding: 24, maxWidth: 1200, margin: '0 auto' }}>
+    <div style={{ padding: 24, width: '100%', overflowX: 'hidden' }}>
       {/* Header */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
         <div>
