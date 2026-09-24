@@ -163,24 +163,7 @@ export default function ZaloTemplatePage() {
         ? <Tag color="geekblue" style={{ fontWeight: 500 }}>{oaName}</Tag>
         : <Tag color="warning">Chưa gán OA</Tag>,
     },
-    {
-      title: 'Loại mẫu',
-      dataIndex: 'template_type',
-      key: 'template_type',
-      render: (text) => {
-        const types = {
-          order_confirm: { color: 'green', label: 'Xác nhận Đơn hàng' },
-          appointment: { color: 'cyan', label: 'Nhắc lịch hẹn' },
-          promotion: { color: 'magenta', label: 'Khuyến mãi' },
-          birthday: { color: 'purple', label: 'Chúc mừng sinh nhật' },
-          care: { color: 'orange', label: 'Thu tiền / Chăm sóc' },
-          delivery_warranty: { color: 'blue', label: 'Giao hàng / Bảo hành' },
-          custom: { color: 'default', label: 'Tùy chỉnh' },
-        }
-        const t = types[text] || types.custom
-        return <Tag color={t.color}>{t.label}</Tag>
-      },
-    },
+
     {
       title: 'Trạng thái',
       dataIndex: 'is_active',
@@ -268,16 +251,6 @@ export default function ZaloTemplatePage() {
             dataSource={templates}
             loading={loading}
             renderItem={(record) => {
-              const types = {
-                order_confirm: { color: 'green', label: 'Xác nhận Đơn hàng' },
-                appointment: { color: 'cyan', label: 'Nhắc lịch hẹn' },
-                promotion: { color: 'magenta', label: 'Khuyến mãi' },
-                birthday: { color: 'purple', label: 'Chúc mừng sinh nhật' },
-                care: { color: 'orange', label: 'Thu tiền / Chăm sóc' },
-                delivery_warranty: { color: 'blue', label: 'Giao hàng / Bảo hành' },
-                custom: { color: 'default', label: 'Tùy chỉnh' },
-              }
-              const t = types[record.template_type] || types.custom
               return (
                 <List.Item style={{ padding: '16px', display: 'block', borderBottom: '1px solid #f0f0f0' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 8 }}>
@@ -292,10 +265,7 @@ export default function ZaloTemplatePage() {
                     <Tag color="blue" style={{ margin: 0 }}>{record.zalo_template_id}</Tag>
                   </div>
 
-                  <div style={{ marginBottom: 12, background: '#f8fafc', padding: '8px 12px', borderRadius: 8, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <Text type="secondary" style={{ fontSize: 13 }}>Loại mẫu:</Text>
-                    <Tag color={t.color} style={{ margin: 0 }}>{t.label}</Tag>
-                  </div>
+                  <div style={{ marginBottom: 12 }}>
 
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderTop: '1px dashed #f0f0f0', paddingTop: 12 }}>
                     <Text type="secondary" style={{ fontSize: 12 }}>Ngày tạo: {dayjs(record.created_at).format('DD/MM/YYYY')}</Text>
@@ -385,17 +355,7 @@ export default function ZaloTemplatePage() {
             </Select>
           </Form.Item>
 
-          <Form.Item name="template_type" label="Loại mẫu (Mục đích)">
-            <Select>
-              <Option value="order_confirm">Xác nhận Đơn hàng</Option>
-              <Option value="appointment">Nhắc lịch hẹn</Option>
-              <Option value="promotion">Khuyến mãi / Marketing</Option>
-              <Option value="birthday">Chúc mừng sinh nhật</Option>
-              <Option value="care">Thu tiền / Chăm sóc</Option>
-              <Option value="delivery_warranty">Giao hàng / Bảo hành</Option>
-              <Option value="custom">Tùy chỉnh khác</Option>
-            </Select>
-          </Form.Item>
+
 
           <Form.Item name="content_preview" label="Nội dung mẫu (Chỉ để xem và dễ nhớ)">
             <Input.TextArea rows={3} placeholder="Ví dụ: Xin chào <ten_khach_hang>, đơn hàng <ma_don_hang> của bạn đã được xác nhận..." />
