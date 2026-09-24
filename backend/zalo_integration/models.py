@@ -487,7 +487,134 @@ class ZaloMessageTemplate(models.Model):
         return f"{self.name} ({self.company.name})"
 
 
-# ── Model 4: Lịch sử gửi ZNS ─────────────────────────────────────────────────
+# ── Model 4: Chiến dịch ZNS ──────────────────────────────────────────────────
+
+class ZnsCampaign(models.Model):
+    """
+    Quản lý các chiến dịch gửi tin nhắn ZNS tự động.
+    Mỗi chiến dịch gắn với 1 loại mẫu ZNS và có cấu hình riêng.
+    """
+
+    TYPE_ORDER_CONFIRM    = "order_confirm"
+    TYPE_PAYMENT          = "payment"
+    TYPE_APPOINTMENT      = "appointment"
+    TYPE_MARKETING        = "marketing"
+    TYPE_BIRTHDAY         = "birthday"
+    TYPE_DELIVERY         = "delivery"
+    TYPE_CUSTOM           = "custom"
+    TYPE_CHOICES = [
+        (TYPE_ORDER_CONFIRM, "Xác nhận Đơn hàng"),
+        (TYPE_PAYMENT,       "Thu tiền"),
+        (TYPE_APPOINTMENT,   "Nhắc lịch hẹn"),
+        (TYPE_MARKETING,     "Khuyến mãi / Marketing"),
+        (TYPE_BIRTHDAY,      "Chúc mừng Sinh nhật"),
+        (TYPE_DELIVERY,      "Giao hàng / Bảo hành"),
+        (TYPE_CUSTOM,        "Tùy chỉnh khác"),
+    ]
+
+    company = models.ForeignKey(
+        "users.Company",
+        on_delete=models.CASCADE,
+        related_name="zns_campaigns",
+        verbose_name="Công ty",
+    )
+    name = models.CharField(
+        max_length=200,
+        verbose_name="Tên chiến dịch",
+    )
+    campaign_type = models.CharField(
+        max_length=20,
+        choices=TYPE_CHOICES,
+        verbose_name="Loại chiến dịch",
+        db_index=True,
+    )
+    template = models.ForeignKey(
+        "ZaloMessageTemplate",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="campaigns",
+        verbose_name="Mẫu ZNS",
+        help_text="OA gửi sẽ tự động lấy từ mẫu đã chọn.",
+    )
+    is_active = models.BooleanField(
+        default=False,
+        verbose_name="Đang hoạt động",
+        db_index=True,
+    )
+    # Cấu hình riêng theo từng loại chiến dịch — lưu dạng JSON
+    # Ví dụ order_confirm: {"delay_minutes": 0}
+    # Ví dụ delivery: {"trigger_statuses": ["đang_giao", "đã_giao"], "delay_minutes": 0}
+    # Ví dụ birthday: {"send_hour": 8, "days_before": 0}
+    # Ví dụ appointment: {"minutes_before": 120}
+    config_json = models.JSONField(
+        default=dict,
+        verbose_name="Cấu hình chiến dịch",
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = "Chiến dịch ZNS"
+        verbose_name_plural = "Chiến dịch ZNS"
+        ordering = ["-created_at"]
+
+    def __str__(self):
+        return f"{self.name} ({self.get_campaign_type_display()})"
+
+
+# ── Model 4b: Hàng đợi gửi ZNS ───────────────────────────────────────────────
+
+class ZnsSendQueue(models.Model):
+    """
+    Hàng đợi gửi ZNS theo lịch đặt.
+    Signal/cron đẩy vào đây, Celery task quét mỗi 1 phút để xử lý.
+    """
+
+    STATUS_PENDING  = "pending"
+    STATUS_SENT     = "sent"
+    STATUS_FAILED   = "failed"
+    STATUS_CHOICES = [
+        (STATUS_PENDING, "Chờ gửi"),
+        (STATUS_SENT,    "Đã gửi"),
+        (STATUS_FAILED,  "Thất bại"),
+    ]
+
+    campaign = models.ForeignKey(
+        ZnsCampaign,
+        on_delete=models.CASCADE,
+        related_name="send_queue",
+        verbose_name="Chiến dịch",
+    )
+    recipient_phone = models.CharField(max_length=20, verbose_name="SĐT nhận")
+    recipient_name  = models.CharField(max_length=255, blank=True, verbose_name="Tên người nhận")
+    template_data   = models.JSONField(default=dict, verbose_name="Tham số ZNS")
+    # Ví dụ: "order:123", "receipt:456", "customer:789"
+    trigger_object  = models.CharField(max_length=100, blank=True, verbose_name="Nguồn kích hoạt")
+    scheduled_at    = models.DateTimeField(verbose_name="Thời điểm gửi", db_index=True)
+    status          = models.CharField(
+        max_length=10,
+        choices=STATUS_CHOICES,
+        default=STATUS_PENDING,
+        verbose_name="Trạng thái",
+        db_index=True,
+    )
+    error_message   = models.TextField(blank=True, verbose_name="Lỗi")
+    created_at      = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        verbose_name = "Hàng đợi ZNS"
+        verbose_name_plural = "Hàng đợi ZNS"
+        ordering = ["scheduled_at"]
+        indexes = [
+            models.Index(fields=["status", "scheduled_at"]),
+        ]
+
+    def __str__(self):
+        return f"[{self.status}] {self.campaign.name} → {self.recipient_phone} @ {self.scheduled_at}"
+
+
+# ── Model 5: Lịch sử gửi ZNS ─────────────────────────────────────────────────
 
 class ZaloMessageLog(models.Model):
     """
@@ -508,6 +635,21 @@ class ZaloMessageLog(models.Model):
         on_delete=models.CASCADE,
         related_name="zalo_message_logs",
         verbose_name="Công ty",
+    )
+    # Liên kết chiến dịch (null nếu gửi thủ công)
+    campaign = models.ForeignKey(
+        "ZnsCampaign",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="message_logs",
+        verbose_name="Chiến dịch ZNS",
+    )
+    # Nguồn kích hoạt — ví dụ: "order:123", "receipt:456"
+    trigger_object = models.CharField(
+        max_length=100,
+        blank=True,
+        verbose_name="Nguồn kích hoạt",
     )
     template = models.ForeignKey(
         "ZaloMessageTemplate",
@@ -566,6 +708,11 @@ class ZaloMessageLog(models.Model):
         blank=True,
         verbose_name="Zalo Message ID",
         help_text="ID tin nhắn do Zalo trả về sau khi gửi thành công.",
+    )
+    error_code = models.CharField(
+        max_length=50,
+        blank=True,
+        verbose_name="Mã lỗi Zalo",
     )
     error_message = models.TextField(
         blank=True,

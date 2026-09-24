@@ -1,4 +1,4 @@
-from django.urls import include, path
+﻿from django.urls import include, path
 from rest_framework.routers import DefaultRouter
 
 from .views import (
@@ -9,6 +9,7 @@ from .views import (
     SocialLeadViewSet,
     ZaloLeadTagViewSet,
     ZaloQuickReplyViewSet,
+    ZnsCampaignViewSet,
 )
 
 router = DefaultRouter()
@@ -18,11 +19,9 @@ router.register(r"templates", ZaloMessageTemplateViewSet, basename="zalo-templat
 router.register(r"message-logs", ZaloMessageLogViewSet, basename="zalo-log")
 router.register(r"tags", ZaloLeadTagViewSet, basename="zalo-tag")
 router.register(r"quick-replies", ZaloQuickReplyViewSet, basename="zalo-quick-reply")
+router.register(r"campaigns", ZnsCampaignViewSet, basename="zns-campaign")
 
 urlpatterns = [
-    # Webhook endpoint (Public — Zalo server gọi vào, không cần JWT)
     path("webhook/", ZaloWebhookView.as_view(), name="zalo-webhook"),
-
-    # API endpoints (JWT required, filter theo company)
     path("", include(router.urls)),
 ]

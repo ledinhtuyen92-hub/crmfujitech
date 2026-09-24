@@ -274,10 +274,20 @@ try:
             "task": "facebook.cleanup_stale_leads",
             "schedule": crontab(minute=0, hour=3),
         },
-        # Tự động gửi ZNS chúc mừng sinh nhật mỗi ngày lúc 8h sáng
+        # Tự động gửi ZNS chúc mừng sinh nhật mỗi ngày lúc 8h sáng (legacy)
         "zalo-send-birthday-zns": {
             "task": "zalo.send_birthday_zns",
             "schedule": crontab(minute=0, hour=8),
+        },
+        # [Campaign] Gửi ZNS sinh nhật qua Campaign Engine mỗi ngày lúc 8h sáng
+        "zalo-send-birthday-zns-campaign": {
+            "task": "zalo.send_birthday_zns_campaign",
+            "schedule": crontab(minute=0, hour=8),
+        },
+        # [Campaign] Quét hàng đợi ZNS và gửi tin theo lịch (mỗi 1 phút)
+        "zalo-process-zns-send-queue": {
+            "task": "zalo.process_zns_send_queue",
+            "schedule": crontab(minute="*"),
         },
         # Đánh dấu khách ngủ đông mỗi ngày lúc nửa đêm
         "crm-check-inactive-customers": {

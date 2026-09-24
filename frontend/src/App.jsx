@@ -42,6 +42,7 @@ import CompanyGeneralSettings from './pages/settings/CompanyGeneralSettings'
 import ZaloInboxPage from './pages/ZaloInboxPage'
 import ZaloConfigPage from './pages/settings/ZaloConfigPage'
 import ZaloTemplatePage from './pages/settings/ZaloTemplatePage'
+import ZnsCampaignPage from './pages/settings/ZnsCampaignPage'
 import FacebookInboxPage from './pages/FacebookInboxPage'
 import FacebookConfigPage from './pages/settings/FacebookConfigPage'
 import WebsiteIntegration from './pages/settings/WebsiteIntegration'
@@ -66,6 +67,7 @@ function DynamicTitle() {
     else if (path.startsWith('/delivery')) title = 'Giao hàng | Fujitech Group CRM';
     else if (path.startsWith('/warranty')) title = 'Bảo hành | Fujitech Group CRM';
     else if (path.startsWith('/zalo/inbox')) title = 'Zalo Inbox | Fujitech Group CRM';
+    else if (path.startsWith('/zalo/campaigns')) title = 'Chiến dịch ZNS | Fujitech Group CRM';
     else if (path.startsWith('/facebook/inbox')) title = 'Facebook Inbox | Fujitech Group CRM';
     else if (path.startsWith('/settings')) title = 'Cấu hình | Fujitech Group CRM';
     else if (path.startsWith('/admin')) title = 'Quản trị hệ thống | Fujitech Group CRM';
@@ -201,6 +203,14 @@ function App() {
                 <ModuleRoute moduleCode="zalo">
                   <PermissionRoute permissionCode="zalo.view" fallback="/dashboard">
                     <ZaloInboxPage />
+                  </PermissionRoute>
+                </ModuleRoute>
+              } />
+
+              <Route path="/zalo/campaigns" element={
+                <ModuleRoute moduleCode="zalo">
+                  <PermissionRoute permissionCode="zalo.config" fallback="/dashboard">
+                    <ZnsCampaignPage />
                   </PermissionRoute>
                 </ModuleRoute>
               } />
