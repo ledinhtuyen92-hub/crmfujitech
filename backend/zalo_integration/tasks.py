@@ -297,3 +297,134 @@ def send_birthday_zns_to_customers(self):
 
     logger.info(f"[ZaloTask:SendBirthdayZNS] Hoàn thành. Đã gửi {sent_count} ZNS sinh nhật.")
     return {"success": True, "sent_count": sent_count}
+
+
+# Task: Quet hang doi ZNS (moi 1 phut)
+
+@shared_task(name="zalo.process_zns_send_queue", bind=True, max_retries=0)
+def process_zns_send_queue(self):
+    """
+    Quet ZnsSendQueue, lay cac ban ghi status=pending va scheduled_at <= now(),
+    gui ZNS qua Zalo API, ghi ket qua vao ZaloMessageLog.
+    Chay moi 1 phut qua Celery Beat.
+    """
+    from zalo_integration.models import ZnsSendQueue, ZaloMessageLog
+    from zalo_integration.services import send_zns_message
+
+    now = timezone.now()
+    queue_items = ZnsSendQueue.objects.filter(
+        status=ZnsSendQueue.STATUS_PENDING,
+        scheduled_at__lte=now,
+    ).select_related("campaign", "campaign__template")[:100]
+
+    if not queue_items.exists():
+        return {"processed": 0}
+
+    sent_count = 0
+    failed_count = 0
+
+    for item in queue_items:
+        campaign = item.campaign
+        template = campaign.template
+
+        if not template:
+            item.status = ZnsSendQueue.STATUS_FAILED
+            item.error_message = "Chien dich khong co mau ZNS"
+            item.save(update_fields=["status", "error_message"])
+            failed_count += 1
+            continue
+
+        log = ZaloMessageLog.objects.create(
+            company=campaign.company,
+            campaign=campaign,
+            template=template,
+            recipient_phone=item.recipient_phone,
+            params_sent=item.template_data,
+            trigger_object=item.trigger_object,
+            status=ZaloMessageLog.STATUS_PENDING,
+        )
+
+        try:
+            success = send_zns_message(log.id)
+            if success:
+                item.status = ZnsSendQueue.STATUS_SENT
+                item.save(update_fields=["status"])
+                sent_count += 1
+                logger.info(f"[ZNS Queue] Gui thanh cong: {item.recipient_phone} | Campaign: {campaign.name}")
+            else:
+                item.status = ZnsSendQueue.STATUS_FAILED
+                item.error_message = log.error_message or "Gui that bai"
+                item.save(update_fields=["status", "error_message"])
+                failed_count += 1
+        except Exception as e:
+            item.status = ZnsSendQueue.STATUS_FAILED
+            item.error_message = str(e)
+            item.save(update_fields=["status", "error_message"])
+            log.status = ZaloMessageLog.STATUS_FAILED
+            log.error_message = str(e)
+            log.save(update_fields=["status", "error_message"])
+            failed_count += 1
+            logger.error(f"[ZNS Queue] Loi gui {item.recipient_phone}: {e}")
+
+    logger.info(f"[ZNS Queue] Hoan thanh: {sent_count} thanh cong, {failed_count} that bai.")
+    return {"processed": sent_count + failed_count, "sent": sent_count, "failed": failed_count}
+
+
+# Task: Gui ZNS sinh nhat qua Campaign Engine (moi ngay 08:00)
+
+@shared_task(name="zalo.send_birthday_zns_campaign", bind=True, max_retries=0)
+def send_birthday_zns_campaign(self):
+    """
+    Phien ban moi dung Campaign Engine.
+    Quet cac ZnsCampaign type=birthday dang active,
+    tim khach hang co sinh nhat hom nay va day vao hang doi.
+    """
+    from zalo_integration.models import ZnsCampaign, ZnsSendQueue
+    from crm.models import Customer
+
+    today = timezone.localdate()
+    sent_count = 0
+
+    campaigns = ZnsCampaign.objects.filter(
+        campaign_type=ZnsCampaign.TYPE_BIRTHDAY,
+        is_active=True,
+    ).select_related("template", "company")
+
+    for campaign in campaigns:
+        if not campaign.template:
+            continue
+
+        days_before = campaign.config_json.get("days_before", 0)
+        target_date = today + timezone.timedelta(days=days_before) if days_before else today
+
+        customers = Customer.objects.filter(
+            company=campaign.company,
+            birthday__month=target_date.month,
+            birthday__day=target_date.day,
+        ).exclude(phone="").exclude(phone__isnull=True)
+
+        for customer in customers:
+            trigger_key = f"birthday:{customer.id}:{today.isoformat()}"
+            already = ZnsSendQueue.objects.filter(
+                campaign=campaign,
+                trigger_object=trigger_key,
+            ).exists()
+            if already:
+                continue
+
+            params = {
+                "customer_name": customer.name,
+                "birthday": customer.birthday.strftime("%d/%m/%Y") if customer.birthday else "",
+            }
+            ZnsSendQueue.objects.create(
+                campaign=campaign,
+                recipient_phone=customer.phone,
+                recipient_name=customer.name,
+                template_data=params,
+                trigger_object=trigger_key,
+                scheduled_at=timezone.now(),
+            )
+            sent_count += 1
+
+    logger.info(f"[ZNS Birthday Campaign] Da day vao queue {sent_count} tin sinh nhat.")
+    return {"success": True, "queued": sent_count}
