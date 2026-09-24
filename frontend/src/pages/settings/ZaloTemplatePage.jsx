@@ -265,7 +265,6 @@ export default function ZaloTemplatePage() {
                     <Tag color="blue" style={{ margin: 0 }}>{record.zalo_template_id}</Tag>
                   </div>
 
-                  <div style={{ marginBottom: 12 }}>
 
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderTop: '1px dashed #f0f0f0', paddingTop: 12 }}>
                     <Text type="secondary" style={{ fontSize: 12 }}>Ngày tạo: {dayjs(record.created_at).format('DD/MM/YYYY')}</Text>
