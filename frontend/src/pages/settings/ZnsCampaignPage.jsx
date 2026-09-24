@@ -1,24 +1,29 @@
 import React, { useState, useEffect, useCallback } from 'react'
 import {
-  Badge, Button, Card, Col, Divider, Drawer, Empty, Form, Input,
+  Badge, Button, Card, Col, DatePicker, Divider, Drawer, Empty, Form, Input,
   InputNumber, Modal, Popconfirm, Row, Select, Space, Spin, Statistic,
-  Switch, Table, Tag, Tabs, Tooltip, Typography, message, Checkbox, TimePicker,
-  Radio, Alert, Descriptions
+  Switch, Table, Tag, Tabs, Tooltip, Typography, message, Checkbox,
+  Radio, Alert, Progress
 } from 'antd'
 import {
   PlusOutlined, EditOutlined, DeleteOutlined, PlayCircleOutlined,
   PauseCircleOutlined, ThunderboltOutlined, HistoryOutlined,
   CheckCircleOutlined, CloseCircleOutlined, ClockCircleOutlined,
-  BarChartOutlined, SendOutlined, ExperimentOutlined, ReloadOutlined,
+  BarChartOutlined, ExperimentOutlined, ReloadOutlined,
   RocketOutlined, BellOutlined, CalendarOutlined, GiftOutlined,
-  CarOutlined, TagOutlined, SettingOutlined, InfoCircleOutlined
+  CarOutlined, SettingOutlined, InfoCircleOutlined, EyeOutlined
 } from '@ant-design/icons'
+import {
+  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RTooltip,
+  Legend, ResponsiveContainer, Cell
+} from 'recharts'
 import dayjs from 'dayjs'
 import api from '../../utils/api'
 
+const { RangePicker } = DatePicker
+
 const { Title, Text, Paragraph } = Typography
 const { Option } = Select
-const { TabPane } = Tabs
 
 // ── Campaign type config ──────────────────────────────────────────────────────
 const CAMPAIGN_TYPES = {
@@ -101,8 +106,11 @@ export default function ZnsCampaignPage() {
   const [logs, setLogs] = useState([])
   const [logsLoading, setLogsLoading] = useState(false)
   const [stats, setStats] = useState(null)
-  const [logFilter, setLogFilter] = useState('all') // all | sent | failed
+  const [logFilter, setLogFilter] = useState('all')
+  const [logDateRange, setLogDateRange] = useState(null)
   const [logDrawerOpen, setLogDrawerOpen] = useState(false)
+  const [errorDetailRecord, setErrorDetailRecord] = useState(null)
+  const [errorModalOpen, setErrorModalOpen] = useState(false)
 
   // Test send
   const [testPhone, setTestPhone] = useState('')
@@ -136,12 +144,14 @@ export default function ZnsCampaignPage() {
   }, [fetchCampaigns, fetchTemplates])
 
   // ── Fetch logs ─────────────────────────────────────────────────────────────
-  const fetchLogs = async (campaignId, statusFilter = 'all') => {
+  const fetchLogs = async (campaignId, statusFilter = 'all', dateRange = null) => {
     if (!campaignId) return
     setLogsLoading(true)
     try {
-      const params = { page_size: 100 }
+      const params = { page_size: 200 }
       if (statusFilter !== 'all') params.status = statusFilter
+      if (dateRange?.[0]) params.date_from = dateRange[0].format('YYYY-MM-DD')
+      if (dateRange?.[1]) params.date_to = dateRange[1].format('YYYY-MM-DD')
       const [logRes, statsRes] = await Promise.all([
         api.get(`/zalo/campaigns/${campaignId}/logs/`, { params }),
         api.get(`/zalo/campaigns/${campaignId}/stats/`),
@@ -155,8 +165,9 @@ export default function ZnsCampaignPage() {
   const openLogDrawer = (campaign) => {
     setSelectedCampaignForLog(campaign)
     setLogFilter('all')
+    setLogDateRange(null)
     setLogDrawerOpen(true)
-    fetchLogs(campaign.id, 'all')
+    fetchLogs(campaign.id, 'all', null)
   }
 
   // ── Toggle bật/tắt ────────────────────────────────────────────────────────
@@ -462,12 +473,18 @@ export default function ZnsCampaignPage() {
       ),
     },
     {
-      title: 'Lỗi',
-      dataIndex: 'error_message',
-      key: 'error_message',
-      render: (v) => v ? (
-        <Tooltip title={v}>
-          <Text type="danger" style={{ fontSize: 11 }} ellipsis>{v}</Text>
+      title: 'Chi tiết lỗi',
+      key: 'error_detail',
+      width: 100,
+      render: (_, row) => row.error_message ? (
+        <Tooltip title={row.error_message}>
+          <Button
+            size="small" danger
+            icon={<EyeOutlined />}
+            onClick={() => { setErrorDetailRecord(row); setErrorModalOpen(true) }}
+          >
+            Xem lỗi
+          </Button>
         </Tooltip>
       ) : null,
     },
@@ -635,19 +652,27 @@ export default function ZnsCampaignPage() {
         )}
 
         {/* Filter */}
-        <Space style={{ marginBottom: 12 }}>
+        <Space wrap style={{ marginBottom: 12 }}>
           <Text strong style={{ fontSize: 13 }}>Lọc:</Text>
           {['all', 'sent', 'failed', 'pending'].map(f => (
             <Button key={f} size="small"
               type={logFilter === f ? 'primary' : 'default'}
-              onClick={() => { setLogFilter(f); fetchLogs(selectedCampaignForLog?.id, f) }}
+              onClick={() => { setLogFilter(f); fetchLogs(selectedCampaignForLog?.id, f, logDateRange) }}
               danger={f === 'failed'}
             >
               {f === 'all' ? 'Tất cả' : STATUS_LOG_LABEL[f]}
             </Button>
           ))}
+          <RangePicker
+            size="small"
+            value={logDateRange}
+            onChange={(val) => { setLogDateRange(val); fetchLogs(selectedCampaignForLog?.id, logFilter, val) }}
+            placeholder={['Từ ngày', 'Đến ngày']}
+            format="DD/MM/YYYY"
+            allowClear
+          />
           <Button size="small" icon={<ReloadOutlined />}
-            onClick={() => fetchLogs(selectedCampaignForLog?.id, logFilter)} />
+            onClick={() => fetchLogs(selectedCampaignForLog?.id, logFilter, logDateRange)} />
         </Space>
 
         <Table
@@ -683,6 +708,43 @@ export default function ZnsCampaignPage() {
           size="large"
         />
       </Modal>
+
+      {/* ── Modal Chi tiết lỗi ── */}
+      <Modal
+        title={<span style={{ color: '#dc2626' }}>❌ Chi tiết lỗi gửi ZNS</span>}
+        open={errorModalOpen}
+        onCancel={() => setErrorModalOpen(false)}
+        footer={<Button onClick={() => setErrorModalOpen(false)}>Đóng</Button>}
+        width={520}
+      >
+        {errorDetailRecord && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+            <div style={{ background: '#fef2f2', border: '1px solid #fecaca', borderRadius: 8, padding: 12 }}>
+              <div style={{ fontSize: 12, color: '#6b7280', marginBottom: 4 }}>SĐT nhận</div>
+              <div style={{ fontWeight: 700 }}>{errorDetailRecord.recipient_phone}</div>
+            </div>
+            {errorDetailRecord.error_code && (
+              <div style={{ background: '#fff7ed', border: '1px solid #fed7aa', borderRadius: 8, padding: 12 }}>
+                <div style={{ fontSize: 12, color: '#6b7280', marginBottom: 4 }}>Mã lỗi Zalo</div>
+                <Tag color="orange">{errorDetailRecord.error_code}</Tag>
+              </div>
+            )}
+            <div style={{ background: '#fef2f2', border: '1px solid #fecaca', borderRadius: 8, padding: 12 }}>
+              <div style={{ fontSize: 12, color: '#6b7280', marginBottom: 4 }}>Mô tả lỗi</div>
+              <div style={{ color: '#dc2626', whiteSpace: 'pre-wrap', wordBreak: 'break-all' }}>
+                {errorDetailRecord.error_message || 'Không có mô tả lỗi'}
+              </div>
+            </div>
+            {errorDetailRecord.trigger_object && (
+              <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: 8, padding: 12 }}>
+                <div style={{ fontSize: 12, color: '#6b7280', marginBottom: 4 }}>Nguồn kích hoạt</div>
+                <Tag>{errorDetailRecord.trigger_object}</Tag>
+              </div>
+            )}
+            <div style={{ fontSize: 11, color: '#9ca3af', textAlign: 'right' }}>🕐 {fmt(errorDetailRecord.sent_at)}</div>
+          </div>
+        )}
+      </Modal>
     </div>
   )
 }
@@ -691,78 +753,173 @@ export default function ZnsCampaignPage() {
 function CampaignReport({ campaigns }) {
   const [reportData, setReportData] = useState(null)
   const [loading, setLoading] = useState(false)
+  const [dateRange, setDateRange] = useState([dayjs().subtract(30, 'day'), dayjs()])
 
-  useEffect(() => {
-    const fetchReport = async () => {
-      setLoading(true)
-      try {
-        const res = await api.get('/zalo/campaigns/report/')
-        setReportData(res.data)
-      } catch {}
-      finally { setLoading(false) }
-    }
-    fetchReport()
-  }, [])
+  const fetchReport = useCallback(async () => {
+    setLoading(true)
+    try {
+      const params = {}
+      if (dateRange?.[0]) params.date_from = dateRange[0].format('YYYY-MM-DD')
+      if (dateRange?.[1]) params.date_to = dateRange[1].format('YYYY-MM-DD')
+      const res = await api.get('/zalo/campaigns/report/', { params })
+      setReportData(res.data)
+    } catch {}
+    finally { setLoading(false) }
+  }, [dateRange])
+
+  useEffect(() => { fetchReport() }, [fetchReport])
 
   if (loading) return <div style={{ textAlign: 'center', padding: 60 }}><Spin size="large" /></div>
   if (!reportData) return <Empty description="Chưa có dữ liệu báo cáo" style={{ padding: 60 }} />
 
+  // Chart colors
+  const byCampaign = reportData.by_campaign ?? []
+  const chartData = byCampaign.map(c => ({
+    name: c.name.length > 14 ? c.name.slice(0, 14) + '…' : c.name,
+    'Thành công': c.sent ?? 0,
+    'Thất bại': c.failed ?? 0,
+  }))
+
   return (
     <div>
-      {/* Tổng quan */}
-      <Row gutter={16} style={{ marginBottom: 24 }}>
+      {/* Filter date range */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
+        <Text strong style={{ fontSize: 14 }}>📊 Tổng quan chiến dịch</Text>
+        <Space>
+          <RangePicker
+            value={dateRange}
+            onChange={setDateRange}
+            format="DD/MM/YYYY"
+            placeholder={['Từ ngày', 'Đến ngày']}
+            presets={[
+              { label: '7 ngày qua', value: [dayjs().subtract(7, 'd'), dayjs()] },
+              { label: '30 ngày qua', value: [dayjs().subtract(30, 'd'), dayjs()] },
+              { label: 'Tháng này', value: [dayjs().startOf('month'), dayjs()] },
+            ]}
+          />
+          <Button icon={<ReloadOutlined />} onClick={fetchReport} loading={loading} size="small">Làm mới</Button>
+        </Space>
+      </div>
+
+      {/* KPI Cards */}
+      <Row gutter={16} style={{ marginBottom: 28 }}>
         {[
-          { label: '📤 Tổng gửi', value: reportData.total_sent ?? 0, color: '#2563eb' },
-          { label: '✅ Thành công', value: reportData.total_success ?? 0, color: '#16a34a' },
-          { label: '❌ Thất bại', value: reportData.total_failed ?? 0, color: '#dc2626' },
-          { label: '📈 Tỷ lệ thành công', value: `${reportData.success_rate ?? 0}%`, color: '#7c3aed' },
+          { label: 'Tổng gửi', value: reportData.total_sent ?? 0, color: '#2563eb', bg: '#eff6ff', icon: '📤' },
+          { label: 'Thành công', value: reportData.total_success ?? 0, color: '#16a34a', bg: '#f0fdf4', icon: '✅' },
+          { label: 'Thất bại', value: reportData.total_failed ?? 0, color: '#dc2626', bg: '#fef2f2', icon: '❌' },
+          { label: 'Tỷ lệ thành công', value: `${reportData.success_rate ?? 0}%`, color: '#7c3aed', bg: '#f5f3ff', icon: '📈' },
         ].map((s, i) => (
           <Col span={6} key={i}>
-            <Card bordered={false} style={{ background: '#f8fafc', borderRadius: 12, textAlign: 'center' }}>
-              <div style={{ fontSize: 28, fontWeight: 800, color: s.color }}>{s.value}</div>
-              <div style={{ fontSize: 13, color: '#64748b', marginTop: 4 }}>{s.label}</div>
+            <Card bordered={false} style={{ background: s.bg, borderRadius: 14, textAlign: 'center', border: `1px solid ${s.color}22` }}>
+              <div style={{ fontSize: 26, marginBottom: 2 }}>{s.icon}</div>
+              <div style={{ fontSize: 30, fontWeight: 800, color: s.color, lineHeight: 1.1 }}>{s.value}</div>
+              <div style={{ fontSize: 12, color: '#64748b', marginTop: 4 }}>{s.label}</div>
             </Card>
           </Col>
         ))}
       </Row>
 
-      {/* Bảng theo từng campaign */}
-      <Table
-        dataSource={reportData.by_campaign ?? []}
-        rowKey="id"
-        size="small"
-        pagination={false}
-        columns={[
-          {
-            title: 'Chiến dịch',
-            dataIndex: 'name',
-            render: (name, row) => (
-              <Space>
-                <span>{CAMPAIGN_TYPES[row.campaign_type]?.icon}</span>
-                <span style={{ fontWeight: 600 }}>{name}</span>
-              </Space>
-            ),
-          },
-          {
-            title: 'Loại',
-            dataIndex: 'campaign_type',
-            render: (t) => <Tag color={CAMPAIGN_TYPES[t]?.color}>{CAMPAIGN_TYPES[t]?.label}</Tag>,
-          },
-          { title: 'Tổng gửi', dataIndex: 'total', width: 100, render: v => <b>{v ?? 0}</b> },
-          { title: '✅ OK', dataIndex: 'sent', width: 80, render: v => <span style={{ color: '#16a34a', fontWeight: 700 }}>{v ?? 0}</span> },
-          { title: '❌ Fail', dataIndex: 'failed', width: 80, render: v => <span style={{ color: '#dc2626', fontWeight: 700 }}>{v ?? 0}</span> },
-          {
-            title: 'Tỷ lệ',
-            dataIndex: 'success_rate',
-            width: 100,
-            render: (v) => {
-              const pct = v ?? 0
-              const color = pct >= 90 ? '#16a34a' : pct >= 70 ? '#d97706' : '#dc2626'
-              return <span style={{ color, fontWeight: 700 }}>{pct}%</span>
+      {/* Biểu đồ cột theo chiến dịch */}
+      {chartData.length > 0 && (
+        <Card
+          bordered={false}
+          style={{ marginBottom: 24, borderRadius: 12, background: '#fafafa' }}
+          title={
+            <span style={{ fontSize: 13, fontWeight: 700 }}>
+              <BarChartOutlined style={{ marginRight: 6, color: '#2563eb' }} />
+              Số tin gửi theo chiến dịch
+            </span>
+          }
+        >
+          <ResponsiveContainer width="100%" height={260}>
+            <BarChart data={chartData} margin={{ top: 8, right: 16, left: 0, bottom: 8 }}>
+              <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
+              <XAxis dataKey="name" tick={{ fontSize: 12 }} />
+              <YAxis tick={{ fontSize: 12 }} allowDecimals={false} />
+              <RTooltip
+                contentStyle={{ borderRadius: 8, border: '1px solid #e2e8f0', fontSize: 13 }}
+              />
+              <Legend iconType="circle" wrapperStyle={{ fontSize: 12 }} />
+              <Bar dataKey="Thành công" fill="#16a34a" radius={[4, 4, 0, 0]} maxBarSize={48} />
+              <Bar dataKey="Thất bại" fill="#ef4444" radius={[4, 4, 0, 0]} maxBarSize={48} />
+            </BarChart>
+          </ResponsiveContainer>
+        </Card>
+      )}
+
+      {/* Bảng chi tiết theo từng campaign */}
+      <Card
+        bordered={false}
+        style={{ borderRadius: 12 }}
+        title={<span style={{ fontSize: 13, fontWeight: 700 }}>📋 Chi tiết theo chiến dịch</span>}
+      >
+        <Table
+          dataSource={byCampaign}
+          rowKey="id"
+          size="small"
+          pagination={false}
+          columns={[
+            {
+              title: 'Chiến dịch',
+              dataIndex: 'name',
+              render: (name, row) => (
+                <Space>
+                  <span>{CAMPAIGN_TYPES[row.campaign_type]?.icon}</span>
+                  <span style={{ fontWeight: 600 }}>{name}</span>
+                </Space>
+              ),
             },
-          },
-        ]}
-      />
+            {
+              title: 'Loại',
+              dataIndex: 'campaign_type',
+              width: 160,
+              render: (t) => {
+                const cfg = CAMPAIGN_TYPES[t]
+                return <Tag color={cfg?.color} style={{ borderColor: cfg?.color }}>{cfg?.label}</Tag>
+              },
+            },
+            {
+              title: 'Tổng gửi',
+              dataIndex: 'total',
+              width: 90,
+              render: v => <b style={{ fontSize: 14 }}>{v ?? 0}</b>,
+            },
+            {
+              title: '✅ OK',
+              dataIndex: 'sent',
+              width: 80,
+              render: v => <span style={{ color: '#16a34a', fontWeight: 700 }}>{v ?? 0}</span>,
+            },
+            {
+              title: '❌ Fail',
+              dataIndex: 'failed',
+              width: 80,
+              render: v => <span style={{ color: '#dc2626', fontWeight: 700 }}>{v ?? 0}</span>,
+            },
+            {
+              title: 'Tỷ lệ thành công',
+              dataIndex: 'success_rate',
+              width: 160,
+              render: (v) => {
+                const pct = v ?? 0
+                const color = pct >= 90 ? '#16a34a' : pct >= 70 ? '#d97706' : '#dc2626'
+                return (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <Progress
+                      percent={pct}
+                      size="small"
+                      strokeColor={color}
+                      showInfo={false}
+                      style={{ flex: 1, minWidth: 60 }}
+                    />
+                    <span style={{ color, fontWeight: 700, minWidth: 38 }}>{pct}%</span>
+                  </div>
+                )
+              },
+            },
+          ]}
+        />
+      </Card>
     </div>
   )
 }

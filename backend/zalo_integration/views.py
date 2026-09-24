@@ -1406,16 +1406,33 @@ class ZnsCampaignViewSet(viewsets.ModelViewSet):
 
     @action(detail=True, methods=["get"])
     def logs(self, request, pk=None):
-        """Lich su gui ZNS cua chien dich nay."""
+        """Lich su gui ZNS cua chien dich nay. Ho tro filter theo status, date_from, date_to."""
         from .models import ZaloMessageLog
         from rest_framework import serializers as S
 
         campaign = self.get_object()
         qs = ZaloMessageLog.objects.filter(campaign=campaign).order_by("-sent_at")
+
+        # Filter theo status
         status_filter = request.query_params.get("status")
         if status_filter:
             qs = qs.filter(status=status_filter)
-        qs = qs[:200]
+
+        # Filter theo khoang thoi gian
+        date_from = request.query_params.get("date_from")
+        date_to = request.query_params.get("date_to")
+        if date_from:
+            qs = qs.filter(sent_at__date__gte=date_from)
+        if date_to:
+            qs = qs.filter(sent_at__date__lte=date_to)
+
+        # Filter theo ten khach hang
+        search = request.query_params.get("search")
+        if search:
+            qs = qs.filter(recipient_name__icontains=search) | qs.filter(recipient_phone__icontains=search)
+
+        page_size = int(request.query_params.get("page_size", 200))
+        qs = qs[:page_size]
 
         class LogSerializer(S.ModelSerializer):
             class Meta:
@@ -1445,15 +1462,25 @@ class ZnsCampaignViewSet(viewsets.ModelViewSet):
 
     @action(detail=False, methods=["get"])
     def report(self, request):
-        """Bao cao tong hop tat ca campaign."""
+        """Bao cao tong hop tat ca campaign. Ho tro filter date_from, date_to."""
         from .models import ZnsCampaign, ZaloMessageLog
-        from django.db.models import Count, Q
+
+        date_from = request.query_params.get("date_from")
+        date_to   = request.query_params.get("date_to")
+
+        def apply_date_filter(qs):
+            if date_from:
+                qs = qs.filter(sent_at__date__gte=date_from)
+            if date_to:
+                qs = qs.filter(sent_at__date__lte=date_to)
+            return qs
+
         campaigns = ZnsCampaign.objects.filter(company=request.user.company)
         by_campaign = []
         for c in campaigns:
-            qs = ZaloMessageLog.objects.filter(campaign=c)
-            total = qs.count()
-            sent = qs.filter(status="sent").count()
+            qs = apply_date_filter(ZaloMessageLog.objects.filter(campaign=c))
+            total  = qs.count()
+            sent   = qs.filter(status="sent").count()
             failed = qs.filter(status="failed").count()
             by_campaign.append({
                 "id": c.id,
@@ -1464,14 +1491,15 @@ class ZnsCampaignViewSet(viewsets.ModelViewSet):
                 "failed": failed,
                 "success_rate": round(sent / total * 100, 1) if total else 0,
             })
-        all_logs = ZaloMessageLog.objects.filter(company=request.user.company)
-        total_sent = all_logs.count()
+
+        all_logs      = apply_date_filter(ZaloMessageLog.objects.filter(company=request.user.company))
+        total_sent    = all_logs.count()
         total_success = all_logs.filter(status="sent").count()
-        total_failed = all_logs.filter(status="failed").count()
+        total_failed  = all_logs.filter(status="failed").count()
         return Response({
-            "total_sent": total_sent,
+            "total_sent":    total_sent,
             "total_success": total_success,
-            "total_failed": total_failed,
-            "success_rate": round(total_success / total_sent * 100, 1) if total_sent else 0,
-            "by_campaign": by_campaign,
+            "total_failed":  total_failed,
+            "success_rate":  round(total_success / total_sent * 100, 1) if total_sent else 0,
+            "by_campaign":   by_campaign,
         })
