@@ -617,32 +617,6 @@ export default function ZaloConfigPage() {
           />
 
           <Divider orientation="left" plain>Cấu hình Tự động & Dọn dẹp</Divider>
-          {/* Thông báo chuyển sang module Chiến dịch ZNS mới */}
-          <div style={{
-            background: 'linear-gradient(135deg, #eff6ff 0%, #f0fdf4 100%)',
-            border: '1px solid #bfdbfe',
-            borderRadius: 10,
-            padding: '14px 16px',
-            marginBottom: 20,
-            display: 'flex',
-            alignItems: 'flex-start',
-            gap: 12,
-          }}>
-            <span style={{ fontSize: 22, flexShrink: 0 }}>🚀</span>
-            <div>
-              <div style={{ fontWeight: 700, color: '#1e40af', marginBottom: 4, fontSize: 14 }}>
-                Gửi ZNS tự động đã chuyển sang module mới
-              </div>
-              <div style={{ fontSize: 13, color: '#374151', lineHeight: 1.6 }}>
-                Các cấu hình <b>Thu tiền</b>, <b>Giao hàng/Bảo hành</b>, <b>Sinh nhật</b> và nhiều loại khác
-                đã được tích hợp vào <b>Chiến dịch ZNS</b> — nơi bạn có thể tạo nhiều chiến dịch,
-                theo dõi lịch sử gửi và xem báo cáo chi tiết.
-              </div>
-              <a href="/zalo/campaigns" style={{ marginTop: 8, display: 'inline-block', color: '#2563eb', fontWeight: 600, fontSize: 13 }}>
-                ➜ Đi đến Chiến dịch ZNS →
-              </a>
-            </div>
-          </div>
           <Form.Item 
             name="auto_create_customer_from_phone" 
             label="Tự động quét & tạo Khách hàng khi phát hiện SĐT" 
