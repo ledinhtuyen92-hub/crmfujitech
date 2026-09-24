@@ -1538,21 +1538,29 @@ export default function FacebookInboxPage() {
             content={
               <div style={{ minWidth: 230, padding: 4 }}>
                 <Radio.Group
-                  value={sortBy === 'waiting_longest' ? 'waiting_longest' : (replyFilter || 'all')}
+                  value={sortBy === 'waiting_longest' ? 'waiting_longest' : (hasUnreadOnly ? 'has_unread' : (replyFilter || 'all'))}
                   onChange={(e) => {
                     const val = e.target.value
                     if (val === 'all') {
                       setReplyFilter('')
                       setSortBy('')
+                      setHasUnreadOnly(false)
                     } else if (val === 'unanswered') {
                       setReplyFilter('unanswered')
                       setSortBy('')
+                      setHasUnreadOnly(false)
                     } else if (val === 'waiting_longest') {
                       setReplyFilter('unanswered')
                       setSortBy('waiting_longest')
+                      setHasUnreadOnly(false)
                     } else if (val === 'read_unanswered') {
                       setReplyFilter('read_unanswered')
                       setSortBy('')
+                      setHasUnreadOnly(false)
+                    } else if (val === 'has_unread') {
+                      setReplyFilter('')
+                      setSortBy('')
+                      setHasUnreadOnly(true)
                     }
                   }}
                   style={{ display: 'flex', flexDirection: 'column', gap: 12 }}
@@ -1561,18 +1569,19 @@ export default function FacebookInboxPage() {
                   <Radio value="unanswered" style={{ fontWeight: 500, color: '#2563eb' }}>⏱️ Giảm dần theo thời gian (Khách chờ)</Radio>
                   <Radio value="waiting_longest" style={{ fontWeight: 600, color: '#d97706' }}>⏳ Đợi phản hồi lâu nhất</Radio>
                   <Radio value="read_unanswered" style={{ fontWeight: 500, color: '#9333ea' }}>👀 Đã đọc nhưng chưa trả lời</Radio>
+                  <Radio value="has_unread" style={{ fontWeight: 600, color: '#ef4444' }}>🔔 Có thông báo chưa đọc (Badge đỏ)</Radio>
                 </Radio.Group>
               </div>
             }
             trigger="click"
           >
-            <Tooltip title="Lọc chưa trả lời (Theo thời gian / Đợi lâu nhất)" placement="right">
+            <Tooltip title="Lọc chưa trả lời (Theo thời gian / Đợi lâu nhất / Thông báo chưa đọc)" placement="right">
               <div
                 style={{
                   width: 36, height: 36, borderRadius: 10, cursor: 'pointer',
                   display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  background: (replyFilter || sortBy) ? '#f59e0b' : 'transparent',
-                  color: (replyFilter || sortBy) ? '#fff' : '#94a3b8',
+                  background: (replyFilter || sortBy) ? '#f59e0b' : hasUnreadOnly ? '#ef4444' : 'transparent',
+                  color: (replyFilter || sortBy || hasUnreadOnly) ? '#fff' : '#94a3b8',
                   transition: 'all 0.2s',
                 }}
               >
