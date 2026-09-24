@@ -1309,3 +1309,169 @@ class ZaloQuickReplyViewSet(viewsets.ModelViewSet):
     def perform_create(self, serializer):
         serializer.save(company=self.request.user.company, created_by=self.request.user)
 
+
+# ZnsCampaignViewSet
+
+class ZnsCampaignViewSet(viewsets.ModelViewSet):
+    """
+    CRUD + toggle + test + logs + stats + report cho ZNS Campaigns.
+    """
+    from .models import ZnsCampaign, ZaloMessageLog
+    from rest_framework import serializers as drf_serializers
+
+    permission_classes = [
+        IsAuthenticated,
+        IsActiveUserAndCompany,
+        CheckDataMaintenanceMode,
+        IsModuleActivePermission,
+        ActionBasedPermission,
+    ]
+    action_permissions = {
+        "list": ["zalo.config"],
+        "retrieve": ["zalo.config"],
+        "create": ["zalo.config"],
+        "update": ["zalo.config"],
+        "partial_update": ["zalo.config"],
+        "destroy": ["zalo.config"],
+        "toggle": ["zalo.config"],
+        "test": ["zalo.config"],
+        "logs": ["zalo.config"],
+        "stats": ["zalo.config"],
+        "report": ["zalo.config"],
+    }
+
+    def get_serializer_class(self):
+        from .models import ZnsCampaign
+        from rest_framework import serializers as S
+
+        class ZnsCampaignSerializer(S.ModelSerializer):
+            template_name = S.SerializerMethodField()
+
+            class Meta:
+                model = ZnsCampaign
+                fields = [
+                    "id", "name", "campaign_type", "template", "template_name",
+                    "is_active", "config_json", "created_at", "updated_at",
+                ]
+                read_only_fields = ["id", "created_at", "updated_at"]
+
+            def get_template_name(self, obj):
+                return obj.template.name if obj.template else None
+
+        return ZnsCampaignSerializer
+
+    def get_queryset(self):
+        from .models import ZnsCampaign
+        return ZnsCampaign.objects.filter(
+            company=self.request.user.company
+        ).select_related("template").order_by("-created_at")
+
+    def perform_create(self, serializer):
+        serializer.save(company=self.request.user.company)
+
+    @action(detail=True, methods=["post"])
+    def toggle(self, request, pk=None):
+        """Bat/tat chien dich."""
+        from .models import ZnsCampaign
+        campaign = self.get_object()
+        campaign.is_active = not campaign.is_active
+        campaign.save(update_fields=["is_active"])
+        return Response({"is_active": campaign.is_active})
+
+    @action(detail=True, methods=["post"])
+    def test(self, request, pk=None):
+        """Gui ZNS test den so dien thoai chi dinh."""
+        from .models import ZaloMessageLog
+        campaign = self.get_object()
+        phone = request.data.get("phone", "")
+        if not phone:
+            return Response({"error": "Thieu so dien thoai"}, status=400)
+        if not campaign.template:
+            return Response({"error": "Chien dich chua co mau ZNS"}, status=400)
+        log = ZaloMessageLog.objects.create(
+            company=request.user.company,
+            campaign=campaign,
+            template=campaign.template,
+            recipient_phone=phone,
+            recipient_name="Test",
+            params_sent={"customer_name": "Test", "order_number": "TEST-001"},
+            trigger_object="test",
+            status=ZaloMessageLog.STATUS_PENDING,
+        )
+        from .services import send_zns_message
+        ok = send_zns_message(log.id)
+        if ok:
+            return Response({"success": True, "message": "Da gui ZNS test"})
+        return Response({"success": False, "message": log.error_message or "Gui that bai"}, status=400)
+
+    @action(detail=True, methods=["get"])
+    def logs(self, request, pk=None):
+        """Lich su gui ZNS cua chien dich nay."""
+        from .models import ZaloMessageLog
+        from rest_framework import serializers as S
+
+        campaign = self.get_object()
+        qs = ZaloMessageLog.objects.filter(campaign=campaign).order_by("-sent_at")
+        status_filter = request.query_params.get("status")
+        if status_filter:
+            qs = qs.filter(status=status_filter)
+        qs = qs[:200]
+
+        class LogSerializer(S.ModelSerializer):
+            class Meta:
+                model = ZaloMessageLog
+                fields = ["id", "recipient_phone", "recipient_name", "trigger_object",
+                          "status", "error_code", "error_message", "zalo_msg_id", "sent_at"]
+
+        return Response(LogSerializer(qs, many=True).data)
+
+    @action(detail=True, methods=["get"])
+    def stats(self, request, pk=None):
+        """Thong ke tong hop cua 1 campaign."""
+        from .models import ZaloMessageLog
+        campaign = self.get_object()
+        qs = ZaloMessageLog.objects.filter(campaign=campaign)
+        total = qs.count()
+        sent = qs.filter(status="sent").count()
+        failed = qs.filter(status="failed").count()
+        rate = round(sent / total * 100, 1) if total else 0
+        return Response({
+            "total": total,
+            "sent": sent,
+            "failed": failed,
+            "pending": qs.filter(status="pending").count(),
+            "success_rate": rate,
+        })
+
+    @action(detail=False, methods=["get"])
+    def report(self, request):
+        """Bao cao tong hop tat ca campaign."""
+        from .models import ZnsCampaign, ZaloMessageLog
+        from django.db.models import Count, Q
+        campaigns = ZnsCampaign.objects.filter(company=request.user.company)
+        by_campaign = []
+        for c in campaigns:
+            qs = ZaloMessageLog.objects.filter(campaign=c)
+            total = qs.count()
+            sent = qs.filter(status="sent").count()
+            failed = qs.filter(status="failed").count()
+            by_campaign.append({
+                "id": c.id,
+                "name": c.name,
+                "campaign_type": c.campaign_type,
+                "total": total,
+                "sent": sent,
+                "failed": failed,
+                "success_rate": round(sent / total * 100, 1) if total else 0,
+            })
+        all_logs = ZaloMessageLog.objects.filter(company=request.user.company)
+        total_sent = all_logs.count()
+        total_success = all_logs.filter(status="sent").count()
+        total_failed = all_logs.filter(status="failed").count()
+        return Response({
+            "total_sent": total_sent,
+            "total_success": total_success,
+            "total_failed": total_failed,
+            "success_rate": round(total_success / total_sent * 100, 1) if total_sent else 0,
+            "by_campaign": by_campaign,
+        })

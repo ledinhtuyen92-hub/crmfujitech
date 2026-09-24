@@ -58,6 +58,7 @@ import {
   RobotOutlined, BookOutlined,
   FacebookOutlined,
   CloudUploadOutlined,
+  RocketOutlined,
 } from '@ant-design/icons'
 import { useAuth } from '../contexts/AuthContext'
 
@@ -228,6 +229,11 @@ function MainLayout({ children, isDarkMode, toggleTheme }) {
               key: '/settings/zalo-templates',
               icon: <MessageOutlined />,
               label: <Link to="/settings/zalo-templates">Mẫu Zalo ZNS</Link>,
+            }] : []),
+            ...(hasPermission('zalo.config') ? [{
+              key: '/zalo/campaigns',
+              icon: <RocketOutlined style={{ color: '#2563eb' }} />,
+              label: <Link to="/zalo/campaigns">Chiến dịch ZNS</Link>,
             }] : []),
           ],
         }] : []),
