@@ -36,7 +36,7 @@ import {
 } from 'antd' 
 import dayjs from 'dayjs'
 import React, { useCallback, useEffect, useState, useRef } from 'react'
-import { useLocation } from 'react-router-dom'
+import { useLocation, useNavigate } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
 import useDebounce from '../hooks/useDebounce'
 import api from '../utils/api'
@@ -162,6 +162,7 @@ export default function OrderList() {
   const { user, isCompanyAdmin, hasPermission, checkMaintenance, isModuleActive, companySettings } = useAuth()
   const [messageApi, contextHolder] = message.useMessage()
   const location = useLocation()
+  const navigate = useNavigate()
 
   // Data states
   const [orders, setOrders] = useState([])
@@ -294,7 +295,9 @@ export default function OrderList() {
   };
 
   // Filters
-  const [searchInput, searchQuery, handleSearchChange] = useDebounce('', 400)
+  // Đọc search param từ URL ngay khi khởi tạo để fetch lần đầu đã đúng
+  const _initSearch = new URLSearchParams(location.search).get('search') || ''
+  const [searchInput, searchQuery, handleSearchChange] = useDebounce(_initSearch, 400)
   const [statusFilter, setStatusFilter] = useState('')
   const [financialFilter, setFinancialFilter] = useState('')
   const [paymentTargetFilter, setPaymentTargetFilter] = useState('')
@@ -302,16 +305,22 @@ export default function OrderList() {
   const [salesFilter, setSalesFilter] = useState('')
   const [salesUsers, setSalesUsers] = useState([])
 
-  // Đọc ?search= từ URL khi navigate từ trang Khách hàng
+  // Đọc ?search= hoặc mở trực tiếp từ URL state khi navigate từ trang Khách hàng
   useEffect(() => {
     const params = new URLSearchParams(location.search)
     const searchVal = params.get('search')
     if (searchVal) {
       handleSearchChange(searchVal)
-      // Xóa query param khỏi URL để tránh reload lại
-      window.history.replaceState({}, '', '/orders')
     }
-  }, [location.search])
+
+    const viewData = location.state?.viewOrderData
+    if (viewData) {
+      setSelectedOrder(viewData)
+      setDrawerVisible(true)
+      // Xoá state để không tự mở lại khi refresh, nhưng giữ nguyên URL (có search param)
+      navigate(location.pathname + location.search, { replace: true, state: {} })
+    }
+  }, [location.search, location.state])
 
   // Modal Add / Edit
   const [modalVisible, setModalVisible] = useState(false)
@@ -821,13 +830,7 @@ export default function OrderList() {
     printWin.document.close()
   }
 
-  useEffect(() => {
-    const params = new URLSearchParams(location.search)
-    const searchQuery = params.get('search')
-    if (searchQuery) {
-      setSearchText(searchQuery)
-    }
-  }, [location.search])
+
 
   useEffect(() => {
     fetchCustomersAndProducts()
