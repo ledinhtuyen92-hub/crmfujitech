@@ -542,6 +542,7 @@ export default function FacebookInboxPage() {
   const messagesContainerRef = useRef(null)
   const isUserScrollingUp = useRef(false)  // true khi người dùng đang kéo lên xem tin cũ
   const prevLeadId = useRef(null)           // theo dõi lần đầu mở hội thoại
+  const isFetchingMoreRef = useRef(false)
 
   // Sync History
   const [syncModal, setSyncModal] = useState(false)
@@ -640,6 +641,7 @@ export default function FacebookInboxPage() {
           return merged
         })
         setPage(params.page)
+        isFetchingMoreRef.current = false
       } else if (!silent) {
         setLeads(data)
         setPage(1)
@@ -658,8 +660,12 @@ export default function FacebookInboxPage() {
 
       if (res.data?.next) setHasMore(true)
       else setHasMore(false)
+      if (isLoadMore) isFetchingMoreRef.current = false
 
-    } catch { if (!silent) message.error('Không thể tải danh sách hội thoại Facebook.') }
+    } catch { 
+      if (isLoadMore) isFetchingMoreRef.current = false
+      if (!silent) message.error('Không thể tải danh sách hội thoại Facebook.') 
+    }
     finally { if (!silent && !isLoadMore) setLoading(false) }
   }
 
@@ -758,6 +764,16 @@ export default function FacebookInboxPage() {
     const distanceFromBottom = container.scrollHeight - container.scrollTop - container.clientHeight
     // Nếu cách đáy > 120px thì coi như đang xem tin cũ
     isUserScrollingUp.current = distanceFromBottom > 120
+  }
+
+  const handleLeadsScroll = (e) => {
+    const { scrollTop, scrollHeight, clientHeight } = e.target
+    if (scrollHeight - scrollTop - clientHeight < 100) {
+      if (!loading && hasMore && !isFetchingMoreRef.current) {
+        isFetchingMoreRef.current = true
+        fetchLeads(true, true)
+      }
+    }
   }
 
   useEffect(() => {
@@ -1841,7 +1857,7 @@ export default function FacebookInboxPage() {
               style={{ borderRadius: 20 }}
             />
           </div>
-          <div style={{ flex: 1, overflowY: 'auto' }}>
+          <div style={{ flex: 1, overflowY: 'auto' }} onScroll={handleLeadsScroll}>
             {loading ? (
               <div style={{ padding: 16 }}><Skeleton active avatar paragraph={{ rows: 2 }} /><Skeleton active avatar paragraph={{ rows: 2 }} /></div>
             ) : filteredLeads.length === 0 ? (
@@ -1855,6 +1871,11 @@ export default function FacebookInboxPage() {
                   onClick={() => handleSelectLead(lead)}
                 />
               ))
+            )}
+            {isFetchingMoreRef.current && (
+              <div style={{ textAlign: 'center', padding: '10px 0' }}>
+                <Spin size="small" />
+              </div>
             )}
           </div>
         </div>

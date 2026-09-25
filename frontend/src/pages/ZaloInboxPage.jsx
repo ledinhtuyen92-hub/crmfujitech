@@ -284,6 +284,7 @@ export default function ZaloInboxPage() {
   const isDraggingRight = useRef(false)
   const dragStartX = useRef(0)
   const dragStartWidth = useRef(0)
+  const isFetchingMoreRef = useRef(false)
 
   const startDragLeft = (e) => {
     isDraggingLeft.current = true
@@ -415,12 +416,25 @@ export default function ZaloInboxPage() {
       if (res.data?.next) setHasMore(true)
       else setHasMore(false)
 
+      if (isLoadMore) isFetchingMoreRef.current = false
+
     } catch {
+      if (isLoadMore) isFetchingMoreRef.current = false
       if (!background) message.error('Không thể tải danh sách Social Leads.')
     } finally {
       if (!background && !isLoadMore) setLoading(false)
     }
   }, [search, statusFilter, phoneFilterMode, replyFilter, sortBy, selectedOaFilter, isStarredOnly, tagFilter, assignedToFilter, page])
+
+  const handleLeadsScroll = (e) => {
+    const { scrollTop, scrollHeight, clientHeight } = e.target
+    if (scrollHeight - scrollTop - clientHeight < 100) {
+      if (!loading && hasMore && !isFetchingMoreRef.current) {
+        isFetchingMoreRef.current = true
+        fetchLeads(true, true)
+      }
+    }
+  }
 
   const fetchDetail = async (leadId, background = false) => {
     if (!background) setDetailLoading(true)
@@ -1303,7 +1317,7 @@ export default function ZaloInboxPage() {
               ]}
             />
           </div>
-          <div style={{ flex: 1, overflowY: 'auto' }}>
+          <div style={{ flex: 1, overflowY: 'auto' }} onScroll={handleLeadsScroll}>
             {loading ? (
               <div style={{ padding: 40, textAlign: 'center' }}><Spin /></div>
             ) : leads.length === 0 ? (
@@ -1317,6 +1331,11 @@ export default function ZaloInboxPage() {
                   onClick={() => handleSelectLead(lead)}
                 />
               ))
+            )}
+            {isFetchingMoreRef.current && (
+              <div style={{ textAlign: 'center', padding: '10px 0' }}>
+                <Spin size="small" />
+              </div>
             )}
           </div>
           <div style={{ padding: '6px 12px', borderTop: '1px solid #e5e7eb', background: '#f8fafc', fontSize: 11, color: '#64748b' }}>
