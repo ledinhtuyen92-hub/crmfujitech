@@ -1327,17 +1327,17 @@ class ZnsCampaignViewSet(viewsets.ModelViewSet):
         ActionBasedPermission,
     ]
     action_permissions = {
-        "list": ["zalo.config"],
-        "retrieve": ["zalo.config"],
-        "create": ["zalo.config"],
-        "update": ["zalo.config"],
-        "partial_update": ["zalo.config"],
-        "destroy": ["zalo.config"],
-        "toggle": ["zalo.config"],
-        "test": ["zalo.config"],
-        "logs": ["zalo.config"],
-        "stats": ["zalo.config"],
-        "report": ["zalo.config"],
+        "list": ["zalo.campaigns"],
+        "retrieve": ["zalo.campaigns"],
+        "create": ["zalo.campaigns"],
+        "update": ["zalo.campaigns"],
+        "partial_update": ["zalo.campaigns"],
+        "destroy": ["zalo.campaigns"],
+        "toggle": ["zalo.campaigns"],
+        "test": ["zalo.campaigns"],
+        "logs": ["zalo.campaigns"],
+        "stats": ["zalo.campaigns"],
+        "report": ["zalo.campaigns"],
     }
 
     def get_serializer_class(self):

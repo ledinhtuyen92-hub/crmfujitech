@@ -209,7 +209,7 @@ function App() {
 
               <Route path="/zalo/campaigns" element={
                 <ModuleRoute moduleCode="zalo">
-                  <PermissionRoute permissionCode="zalo.config" fallback="/dashboard">
+                  <PermissionRoute permissionCode="zalo.campaigns" fallback="/dashboard">
                     <ZnsCampaignPage />
                   </PermissionRoute>
                 </ModuleRoute>

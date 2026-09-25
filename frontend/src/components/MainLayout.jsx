@@ -210,7 +210,7 @@ function MainLayout({ children, isDarkMode, toggleTheme }) {
           icon: <SafetyCertificateOutlined />,
           label: <Link to="/warranty">Bảo hành</Link>,
         }] : []),
-        ...(isModuleActive('zalo') && (hasPermission('zalo.view') || hasPermission('zalo.config') || hasPermission('zalo.manage_templates')) ? [{
+        ...(isModuleActive('zalo') && (hasPermission('zalo.view') || hasPermission('zalo.config') || hasPermission('zalo.manage_templates') || hasPermission('zalo.campaigns')) ? [{
           key: 'zalo-group',
           icon: <WechatOutlined style={{ color: '#0068ff' }} />,
           label: 'Zalo (Omnichannel)',
@@ -230,7 +230,7 @@ function MainLayout({ children, isDarkMode, toggleTheme }) {
               icon: <MessageOutlined />,
               label: <Link to="/settings/zalo-templates">Mẫu Zalo ZNS</Link>,
             }] : []),
-            ...(hasPermission('zalo.config') ? [{
+            ...(hasPermission('zalo.campaigns') ? [{
               key: '/zalo/campaigns',
               icon: <RocketOutlined style={{ color: '#2563eb' }} />,
               label: <Link to="/zalo/campaigns">Chiến dịch ZNS</Link>,
