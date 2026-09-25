@@ -100,7 +100,13 @@ export function AuthProvider({ children }) {
         return false
       }
 
-      if (user.is_superuser || user.is_company_admin) return true
+      if (user.is_superuser || user.is_company_admin) {
+        if (Array.isArray(permissionCode)) {
+          if (permissionCode.some(code => code.startsWith('settings.'))) return true
+        } else {
+          if (permissionCode.startsWith('settings.')) return true
+        }
+      }
       if (Array.isArray(permissionCode)) {
         return permissionCode.some(code => (user.permissions || []).includes(code))
       }

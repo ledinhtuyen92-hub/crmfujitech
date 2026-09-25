@@ -139,6 +139,10 @@ export default function UserManagement() {
     const payload = { ...values }
     // Xóa password nếu để trống khi sửa
     if (!payload.password) delete payload.password
+    
+    // Ant Design clears select as undefined, which PATCH ignores. Explicitly set to null to clear.
+    if (payload.department === undefined) payload.department = null;
+    if (payload.role === undefined) payload.role = null;
 
     try {
       if (editingUser) {

@@ -189,35 +189,43 @@ class OrderViewSet(TenantQuerySetMixin, viewsets.ModelViewSet):
         from core.numbering import generate_order_number
         company = self.request.user.company
         order_number = generate_order_number(company)
+        
+        user = self.request.user
+        require_approval = user.role and user.role.permissions.filter(code="orders.require_approval").exists()
+        initial_status = "pending" if require_approval else "approved"
+        
+        serializer.validated_data["status"] = initial_status
+        
         order = serializer.save(
             company=company,
             created_by=self.request.user,
             order_number=order_number,
-            status="pending",
         )
         order.generate_payment_milestones()
-        try:
-            from approvals.models import ApprovalRequest, ApprovalStep
-            from django.contrib.contenttypes.models import ContentType
-            ct = ContentType.objects.get_for_model(order)
-            req = ApprovalRequest.objects.create(
-                company=company,
-                content_type=ct,
-                object_id=order.id,
-                requester=self.request.user,
-                title=f"Phê duyệt Đơn hàng {order.order_number}",
-                description=f"Đơn hàng {order.order_number} — Khách hàng: {order.customer.name if order.customer else 'Khách lẻ'}",
-                status=ApprovalRequest.STATUS_PENDING,
-            )
-            ApprovalStep.objects.create(
-                request=req,
-                step_order=1,
-                status=ApprovalStep.STATUS_PENDING,
-            )
-        except Exception as e:
-            import traceback
-            with open("error_approval.txt", "w", encoding="utf-8") as f:
-                f.write(traceback.format_exc())
+        
+        if require_approval:
+            try:
+                from approvals.models import ApprovalRequest, ApprovalStep
+                from django.contrib.contenttypes.models import ContentType
+                ct = ContentType.objects.get_for_model(order)
+                req = ApprovalRequest.objects.create(
+                    company=company,
+                    content_type=ct,
+                    object_id=order.id,
+                    requester=self.request.user,
+                    title=f"Phê duyệt Đơn hàng {order.order_number}",
+                    description=f"Đơn hàng {order.order_number} — Khách hàng: {order.customer.name if order.customer else 'Khách lẻ'}",
+                    status=ApprovalRequest.STATUS_PENDING,
+                )
+                ApprovalStep.objects.create(
+                    request=req,
+                    step_order=1,
+                    status=ApprovalStep.STATUS_PENDING,
+                )
+            except Exception as e:
+                import traceback
+                with open("error_approval.txt", "w", encoding="utf-8") as f:
+                    f.write(traceback.format_exc())
 
     def perform_update(self, serializer):
         instance = self.get_object()
@@ -238,8 +246,14 @@ class OrderViewSet(TenantQuerySetMixin, viewsets.ModelViewSet):
             if hasattr(instance, 'production_order') and instance.production_order.status in ['in_progress', 'completed'] and new_status in ['pending', 'rejected', 'cancelled']:
                 from rest_framework.exceptions import ValidationError
                 raise ValidationError({"status": "Không thể chuyển về chờ duyệt/hủy khi Lệnh sản xuất đang thực hiện hoặc đã hoàn thành."})
+        user = self.request.user
+        require_approval = user.role and user.role.permissions.filter(code="orders.require_approval").exists()
+
         if old_status in ["pending", "rejected", "approved"]:
-            serializer.validated_data["status"] = "pending"
+            if require_approval:
+                serializer.validated_data["status"] = "pending"
+            else:
+                serializer.validated_data["status"] = "approved"
             
         kwargs = {}
         if 'customer' in serializer.validated_data:
@@ -256,35 +270,36 @@ class OrderViewSet(TenantQuerySetMixin, viewsets.ModelViewSet):
         order.generate_payment_milestones()
 
         if old_status in ["pending", "rejected", "approved"]:
-            try:
-                from approvals.models import ApprovalRequest, ApprovalStep
-                from django.contrib.contenttypes.models import ContentType
-                ct = ContentType.objects.get_for_model(order)
-                
-                # Hủy tất cả request cũ đang pending
-                ApprovalRequest.objects.filter(
-                    content_type=ct,
-                    object_id=order.id,
-                    status=ApprovalRequest.STATUS_PENDING
-                ).update(status=ApprovalRequest.STATUS_CANCELED)
-                
-                # Tạo request mới
-                req = ApprovalRequest.objects.create(
-                    company=order.company,
-                    content_type=ct,
-                    object_id=order.id,
-                    requester=self.request.user,
-                    title=f"Phê duyệt Đơn hàng {order.order_number} (Cập nhật)",
-                    description=f"Đơn hàng {order.order_number} — Khách hàng: {order.customer.name if order.customer else 'Khách lẻ'}",
-                    status=ApprovalRequest.STATUS_PENDING,
-                )
-                ApprovalStep.objects.create(
-                    request=req,
-                    step_order=1,
-                    status=ApprovalStep.STATUS_PENDING,
-                )
-            except Exception as e:
-                pass
+            from approvals.models import ApprovalRequest, ApprovalStep
+            from django.contrib.contenttypes.models import ContentType
+            ct = ContentType.objects.get_for_model(order)
+            
+            # Hủy tất cả request cũ đang pending dù có require_approval hay không
+            ApprovalRequest.objects.filter(
+                content_type=ct,
+                object_id=order.id,
+                status=ApprovalRequest.STATUS_PENDING
+            ).update(status=ApprovalRequest.STATUS_CANCELED)
+
+            if require_approval:
+                try:
+                    # Tạo request mới
+                    req = ApprovalRequest.objects.create(
+                        company=order.company,
+                        content_type=ct,
+                        object_id=order.id,
+                        requester=self.request.user,
+                        title=f"Phê duyệt Đơn hàng {order.order_number} (Cập nhật)",
+                        description=f"Đơn hàng {order.order_number} — Khách hàng: {order.customer.name if order.customer else 'Khách lẻ'}",
+                        status=ApprovalRequest.STATUS_PENDING,
+                    )
+                    ApprovalStep.objects.create(
+                        request=req,
+                        step_order=1,
+                        status=ApprovalStep.STATUS_PENDING,
+                    )
+                except Exception as e:
+                    pass
 
     @action(detail=True, methods=["post"], url_path="approve")
     def approve(self, request, pk=None):

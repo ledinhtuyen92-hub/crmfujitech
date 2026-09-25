@@ -241,16 +241,20 @@ class User(AbstractUser):
 
     def get_permission_codes(self):
         """Trả về set các permission code của user."""
+        codes = set()
         if self.is_superuser or self.is_company_admin:
-            # Admin có toàn bộ quyền
-            return set(Permission.objects.values_list("code", flat=True))
-        if not self.role:
-            return set()
-        return set(self.role.permissions.values_list("code", flat=True))
+            # Admin luôn tự động có các quyền thuộc nhóm Cài đặt
+            settings_perms = Permission.objects.filter(code__startswith="settings.").values_list("code", flat=True)
+            codes.update(settings_perms)
+            
+        if self.role:
+            codes.update(self.role.permissions.values_list("code", flat=True))
+            
+        return codes
 
     def has_perm_code(self, code: str) -> bool:
         """Kiểm tra nhanh một permission code."""
-        if self.is_superuser or self.is_company_admin:
+        if (self.is_superuser or self.is_company_admin) and code.startswith("settings."):
             return True
         if not self.role:
             return False

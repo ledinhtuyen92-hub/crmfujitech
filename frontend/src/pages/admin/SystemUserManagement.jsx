@@ -155,6 +155,10 @@ export default function SystemUserManagement() {
     const payload = { ...values }
     if (!payload.password) delete payload.password
 
+    // explicitly clear undefined select values for DRF PATCH
+    if (payload.department === undefined) payload.department = null;
+    if (payload.role === undefined) payload.role = null;
+
     try {
       if (editingUser) {
         await api.patch(`users/users/${editingUser.id}/`, payload)

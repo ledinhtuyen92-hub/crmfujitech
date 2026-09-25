@@ -43,6 +43,7 @@ PERMISSIONS = [
     {"code": "orders.edit", "name": "Chỉnh sửa đơn hàng", "module": "orders"},
     {"code": "orders.delete", "name": "Xóa đơn hàng", "module": "orders"},
     {"code": "orders.approve", "name": "Duyệt / Từ chối đơn hàng", "module": "orders"},
+    {"code": "orders.require_approval", "name": "Bắt buộc duyệt đơn", "module": "orders"},
     {"code": "orders.cancel", "name": "Hủy đơn hàng", "module": "orders"},
     {"code": "orders.export_pdf", "name": "Xuất PDF đơn hàng", "module": "orders"},
     {"code": "orders.view_all", "name": "Xem tất cả đơn hàng (không giới hạn bởi người tạo)", "module": "orders"},

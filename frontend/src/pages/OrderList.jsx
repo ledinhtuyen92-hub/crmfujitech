@@ -2651,8 +2651,8 @@ export default function OrderList() {
         discount_total: Number(order.discount_total || 0),
         shipping_fee: Number(order.shipping_fee || 0),
         installation_fee: Number(order.installation_fee || 0),
-        delivery_time: order.delivery_time || '3-5 ngày làm việc',
-        warranty_months: order.warranty_months !== undefined ? order.warranty_months : 12,
+        delivery_time: order.delivery_time || '9 - 10 ngày',
+        warranty_months: order.warranty_months !== undefined ? order.warranty_months : 36,
         validity_days: order.validity_days || 30,
         payment_terms_schedule: order.payment_terms_schedule && order.payment_terms_schedule.length > 0 
           ? order.payment_terms_schedule 
@@ -2728,8 +2728,8 @@ export default function OrderList() {
       form.setFieldsValue({ status: 'pending', discount_total: 0,
         shipping_fee: 0,
         installation_fee: 0,
-        delivery_time: '3-5 ngày làm việc',
-        warranty_months: 12,
+        delivery_time: '9 - 10 ngày',
+        warranty_months: 36,
         validity_days: 30,
         notes: defaultTerms,
         payment_terms_schedule: [{ title: 'Thanh toán đợt 1', percentage: 100, type: 'deposit' }],
@@ -2789,7 +2789,7 @@ export default function OrderList() {
         shipping_fee: Number(values.shipping_fee || 0),
         installation_fee: Number(values.installation_fee) || 0,
         delivery_time: values.delivery_time || '',
-        warranty_months: Number(values.warranty_months) || 12,
+        warranty_months: Number(values.warranty_months) || 36,
         validity_days: Number(values.validity_days) || 30,
         payment_terms_schedule: values.payment_terms_schedule || [],
         subtotal: subtotal,
@@ -3992,7 +3992,7 @@ export default function OrderList() {
           <Row gutter={16}>
             <Col xs={24} sm={6}>
               <Form.Item name="delivery_time" label="Thời gian giao hàng">
-                <Input placeholder="3-5 ngày..." />
+                <Input placeholder="9 - 10 ngày..." />
               </Form.Item>
             </Col>
             <Col xs={24} sm={6}>

@@ -463,7 +463,7 @@ export default function BlockRenderer({ block, allBlocks, isActive, onSelect, on
             )}
             {block.props.showDeliveryTime && (
               <div style={{ fontSize: 12, color: '#334155', marginBottom: 4 }}>
-                Thời gian giao hàng / thi công: <strong>3-5 ngày làm việc</strong>
+                Thời gian giao hàng / thi công: <strong>9 - 10 ngày</strong>
               </div>
             )}
             {block.props.showValidity && (

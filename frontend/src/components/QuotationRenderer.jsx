@@ -671,7 +671,7 @@ export default function QuotationRenderer({ layoutConfig, layoutStyle, data, ren
             )}
             {block.props.showDeliveryTime && (data?.delivery_time || data?.delivery_time === '') && (
               <div style={{ fontSize: 12, color: '#334155', marginBottom: 4 }}>
-                Thời gian giao hàng / thi công: <strong>{data.delivery_time || '3-5 ngày làm việc'}</strong>
+                Thời gian giao hàng / thi công: <strong>{data.delivery_time || '9 - 10 ngày'}</strong>
               </div>
             )}
             {block.props.showInstallationDate && data?.installation_date && (

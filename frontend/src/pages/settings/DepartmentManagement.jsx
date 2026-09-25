@@ -57,7 +57,7 @@ export default function DepartmentManagement() {
       const [depsRes, usersRes, factoriesRes] = await Promise.all([
         api.get('users/departments/'),
         api.get('users/users/'),
-        api.get('production/factories/'),
+        api.get('production/factories/').catch(() => ({ data: [] })),
       ])
       const depsData = Array.isArray(depsRes.data) ? depsRes.data : depsRes.data?.results ?? []
       const usersData = Array.isArray(usersRes.data) ? usersRes.data : usersRes.data?.results ?? []

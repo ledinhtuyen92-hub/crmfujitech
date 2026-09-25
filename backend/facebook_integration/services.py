@@ -467,7 +467,13 @@ def send_facebook_message(
                                         if r3.get("success"):
                                             last_message_id = r3.get("message_id")
                                         else:
-                                            return {"success": False, "error": r3.get("error", "Lỗi gửi tin nhắn sau mọi fallback")}
+                                            friendly_error = (
+                                                "Facebook từ chối gửi tin nhắn do Trang của bạn đang bị một ứng dụng khác "
+                                                "(ví dụ: Chatbot, Meta AI) chiếm quyền kiểm soát hội thoại. "
+                                                "Vui lòng vào Cài đặt Trang Facebook -> Nhắn tin nâng cao -> Giao thức bàn giao "
+                                                "và thiết lập CRM làm 'Ứng dụng nhận chính', hoặc tắt Chatbot/Meta AI."
+                                            )
+                                            return {"success": False, "error": friendly_error}
                                     else:
                                         return {"success": False, "error": resp_data2["error"].get("message", "Lỗi gửi sau pass thread control")}
                             else:

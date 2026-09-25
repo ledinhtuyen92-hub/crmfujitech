@@ -441,6 +441,14 @@ export default function RoleManagement() {
                       </div>
                     }
                   >
+                    {module === 'settings' && (
+                      <div style={{ marginBottom: 12, padding: '8px 12px', background: '#fff1f0', border: '1px solid #ffa39e', borderRadius: 4 }}>
+                        <Text type="danger" style={{ fontSize: 12 }}>
+                          <InfoCircleOutlined style={{ marginRight: 6 }} />
+                          Lưu ý: Các tài khoản Quản trị hệ thống (Admin) sẽ mặc định luôn có các quyền này để tránh rủi ro mất quyền kiểm soát, bất kể Vai trò được cấu hình như thế nào.
+                        </Text>
+                      </div>
+                    )}
                     <Row gutter={[0, 6]}>
                       {perms.map((p) => (
                         <Col xs={24} md={12} key={p.id}>

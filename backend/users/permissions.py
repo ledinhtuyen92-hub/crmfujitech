@@ -149,16 +149,21 @@ class ActionBasedPermission(BasePermission):
         if not (request.user and request.user.is_authenticated):
             return False
             
-        # Superuser và company admin luôn có tất cả quyền
-        if request.user.is_superuser or request.user.is_company_admin:
-            return True
-            
         action_permissions = getattr(view, "action_permissions", {})
         required_perm = action_permissions.get(view.action)
         
         if not required_perm:
             # Nếu action không được định nghĩa trong map, mặc định cho qua (dựa vào IsAuthenticated)
             return True
+            
+        is_admin = request.user.is_superuser or request.user.is_company_admin
+        if is_admin:
+            # Admin luôn tự động có các quyền thuộc nhóm Cài đặt (để không bị khóa ngoài hệ thống)
+            if isinstance(required_perm, (list, tuple)):
+                if any(p.startswith("settings.") for p in required_perm):
+                    return True
+            elif isinstance(required_perm, str) and required_perm.startswith("settings."):
+                return True
             
         if not request.user.role:
             return False
