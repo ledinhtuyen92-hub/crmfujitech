@@ -4,7 +4,7 @@ import dayjs from 'dayjs'
 import React, { useCallback, useEffect, useState, useRef } from 'react'
 import { useAuth } from '../contexts/AuthContext'
 import useDebounce from '../hooks/useDebounce'
-import { useLocation } from 'react-router-dom'
+import { useLocation, useNavigate } from 'react-router-dom'
 import { DndContext, PointerSensor, useSensor, useSensors, KeyboardSensor, closestCenter } from '@dnd-kit/core';
 import { restrictToVerticalAxis } from '@dnd-kit/modifiers';
 import { SortableContext, useSortable, verticalListSortingStrategy, arrayMove, sortableKeyboardCoordinates } from '@dnd-kit/sortable';
@@ -106,6 +106,7 @@ export default function QuotationList() {
   const { token } = theme.useToken()
   const { user, isCompanyAdmin, hasPermission, checkMaintenance, isModuleActive, companySettings } = useAuth()
   const location = useLocation()
+  const navigate = useNavigate()
   const [messageApi, contextHolder] = message.useMessage()
 
   // Data states
@@ -193,7 +194,9 @@ export default function QuotationList() {
     }
   };
   // Filters
-  const [searchInput, searchQuery, handleSearchChange] = useDebounce('', 400)
+  // Đọc search param từ URL ngay khi khởi tạo để fetch lần đầu đã đúng
+  const _initSearch = new URLSearchParams(location.search).get('search') || ''
+  const [searchInput, searchQuery, handleSearchChange] = useDebounce(_initSearch, 400)
   const [statusFilter, setStatusFilter] = useState('')
 
   // Modal Add / Edit
@@ -321,7 +324,6 @@ export default function QuotationList() {
 
     if (searchVal) {
       handleSearchChange(searchVal)
-      window.history.replaceState({}, '', '/quotations')
     }
 
     const targetId = stateCustId || queryCustId
@@ -329,6 +331,14 @@ export default function QuotationList() {
       const numId = Number(targetId) || targetId
       openModal(null, numId, stateCustData)
       window.history.replaceState({}, '', '/quotations')
+    }
+
+    const viewData = location.state?.viewQuotationData
+    if (viewData) {
+      setSelectedQuotation(viewData)
+      setDrawerVisible(true)
+      // Xoá state để không tự mở lại khi refresh, nhưng giữ nguyên URL (có search param)
+      navigate(location.pathname + location.search, { replace: true, state: {} })
     }
   }, [location.state, location.search])
 

@@ -520,14 +520,36 @@ function CustomerList() {
     navigate('/quotations', { state: { createForCustomer: record.id, customerData: record } })
   }
 
-  const handleViewQuotations = (record, e) => {
+  const handleViewQuotations = async (record, e) => {
     e?.stopPropagation()
+    if (record.quotation_count === 1) {
+      try {
+        const res = await api.get('/sales/quotations/', { params: { search: record.phone || record.name, page_size: 1 } })
+        if (res.data?.results?.length === 1) {
+          navigate(`/quotations?search=${encodeURIComponent(record.phone || record.name)}`, { state: { viewQuotationData: res.data.results[0] } })
+          return
+        }
+      } catch (err) {
+        // fallback to list view on error
+      }
+    }
     // Truyền số điện thoại hoặc tên khách hàng qua query URL để tìm kiếm
     navigate(`/quotations?search=${encodeURIComponent(record.phone || record.name)}`)
   }
 
-  const handleViewOrders = (record, e) => {
+  const handleViewOrders = async (record, e) => {
     e?.stopPropagation()
+    if (record.order_count === 1) {
+      try {
+        const res = await api.get('/orders/orders/', { params: { search: record.phone || record.name, page_size: 1 } })
+        if (res.data?.results?.length === 1) {
+          navigate(`/orders?search=${encodeURIComponent(record.phone || record.name)}`, { state: { viewOrderData: res.data.results[0] } })
+          return
+        }
+      } catch (err) {
+        // fallback to list view on error
+      }
+    }
     navigate(`/orders?search=${encodeURIComponent(record.phone || record.name)}`)
   }
 
