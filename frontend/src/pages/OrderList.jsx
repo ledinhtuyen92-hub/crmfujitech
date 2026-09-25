@@ -302,6 +302,17 @@ export default function OrderList() {
   const [salesFilter, setSalesFilter] = useState('')
   const [salesUsers, setSalesUsers] = useState([])
 
+  // Đọc ?search= từ URL khi navigate từ trang Khách hàng
+  useEffect(() => {
+    const params = new URLSearchParams(location.search)
+    const searchVal = params.get('search')
+    if (searchVal) {
+      handleSearchChange(searchVal)
+      // Xóa query param khỏi URL để tránh reload lại
+      window.history.replaceState({}, '', '/orders')
+    }
+  }, [location.search])
+
   // Modal Add / Edit
   const [modalVisible, setModalVisible] = useState(false)
   const [editingOrder, setEditingOrder] = useState(null)
