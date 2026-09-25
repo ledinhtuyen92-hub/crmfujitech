@@ -350,6 +350,17 @@ class FacebookLeadViewSet(mixins.UpdateModelMixin, mixins.DestroyModelMixin, vie
         if page_config_id and page_config_id != "all":
             qs = qs.filter(page_config_id=page_config_id)
 
+        search = self.request.query_params.get("search")
+        if search:
+            from django.db.models import Q
+            qs = qs.filter(
+                Q(fb_user_name__icontains=search) |
+                Q(last_message_preview__icontains=search) |
+                Q(detected_phone__icontains=search) |
+                Q(detected_email__icontains=search) |
+                Q(detected_address__icontains=search)
+            )
+
         is_archived_param = self.request.query_params.get("is_archived")
         if is_archived_param == "true":
             qs = qs.filter(is_archived=True)

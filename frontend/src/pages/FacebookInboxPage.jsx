@@ -64,6 +64,7 @@ import {
   theme
 } from 'antd'
 import { useResponsive } from '../hooks/useResponsive'
+import useDebounce from '../hooks/useDebounce'
 import { useEffect, useRef, useState } from 'react'
 import { useAuth } from '../contexts/AuthContext'
 import api from '../utils/api'
@@ -513,7 +514,7 @@ export default function FacebookInboxPage() {
   const [hasMore, setHasMore] = useState(false)
   const [selectedLead, setSelectedLead] = useState(null)
   const [messages, setMessages] = useState([])
-  const [search, setSearch] = useState('')
+  const [searchValue, search, handleSearchChange] = useDebounce('', 500)
   const [statusFilter, setStatusFilter] = useState('')
   const [hasPhoneOnly, setHasPhoneOnly] = useState(false)
   const [hasUnreadOnly, setHasUnreadOnly] = useState(false)
@@ -614,6 +615,7 @@ export default function FacebookInboxPage() {
     if (!silent && !isLoadMore) setLoading(true)
     try {
       const params = {}
+      if (search) params.search = search
       if (selectedPage && selectedPage !== 'all') params.page_config = selectedPage
       if (phoneFilterMode === 'has_phone' || hasPhoneOnly) params.has_phone = 'true'
       else if (phoneFilterMode === 'no_phone') params.has_phone = 'false'
@@ -724,7 +726,7 @@ export default function FacebookInboxPage() {
     fetchLeads() 
     const interval = setInterval(() => { fetchLeads(true) }, 3000)
     return () => clearInterval(interval)
-  }, [selectedPage, hasPhoneOnly, phoneFilterMode, statusFilter, hasUnreadOnly, isArchivedOnly, replyFilter, sortBy, isStarredOnly, tagFilter, assignedToFilter])
+  }, [selectedPage, hasPhoneOnly, phoneFilterMode, statusFilter, hasUnreadOnly, isArchivedOnly, replyFilter, sortBy, isStarredOnly, tagFilter, assignedToFilter, search])
 
   useEffect(() => {
     if (location.state?.selectedLeadId) {
@@ -1851,8 +1853,8 @@ export default function FacebookInboxPage() {
             <Input
               prefix={<SearchOutlined style={{ color: '#9ca3af' }} />}
               placeholder="Tìm kiếm hội thoại..."
-              value={search}
-              onChange={e => setSearch(e.target.value)}
+              value={searchValue}
+              onChange={handleSearchChange}
               size="small"
               style={{ borderRadius: 20 }}
             />
