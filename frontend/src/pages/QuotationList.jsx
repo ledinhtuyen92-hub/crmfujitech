@@ -317,10 +317,11 @@ export default function QuotationList() {
     const stateCustData = location.state?.customerData
     const params = new URLSearchParams(location.search)
     const queryCustId = params.get('customerId')
-    const searchQuery = params.get('search')
+    const searchVal = params.get('search')
 
-    if (searchQuery) {
-      setSearchText(searchQuery)
+    if (searchVal) {
+      handleSearchChange(searchVal)
+      window.history.replaceState({}, '', '/quotations')
     }
 
     const targetId = stateCustId || queryCustId
