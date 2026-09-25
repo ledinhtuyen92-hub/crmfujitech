@@ -358,7 +358,9 @@ class FacebookLeadViewSet(mixins.UpdateModelMixin, mixins.DestroyModelMixin, vie
                 Q(last_message_preview__icontains=search) |
                 Q(detected_phone__icontains=search) |
                 Q(detected_email__icontains=search) |
-                Q(detected_address__icontains=search)
+                Q(detected_address__icontains=search) |
+                Q(customer__name__icontains=search) |
+                Q(customer__phone__icontains=search)
             )
 
         is_archived_param = self.request.query_params.get("is_archived")

@@ -665,7 +665,9 @@ class SocialLeadViewSet(viewsets.ModelViewSet):
             qs = qs.filter(
                 Q(display_name__icontains=search) |
                 Q(social_id__icontains=search) |
-                Q(last_message__icontains=search)
+                Q(last_message__icontains=search) |
+                Q(customer__name__icontains=search) |
+                Q(customer__phone__icontains=search)
             )
 
         # Filter theo SĐT phát hiện
