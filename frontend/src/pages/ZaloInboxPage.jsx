@@ -20,6 +20,7 @@ import 'dayjs/locale/vi'
 import api from '../utils/api'
 import { useAuth } from '../contexts/AuthContext'
 import { useResponsive } from '../hooks/useResponsive'
+import useDebounce from '../hooks/useDebounce'
 
 const cleanUrl = (url) => {
   if (!url) return '';
@@ -235,7 +236,7 @@ export default function ZaloInboxPage() {
   const [infoDrawerVisible, setInfoDrawerVisible] = useState(false)
   
   // Filter states
-  const [search, setSearch] = useState('')
+  const [searchValue, search, handleSearchChange] = useDebounce('', 500)
   const [statusFilter, setStatusFilter] = useState('')
   const [phoneFilterMode, setPhoneFilterMode] = useState('all') // 'all' | 'has_phone' | 'no_phone'
   const [replyFilter, setReplyFilter] = useState('')
@@ -472,7 +473,7 @@ export default function ZaloInboxPage() {
     fetchLeads()
     const interval = setInterval(() => { fetchLeads(true) }, 3000)
     return () => clearInterval(interval)
-  }, [fetchLeads])
+  }, [fetchLeads, search])
 
   useEffect(() => {
     if (location.state?.selectedLeadId) {
@@ -1294,11 +1295,11 @@ export default function ZaloInboxPage() {
         {(!isMobile || !selectedLead) && (
         <div style={{ width: isMobile ? '100%' : leftColWidth, flex: isMobile ? 1 : 'none', height: isMobile ? 'auto' : '100%', borderRight: isMobile ? 'none' : '1px solid #e5e7eb', display: 'flex', flexDirection: 'column', background: '#fff', flexShrink: isMobile ? 1 : 0, minHeight: 0 }}>
           <div style={{ padding: '8px 12px', borderBottom: '1px solid #e5e7eb' }}>
-            <Search
+            <Input
+              prefix={<SearchOutlined style={{ color: '#9ca3af' }} />}
               placeholder="Tìm tên, tin nhắn..."
-              value={search}
-              onChange={e => setSearch(e.target.value)}
-              onSearch={() => fetchLeads()}
+              value={searchValue}
+              onChange={handleSearchChange}
               allowClear
               style={{ marginBottom: 8 }}
             />
