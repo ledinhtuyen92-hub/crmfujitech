@@ -217,10 +217,14 @@ export default function AiAgentSettings() {
 
   const handleOpenKeyModal = (record = null) => {
     setEditingKey(record);
+    keyForm.resetFields();
+    setFetchedModels([]);
     if (record) {
-      keyForm.setFieldsValue(record);
+      keyForm.setFieldsValue({
+        ...record,
+        fallback_model: record.fallback_model || undefined
+      });
     } else {
-      keyForm.resetFields();
       keyForm.setFieldsValue({ provider: 'openai', is_active: true, priority: 0 });
     }
     setKeyModalVisible(true);
@@ -283,6 +287,8 @@ export default function AiAgentSettings() {
 
   const handleOpenModal = async (agent = null) => {
     setEditingAgent(agent);
+    setFetchedModels([]);
+    setFetchedKey("");
 
     // Luôn lấy template mới nhất từ Backend trước khi điền vào form
     let currentTemplate = defaultJsonTemplate;
