@@ -511,6 +511,10 @@ export default function ZaloInboxPage() {
 
   const handleSelectLead = (lead) => {
     setSelectedLead(lead)
+    // Cập nhật giao diện lập tức xoá badge đỏ khi xem hội thoại
+    setLeads(prev => prev.map(l => 
+      l.id === lead.id ? { ...l, has_unread_message: false, unread_count: 0 } : l
+    ))
   }
 
   const handleRefresh = () => {
