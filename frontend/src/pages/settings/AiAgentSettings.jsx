@@ -261,6 +261,7 @@ export default function AiAgentSettings() {
   const keyColumns = [
     { title: 'Nhà cung cấp', dataIndex: 'provider', key: 'provider', render: (t) => <Tag color='blue'>{t?.toUpperCase()}</Tag> },
     { title: 'API Key', dataIndex: 'api_key', key: 'api_key', render: (t) => <Text>{t?.substring(0, 8)}...{t?.slice(-4)}</Text> },
+    { title: 'Model dự phòng', dataIndex: 'fallback_model', key: 'fallback_model', render: (t) => t ? <Text code>{t}</Text> : <Text type="secondary" italic>Mặc định</Text> },
     { title: 'Độ ưu tiên', dataIndex: 'priority', key: 'priority' },
     { title: 'Trạng thái', dataIndex: 'is_active', key: 'is_active', render: (isActive) => isActive ? <Tag color='green'>Đang hoạt động</Tag> : <Tag color='red'>Tạm ngưng</Tag> },
     { title: 'Thao tác', key: 'actions', render: (_, record) => (
