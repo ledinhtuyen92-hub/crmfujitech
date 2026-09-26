@@ -330,12 +330,29 @@ def generate_image_description(image_url: str, api_keys, provider: str = 'gemini
     return ""
 
 def generate_ai_reply(agent: AiAgent, conversation_history: list, lead_name: str):
-    provider = get_provider_for_model(agent.model_name)
-    api_keys = get_api_keys(agent.company, provider)
+    primary_provider = get_provider_for_model(agent.model_name)
+    primary_keys = get_api_keys(agent.company, primary_provider)
     
-    if not api_keys:
-        logger.warning(f"No API Key configured for provider {provider}")
-        return {'error': True, 'reply': 'Hệ thống AI chưa được cấu hình API Key.', 'sentiment': 'handoff', 'summary': ''}
+    platforms_to_try = []
+    if primary_keys:
+        platforms_to_try.append((primary_provider, primary_keys, agent.model_name))
+        
+    # Thêm các nền tảng dự phòng
+    fallback_defaults = {
+        'gemini': 'gemini-2.0-flash',
+        'openai': 'gpt-4o-mini',
+        'anthropic': 'claude-3-5-sonnet-20240620'
+    }
+    
+    for p, default_model in fallback_defaults.items():
+        if p != primary_provider:
+            p_keys = get_api_keys(agent.company, p)
+            if p_keys:
+                platforms_to_try.append((p, p_keys, default_model))
+                
+    if not platforms_to_try:
+        logger.warning(f"No API Key configured for any provider")
+        return {'error': True, 'reply': 'Hệ thống AI chưa được cấu hình bất kỳ API Key nào.', 'sentiment': 'handoff', 'summary': ''}
 
     json_template = agent.core_prompt_template.strip() if agent.core_prompt_template else DEFAULT_JSON_TEMPLATE
     core_rules = agent.core_system_rules.strip() if agent.core_system_rules else DEFAULT_SYSTEM_RULES
@@ -347,56 +364,67 @@ TRẢ LỜI BẮT BUỘC THEO ĐỊNH DẠNG JSON SAU (chỉ trả về JSON thu
 {json_template}"""
 
     last_error = None
-    for api_key in api_keys:
-        try:
-            if provider == 'openai':
-                result, usage = call_openai(api_key, agent, system_prompt, conversation_history)
-            elif provider == 'gemini':
-                result, usage = call_gemini(api_key, agent, system_prompt, conversation_history)
-            elif provider == 'anthropic':
-                result, usage = call_anthropic(api_key, agent, system_prompt, conversation_history)
-            
-            # Log usage
+    original_model_name = agent.model_name
+
+    for current_provider, api_keys, current_model in platforms_to_try:
+        # Override model_name tạm thời để các hàm call_XXX gọi đúng model
+        agent.model_name = current_model
+        
+        for api_key in api_keys:
             try:
-                from .models import ApiUsageLog, AiModelPricing
-                from decimal import Decimal
+                if current_provider == 'openai':
+                    result, usage = call_openai(api_key, agent, system_prompt, conversation_history)
+                elif current_provider == 'gemini':
+                    result, usage = call_gemini(api_key, agent, system_prompt, conversation_history)
+                elif current_provider == 'anthropic':
+                    result, usage = call_anthropic(api_key, agent, system_prompt, conversation_history)
                 
-                model_name = agent.model_name or ('gpt-4o-mini' if provider == 'openai' else 'gemini-2.0-flash' if provider == 'gemini' else 'claude-3-5-sonnet-20240620')
-                if model_name.startswith('models/'):
-                    model_name = model_name[7:]
+                # Log usage
+                try:
+                    from .models import ApiUsageLog, AiModelPricing
+                    from decimal import Decimal
                     
-                input_price = 0.0
-                output_price = 0.0
-                
-                pricing_obj = AiModelPricing.objects.filter(model_name=model_name).first()
-                if pricing_obj:
-                    input_price = float(pricing_obj.input_price_per_1m)
-                    output_price = float(pricing_obj.output_price_per_1m)
-                else:
-                    pricing_obj = AiModelPricing.objects.filter(model_name__icontains=provider).first()
+                    model_name_for_pricing = current_model
+                    if model_name_for_pricing.startswith('models/'):
+                        model_name_for_pricing = model_name_for_pricing[7:]
+                        
+                    input_price = 0.0
+                    output_price = 0.0
+                    
+                    pricing_obj = AiModelPricing.objects.filter(model_name=model_name_for_pricing).first()
                     if pricing_obj:
                         input_price = float(pricing_obj.input_price_per_1m)
                         output_price = float(pricing_obj.output_price_per_1m)
-                
-                total_cost = (usage.get('input', 0) * input_price / 1_000_000) + (usage.get('output', 0) * output_price / 1_000_000)
-                ApiUsageLog.objects.create(
-                    company=agent.company,
-                    agent=agent,
-                    provider=provider,
-                    model_name=model_name,
-                    input_tokens=usage.get('input', 0),
-                    output_tokens=usage.get('output', 0),
-                    total_cost_usd=Decimal(str(total_cost))
-                )
-            except Exception as log_e:
-                logger.error(f"Failed to log API usage: {log_e}")
+                    else:
+                        pricing_obj = AiModelPricing.objects.filter(model_name__icontains=current_provider).first()
+                        if pricing_obj:
+                            input_price = float(pricing_obj.input_price_per_1m)
+                            output_price = float(pricing_obj.output_price_per_1m)
                     
-            return result
-        except Exception as e:
-            last_error = e
-            continue
-            
-    logger.error(f"All API Keys failed for provider {provider}. Last error: {last_error}")
+                    total_cost = (usage.get('input', 0) * input_price / 1_000_000) + (usage.get('output', 0) * output_price / 1_000_000)
+                    ApiUsageLog.objects.create(
+                        company=agent.company,
+                        agent=agent,
+                        provider=current_provider,
+                        model_name=model_name_for_pricing,
+                        input_tokens=usage.get('input', 0),
+                        output_tokens=usage.get('output', 0),
+                        total_cost_usd=Decimal(str(total_cost))
+                    )
+                except Exception as log_e:
+                    logger.error(f"Failed to log API usage: {log_e}")
+                        
+                # Khôi phục model_name
+                agent.model_name = original_model_name
+                return result
+            except Exception as e:
+                last_error = e
+                logger.error(f"API Key failed for provider {current_provider}. Error: {e}")
+                continue
+                
+    # Khôi phục model_name
+    agent.model_name = original_model_name
+    logger.error(f"All platforms and API Keys failed. Last error: {last_error}")
     
     # Catch quota errors
     if last_error and ('429' in str(last_error) or 'quota' in str(last_error).lower() or 'insufficient' in str(last_error).lower()):
@@ -407,7 +435,7 @@ TRẢ LỜI BẮT BUỘC THEO ĐỊNH DẠNG JSON SAU (chỉ trả về JSON thu
                 company=agent.company,
                 recipient=None, # System wide
                 title="CẢNH BÁO QUOTA AI",
-                message=f"Hệ thống báo lỗi hết Quota / Hết tiền đối với API Key {provider.upper()}. Vui lòng kiểm tra lại thiết lập.",
+                message=f"Hệ thống báo lỗi hết Quota / Hết tiền đối với các API Key. Vui lòng kiểm tra lại thiết lập.",
                 type='ai_error',
                 related_data=json.dumps({"agent_id": agent.id, "error": str(last_error)})
             )
@@ -422,7 +450,7 @@ TRẢ LỜI BẮT BUỘC THEO ĐỊNH DẠNG JSON SAU (chỉ trả về JSON thu
             company=agent.company,
             recipient=None,
             title="⚠️ AI bị tắt tự động do lỗi API",
-            message=f"AI Agent '{agent.name}' không thể trả lời do tất cả API Key đều thất bại. Vui lòng kiểm tra API Key của {provider.upper()} và tiếp tục trả lời khách.",
+            message=f"AI Agent '{agent.name}' không thể trả lời do tất cả các nền tảng API đều thất bại. Vui lòng kiểm tra API Key và tiếp tục trả lời khách.",
             type='ai_error',
             related_data=json.dumps({"agent_id": agent.id, "error": str(last_error)})
         )
@@ -443,52 +471,67 @@ def generate_raw_text(agent: AiAgent, prompt: str) -> str:
     Tự động xoay vòng qua tất cả API Keys khi key hiện tại bị lỗi (hết quota, sai key...).
     Raise Exception nếu TẤT CẢ keys đều thất bại.
     """
-    provider = get_provider_for_model(agent.model_name)
-    api_keys = get_api_keys(agent.company, provider)
+    primary_provider = get_provider_for_model(agent.model_name)
+    primary_keys = get_api_keys(agent.company, primary_provider)
     
-    if not api_keys:
-        raise ValueError(f"Chưa cấu hình API Key cho nhà cung cấp {provider.upper()}. Vào Cài đặt AI > API Keys để thêm.")
+    platforms_to_try = []
+    if primary_keys:
+        platforms_to_try.append((primary_provider, primary_keys, agent.model_name))
+        
+    fallback_defaults = {
+        'gemini': 'gemini-2.0-flash',
+        'openai': 'gpt-4o-mini',
+        'anthropic': 'claude-3-5-sonnet-20240620'
+    }
+    for p, default_model in fallback_defaults.items():
+        if p != primary_provider:
+            p_keys = get_api_keys(agent.company, p)
+            if p_keys:
+                platforms_to_try.append((p, p_keys, default_model))
+                
+    if not platforms_to_try:
+        raise ValueError(f"Chưa cấu hình API Key cho nhà cung cấp. Vào Cài đặt AI > API Keys để thêm.")
     
-    model_name = agent.model_name
     last_error = None
     
-    for api_key in api_keys:
-        try:
-            if provider == 'openai':
-                from openai import OpenAI
-                client = OpenAI(api_key=api_key)
-                res = client.chat.completions.create(
-                    model=model_name or 'gpt-4o-mini',
-                    messages=[{"role": "user", "content": prompt}]
-                )
-                return res.choices[0].message.content
-            elif provider == 'gemini':
-                from google import genai as google_genai
-                client = google_genai.Client(api_key=api_key)
-                gm_name = model_name or 'gemini-2.0-flash'
-                if gm_name.startswith('models/'):
-                    gm_name = gm_name[7:]
-                res = client.models.generate_content(
-                    model=gm_name,
-                    contents=prompt
-                )
-                return res.text
-            elif provider == 'anthropic':
-                import anthropic
-                client = anthropic.Anthropic(api_key=api_key)
-                res = client.messages.create(
-                    model=model_name or 'claude-3-5-sonnet-20241022',
-                    max_tokens=2048,
-                    messages=[{"role": "user", "content": prompt}]
-                )
-                return res.content[0].text
-            else:
-                raise ValueError(f"Nhà cung cấp AI '{provider}' không được hỗ trợ.")
-        except Exception as e:
-            last_error = e
-            logger.warning(f"[generate_raw_text] Key thất bại ({provider}), thử key tiếp theo... Lỗi: {e}")
-            continue
+    for current_provider, api_keys, current_model in platforms_to_try:
+        for api_key in api_keys:
+            try:
+                if current_provider == 'openai':
+                    from openai import OpenAI
+                    client = OpenAI(api_key=api_key)
+                    res = client.chat.completions.create(
+                        model=current_model or 'gpt-4o-mini',
+                        messages=[{"role": "user", "content": prompt}]
+                    )
+                    return res.choices[0].message.content
+                elif current_provider == 'gemini':
+                    from google import genai as google_genai
+                    client = google_genai.Client(api_key=api_key)
+                    gm_name = current_model or 'gemini-2.0-flash'
+                    if gm_name.startswith('models/'):
+                        gm_name = gm_name[7:]
+                    res = client.models.generate_content(
+                        model=gm_name,
+                        contents=prompt
+                    )
+                    return res.text
+                elif current_provider == 'anthropic':
+                    import anthropic
+                    client = anthropic.Anthropic(api_key=api_key)
+                    res = client.messages.create(
+                        model=current_model or 'claude-3-5-sonnet-20241022',
+                        max_tokens=2048,
+                        messages=[{"role": "user", "content": prompt}]
+                    )
+                    return res.content[0].text
+                else:
+                    raise ValueError(f"Nhà cung cấp AI '{current_provider}' không được hỗ trợ.")
+            except Exception as e:
+                last_error = e
+                logger.warning(f"[generate_raw_text] Key thất bại ({current_provider}), thử key tiếp theo... Lỗi: {e}")
+                continue
     
     # Tất cả keys đều thất bại
-    raise RuntimeError(f"Tất cả {len(api_keys)} API Key {provider.upper()} đều thất bại. Lỗi cuối: {str(last_error)[:200]}")
+    raise RuntimeError(f"Tất cả API Keys từ các nền tảng đều thất bại. Lỗi cuối: {str(last_error)[:200]}")
 
