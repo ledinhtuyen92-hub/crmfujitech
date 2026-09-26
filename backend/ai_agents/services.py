@@ -344,6 +344,13 @@ def generate_ai_reply(agent: AiAgent, conversation_history: list, lead_name: str
         'anthropic': 'claude-3-5-sonnet-20240620'
     }
     
+    # Ghi đè model mặc định nếu user có cài đặt fallback_model trong kho Key
+    from .models import CompanyAiKey
+    for p in fallback_defaults.keys():
+        custom_key = CompanyAiKey.objects.filter(company=agent.company, provider=p, is_active=True).exclude(fallback_model__isnull=True).exclude(fallback_model='').order_by('-priority').first()
+        if custom_key and custom_key.fallback_model:
+            fallback_defaults[p] = custom_key.fallback_model
+            
     for p, default_model in fallback_defaults.items():
         if p != primary_provider:
             p_keys = get_api_keys(agent.company, p)
@@ -483,6 +490,13 @@ def generate_raw_text(agent: AiAgent, prompt: str) -> str:
         'openai': 'gpt-4o-mini',
         'anthropic': 'claude-3-5-sonnet-20240620'
     }
+    
+    from .models import CompanyAiKey
+    for p in fallback_defaults.keys():
+        custom_key = CompanyAiKey.objects.filter(company=agent.company, provider=p, is_active=True).exclude(fallback_model__isnull=True).exclude(fallback_model='').order_by('-priority').first()
+        if custom_key and custom_key.fallback_model:
+            fallback_defaults[p] = custom_key.fallback_model
+            
     for p, default_model in fallback_defaults.items():
         if p != primary_provider:
             p_keys = get_api_keys(agent.company, p)

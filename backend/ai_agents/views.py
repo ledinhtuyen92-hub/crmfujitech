@@ -524,17 +524,22 @@ class CompanyAiSettingsViewSet(viewsets.ModelViewSet):
     def fetch_models(self, request):
         """Gọi thẳng API của từng Provider để lấy danh sách model đang hỗ trợ."""
         provider = request.query_params.get('provider')
+        custom_key = request.query_params.get('api_key')
+        
         if not provider:
             return Response({'error': 'Missing provider parameter'}, status=400)
 
         company = request.user.company
-        from .services import get_api_keys
-        keys = get_api_keys(company, provider)
-
-        if not keys:
-            return Response({'error': f'Không có API Key nào đang hoạt động cho nhà cung cấp "{provider}".'}, status=400)
-
-        api_key = keys[0]
+        
+        if custom_key:
+            api_key = custom_key.strip()
+        else:
+            from .services import get_api_keys
+            keys = get_api_keys(company, provider)
+            if not keys:
+                return Response({'error': f'Không có API Key nào đang hoạt động cho nhà cung cấp "{provider}".'}, status=400)
+            api_key = keys[0]
+            
         models = []
 
         try:

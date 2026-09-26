@@ -175,13 +175,17 @@ export default function AiAgentSettings() {
   };
 
 
-  const handleFetchModels = async (provider) => {
+  const handleFetchModels = async (provider, customApiKey = null) => {
     if (!provider) return;
     setFetchingModels(true);
     setFetchedModels([]);
     setFetchedKey("");
     try {
-      const { data } = await api.get(`ai_agents/settings/fetch_models/?provider=${provider}`);
+      let url = `ai_agents/settings/fetch_models/?provider=${provider}`;
+      if (customApiKey) {
+        url += `&api_key=${encodeURIComponent(customApiKey)}`;
+      }
+      const { data } = await api.get(url);
       if (data.models && data.models.length > 0) {
         setFetchedModels(data.models);
         setFetchedKey(data.used_key || "");
@@ -1026,6 +1030,46 @@ export default function AiAgentSettings() {
           <Form.Item name='api_key' label='API Key' rules={[{required: true}]}>
             <Input.Password placeholder='Nhập API Key...' />
           </Form.Item>
+
+          <Form.Item shouldUpdate={(prevValues, currentValues) => prevValues.provider !== currentValues.provider || prevValues.api_key !== currentValues.api_key} noStyle>
+            {({ getFieldValue }) => {
+              const currentProvider = getFieldValue('provider');
+              const currentApiKey = getFieldValue('api_key');
+              const canFetch = currentProvider && currentApiKey && currentApiKey.trim().length > 5;
+              
+              return (
+                <Form.Item 
+                  name='fallback_model' 
+                  label={
+                    <Space style={{ width: '100%', justifyContent: 'space-between' }}>
+                      <Typography.Text strong>Model dự phòng (Tùy chọn)</Typography.Text>
+                      <Button 
+                        size='small' 
+                        type='primary' 
+                        ghost 
+                        icon={<SyncOutlined spin={fetchingModels} />} 
+                        loading={fetchingModels} 
+                        disabled={!canFetch}
+                        onClick={() => handleFetchModels(currentProvider, currentApiKey)}
+                      >
+                        Lấy mô hình thực tế
+                      </Button>
+                    </Space>
+                  }
+                  help='Model này sẽ được dùng khi hệ thống tự động mượn key này để vượt rào (fallback).'
+                >
+                  {fetchedModels && fetchedModels.length > 0 ? (
+                    <Select showSearch placeholder='Chọn hoặc nhập tên mô hình...' disabled={!canFetch}>
+                      {fetchedModels.map(m => <Select.Option key={m.id} value={m.id}>{m.id}</Select.Option>)}
+                    </Select>
+                  ) : (
+                    <Input placeholder='Ví dụ: gemini-2.0-flash' disabled={!canFetch} />
+                  )}
+                </Form.Item>
+              );
+            }}
+          </Form.Item>
+
           <Form.Item name='priority' label='Độ ưu tiên (Ưu tiên cao nhất = 100)' help='Các Key có priority cao hơn sẽ được gọi trước, nếu hết tiền sẽ tự trượt xuống Key có priority thấp hơn.'>
             <Input type='number' />
           </Form.Item>

@@ -56,6 +56,7 @@ class CompanyAiKey(models.Model):
     api_key = models.CharField(max_length=255)
     is_active = models.BooleanField(default=True)
     priority = models.IntegerField(default=0, help_text="Độ ưu tiên (cao hơn sẽ được chọn trước)")
+    fallback_model = models.CharField(max_length=100, blank=True, null=True, help_text="Model sẽ dùng khi key này được gọi làm nền tảng dự phòng")
     created_at = models.DateTimeField(auto_now_add=True)
     
     def __str__(self):
