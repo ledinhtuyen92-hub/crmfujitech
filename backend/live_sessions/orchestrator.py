@@ -13,6 +13,7 @@ from live_sessions.audio.storage import LocalAudioStorageBackend
 from live_sessions.protocol.commands import SpeechSpeakPayloadSerializer
 from live_sessions.protocol.envelope import ProtocolEnvelopeSerializer
 from live_sessions.sequence import LiveSequenceService, SequenceUnavailableException
+from live_sessions.console_events import LiveConsoleEventService
 
 logger = logging.getLogger(__name__)
 
@@ -34,6 +35,13 @@ class LiveOrchestrator:
 
         if not correlation_id:
             correlation_id = str(uuid.uuid4())
+            
+        LiveConsoleEventService.emit(
+            session_id=session_id,
+            event_type="live.comment.received",
+            payload={"text": user_message},
+            correlation_id=correlation_id
+        )
 
         # 1. Load LiveSession
         try:
@@ -45,10 +53,12 @@ class LiveOrchestrator:
         # 2. Validate status
         if session.status == LiveSession.STATUS_HUMAN_TAKEOVER:
             logger.info(f"[Session: {session_id}][Corr: {correlation_id}] Session is in HUMAN_TAKEOVER. Suppressed.")
+            LiveConsoleEventService.emit(session_id, "live.ai.suppressed", {"reason": "human_takeover"}, correlation_id)
             return {"status": "suppressed", "reason": "human_takeover"}
 
         if session.status != LiveSession.STATUS_RUNNING:
             logger.info(f"[Session: {session_id}][Corr: {correlation_id}] Session is not RUNNING (current: {session.status}). Suppressed.")
+            LiveConsoleEventService.emit(session_id, "live.ai.suppressed", {"reason": f"not_running ({session.status})"}, correlation_id)
             return {"status": "suppressed", "reason": "not_running"}
 
         # 3. Load Agent
@@ -62,8 +72,10 @@ class LiveOrchestrator:
         try:
             context_text = search_knowledge(agent, user_message, limit=3, product_id=session.product_id)
             logger.info(f"[Session: {session_id}][Corr: {correlation_id}] RAG completed.")
+            LiveConsoleEventService.emit(session_id, "live.rag.completed", {"context_found": bool(context_text)}, correlation_id)
         except Exception as e:
             logger.error(f"[Session: {session_id}][Corr: {correlation_id}] RAG error: {e}")
+            LiveConsoleEventService.emit(session_id, "live.rag.error", {"error": str(e)}, correlation_id)
             # Continue even if RAG fails
 
         # 4.5 Fetch Product Truth
@@ -80,6 +92,8 @@ class LiveOrchestrator:
             
             if platform_product and platform_product.live_price_override:
                 product_truth += f"- GIÁ ĐANG CHẠY FLASH SALE TRÊN LIVE: {platform_product.live_price_override} (Ưu tiên báo giá này cho khách livestream)\n"
+                
+            LiveConsoleEventService.emit(session_id, "live.product_truth.loaded", {"product_name": product.name, "sku": product.sku, "has_live_price": bool(platform_product and platform_product.live_price_override)}, correlation_id)
         except Exception as e:
             logger.error(f"[Session: {session_id}][Corr: {correlation_id}] Failed to load platform product truth: {e}")
 
@@ -123,6 +137,7 @@ class LiveOrchestrator:
             logger.info(f"[Session: {session_id}][Corr: {correlation_id}] AI completed.")
         except Exception as e:
             logger.error(f"[Session: {session_id}][Corr: {correlation_id}] AI error: {e}")
+            LiveConsoleEventService.emit(session_id, "live.ai.error", {"error": str(e)}, correlation_id)
             return {"status": "error", "reason": "ai_failure"}
 
         intent = ai_result.get("intent", "UNKNOWN")
@@ -130,6 +145,13 @@ class LiveOrchestrator:
         logger.info(f"[Session: {session_id}][Corr: {correlation_id}] AI Intent: {intent}, Action: {action}")
 
         reply_text = ai_result.get("reply", "").strip()
+        
+        LiveConsoleEventService.emit(session_id, "live.ai.completed", {
+            "intent": intent,
+            "action": action,
+            "reply_length": len(reply_text),
+            "reply_text": reply_text
+        }, correlation_id)
         
         # Save to context
         if action != "IGNORE":
@@ -154,8 +176,10 @@ class LiveOrchestrator:
             }
             audio_result = self.tts_provider.generate(reply_text, voice_config)
             logger.info(f"[Session: {session_id}][Corr: {correlation_id}] TTS completed.")
+            LiveConsoleEventService.emit(session_id, "live.tts.completed", {"format": audio_result.format, "bytes": len(audio_result.audio_bytes)}, correlation_id)
         except Exception as e:
             logger.error(f"[Session: {session_id}][Corr: {correlation_id}] TTS error: {e}")
+            LiveConsoleEventService.emit(session_id, "live.tts.error", {"error": str(e)}, correlation_id)
             return {"status": "error", "reason": "tts_failure"}
 
         # 7. Store Audio
@@ -220,8 +244,10 @@ class LiveOrchestrator:
                 }
             )
             logger.info(f"[Session: {session_id}][Corr: {correlation_id}][Cmd: {command_id}][Msg: {message_id}] Command built and sent.")
+            LiveConsoleEventService.emit(session_id, "live.speech.dispatched", {"command_id": command_id, "message_id": message_id}, correlation_id)
         except Exception as e:
             logger.error(f"[Session: {session_id}][Corr: {correlation_id}] Channel layer error: {e}")
+            LiveConsoleEventService.emit(session_id, "live.speech.error", {"error": str(e)}, correlation_id)
             return {"status": "error", "reason": "channel_layer_failure"}
 
         return {

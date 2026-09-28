@@ -86,6 +86,10 @@ class LiveSessionViewSet(viewsets.ModelViewSet):
         'destroy': 'ai_agent.manage_agents',
         'start': 'ai_agent.manage_agents',
         'stop': 'ai_agent.manage_agents',
+        'pause': 'ai_agent.manage_agents',
+        'human_takeover': 'ai_agent.manage_agents',
+        'resume': 'ai_agent.manage_agents',
+        'test_comment': 'ai_agent.manage_agents',
     }
 
     def get_queryset(self):
@@ -105,6 +109,43 @@ class LiveSessionViewSet(viewsets.ModelViewSet):
         session = self.get_object()
         session.change_status(LiveSession.STATUS_STOPPED)
         return Response({'status': session.status})
+
+    @action(detail=True, methods=['post'])
+    def pause(self, request, pk=None):
+        session = self.get_object()
+        session.change_status(LiveSession.STATUS_PAUSED)
+        return Response({'status': session.status})
+
+    @action(detail=True, methods=['post'], url_path='human-takeover')
+    def human_takeover(self, request, pk=None):
+        session = self.get_object()
+        session.change_status(LiveSession.STATUS_HUMAN_TAKEOVER)
+        return Response({'status': session.status})
+
+    @action(detail=True, methods=['post'])
+    def resume(self, request, pk=None):
+        session = self.get_object()
+        session.change_status(LiveSession.STATUS_RUNNING)
+        return Response({'status': session.status})
+        
+    @action(detail=True, methods=['post'], url_path='test-comment')
+    def test_comment(self, request, pk=None):
+        session = self.get_object()
+        content = request.data.get('content')
+        if not content:
+            return Response({'detail': 'content is required'}, status=status.HTTP_400_BAD_REQUEST)
+            
+        import uuid
+        correlation_id = f"test_{uuid.uuid4().hex[:8]}"
+        
+        # Dispatch to existing live comment pipeline
+        from .tasks import handle_live_message
+        handle_live_message.delay(
+            session_id=str(session.id),
+            user_message=content,
+            correlation_id=correlation_id
+        )
+        return Response({'status': 'dispatched', 'correlation_id': correlation_id})
 
 
 class IsAuthenticatedDevice(permissions.BasePermission):

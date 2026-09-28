@@ -190,3 +190,51 @@ class DeviceAgentConsumer(AsyncWebsocketConsumer):
             }
         }
         await self.send(text_data=json.dumps(error_envelope))
+
+class AdminConsoleConsumer(AsyncWebsocketConsumer):
+    
+    async def connect(self):
+        user = self.scope.get("user")
+        if not user or not user.is_authenticated:
+            logger.warning("Admin WS rejected: unauthenticated.")
+            await self.close(code=4001)
+            return
+
+        self.session_id = self.scope['url_route']['kwargs']['session_id']
+        
+        # Verify Session
+        try:
+            self.session = await database_sync_to_async(LiveSession.objects.get)(id=self.session_id, company=user.company)
+        except LiveSession.DoesNotExist:
+            logger.warning(f"Admin WS rejected: session {self.session_id} not found for company {user.company.id}.")
+            await self.close(code=4004)
+            return
+
+        self.group_name = f"live_session_{self.session_id}_admin"
+        
+        await self.channel_layer.group_add(
+            self.group_name,
+            self.channel_name,
+        )
+
+        await self.accept()
+        logger.info(f"Admin WS connected: session_id={self.session_id} user={user.id}")
+
+    async def disconnect(self, close_code):
+        if hasattr(self, 'group_name'):
+            await self.channel_layer.group_discard(
+                self.group_name,
+                self.channel_name,
+            )
+        logger.info(f"Admin WS disconnected: session_id={getattr(self, 'session_id', 'unknown')} code={close_code}")
+
+    async def receive(self, text_data):
+        # Admin is strictly read-only for now via WS, commands are sent via REST
+        logger.info(f"Admin WS received message (ignored): {text_data}")
+
+    async def admin_event(self, event):
+        """
+        Called when backend wants to send a console event down to admin.
+        """
+        envelope = event["envelope"]
+        await self.send(text_data=json.dumps(envelope))
