@@ -250,10 +250,11 @@ export default function Inventory() {
   const [submitting, setSubmitting] = useState(false)
 
   // Permissions
-  const canCreate = hasPermission('inventory.create')
-  const canEdit = hasPermission('inventory.edit')
-  const canDelete = hasPermission('inventory.delete')
+  const canCreate = hasPermission(['inventory.import', 'inventory.adjust'])
+  const canEdit = hasPermission('products.edit')
+  const canDelete = hasPermission('products.delete')
   const canManualExport = hasPermission('inventory.manual_export')
+  const canManageWarehouse = hasPermission('inventory.manage_warehouse')
 
   // ── Fetch Data ────────────────────────────────────────────────────────
   const fetchProducts = useCallback(async () => {
@@ -2093,7 +2094,7 @@ export default function Inventory() {
               ),
               children: (
                 <div>
-                  {canCreate && (
+                  {canManageWarehouse && (
                     <Row justify="end" style={{ marginBottom: 16 }}>
                       <Button
                         type="primary"
@@ -2128,7 +2129,7 @@ export default function Inventory() {
                             <Text>{w.location || '—'}</Text>
                           </div>
                           <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
-                            {canEdit && (
+                            {canManageWarehouse && (
                               <Button
                                 type="text"
                                 icon={<EditOutlined style={{ color: '#d97706' }} />}
@@ -2136,7 +2137,7 @@ export default function Inventory() {
                                 title="Sửa kho hàng"
                               />
                             )}
-                            {canDelete && (
+                            {canManageWarehouse && (
                               <Popconfirm
                                 title="Xoá kho hàng?"
                                 description="Bạn có chắc chắn muốn xoá kho hàng này không?"
@@ -2180,7 +2181,7 @@ export default function Inventory() {
                           align: 'right',
                           render: (_, r) => (
                             <Space>
-                              {canEdit && (
+                              {canManageWarehouse && (
                                 <Button
                                   type="text"
                                   icon={<EditOutlined style={{ color: '#d97706' }} />}
@@ -2188,7 +2189,7 @@ export default function Inventory() {
                                   title="Sửa kho hàng"
                                 />
                               )}
-                              {canDelete && (
+                              {canManageWarehouse && (
                                 <Popconfirm
                                   title="Xoá kho hàng?"
                                   description="Bạn có chắc chắn muốn xoá kho hàng này không?"
@@ -2564,9 +2565,16 @@ export default function Inventory() {
                                   rules={[{ required: true, message: 'Chọn sản phẩm' }]}
                                   style={{ marginBottom: 0 }}
                                 >
-                                  <Select showSearch optionFilterProp="children" placeholder="Chọn sản phẩm...">
+                                  <Select 
+                                    showSearch 
+                                    optionFilterProp="children" 
+                                    placeholder="Chọn sản phẩm..."
+                                    popupMatchSelectWidth={false}
+                                  >
                                     {availableProds.map((p) => (
-                                      <Option key={p.id} value={p.id}>{p.name} ({p.sku})</Option>
+                                      <Option key={p.id} value={p.id} title={`${p.name} (${p.sku})`}>
+                                        {p.name} ({p.sku})
+                                      </Option>
                                     ))}
                                   </Select>
                                 </Form.Item>
@@ -2589,14 +2597,14 @@ export default function Inventory() {
                               const txnType = getFieldValue('type');
                               const wId = getFieldValue('warehouse');
                               const pId = getFieldValue(['items', name, 'product']);
-                              if (!pId || !wId || txnType === 'import') return null;
+                              if (!pId || !wId) return null;
                               const stock = modalStockLevels.find(
                                 s => Number(s.product) === Number(pId) && Number(s.warehouse) === Number(wId)
                               );
-                              const qty = stock ? Number(stock.quantity) : null;
+                              const qty = stock ? Number(stock.quantity) : 0;
                               const prod = products.find(p => p.id === pId);
                               const unit = prod?.unit || 'cái';
-                              if (qty === null) return null;
+                              
                               const isLow = qty <= (stock?.min_quantity || 0);
                               return (
                                 <div style={{

@@ -347,8 +347,9 @@ class Order(models.Model):
                         pass
                 self.approve(approved_by_user=acted_by)
             else:
-                self.financial_status = self.FIN_STATUS_CREDIT_APPROVED
-                self.save(update_fields=["financial_status", "updated_at"])
+                if self.financial_status != self.FIN_STATUS_FULLY_PAID:
+                    self.financial_status = self.FIN_STATUS_CREDIT_APPROVED
+                    self.save(update_fields=["financial_status", "updated_at"])
                 try:
                     from orders.signals import check_and_trigger_mo_gate
                     check_and_trigger_mo_gate(self)
