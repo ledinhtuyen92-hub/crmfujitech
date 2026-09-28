@@ -158,3 +158,31 @@ class DeviceSessionViewSet(viewsets.ViewSet):
             return Response({'detail': str(e)}, status=400)
             
         return Response({'status': session.status})
+
+from django.http import FileResponse, Http404
+from rest_framework.decorators import api_view, permission_classes
+from .audio.storage import LocalAudioStorageBackend
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticatedDevice])
+def serve_audio_asset(request, token):
+    """
+    Secure endpoint to download audio assets.
+    The token acts as a signed URL, but we also enforce that the requesting Device
+    belongs to the same company as the asset.
+    """
+    storage = LocalAudioStorageBackend()
+    payload = storage.verify_token(token)
+    
+    if not payload:
+        raise Http404("Audio token invalid or expired.")
+        
+    device = request.auth
+    if str(device.company_id) != payload["company_id"]:
+        return Response({'detail': 'Forbidden. Tenant mismatch.'}, status=403)
+        
+    file_path = storage.get_audio_path(payload)
+    if not file_path:
+        raise Http404("Audio file not found on server.")
+        
+    return FileResponse(open(file_path, 'rb'), content_type=f'audio/{payload["format"]}')

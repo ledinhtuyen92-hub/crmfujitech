@@ -75,6 +75,79 @@ import uuid
 from django.utils import timezone
 from django.core.exceptions import ValidationError
 
+class PlatformAccount(models.Model):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    company = models.ForeignKey(
+        "users.Company",
+        on_delete=models.CASCADE,
+        related_name="platform_accounts",
+        verbose_name="Công ty",
+    )
+    platform = models.CharField(
+        max_length=50,
+        choices=LivePlatformProduct.PLATFORM_CHOICES,
+        verbose_name="Nền tảng",
+    )
+    account_id = models.CharField(max_length=255, verbose_name="External Account ID")
+    display_name = models.CharField(max_length=255, verbose_name="Tên hiển thị")
+    
+    # Security Note: Should be encrypted in production
+    access_token = models.TextField(blank=True, null=True, verbose_name="Access Token")
+    refresh_token = models.TextField(blank=True, null=True, verbose_name="Refresh Token")
+    token_expires_at = models.DateTimeField(blank=True, null=True, verbose_name="Token Hết hạn")
+    
+    scopes = models.TextField(blank=True, null=True, verbose_name="Scopes")
+    status = models.CharField(max_length=50, default="active", verbose_name="Trạng thái")
+    metadata = models.JSONField(default=dict, blank=True, verbose_name="Metadata")
+    
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = "Tài khoản nền tảng"
+        verbose_name_plural = "Tài khoản nền tảng"
+        constraints = [
+            models.UniqueConstraint(
+                fields=["company", "platform", "account_id"],
+                name="unique_platform_account"
+            )
+        ]
+
+    def save(self, *args, **kwargs):
+        from .platforms.security import encrypt_token, decrypt_token
+        
+        def encrypt_if_needed(val):
+            if not val:
+                return val
+            try:
+                # If it can be decrypted, it's already encrypted
+                decrypt_token(val)
+                return val
+            except Exception:
+                return encrypt_token(val)
+
+        self.access_token = encrypt_if_needed(self.access_token)
+        self.refresh_token = encrypt_if_needed(self.refresh_token)
+        super().save(*args, **kwargs)
+
+    def get_decrypted_access_token(self):
+        from .platforms.security import decrypt_token
+        try:
+            return decrypt_token(self.access_token)
+        except Exception:
+            return self.access_token
+
+    def get_decrypted_refresh_token(self):
+        from .platforms.security import decrypt_token
+        try:
+            return decrypt_token(self.refresh_token)
+        except Exception:
+            return self.refresh_token
+
+    def __str__(self):
+        return f"{self.display_name} ({self.get_platform_display()})"
+
+
 class LiveDevice(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     company = models.ForeignKey(
@@ -136,6 +209,14 @@ class LiveSession(models.Model):
         choices=LivePlatformProduct.PLATFORM_CHOICES,
         verbose_name="Nền tảng",
     )
+    platform_account = models.ForeignKey(
+        PlatformAccount,
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="sessions",
+        verbose_name="Tài khoản nền tảng",
+    )
     product = models.ForeignKey(
         "inventory.Product",
         on_delete=models.PROTECT,
@@ -153,6 +234,18 @@ class LiveSession(models.Model):
         choices=STATUS_CHOICES,
         default=STATUS_DRAFT,
         verbose_name="Trạng thái",
+    )
+    external_session_id = models.CharField(
+        max_length=255, 
+        null=True, 
+        blank=True, 
+        verbose_name="ID Phiên Live (Platform)"
+    )
+    stream_url = models.URLField(
+        max_length=1000, 
+        null=True, 
+        blank=True, 
+        verbose_name="RTMP Stream URL"
     )
     started_at = models.DateTimeField(null=True, blank=True, verbose_name="Thời gian bắt đầu")
     ended_at = models.DateTimeField(null=True, blank=True, verbose_name="Thời gian kết thúc")
@@ -174,6 +267,10 @@ class LiveSession(models.Model):
             raise ValidationError("Sản phẩm không thuộc cùng công ty với phiên Live.")
         if self.ai_agent_id and self.company_id != self.ai_agent.company_id:
             raise ValidationError("AI Agent không thuộc cùng công ty với phiên Live.")
+        if self.platform_account_id and self.company_id != self.platform_account.company_id:
+            raise ValidationError("Tài khoản nền tảng không thuộc cùng công ty với phiên Live.")
+        if self.platform_account_id and self.platform != self.platform_account.platform:
+            raise ValidationError("Nền tảng của phiên Live không khớp với nền tảng của tài khoản.")
 
     def change_status(self, new_status):
         valid_transitions = {

@@ -108,6 +108,10 @@ class AiAgent(models.Model):
     drip_followup_hours = models.IntegerField(default=24, help_text="Số giờ chờ trước khi tự động bám đuổi")
     debounce_delay = models.IntegerField(default=4, help_text="Thời gian chờ (giây) sau tin nhắn cuối để gộp các tin nhắn lại. Khuyên dùng: 4-15 giây", verbose_name="Thời gian chờ gộp tin (Debounce)")
     
+    # Cấu hình Giọng nói (TTS)
+    tts_voice = models.CharField(max_length=50, default='alloy', help_text="Giọng đọc (vd: alloy, nova, fable, onyx, echo, shimmer)")
+    tts_speed = models.FloatField(default=1.0, help_text="Tốc độ đọc (0.25 - 4.0)")
+    
     is_active = models.BooleanField(default=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
