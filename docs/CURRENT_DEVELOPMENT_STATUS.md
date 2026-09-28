@@ -97,7 +97,7 @@ ACK_COMPLETED -> Cloud
 | Phase 1D-7E | GREEN | Shopee Comment Polling | Celery Beat polling API Shopee, Deduplication. |
 | Phase 1D-7F | GREEN | Live Response Pipeline | RAG + Product Truth + Intent/Action router. |
 | Phase 1D-7G | GREEN | AI -> TTS -> Avatar | Ánh xạ cấu hình giọng nói AI sang Audio TTS. |
-| Phase 1D-7H | YELLOW | Real E2E Validation | Level 1 (Mocked E2E) = GREEN (24/24 Tests). Level 2 (Real Environment) = BLOCKED (Thiếu Windows Host có Python/Audio driver + OpenAI DB credential config issue). |
+| Phase 1D-7H | GREEN | Real E2E Validation | Cloud -> Live Studio Audio E2E (Websocket, Audio Storage, Pygame, ACK_COMPLETED). |
 
 ==================================================
 ## 4. CURRENT VERIFIED CAPABILITIES
@@ -121,25 +121,24 @@ ACK_COMPLETED -> Cloud
 ==================================================
 - **Relevant Test Suites:** `live_sessions/tests_*.py`, `live_studio/tests/test_*.py`
 - **Unit Tests Coverage:** Hàng chục unit test cho Orchestrator, Auth, Platforms, Protocol, Websocket.
-- **Latest E2E Test (Phase A/B Live Test Console):** 3/3 PASS (GREEN).
+- **Latest E2E Test (Phase A/B/C Live Test Console):** 7/7 PASS (GREEN).
 - **Validation Level 1 (Fully Mocked E2E):** GREEN.
-- **Validation Level 2 (Real System/Device):** BLOCKED (thiếu môi trường).
-- **Validation Level 3 (Real Shopee):** BLOCKED (phụ thuộc Level 2).
+- **Validation Level 2 (Real System/Device):** GREEN (Live Studio Windows E2E Audio).
+- **Validation Level 3 (Real Shopee/TikTok):** BLOCKED (phụ thuộc Level 2 - Live Streaming Execution Layer).
 
 ==================================================
 ## 6. CURRENT BLOCKERS
 ==================================================
 | Blocker | Impact | Status | Resolution |
 |----------|--------|--------|------------|
-| Missing Windows Host | Thiết bị `live_studio/` không thể chạy trên môi trường Linux Docker (yêu cầu PyGame/PyAudio cho giao diện Avatar/Audio driver). | BLOCKED (Validation L2) | Developer cần chạy `live_studio/main.py` trên Windows Host thực tế. |
-| OpenAI API Key | Database `CompanyAiKey` có key thật, nhưng `OpenAITTSProvider` trong `LiveOrchestrator` hiện tại lại đang dựa vào biến môi trường `settings.OPENAI_API_KEY` (Technical Discrepancy). | BLOCKED (Validation L2) | Yêu cầu user config biến môi trường hoặc refactor `OpenAITTSProvider` để đọc key từ Database như `generate_ai_reply()`. |
+| Missing Windows Host | Thiết bị `live_studio/` không thể chạy trên môi trường Linux Docker. | RESOLVED | Đã cấu hình và chạy trên Windows Host thực tế. |
+| OpenAI API Key | `OpenAITTSProvider` phụ thuộc biến môi trường `settings.OPENAI_API_KEY`. | RESOLVED | Đã tích hợp với `CompanyAiKey` mechanism giống AI Core. |
 
 ==================================================
 ## 7. TECHNICAL DEBT
 ==================================================
 - **MVP Limitation:** Orchestrator hiện đang chờ phản hồi đồng bộ từ TTS API OpenAI (blocking operation bên trong ASGI/Celery).
 - **MVP Limitation:** RAG đang dựa trên Google GenAI nhúng trực tiếp; ChromaDB nhúng; nên không tối ưu cho high-concurrency (nhưng phù hợp MVP).
-- **Technical Debt:** `OpenAITTSProvider` bị cứng hóa phụ thuộc vào `settings.OPENAI_API_KEY`, không dùng chung luồng luân chuyển API Key đa tenant của hệ thống AI Core (đã ghi nhận trong blocker).
 
 ==================================================
 ## 8. SECURITY RULES
@@ -237,19 +236,28 @@ live_studio/ (Mã nguồn Device thực thi trên Windows Host)
 ==================================================
 ## 14. CURRENT DEVELOPMENT TARGET
 ==================================================
-**NEXT DEVELOPMENT TARGET:** "Live Test Console V1" (Phase C/D)
+**CURRENT DEVELOPMENT STAGE:**
+Cloud -> Live Studio Audio E2E — GREEN
 
-Mục tiêu hiện tại là hoàn tất giao diện frontend cho Live Test Console V1 (Tạo Session, Chọn cấu hình, Gửi Synthetic Comment, và Quan sát Event Timeline từ Websocket Admin). 
-Backend infrastructure cho tính năng này (Phase A và B) đã được thực hiện và TEST GREEN. 
-Việc tiếp theo là Code React Page.
+**NEXT DEVELOPMENT STAGE:**
+Live Streaming Execution Layer
+
+Expected next investigation:
+- Live Studio video output
+- Encoder architecture
+- RTMP execution
+- Platform streaming adapter
+- Shopee streaming execution
+- TikTok capability audit/streaming constraints
 
 ==================================================
 ## 15. PROPOSED NEXT IMPLEMENTATION PLAN
 ==================================================
 - **Phase A (Backend Console Infra):** IMPLEMENTED (GREEN)
 - **Phase B (Backend Unit Testing):** IMPLEMENTED (GREEN)
-- **Phase C (React Frontend UI):** PLANNED / NOT IMPLEMENTED YET
-- **Phase D (E2E Frontend Integration):** PLANNED / NOT IMPLEMENTED YET
+- **Phase C (React Frontend UI):** IMPLEMENTED (GREEN)
+- **Phase D (Real E2E Audio):** IMPLEMENTED (GREEN)
+- **Phase E (Live Streaming Execution Layer):** PLANNED / NOT IMPLEMENTED YET
 
 ==================================================
 ## 16. ENVIRONMENT REQUIREMENTS
@@ -280,8 +288,7 @@ Việc tiếp theo là Code React Page.
 ==================================================
 | Source | Current Reality | Action |
 |--------|-----------------|--------|
-| Phase 1D-7H Plan | Môi trường test không hỗ trợ Windows Host và thiếu OPENAI_API_KEY env. | Đình chỉ E2E L2 Test. |
-| AI Core Credentials | Hệ thống AI Core đọc từ DB (`CompanyAiKey`), nhưng `OpenAITTSProvider` lại đọc từ `settings.OPENAI_API_KEY`. | Đã log vào Blockers / Technical Debt để refactor sau. |
+| Shopee/TikTok Live Streaming | Chưa được implement và kiểm chứng thư viện encoder. | Khảo sát RTMP architecture trước khi code. |
 
 ==================================================
 ## 19. LAST UPDATED
@@ -289,5 +296,4 @@ Việc tiếp theo là Code React Page.
 - **Last Updated:** 2026-09-28
 - **Updated By:** AI-assisted development (Antigravity/Gemini)
 - **Current Branch:** V2
-- **Current Commit:** 030d36277becfb4d87d769e1cf1788d4c1a994ca
-- **Repository Status:** Có file sửa đổi (`consumers.py`, `orchestrator.py`, `routing.py`, `views.py`) và tạo mới (`console_events.py`, `tests_console.py`).
+- **Repository Status:** Console Phase C hoàn tất. Cloud -> Live Studio E2E GREEN. Sẵn sàng cho Streaming Layer.

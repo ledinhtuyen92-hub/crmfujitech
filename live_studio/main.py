@@ -202,3 +202,39 @@ class LiveStudioApp:
         ack_msg = self.ack_manager.build_ack(cmd_id, ACK_FAILED, "", error_code)
         asyncio.create_task(self.ws_client.send(ack_msg))
         self.queue_manager.mark_done(item)
+
+import sys
+
+async def run_app():
+    if len(sys.argv) < 4:
+        print("Usage: python main.py <ws_url> <token> <session_id>")
+        sys.exit(1)
+        
+    ws_url = sys.argv[1]
+    token = sys.argv[2]
+    session_id = sys.argv[3]
+    
+    from live_studio.execution.audio_player import PygameAudioPlayer
+    
+    app = LiveStudioApp(
+        ws_url=ws_url,
+        token=token,
+        session_id=session_id,
+        audio_player=PygameAudioPlayer()
+    )
+    
+    print(f"CONNECTING: {ws_url}")
+    try:
+        await app.start()
+        # Keep running
+        while True:
+            await asyncio.sleep(1)
+    except KeyboardInterrupt:
+        pass
+    finally:
+        await app.stop()
+
+if __name__ == '__main__':
+    logging.basicConfig(level=logging.INFO, format='%(asctime)s [%(levelname)s] %(name)s: %(message)s')
+    asyncio.run(run_app())
+

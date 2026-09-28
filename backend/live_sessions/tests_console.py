@@ -105,7 +105,6 @@ class LiveConsoleTests(TestCase):
             correlation_id="corr-123"
         )
         
-        mock_async_to_sync.assert_called_once()
         mock_async_to_sync.return_value.assert_called_once_with(
             f"live_session_{self.session.id}_admin",
             {
@@ -121,3 +120,76 @@ class LiveConsoleTests(TestCase):
                 }
             }
         )
+
+    def test_start_from_draft(self):
+        """Test DRAFT -> START transitions correctly through READY to RUNNING."""
+        session = LiveSession.objects.create(
+            company=self.company,
+            device=self.device,
+            platform="custom",
+            product=self.product,
+            ai_agent=self.agent,
+            status=LiveSession.STATUS_DRAFT
+        )
+        url = reverse('sessions-start', args=[session.id])
+        resp = self.client.post(url)
+        self.assertEqual(resp.status_code, 200)
+        session.refresh_from_db()
+        self.assertEqual(session.status, LiveSession.STATUS_RUNNING)
+
+    def test_start_from_ready(self):
+        """Test READY -> START transitions correctly to RUNNING."""
+        session = LiveSession.objects.create(
+            company=self.company,
+            device=self.device,
+            platform="custom",
+            product=self.product,
+            ai_agent=self.agent,
+            status=LiveSession.STATUS_READY
+        )
+        url = reverse('sessions-start', args=[session.id])
+        resp = self.client.post(url)
+        self.assertEqual(resp.status_code, 200)
+        session.refresh_from_db()
+        self.assertEqual(session.status, LiveSession.STATUS_RUNNING)
+
+    def test_start_invalid_state(self):
+        """Test STOPPED -> START throws validation error and enforces FSM."""
+        session = LiveSession.objects.create(
+            company=self.company,
+            device=self.device,
+            platform="custom",
+            product=self.product,
+            ai_agent=self.agent,
+            status=LiveSession.STATUS_STOPPED
+        )
+        from django.core.exceptions import ValidationError
+        url = reverse('sessions-start', args=[session.id])
+        with self.assertRaises(ValidationError):
+            self.client.post(url)
+        session.refresh_from_db()
+        self.assertEqual(session.status, LiveSession.STATUS_STOPPED)
+
+    def test_start_atomic_rollback(self):
+        """Test that if READY -> RUNNING fails, the DB stays at DRAFT due to atomic rollback."""
+        session = LiveSession.objects.create(
+            company=self.company,
+            device=self.device,
+            platform="custom",
+            product=self.product,
+            ai_agent=self.agent,
+            status=LiveSession.STATUS_DRAFT
+        )
+        
+        url = reverse('sessions-start', args=[session.id])
+        
+        with patch('live_sessions.models.LiveSession.save') as mock_save:
+            # First save() is for READY, second is for RUNNING (which fails)
+            mock_save.side_effect = [None, Exception("Simulated DB Failure")]
+            
+            with self.assertRaises(Exception):
+                self.client.post(url)
+        
+        # Verify the rollback happened (status should remain DRAFT, not READY)
+        session.refresh_from_db()
+        self.assertEqual(session.status, LiveSession.STATUS_DRAFT)

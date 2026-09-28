@@ -154,6 +154,24 @@ class DeviceAgentConsumer(AsyncWebsocketConsumer):
             logger.info(f"Session Sync: {payload}")
             # Mark the connection as ready to receive/send commands
             self.is_synchronized = True
+            
+            # Respond to device to unblock its state
+            sync_response = {
+                "protocol_version": "1.0",
+                "type": "command",
+                "name": "session.sync",
+                "message_id": str(uuid.uuid4()),
+                "timestamp": timezone.now().isoformat(),
+                "sequence_number": 0,
+                "session_id": self.session_id,
+                "payload": {
+                    "cloud_to_device_sequence": 0,
+                    "device_to_cloud_sequence": payload.get('device_to_cloud_sequence', 0),
+                    "status": "synchronized"
+                }
+            }
+            await self.send(text_data=json.dumps(sync_response))
+            
         elif msg_type == 'ack':
             logger.info(f"Received ACK for command {payload.get('command_id')}: {payload.get('status')}")
 
@@ -204,7 +222,7 @@ class AdminConsoleConsumer(AsyncWebsocketConsumer):
         
         # Verify Session
         try:
-            self.session = await database_sync_to_async(LiveSession.objects.get)(id=self.session_id, company=user.company)
+            self.session = await database_sync_to_async(LiveSession.objects.get)(id=self.session_id, company_id=user.company_id)
         except LiveSession.DoesNotExist:
             logger.warning(f"Admin WS rejected: session {self.session_id} not found for company {user.company.id}.")
             await self.close(code=4004)

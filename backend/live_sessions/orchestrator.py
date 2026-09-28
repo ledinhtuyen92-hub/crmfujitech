@@ -1,5 +1,6 @@
 import logging
 import uuid
+import json
 from typing import Dict, Any, Optional
 from django.utils import timezone
 from channels.layers import get_channel_layer
@@ -23,7 +24,8 @@ class LiveOrchestrator:
     Nhận tin nhắn -> RAG -> AI Core -> TTS -> Storage -> WebSocket.
     """
     def __init__(self):
-        self.tts_provider = OpenAITTSProvider()
+        # TTS Provider is initialized dynamically per-session in process_comment
+        # to ensure it uses the correct CompanyAiKey.
         self.audio_storage = LocalAudioStorageBackend()
         self.channel_layer = get_channel_layer()
 
@@ -174,7 +176,15 @@ class LiveOrchestrator:
                 "voice": getattr(agent, 'tts_voice', 'alloy'), 
                 "speed": getattr(agent, 'tts_speed', 1.0)
             }
+            
+            # Resolve AI credential via existing AI Core resolver
+            from ai_agents.services import get_api_keys
+            tts_keys = get_api_keys(session.company, 'openai')
+            resolved_key = tts_keys[0] if tts_keys else None
+            
+            self.tts_provider = OpenAITTSProvider(api_key=resolved_key)
             audio_result = self.tts_provider.generate(reply_text, voice_config)
+            
             logger.info(f"[Session: {session_id}][Corr: {correlation_id}] TTS completed.")
             LiveConsoleEventService.emit(session_id, "live.tts.completed", {"format": audio_result.format, "bytes": len(audio_result.audio_bytes)}, correlation_id)
         except Exception as e:
@@ -234,13 +244,13 @@ class LiveOrchestrator:
             return {"status": "error", "reason": "invalid_envelope_schema"}
 
         # 9. Send to Channel Layer
-        session_group_name = f"live_session_{session.id.hex}"
+        session_group_name = f"live_session_{session.id}_device"
         try:
             async_to_sync(self.channel_layer.group_send)(
                 session_group_name,
                 {
                     "type": "send.command",
-                    "envelope": envelope_serializer.validated_data
+                    "envelope": json.loads(json.dumps(envelope_serializer.data, default=str))
                 }
             )
             logger.info(f"[Session: {session_id}][Corr: {correlation_id}][Cmd: {command_id}][Msg: {message_id}] Command built and sent.")

@@ -124,6 +124,13 @@ class PygameAudioPlayer(BaseAudioPlayer):
             logger.error(f"Pygame playback error: {e}")
             self._is_playing = False
             return False
+        finally:
+            # Release file lock on Windows for cleanup
+            try:
+                if hasattr(pygame.mixer.music, 'unload'):
+                    pygame.mixer.music.unload()
+            except Exception:
+                pass
 
     def stop(self):
         if not self._available:

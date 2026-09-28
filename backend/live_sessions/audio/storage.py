@@ -58,7 +58,7 @@ class LocalAudioStorageBackend(BaseAudioStorage):
             
             # Use Django settings to build URL, fallback to relative
             base_url = getattr(settings, "SITE_URL", "")
-            signed_url = f"{base_url}/api/v1/live_sessions/audio/{signed_token}/"
+            signed_url = f"{base_url}/api/live_sessions/audio/{signed_token}/"
             
             expires_at = datetime.utcnow() + timedelta(hours=2) # 2 hours TTL for MVP
             

@@ -100,10 +100,14 @@ class LiveSessionViewSet(viewsets.ModelViewSet):
 
     @action(detail=True, methods=['post'])
     def start(self, request, pk=None):
+        from django.db import transaction
         session = self.get_object()
-        if session.status == LiveSession.STATUS_DRAFT:
-            session.change_status(LiveSession.STATUS_READY)
-        session.change_status(LiveSession.STATUS_RUNNING)
+        
+        with transaction.atomic():
+            if session.status == LiveSession.STATUS_DRAFT:
+                session.change_status(LiveSession.STATUS_READY)
+            session.change_status(LiveSession.STATUS_RUNNING)
+            
         return Response({'status': session.status})
 
     @action(detail=True, methods=['post'])
@@ -138,7 +142,7 @@ class LiveSessionViewSet(viewsets.ModelViewSet):
             return Response({'detail': 'content is required'}, status=status.HTTP_400_BAD_REQUEST)
             
         import uuid
-        correlation_id = f"test_{uuid.uuid4().hex[:8]}"
+        correlation_id = str(uuid.uuid4())
         
         # Dispatch to existing live comment pipeline
         from .tasks import handle_live_message
@@ -203,10 +207,11 @@ class DeviceSessionViewSet(viewsets.ViewSet):
         return Response({'status': session.status})
 
 from django.http import FileResponse, Http404
-from rest_framework.decorators import api_view, permission_classes
+from rest_framework.decorators import api_view, permission_classes, authentication_classes
 from .audio.storage import LocalAudioStorageBackend
 
 @api_view(['GET'])
+@authentication_classes([DeviceTokenAuthentication])
 @permission_classes([IsAuthenticatedDevice])
 def serve_audio_asset(request, token):
     """
