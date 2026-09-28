@@ -11,6 +11,7 @@ class Migration(migrations.Migration):
     ]
 
     operations = [
+        pgvector.django.VectorExtension(),
         migrations.AddField(
             model_name='producttemplate',
             name='image_vector',

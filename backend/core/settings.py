@@ -88,6 +88,7 @@ INSTALLED_APPS = [
     'zalo_integration',
     'facebook_integration',
     'ai_agents',
+    'live_sessions',
     'django_cleanup.apps.CleanupConfig',
 ]
 

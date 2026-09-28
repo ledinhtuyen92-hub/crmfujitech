@@ -234,6 +234,7 @@ class AiKnowledgeDocumentViewSet(viewsets.ModelViewSet):
     def test_retrieval(self, request):
         query = request.data.get('query', '')
         agent_id = request.data.get('agent_id')
+        product_id = request.data.get('product_id')
         
         if not query or not agent_id:
             return Response({'error': 'Vui lòng cung cấp query và agent_id'}, status=400)
@@ -242,6 +243,7 @@ class AiKnowledgeDocumentViewSet(viewsets.ModelViewSet):
         from openai import OpenAI
         import google.generativeai as genai
         from pgvector.django import L2Distance
+        from django.db.models import Q
         
         company = request.user.company
         try:
@@ -286,11 +288,12 @@ class AiKnowledgeDocumentViewSet(viewsets.ModelViewSet):
             else:
                 distance_expr = L2Distance('embedding', query_embedding)
             
+            q_objects = Q(document__agent_id=agent_id, embedding_provider=provider)
+            if product_id:
+                q_objects &= (Q(document__product_id=product_id) | Q(document__product_id__isnull=True))
+                
             # Tìm kiếm vector bằng pgvector
-            chunks = AiKnowledgeChunk.objects.filter(
-                document__agent_id=agent_id,
-                embedding_provider=provider
-            ).annotate(
+            chunks = AiKnowledgeChunk.objects.filter(q_objects).annotate(
                 distance=distance_expr
             ).order_by('distance')[:3]
             

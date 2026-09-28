@@ -173,7 +173,7 @@ def process_and_save_document(doc_id, api_keys, provider='openai'):
         doc.save()
         raise e
 
-def search_knowledge(agent, query: str, limit: int = 4):
+def search_knowledge(agent, query: str, limit: int = 4, product_id=None):
     """
     Tìm kiếm chunk có semantic tương đồng với câu hỏi (query).
     Tự động xoay vòng API key khi key hiện tại bị hết quota.
@@ -181,6 +181,7 @@ def search_knowledge(agent, query: str, limit: int = 4):
     from .models import AiKnowledgeChunk
     from .services import get_api_keys
     from pgvector.django import CosineDistance
+    from django.db.models import Q
     import logging
     
     if not query or not query.strip():
@@ -216,21 +217,23 @@ def search_knowledge(agent, query: str, limit: int = 4):
         logger = logging.getLogger(__name__)
 
         def _query_chunks(extra_filter=None, limit_override=None):
-            f = dict(
-                document__agent=agent,
-                document__status='completed',
-            )
+            q_objects = Q(document__agent=agent, document__status='completed')
             if extra_filter:
-                f.update(extra_filter)
+                q_objects &= Q(**extra_filter)
+                
+            if product_id:
+                # Ưu tiên product này, hoặc lấy Company Knowledge chung (product_id IS NULL)
+                q_objects &= (Q(document__product_id=product_id) | Q(document__product_id__isnull=True))
+                
             n = limit_override or limit
             if provider == 'gemini':
-                f['embedding_gemini__isnull'] = False
-                return list(AiKnowledgeChunk.objects.filter(**f)
+                q_objects &= Q(embedding_gemini__isnull=False)
+                return list(AiKnowledgeChunk.objects.filter(q_objects)
                     .annotate(distance=CosineDistance('embedding_gemini', query_vector))
                     .order_by('distance')[:n])
             else:
-                f['embedding__isnull'] = False
-                return list(AiKnowledgeChunk.objects.filter(**f)
+                q_objects &= Q(embedding__isnull=False)
+                return list(AiKnowledgeChunk.objects.filter(q_objects)
                     .annotate(distance=CosineDistance('embedding', query_vector))
                     .order_by('distance')[:n])
 

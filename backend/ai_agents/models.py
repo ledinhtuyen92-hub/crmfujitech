@@ -128,6 +128,14 @@ class AiKnowledgeDocument(models.Model):
         verbose_name="Mô tả ảnh (AI sinh ra)",
         help_text="Được dùng để tìm kiếm tài liệu khi khách gửi ảnh"
     )
+    product = models.ForeignKey(
+        'inventory.Product',
+        on_delete=models.CASCADE,
+        null=True,
+        blank=True,
+        related_name='knowledge_docs',
+        verbose_name="Sản phẩm"
+    )
     
     DOC_TYPE_CHOICES = (
         ('file', 'File tài liệu'),

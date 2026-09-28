@@ -16,6 +16,20 @@ class AiKnowledgeDocumentSerializer(serializers.ModelSerializer):
     class Meta:
         model = AiKnowledgeDocument
         fields = '__all__'
+        
+    def validate(self, data):
+        agent = data.get('agent')
+        product = data.get('product')
+        
+        # Nếu đang update một document đã có sẵn
+        if not agent and self.instance:
+            agent = self.instance.agent
+            
+        if agent and product:
+            if product.company != agent.company:
+                raise serializers.ValidationError({"product": "Sản phẩm không thuộc cùng công ty với AI Agent."})
+        
+        return data
 
 class AiAgentSerializer(serializers.ModelSerializer):
     knowledge_docs = AiKnowledgeDocumentSerializer(many=True, read_only=True)
