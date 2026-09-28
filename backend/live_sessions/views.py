@@ -101,6 +101,8 @@ class LiveSessionViewSet(viewsets.ModelViewSet):
     @action(detail=True, methods=['post'])
     def start(self, request, pk=None):
         session = self.get_object()
+        if session.status == LiveSession.STATUS_DRAFT:
+            session.change_status(LiveSession.STATUS_READY)
         session.change_status(LiveSession.STATUS_RUNNING)
         return Response({'status': session.status})
 

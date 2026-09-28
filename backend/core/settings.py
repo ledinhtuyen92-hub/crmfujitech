@@ -242,10 +242,19 @@ CHANNEL_LAYERS = {
     "default": {
         "BACKEND": "channels_redis.core.RedisChannelLayer",
         "CONFIG": {
-            "hosts": [("redis", 6379)],
+            # redis-py 8.0+ defaults socket_timeout to 5s which kills channels_redis
+            # BZPOPMIN blocking command. Pass socket_timeout=None to disable.
+            # Format: {"address": <url>, **kwargs_passed_to_ConnectionPool.from_url}
+            "hosts": [{"address": "redis://redis:6379/0", "socket_timeout": None}],
+            "capacity": 1500,
+            "expiry": 60,
         },
     },
 }
+
+
+
+
 
 
 # ── Celery (Background Tasks) ──────────────────────────────────────────

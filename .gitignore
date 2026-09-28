@@ -5,6 +5,7 @@ __pycache__/
 
 # Bỏ qua môi trường ảo và dữ liệu database Docker cục bộ
 venv/
+.venv/
 env/
 
 db_data/

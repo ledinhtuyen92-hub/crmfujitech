@@ -49,6 +49,7 @@ import WebsiteIntegration from './pages/settings/WebsiteIntegration'
 import AiAgentSettings from './pages/settings/AiAgentSettings'
 import AiKnowledgeBase from './pages/settings/AiKnowledgeBase'
 import Announcements from './pages/Announcements'
+import LiveConsolePage from './pages/live/LiveConsolePage'
 
 function DynamicTitle() {
   const location = useLocation();
@@ -74,6 +75,7 @@ function DynamicTitle() {
     else if (path.startsWith('/login')) title = 'Đăng nhập | Fujitech Group CRM';
     else if (path.startsWith('/approvals')) title = 'Phê duyệt | Fujitech Group CRM';
     else if (path.startsWith('/announcements')) title = 'Thông báo | Fujitech Group CRM';
+    else if (path.startsWith('/live/console')) title = 'Live Console | Fujitech Group CRM';
 
     document.title = title;
   }, [location.pathname]);
@@ -135,6 +137,12 @@ function App() {
                 <PermissionRoute permissionCode="notifications.view_announcements">
                   <Announcements />
                 </PermissionRoute>
+              } />
+
+              <Route path="/live/console" element={
+                <CompanyAdminRoute>
+                  <LiveConsolePage />
+                </CompanyAdminRoute>
               } />
 
               <Route path="/approvals" element={

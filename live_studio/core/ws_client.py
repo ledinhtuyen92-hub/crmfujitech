@@ -56,8 +56,8 @@ class WebSocketClient:
             "sequence_number": seq_num,
             "session_id": self.session_id,
             "payload": {
-                "cloud_to_device_sequence": 0,  # Deprecated? The mock used payload {"last_received_sequence": 0}
-                "last_received_sequence": last_received_sequence, # Using the mock's format to be safe
+                "cloud_to_device_sequence": last_received_sequence,
+                "device_to_cloud_sequence": seq_num,
                 "status": "request"
             }
         }
