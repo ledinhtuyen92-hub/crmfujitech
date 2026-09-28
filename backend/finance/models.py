@@ -178,6 +178,8 @@ class PaymentReceipt(models.Model):
 
         if total_order > 0 and total_paid >= total_order:
             order.financial_status = order.FIN_STATUS_FULLY_PAID
+        elif order.financial_status == order.FIN_STATUS_CREDIT_APPROVED:
+            pass # Giữ nguyên trạng thái Duyệt xuất nợ ngoại lệ nếu chưa thu đủ
         elif total_paid > 0:
             order.financial_status = order.FIN_STATUS_DEPOSIT_PAID
         else:
@@ -202,6 +204,8 @@ class PaymentReceipt(models.Model):
             total_order = float(order.total_amount or 0)
             if total_order > 0 and total_paid >= total_order:
                 order.financial_status = order.FIN_STATUS_FULLY_PAID
+            elif order.financial_status == order.FIN_STATUS_CREDIT_APPROVED:
+                pass # Giữ nguyên trạng thái Duyệt xuất nợ ngoại lệ nếu chưa thu đủ
             elif total_paid > 0:
                 order.financial_status = order.FIN_STATUS_DEPOSIT_PAID
             else:
