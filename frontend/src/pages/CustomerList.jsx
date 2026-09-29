@@ -277,6 +277,71 @@ function CustomerList() {
     }
   };
 
+  // ── Global column config (Admin only) ────────────────────────────────────
+  const [globalColumnModalVisible, setGlobalColumnModalVisible] = useState(false);
+  const [globalColumnOrder, setGlobalColumnOrder] = useState(DEFAULT_COLUMNS);
+  const [globalVisibleColumns, setGlobalVisibleColumns] = useState(DEFAULT_COLUMNS);
+  const [savingGlobalColumns, setSavingGlobalColumns] = useState(false);
+
+  useEffect(() => {
+    if (globalColumnModalVisible && companySettings) {
+      const allowed = companySettings.customer_table_columns;
+      if (allowed && allowed.length > 0) {
+        setGlobalVisibleColumns(allowed);
+        const missing = DEFAULT_COLUMNS.filter(c => !allowed.includes(c));
+        setGlobalColumnOrder([...allowed, ...missing]);
+      } else {
+        setGlobalVisibleColumns(DEFAULT_COLUMNS);
+        setGlobalColumnOrder(DEFAULT_COLUMNS);
+      }
+    }
+  }, [globalColumnModalVisible, companySettings]);
+
+  const handleSaveGlobalColumns = async () => {
+    if (checkMaintenance()) return;
+    try {
+      setSavingGlobalColumns(true);
+      const columnsToSave = globalColumnOrder.filter(k => globalVisibleColumns.includes(k));
+      await api.patch('users/company-settings/', { customer_table_columns: columnsToSave });
+      message.success('Đã lưu cấu hình cột cho toàn công ty');
+      setGlobalColumnModalVisible(false);
+      refreshSettings();
+    } catch (err) {
+      message.error('Lỗi khi lưu cấu hình cột.');
+    } finally {
+      setSavingGlobalColumns(false);
+    }
+  };
+
+  const handleGlobalColumnToggle = (id, checked) => {
+    if (checked) {
+      setGlobalVisibleColumns(prev => [...prev, id]);
+    } else {
+      setGlobalVisibleColumns(prev => prev.filter(c => c !== id));
+    }
+  };
+
+  const handleGlobalColumnDragEnd = (event) => {
+    const { active, over } = event;
+    if (active.id !== over?.id) {
+      setGlobalColumnOrder((items) => {
+        const oldIndex = items.indexOf(active.id);
+        const newIndex = items.indexOf(over.id);
+        return arrayMove(items, oldIndex, newIndex);
+      });
+    }
+  };
+
+  const allowedColsSetting = companySettings?.customer_table_columns;
+  const globalAllowedColumns = (allowedColsSetting && allowedColsSetting.length > 0)
+    ? allowedColsSetting
+    : DEFAULT_COLUMNS;
+
+  const availableOptionsOrder = columnOrder.filter(k => globalAllowedColumns.includes(k));
+  const missingOptions = globalAllowedColumns.filter(k => !columnOrder.includes(k));
+  const effectiveAvailableOptionsOrder = [...availableOptionsOrder, ...missingOptions];
+  const effectiveVisibleColumns = visibleColumns.filter(c => globalAllowedColumns.includes(c));
+
   // Auto Assign Toggle State
   const [autoAssignEnabled, setAutoAssignEnabled] = useState(false)
   const [togglingAutoAssign, setTogglingAutoAssign] = useState(false)
@@ -1260,9 +1325,10 @@ function CustomerList() {
       )}
 
       {/* Filter Bar */}
-      <Card style={{ marginBottom: 16 }} bodyStyle={{ padding: 16 }}>
-        <Row gutter={[16, 16]} align="middle">
-          <Col xs={24} sm={12} md={hasPermission('crm.assign') || hasPermission('crm.auto_assign') || hasPermission('crm.view_all') ? 12 : 8} lg={hasPermission('crm.assign') || hasPermission('crm.auto_assign') || hasPermission('crm.view_all') ? 6 : 8} xl={hasPermission('crm.assign') || hasPermission('crm.auto_assign') || hasPermission('crm.view_all') ? 6 : 8} xxl={hasPermission('crm.assign') || hasPermission('crm.auto_assign') || hasPermission('crm.view_all') ? 5 : 7} style={{ marginBottom: 8 }}>
+      <Card style={{ marginBottom: 16 }} bodyStyle={{ padding: '12px 16px' }}>
+        <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+          {/* Search */}
+          <div style={{ flex: '2 1 180px', minWidth: 140 }}>
             <DebouncedSearchInput
               placeholder="Tìm theo tên hoặc SĐT..."
               prefix={<SearchOutlined style={{ color: '#bfbfbf' }} />}
@@ -1270,10 +1336,12 @@ function CustomerList() {
               onChange={setSearchQuery}
               allowClear
             />
-          </Col>
-          <Col xs={24} sm={12} md={hasPermission('crm.assign') || hasPermission('crm.auto_assign') || hasPermission('crm.view_all') ? 12 : 8} lg={hasPermission('crm.assign') || hasPermission('crm.auto_assign') || hasPermission('crm.view_all') ? 6 : 8} xl={hasPermission('crm.assign') || hasPermission('crm.auto_assign') || hasPermission('crm.view_all') ? 6 : 8} xxl={hasPermission('crm.assign') || hasPermission('crm.auto_assign') || hasPermission('crm.view_all') ? 4 : 5} style={{ marginBottom: 8 }}>
+          </div>
+
+          {/* Trạng thái */}
+          <div style={{ flex: '1.5 1 130px', minWidth: 110 }}>
             <Select
-              placeholder="Lọc theo trạng thái"
+              placeholder="Trạng thái"
               style={{ width: '100%' }}
               value={statusFilter}
               onChange={(val) => setStatusFilter(val)}
@@ -1289,18 +1357,23 @@ function CustomerList() {
                 )
               })}
             </Select>
-          </Col>
-          <Col xs={24} sm={12} md={hasPermission('crm.assign') || hasPermission('crm.auto_assign') || hasPermission('crm.view_all') ? 12 : 8} lg={hasPermission('crm.assign') || hasPermission('crm.auto_assign') || hasPermission('crm.view_all') ? 6 : 8} xl={hasPermission('crm.assign') || hasPermission('crm.auto_assign') || hasPermission('crm.view_all') ? 6 : 8} xxl={hasPermission('crm.assign') || hasPermission('crm.auto_assign') || hasPermission('crm.view_all') ? 5 : 6} style={{ marginBottom: 8 }}>
+          </div>
+
+          {/* Tags */}
+          <div style={{ flex: '1 1 120px', minWidth: 110 }}>
             <Select
               mode="multiple"
-              placeholder="Lọc theo tags"
+              placeholder="Tags"
               style={{ width: '100%' }}
               value={tagsFilter}
               onChange={(val) => setTagsFilter(val)}
               allowClear
               showSearch
               optionFilterProp="children"
-              maxTagCount="responsive"
+              maxTagCount={0}
+              maxTagPlaceholder={(omitted) => `${omitted.length} tags`}
+              dropdownMatchSelectWidth={false}
+              dropdownStyle={{ minWidth: 180 }}
             >
               {allTags.map((tag) => (
                 <Option key={tag.id} value={tag.id}>
@@ -1308,11 +1381,13 @@ function CustomerList() {
                 </Option>
               ))}
             </Select>
-          </Col>
+          </div>
+
+          {/* Nhân viên */}
           {(hasPermission('crm.assign') || hasPermission('crm.auto_assign') || hasPermission('crm.view_all')) && (
-            <Col xs={24} sm={12} md={12} lg={6} xl={6} xxl={4} style={{ marginBottom: 8 }}>
+            <div style={{ flex: '1.5 1 130px', minWidth: 110 }}>
               <Select
-                placeholder="Lọc theo Sale phụ trách"
+                placeholder="Nhân viên"
                 style={{ width: '100%' }}
                 value={assignedToFilter}
                 onChange={(val) => setAssignedToFilter(val)}
@@ -1328,56 +1403,60 @@ function CustomerList() {
                   </Option>
                 ))}
               </Select>
-            </Col>
+            </div>
           )}
-          <Col xs={24} md={24} lg={24} xl={24} xxl={6} style={{ textAlign: isMobile ? 'left' : 'right', marginBottom: 8 }}>
-            <Space wrap>
-              <Button 
-                type={isNewUnattendedFilter ? "primary" : "default"}
-                danger={isNewUnattendedFilter}
-                icon={<TeamOutlined />} 
-                onClick={() => setIsNewUnattendedFilter(!isNewUnattendedFilter)}
-              >
-                Khách mới chưa chăm
-              </Button>
-              <Button onClick={() => fetchCustomers(1)} icon={<ReloadOutlined />}>
-                Làm mới
-              </Button>
-              <Popover 
-                placement="bottomRight" 
-                title="Tùy chỉnh cột hiển thị" 
-                content={
-                  <DndContext
-                    collisionDetection={closestCenter}
-                    onDragEnd={handleColumnDragEnd}
-                    modifiers={[restrictToVerticalAxis]}
-                  >
-                    <SortableContext items={columnOrder} strategy={verticalListSortingStrategy}>
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                        {columnOrder.map((colKey) => {
-                           const opt = allColumnsOptions.find(o => o.value === colKey);
-                           if (!opt) return null;
-                           return (
-                             <SortableColumnOption 
-                               key={colKey} 
-                               id={colKey} 
-                               label={opt.label} 
-                               checked={visibleColumns.includes(colKey)}
-                               onChange={handleColumnToggle}
-                             />
-                           );
-                        })}
-                      </div>
-                    </SortableContext>
-                  </DndContext>
-                }
-                trigger="click"
-              >
-                <Button icon={<TableOutlined />} />
-              </Popover>
-            </Space>
-          </Col>
-        </Row>
+
+          {/* Action buttons */}
+          <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexShrink: 0, marginLeft: 'auto' }}>
+            <Button
+              type={isNewUnattendedFilter ? "primary" : "default"}
+              danger={isNewUnattendedFilter}
+              icon={<TeamOutlined />}
+              onClick={() => setIsNewUnattendedFilter(!isNewUnattendedFilter)}
+              title="Khách mới chưa chăm"
+            />
+            <Button onClick={() => fetchCustomers(1)} icon={<ReloadOutlined />} title="Làm mới" />
+            <Popover
+              placement="bottomRight"
+              title="Tùy chỉnh cột hiển thị"
+              content={
+                <DndContext
+                  collisionDetection={closestCenter}
+                  onDragEnd={handleColumnDragEnd}
+                  modifiers={[restrictToVerticalAxis]}
+                >
+                  <SortableContext items={effectiveAvailableOptionsOrder} strategy={verticalListSortingStrategy}>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                      {effectiveAvailableOptionsOrder.map((colKey) => {
+                         const opt = allColumnsOptions.find(o => o.value === colKey);
+                         if (!opt) return null;
+                         return (
+                           <SortableColumnOption
+                             key={colKey}
+                             id={colKey}
+                             label={opt.label}
+                             checked={effectiveVisibleColumns.includes(colKey)}
+                             onChange={handleColumnToggle}
+                           />
+                         );
+                      })}
+                    </div>
+                  </SortableContext>
+                </DndContext>
+              }
+              trigger="click"
+            >
+              <Button icon={<TableOutlined />} title="Tùy chỉnh cột" />
+            </Popover>
+            {isCompanyAdmin && (
+              <Button
+                onClick={() => setGlobalColumnModalVisible(true)}
+                icon={<SettingOutlined />}
+                title="Cấu hình cột hiển thị (Toàn Công ty)"
+              />
+            )}
+          </div>
+        </div>
       </Card>
 
       {/* Main Table */}
@@ -1460,7 +1539,7 @@ function CustomerList() {
             selectedRowKeys,
             onChange: (newSelectedRowKeys) => setSelectedRowKeys(newSelectedRowKeys),
           }}
-          columns={columnOrder.filter(k => visibleColumns.includes(k)).map(k => columns.find(c => c.key === k)).filter(Boolean)}
+          columns={effectiveAvailableOptionsOrder.filter(k => effectiveVisibleColumns.includes(k)).map(k => columns.find(c => c.key === k)).filter(Boolean)}
           dataSource={customers}
           loading={loading}
           rowKey="id"
@@ -2272,6 +2351,53 @@ function CustomerList() {
         }}
         customers={customers.filter(c => selectedRowKeys.includes(c.id))}
       />
+
+      {/* Modal Cấu hình Cột (Toàn Công ty) - chỉ Admin */}
+      <Modal
+        title="Cấu hình Cột hiển thị (Toàn Công ty)"
+        open={globalColumnModalVisible}
+        onCancel={() => setGlobalColumnModalVisible(false)}
+        footer={null}
+        centered
+        width={400}
+      >
+        <div style={{ marginBottom: 16 }}>
+          <Typography.Text type="secondary">
+            Kéo thả để sắp xếp vị trí cột. Bật/tắt để cho phép hiển thị cột đối với toàn bộ tài khoản trong công ty.
+          </Typography.Text>
+        </div>
+        <DndContext
+          collisionDetection={closestCenter}
+          onDragEnd={handleGlobalColumnDragEnd}
+          modifiers={[restrictToVerticalAxis]}
+        >
+          <SortableContext items={globalColumnOrder} strategy={verticalListSortingStrategy}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', maxHeight: '50vh', overflowY: 'auto', paddingRight: '8px' }}>
+              {globalColumnOrder.map((colKey) => {
+                const opt = allColumnsOptions.find(o => o.value === colKey);
+                if (!opt) return null;
+                return (
+                  <SortableColumnOption
+                    key={colKey}
+                    id={colKey}
+                    label={opt.label}
+                    checked={globalVisibleColumns.includes(colKey)}
+                    onChange={handleGlobalColumnToggle}
+                  />
+                );
+              })}
+            </div>
+          </SortableContext>
+        </DndContext>
+        <div style={{ marginTop: 24, textAlign: 'right' }}>
+          <Space>
+            <Button onClick={() => setGlobalColumnModalVisible(false)}>Hủy</Button>
+            <Button type="primary" onClick={handleSaveGlobalColumns} loading={savingGlobalColumns}>
+              Lưu cấu hình
+            </Button>
+          </Space>
+        </div>
+      </Modal>
     </section>
   )
 }

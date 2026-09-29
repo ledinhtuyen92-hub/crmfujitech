@@ -21,7 +21,7 @@ import {
   Tooltip,
   AutoComplete,
 } from 'antd'
-import { CarOutlined, SearchOutlined, EditOutlined, EyeOutlined, PlusOutlined, DeleteOutlined, UserAddOutlined, FileTextOutlined, PrinterOutlined, CheckCircleOutlined, CloseCircleOutlined, SyncOutlined, SettingOutlined, TableOutlined, ExportOutlined, FilePdfOutlined, EnvironmentOutlined } from '@ant-design/icons'
+import { CarOutlined, SearchOutlined, EditOutlined, EyeOutlined, PlusOutlined, DeleteOutlined, UserAddOutlined, FileTextOutlined, PrinterOutlined, CheckCircleOutlined, CloseCircleOutlined, SyncOutlined, TableOutlined, ExportOutlined, FilePdfOutlined, EnvironmentOutlined , SettingOutlined } from '@ant-design/icons'
 import dayjs from 'dayjs'
 import { useResponsive } from '../hooks/useResponsive'
 import { DndContext, closestCenter } from '@dnd-kit/core';
@@ -46,7 +46,7 @@ const statusConfig = {
 }
 
 export default function DeliveryList() {
-  const { checkMaintenance, hasPermission, companySettings } = useAuth()
+  const { checkMaintenance, hasPermission, companySettings, isCompanyAdmin, refreshSettings, user } = useAuth()
   const [deliveries, setDeliveries] = useState([])
   const [loading, setLoading] = useState(false)
   const [currentPage, setCurrentPage] = useState(1)
@@ -89,6 +89,72 @@ export default function DeliveryList() {
     localStorage.setItem('deliveryListVisibleColumns_v6', JSON.stringify(visibleColumns))
   }, [visibleColumns])
 
+  const [globalColumnModalVisible, setGlobalColumnModalVisible] = useState(false);
+  const [globalColumnOrder, setGlobalColumnOrder] = useState(DEFAULT_COLUMNS);
+  const [globalVisibleColumns, setGlobalVisibleColumns] = useState(DEFAULT_COLUMNS);
+  const [savingGlobalColumns, setSavingGlobalColumns] = useState(false);
+
+  useEffect(() => {
+    if (globalColumnModalVisible && companySettings) {
+      const allowed = companySettings.delivery_table_columns;
+      if (allowed && allowed.length > 0) {
+        setGlobalVisibleColumns(allowed);
+        const missing = DEFAULT_COLUMNS.filter(c => !allowed.includes(c));
+        setGlobalColumnOrder([...allowed, ...missing]);
+      } else {
+        setGlobalVisibleColumns(DEFAULT_COLUMNS);
+        setGlobalColumnOrder(DEFAULT_COLUMNS);
+      }
+    }
+  }, [globalColumnModalVisible, companySettings]);
+
+  const handleSaveGlobalColumns = async () => {
+    if (typeof checkMaintenance === 'function' && checkMaintenance()) return;
+    try {
+      setSavingGlobalColumns(true);
+      const columnsToSave = globalColumnOrder.filter(k => globalVisibleColumns.includes(k));
+      await api.patch('users/company-settings/', { delivery_table_columns: columnsToSave });
+      message.success('Đã lưu cấu hình cột cho toàn công ty');
+      setGlobalColumnModalVisible(false);
+      refreshSettings();
+    } catch (err) {
+      message.error('Lỗi khi lưu cấu hình cột.');
+    } finally {
+      setSavingGlobalColumns(false);
+    }
+  };
+
+  const handleGlobalColumnToggle = (id, checked) => {
+    if (checked) {
+      setGlobalVisibleColumns(prev => [...prev, id]);
+    } else {
+      setGlobalVisibleColumns(prev => prev.filter(c => c !== id));
+    }
+  };
+
+  const handleGlobalColumnDragEnd = (event) => {
+    const { active, over } = event;
+    if (active.id !== over?.id) {
+      setGlobalColumnOrder((items) => {
+        const oldIndex = items.indexOf(active.id);
+        const newIndex = items.indexOf(over.id);
+        return arrayMove(items, oldIndex, newIndex);
+      });
+    }
+  };
+
+  const allowedColsSetting = companySettings?.delivery_table_columns;
+  const globalAllowedColumns = (allowedColsSetting && allowedColsSetting.length > 0)
+    ? allowedColsSetting
+    : DEFAULT_COLUMNS;
+
+  const availableOptionsOrder = columnOrder.filter(k => globalAllowedColumns.includes(k));
+  const missingOptions = globalAllowedColumns.filter(k => !columnOrder.includes(k));
+  const effectiveAvailableOptionsOrder = [...availableOptionsOrder, ...missingOptions];
+
+  const effectiveVisibleColumns = visibleColumns.filter(c => globalAllowedColumns.includes(c));
+
+
   const handleColumnToggle = (id, checked) => {
     if (checked) {
       setVisibleColumns(prev => [...prev, id]);
@@ -120,7 +186,7 @@ export default function DeliveryList() {
   const canEdit = hasPermission('delivery.edit')
   const canCreate = hasPermission('delivery.edit') // Reuse edit permission for simplicity or use delivery.create if exists
   const canDelete = hasPermission('delivery.delete')
-  const [isCompanyAdmin, setIsCompanyAdmin] = useState(false)
+  
   const [shippers, setShippers] = useState([])
   const [assignModalVisible, setAssignModalVisible] = useState(false)
   const [assigningDelivery, setAssigningDelivery] = useState(null)
@@ -704,7 +770,7 @@ export default function DeliveryList() {
               >
                 <SortableContext items={columnOrder} strategy={verticalListSortingStrategy}>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                    {columnOrder.map((colKey) => {
+                    {effectiveAvailableOptionsOrder.map((colKey) => {
                        const opt = allColumnsOptions.find(o => o.value === colKey);
                        if (!opt) return null;
                        return (
@@ -712,7 +778,7 @@ export default function DeliveryList() {
                            key={colKey} 
                            id={colKey} 
                            label={opt.label} 
-                           checked={visibleColumns.includes(colKey)}
+                           checked={effectiveVisibleColumns.includes(colKey)}
                            onChange={handleColumnToggle}
                          />
                        );
@@ -725,6 +791,14 @@ export default function DeliveryList() {
           >
             <Button icon={<TableOutlined />} size={isMobile ? 'middle' : 'large'} style={{ borderRadius: 8 }} />
           </Popover>
+            {isCompanyAdmin && (
+              <Button 
+                onClick={() => setGlobalColumnModalVisible(true)} 
+                icon={<SettingOutlined />} 
+                style={{ borderRadius: 10, height: 40, marginLeft: 8 }} 
+                title="Cấu hình cột hiển thị (Toàn Công ty)"
+              />
+            )}
           {canCreate && (
             <Button type="primary" icon={<PlusOutlined />} onClick={() => openModal()} size={isMobile ? 'middle' : 'large'} style={{ borderRadius: 8 }}>
               {isMobile ? 'Tạo GH' : 'Tạo Giao Hàng Mới'}
@@ -813,7 +887,7 @@ export default function DeliveryList() {
         <Table scroll={{ x: 'max-content' }}
             sticky={{ offsetHeader: 0, getContainer: () => document.getElementById('main-content-scroll') }}
           dataSource={deliveries}
-          columns={columnOrder.filter(k => visibleColumns.includes(k)).map(k => columns.find(c => c.key === k)).filter(Boolean)}
+          columns={effectiveAvailableOptionsOrder.filter(k => effectiveVisibleColumns.includes(k)).map(k => columns.find(c => c.key === k)).filter(Boolean)}
           rowKey="id"
           loading={loading}
           onChange={(pagination) => {
@@ -1049,6 +1123,54 @@ export default function DeliveryList() {
           <TransactionPrintView transaction={viewExportData} company={companySettings} />
         </div>
       </Modal>
-    </section>
+    
+      {/* Modal cấu hình cột (Global) */}
+      <Modal
+        title="Cấu hình Cột hiển thị (Toàn Công ty)"
+        open={globalColumnModalVisible}
+        onCancel={() => setGlobalColumnModalVisible(false)}
+        footer={null}
+        centered
+        width={400}
+      >
+        <div style={{ marginBottom: 16 }}>
+          <Text type="secondary">
+            Kéo thả để sắp xếp vị trí cột. Bật/tắt để cho phép hiển thị cột đối với toàn bộ tài khoản trong công ty.
+          </Text>
+        </div>
+        <DndContext
+          collisionDetection={closestCenter}
+          onDragEnd={handleGlobalColumnDragEnd}
+          modifiers={[restrictToVerticalAxis]}
+        >
+          <SortableContext items={globalColumnOrder} strategy={verticalListSortingStrategy}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', maxHeight: '50vh', overflowY: 'auto', paddingRight: '8px' }}>
+              {globalColumnOrder.map((colKey) => {
+                 const opt = allColumnsOptions.find(o => o.value === colKey);
+                 if (!opt) return null;
+                 return (
+                   <SortableColumnOption 
+                     key={colKey} 
+                     id={colKey} 
+                     label={opt.label} 
+                     checked={globalVisibleColumns.includes(colKey)}
+                     onChange={handleGlobalColumnToggle}
+                   />
+                 );
+              })}
+            </div>
+          </SortableContext>
+        </DndContext>
+        <div style={{ marginTop: 24, textAlign: 'right' }}>
+          <Space>
+            <Button onClick={() => setGlobalColumnModalVisible(false)}>Hủy</Button>
+            <Button type="primary" onClick={handleSaveGlobalColumns} loading={savingGlobalColumns}>
+              Lưu cấu hình
+            </Button>
+          </Space>
+        </div>
+      </Modal>
+
+</section>
   )
 }

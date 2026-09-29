@@ -1,4 +1,4 @@
-import { AlertOutlined, CheckCircleOutlined, ClockCircleOutlined, CloseCircleOutlined, DeleteOutlined, EditOutlined, FileDoneOutlined, FileTextOutlined, MessageOutlined, MinusCircleOutlined, PlusOutlined, PrinterOutlined, SearchOutlined, UploadOutlined, PictureOutlined, CameraOutlined, TableOutlined, ToolOutlined, EnvironmentOutlined } from '@ant-design/icons'
+import { AlertOutlined, CheckCircleOutlined, ClockCircleOutlined, CloseCircleOutlined, DeleteOutlined, EditOutlined, FileDoneOutlined, FileTextOutlined, MessageOutlined, MinusCircleOutlined, PlusOutlined, PrinterOutlined, SearchOutlined, UploadOutlined, PictureOutlined, CameraOutlined, TableOutlined, ToolOutlined, EnvironmentOutlined , SettingOutlined } from '@ant-design/icons'
 import {
   AutoComplete,
   Badge,
@@ -159,7 +159,7 @@ const statusConfig = {
 export default function OrderList() {
   const { isMobile } = useResponsive()
   const { token } = theme.useToken()
-  const { user, isCompanyAdmin, hasPermission, checkMaintenance, isModuleActive, companySettings } = useAuth()
+  const { user, isCompanyAdmin, hasPermission, checkMaintenance, isModuleActive, companySettings, refreshSettings } = useAuth()
   const [messageApi, contextHolder] = message.useMessage()
   const location = useLocation()
   const navigate = useNavigate()
@@ -263,7 +263,73 @@ export default function OrderList() {
 
   useEffect(() => {
     localStorage.setItem('orderListVisibleColumns_v4', JSON.stringify(visibleColumns));
-  }, [visibleColumns]);
+  }, [visibleColumns])
+
+  const [globalColumnModalVisible, setGlobalColumnModalVisible] = useState(false);
+  const [globalColumnOrder, setGlobalColumnOrder] = useState(DEFAULT_COLUMNS);
+  const [globalVisibleColumns, setGlobalVisibleColumns] = useState(DEFAULT_COLUMNS);
+  const [savingGlobalColumns, setSavingGlobalColumns] = useState(false);
+
+  useEffect(() => {
+    if (globalColumnModalVisible && companySettings) {
+      const allowed = companySettings.order_table_columns;
+      if (allowed && allowed.length > 0) {
+        setGlobalVisibleColumns(allowed);
+        const missing = DEFAULT_COLUMNS.filter(c => !allowed.includes(c));
+        setGlobalColumnOrder([...allowed, ...missing]);
+      } else {
+        setGlobalVisibleColumns(DEFAULT_COLUMNS);
+        setGlobalColumnOrder(DEFAULT_COLUMNS);
+      }
+    }
+  }, [globalColumnModalVisible, companySettings]);
+
+  const handleSaveGlobalColumns = async () => {
+    if (typeof checkMaintenance === 'function' && checkMaintenance()) return;
+    try {
+      setSavingGlobalColumns(true);
+      const columnsToSave = globalColumnOrder.filter(k => globalVisibleColumns.includes(k));
+      await api.patch('users/company-settings/', { order_table_columns: columnsToSave });
+      message.success('Đã lưu cấu hình cột cho toàn công ty');
+      setGlobalColumnModalVisible(false);
+      refreshSettings();
+    } catch (err) {
+      message.error('Lỗi khi lưu cấu hình cột.');
+    } finally {
+      setSavingGlobalColumns(false);
+    }
+  };
+
+  const handleGlobalColumnToggle = (id, checked) => {
+    if (checked) {
+      setGlobalVisibleColumns(prev => [...prev, id]);
+    } else {
+      setGlobalVisibleColumns(prev => prev.filter(c => c !== id));
+    }
+  };
+
+  const handleGlobalColumnDragEnd = (event) => {
+    const { active, over } = event;
+    if (active.id !== over?.id) {
+      setGlobalColumnOrder((items) => {
+        const oldIndex = items.indexOf(active.id);
+        const newIndex = items.indexOf(over.id);
+        return arrayMove(items, oldIndex, newIndex);
+      });
+    }
+  };
+
+  const allowedColsSetting = companySettings?.order_table_columns;
+  const globalAllowedColumns = (allowedColsSetting && allowedColsSetting.length > 0)
+    ? allowedColsSetting
+    : DEFAULT_COLUMNS;
+
+  const availableOptionsOrder = columnOrder.filter(k => globalAllowedColumns.includes(k));
+  const missingOptions = globalAllowedColumns.filter(k => !columnOrder.includes(k));
+  const effectiveAvailableOptionsOrder = [...availableOptionsOrder, ...missingOptions];
+
+  const effectiveVisibleColumns = visibleColumns.filter(c => globalAllowedColumns.includes(c));
+;
 
   useEffect(() => {
     // Ensure columnOrder has all current options if backend adds new modules
@@ -3407,7 +3473,7 @@ export default function OrderList() {
                 >
                   <SortableContext items={columnOrder} strategy={verticalListSortingStrategy}>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                      {columnOrder.map((colKey) => {
+                      {effectiveAvailableOptionsOrder.map((colKey) => {
                          const opt = ALL_COLUMNS_OPTIONS.find(o => o.value === colKey);
                          if (!opt) return null;
                          return (
@@ -3415,7 +3481,7 @@ export default function OrderList() {
                              key={colKey} 
                              id={colKey} 
                              label={opt.label} 
-                             checked={visibleColumns.includes(colKey)}
+                             checked={effectiveVisibleColumns.includes(colKey)}
                              onChange={handleColumnToggle}
                            />
                          );
@@ -3428,6 +3494,14 @@ export default function OrderList() {
             >
               <Button size="large" icon={<TableOutlined />} />
             </Popover>
+            {isCompanyAdmin && (
+              <Button 
+                onClick={() => setGlobalColumnModalVisible(true)} 
+                icon={<SettingOutlined />} 
+                style={{ borderRadius: 10, height: 40, marginLeft: 8 }} 
+                title="Cấu hình cột hiển thị (Toàn Công ty)"
+              />
+            )}
             {canCreate && (
               <Button
                 type="primary"
@@ -3748,7 +3822,7 @@ export default function OrderList() {
           <Table
             scroll={{ x: 'max-content' }}
             sticky={{ offsetHeader: 0, getContainer: () => document.getElementById('main-content-scroll') }}
-            columns={columnOrder.filter(k => visibleColumns.includes(k)).map(k => columns.find(c => c.key === k)).filter(Boolean)}
+            columns={effectiveAvailableOptionsOrder.filter(k => effectiveVisibleColumns.includes(k)).map(k => columns.find(c => c.key === k)).filter(Boolean)}
             dataSource={filteredOrders}
             rowKey="id"
             loading={loading}
@@ -4736,7 +4810,55 @@ export default function OrderList() {
           />
         </Modal>
 
-      </section>
+      
+      {/* Modal cấu hình cột (Global) */}
+      <Modal
+        title="Cấu hình Cột hiển thị (Toàn Công ty)"
+        open={globalColumnModalVisible}
+        onCancel={() => setGlobalColumnModalVisible(false)}
+        footer={null}
+        centered
+        width={400}
+      >
+        <div style={{ marginBottom: 16 }}>
+          <Text type="secondary">
+            Kéo thả để sắp xếp vị trí cột. Bật/tắt để cho phép hiển thị cột đối với toàn bộ tài khoản trong công ty.
+          </Text>
+        </div>
+        <DndContext
+          collisionDetection={closestCenter}
+          onDragEnd={handleGlobalColumnDragEnd}
+          modifiers={[restrictToVerticalAxis]}
+        >
+          <SortableContext items={globalColumnOrder} strategy={verticalListSortingStrategy}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', maxHeight: '50vh', overflowY: 'auto', paddingRight: '8px' }}>
+              {globalColumnOrder.map((colKey) => {
+                 const opt = ALL_COLUMNS_OPTIONS.find(o => o.value === colKey);
+                 if (!opt) return null;
+                 return (
+                   <SortableColumnOption 
+                     key={colKey} 
+                     id={colKey} 
+                     label={opt.label} 
+                     checked={globalVisibleColumns.includes(colKey)}
+                     onChange={handleGlobalColumnToggle}
+                   />
+                 );
+              })}
+            </div>
+          </SortableContext>
+        </DndContext>
+        <div style={{ marginTop: 24, textAlign: 'right' }}>
+          <Space>
+            <Button onClick={() => setGlobalColumnModalVisible(false)}>Hủy</Button>
+            <Button type="primary" onClick={handleSaveGlobalColumns} loading={savingGlobalColumns}>
+              Lưu cấu hình
+            </Button>
+          </Space>
+        </div>
+      </Modal>
+
+</section>
   )
 }
 

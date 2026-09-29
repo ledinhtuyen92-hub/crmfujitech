@@ -18,9 +18,7 @@ import {
   TagOutlined,
   UploadOutlined,
   WarningOutlined,
-  SettingOutlined,
-  TableOutlined,
-} from '@ant-design/icons'
+  TableOutlined, SettingOutlined } from '@ant-design/icons'
 import {
   Alert,
   Button,
@@ -64,7 +62,7 @@ const { Option } = Select
 const { TextArea } = Input
 
 export default function Inventory() {
-  const { isCompanyAdmin, hasPermission, checkMaintenance, user, companySettings } = useAuth()
+  const { isCompanyAdmin, hasPermission, checkMaintenance, user, companySettings, refreshSettings } = useAuth()
   const { isMobile } = useResponsive()
   const [messageApi, contextHolder] = message.useMessage()
 
@@ -202,6 +200,72 @@ export default function Inventory() {
   useEffect(() => {
     localStorage.setItem('inventoryTxnVisibleColumns_v3', JSON.stringify(visibleTxnColumns))
   }, [visibleTxnColumns])
+
+  const [globalColumnModalVisible, setGlobalColumnModalVisible] = useState(false);
+  const [globalColumnOrder, setGlobalColumnOrder] = useState(DEFAULT_TXN_COLUMNS);
+  const [globalVisibleColumns, setGlobalVisibleColumns] = useState(DEFAULT_TXN_COLUMNS);
+  const [savingGlobalColumns, setSavingGlobalColumns] = useState(false);
+
+  useEffect(() => {
+    if (globalColumnModalVisible && companySettings) {
+      const allowed = companySettings.inventory_table_columns;
+      if (allowed && allowed.length > 0) {
+        setGlobalVisibleColumns(allowed);
+        const missing = DEFAULT_TXN_COLUMNS.filter(c => !allowed.includes(c));
+        setGlobalColumnOrder([...allowed, ...missing]);
+      } else {
+        setGlobalVisibleColumns(DEFAULT_TXN_COLUMNS);
+        setGlobalColumnOrder(DEFAULT_TXN_COLUMNS);
+      }
+    }
+  }, [globalColumnModalVisible, companySettings]);
+
+  const handleSaveGlobalColumns = async () => {
+    if (typeof checkMaintenance === 'function' && checkMaintenance()) return;
+    try {
+      setSavingGlobalColumns(true);
+      const columnsToSave = globalColumnOrder.filter(k => globalVisibleColumns.includes(k));
+      await api.patch('users/company-settings/', { inventory_table_columns: columnsToSave });
+      message.success('Đã lưu cấu hình cột cho toàn công ty');
+      setGlobalColumnModalVisible(false);
+      refreshSettings();
+    } catch (err) {
+      message.error('Lỗi khi lưu cấu hình cột.');
+    } finally {
+      setSavingGlobalColumns(false);
+    }
+  };
+
+  const handleGlobalColumnToggle = (id, checked) => {
+    if (checked) {
+      setGlobalVisibleColumns(prev => [...prev, id]);
+    } else {
+      setGlobalVisibleColumns(prev => prev.filter(c => c !== id));
+    }
+  };
+
+  const handleGlobalColumnDragEnd = (event) => {
+    const { active, over } = event;
+    if (active.id !== over?.id) {
+      setGlobalColumnOrder((items) => {
+        const oldIndex = items.indexOf(active.id);
+        const newIndex = items.indexOf(over.id);
+        return arrayMove(items, oldIndex, newIndex);
+      });
+    }
+  };
+
+  const allowedColsSetting = companySettings?.inventory_table_columns;
+  const globalAllowedColumns = (allowedColsSetting && allowedColsSetting.length > 0)
+    ? allowedColsSetting
+    : DEFAULT_TXN_COLUMNS;
+
+  const availableOptionsOrder = txnColumnOrder.filter(k => globalAllowedColumns.includes(k));
+  const missingOptions = globalAllowedColumns.filter(k => !txnColumnOrder.includes(k));
+  const effectiveAvailableOptionsOrder = [...availableOptionsOrder, ...missingOptions];
+
+  const effectiveVisibleColumns = visibleTxnColumns.filter(c => globalAllowedColumns.includes(c));
+
 
   const handleTxnColumnToggle = (id, checked) => {
     if (checked) {
@@ -1552,7 +1616,7 @@ export default function Inventory() {
                   >
                     <SortableContext items={txnColumnOrder} strategy={verticalListSortingStrategy}>
                       <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                        {txnColumnOrder.map((colKey) => {
+                        {effectiveAvailableOptionsOrder.map((colKey) => {
                            // For factory_name conditional display
                            if (colKey === 'factory_name' && !hasFactoryInHistory) return null;
 
@@ -1563,7 +1627,7 @@ export default function Inventory() {
                                key={colKey} 
                                id={colKey} 
                                label={opt.label} 
-                               checked={visibleTxnColumns.includes(colKey)}
+                               checked={effectiveVisibleColumns.includes(colKey)}
                                onChange={handleTxnColumnToggle}
                              />
                            );
@@ -1576,6 +1640,14 @@ export default function Inventory() {
               >
                 <Button icon={<TableOutlined />} style={{ borderRadius: 8 }} />
               </Popover>
+            )}
+            {isCompanyAdmin && (
+              <Button 
+                onClick={() => setGlobalColumnModalVisible(true)} 
+                icon={<SettingOutlined />} 
+                style={{ borderRadius: 10, height: 40, marginLeft: 8 }} 
+                title="Cấu hình cột hiển thị (Toàn Công ty)"
+              />
             )}
             {activeTab === 'transactions' && canCreate && (
               <Button
@@ -1834,7 +1906,7 @@ export default function Inventory() {
                   ) : (
                     <Table scroll={{ x: 'max-content' }}
             sticky={{ offsetHeader: 0, getContainer: () => document.getElementById('main-content-scroll') }}
-                      columns={txnColumnOrder.filter(k => visibleTxnColumns.includes(k)).map(k => txnColumns.find(c => c.key === k)).filter(Boolean)}
+                      columns={effectiveAvailableOptionsOrder.filter(k => effectiveVisibleColumns.includes(k)).map(k => txnColumns.find(c => c.key === k)).filter(Boolean)}
                       dataSource={groupedFilteredTransactions}
                       rowKey="id"
                       loading={loading}
@@ -3081,6 +3153,54 @@ export default function Inventory() {
         </div>
       )}
 
-    </section>
+    
+      {/* Modal cấu hình cột (Global) */}
+      <Modal
+        title="Cấu hình Cột hiển thị (Toàn Công ty)"
+        open={globalColumnModalVisible}
+        onCancel={() => setGlobalColumnModalVisible(false)}
+        footer={null}
+        centered
+        width={400}
+      >
+        <div style={{ marginBottom: 16 }}>
+          <Text type="secondary">
+            Kéo thả để sắp xếp vị trí cột. Bật/tắt để cho phép hiển thị cột đối với toàn bộ tài khoản trong công ty.
+          </Text>
+        </div>
+        <DndContext
+          collisionDetection={closestCenter}
+          onDragEnd={handleGlobalColumnDragEnd}
+          modifiers={[restrictToVerticalAxis]}
+        >
+          <SortableContext items={globalColumnOrder} strategy={verticalListSortingStrategy}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', maxHeight: '50vh', overflowY: 'auto', paddingRight: '8px' }}>
+              {globalColumnOrder.map((colKey) => {
+                 const opt = allTxnColumnsOptions.find(o => o.value === colKey);
+                 if (!opt) return null;
+                 return (
+                   <SortableColumnOption 
+                     key={colKey} 
+                     id={colKey} 
+                     label={opt.label} 
+                     checked={globalVisibleColumns.includes(colKey)}
+                     onChange={handleGlobalColumnToggle}
+                   />
+                 );
+              })}
+            </div>
+          </SortableContext>
+        </DndContext>
+        <div style={{ marginTop: 24, textAlign: 'right' }}>
+          <Space>
+            <Button onClick={() => setGlobalColumnModalVisible(false)}>Hủy</Button>
+            <Button type="primary" onClick={handleSaveGlobalColumns} loading={savingGlobalColumns}>
+              Lưu cấu hình
+            </Button>
+          </Space>
+        </div>
+      </Modal>
+
+</section>
   )
 }
