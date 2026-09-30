@@ -24,6 +24,18 @@ class LiveDeviceSerializer(serializers.ModelSerializer):
         read_only_fields = ['id', 'last_seen_at', 'created_at']
 
 class LiveSessionSerializer(serializers.ModelSerializer):
+    # stream_url and stream_key are write_only — NEVER returned in API responses
+    # They contain RTMP credentials which must not be exposed.
+    stream_url = serializers.URLField(write_only=True, required=False, allow_null=True)
+    stream_key = serializers.CharField(
+        write_only=True,
+        required=False,
+        allow_null=True,
+        allow_blank=True,
+        style={'input_type': 'password'},
+        help_text="Stream Key (never returned after save)"
+    )
+    
     class Meta:
         model = LiveSession
         fields = '__all__'
@@ -41,3 +53,51 @@ class LiveSessionSerializer(serializers.ModelSerializer):
         if 'ai_agent' in attrs and attrs['ai_agent'].company != company:
             raise serializers.ValidationError({"ai_agent": "AI Agent không hợp lệ."})
         return attrs
+
+
+class ShopeeManualRtmpSetupSerializer(serializers.Serializer):
+    """
+    Serializer for Manual RTMP mode setup.
+    Used by the /sessions/{id}/setup-manual-rtmp/ endpoint.
+    
+    Security:
+    - server_url and stream_key are write_only by nature (this is an input-only serializer)
+    - They are never returned in any response
+    - stream_key is validated to be non-empty
+    - The combined RTMP URL is stored in LiveSession.stream_url (write_only field)
+    """
+    server_url = serializers.CharField(
+        required=True,
+        help_text="RTMP Server URL from Shopee Live PC (e.g. rtmp://...)"
+    )
+    stream_key = serializers.CharField(
+        required=True,
+        allow_blank=False,
+        style={'input_type': 'password'},
+        help_text="Stream Key from Shopee Live PC"
+    )
+
+    def validate_server_url(self, value):
+        import re
+        value = value.strip()
+        if not re.match(r'^rtmps?://.+', value):
+            raise serializers.ValidationError(
+                "Server URL phải bắt đầu bằng rtmp:// hoặc rtmps://"
+            )
+        return value
+
+    def validate_stream_key(self, value):
+        value = value.strip()
+        if len(value) < 4:
+            raise serializers.ValidationError("Stream Key quá ngắn")
+        return value
+
+    def get_combined_rtmp_url(self) -> str:
+        """
+        Combine Server URL and Stream Key into canonical RTMP URL.
+        Shopee's RTMP uses: server_url/stream_key
+        NEVER log the output of this method.
+        """
+        server_url = self.validated_data['server_url'].rstrip('/')
+        stream_key = self.validated_data['stream_key']
+        return f"{server_url}/{stream_key}"

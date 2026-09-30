@@ -8,6 +8,7 @@ from rest_framework.exceptions import AuthenticationFailed
 from django.contrib.auth.hashers import check_password
 
 from .models import LiveDevice
+from django.core.exceptions import ValidationError
 
 logger = logging.getLogger(__name__)
 
@@ -34,7 +35,7 @@ def get_device_from_token(token: str):
     
     try:
         device = LiveDevice.objects.get(id=device_id_hex)
-    except (LiveDevice.DoesNotExist, ValueError):
+    except (LiveDevice.DoesNotExist, ValueError, ValidationError):
         return AnonymousDevice()
 
     if not device.is_active:

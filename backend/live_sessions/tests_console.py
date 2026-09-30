@@ -90,8 +90,8 @@ class LiveConsoleTests(TestCase):
             correlation_id=resp.data['correlation_id']
         )
 
-    @patch('channels.layers.get_channel_layer')
-    @patch('asgiref.sync.async_to_sync')
+    @patch('live_sessions.console_events.get_channel_layer')
+    @patch('live_sessions.console_events.async_to_sync')
     def test_console_event_service(self, mock_async_to_sync, mock_get_channel_layer):
         """Test LiveConsoleEventService emits correct envelope."""
         from live_sessions.console_events import LiveConsoleEventService

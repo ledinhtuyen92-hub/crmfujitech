@@ -22,3 +22,20 @@ class SessionSyncPayloadSerializer(serializers.Serializer):
     cloud_to_device_sequence = serializers.IntegerField(min_value=0, required=True)
     device_to_cloud_sequence = serializers.IntegerField(min_value=0, required=True)
     status = serializers.ChoiceField(choices=['request', 'acknowledged'], default='request')
+
+class StreamStartPayloadSerializer(serializers.Serializer):
+    command_id = serializers.UUIDField(required=True)
+    correlation_id = serializers.UUIDField(required=False, allow_null=True)
+    stream_url = serializers.CharField(required=True)
+    width = serializers.IntegerField(default=800)
+    height = serializers.IntegerField(default=600)
+    fps = serializers.IntegerField(default=30)
+    video_codec = serializers.CharField(default='h264')
+    bitrate = serializers.CharField(default='2500k')
+    audio_sample_rate = serializers.IntegerField(default=44100)
+    audio_channels = serializers.IntegerField(default=2)
+
+class StreamStopPayloadSerializer(serializers.Serializer):
+    command_id = serializers.UUIDField(required=True)
+    correlation_id = serializers.UUIDField(required=False, allow_null=True)
+    reason = serializers.CharField(required=False, allow_null=True, allow_blank=True)

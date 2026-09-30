@@ -11,7 +11,7 @@ from ai_agents.services import generate_ai_reply
 from ai_agents.rag_processor import search_knowledge
 from live_sessions.audio.tts import OpenAITTSProvider
 from live_sessions.audio.storage import LocalAudioStorageBackend
-from live_sessions.protocol.commands import SpeechSpeakPayloadSerializer
+from live_sessions.protocol.commands import SpeechSpeakPayloadSerializer, StreamStartPayloadSerializer, StreamStopPayloadSerializer
 from live_sessions.protocol.envelope import ProtocolEnvelopeSerializer
 from live_sessions.sequence import LiveSequenceService, SequenceUnavailableException
 from live_sessions.console_events import LiveConsoleEventService
@@ -28,6 +28,149 @@ class LiveOrchestrator:
         # to ensure it uses the correct CompanyAiKey.
         self.audio_storage = LocalAudioStorageBackend()
         self.channel_layer = get_channel_layer()
+
+    def dispatch_stream_start(self, session_id: str) -> Dict[str, Any]:
+        logger.info(f"[Session: {session_id}] Dispatching stream.start")
+        try:
+            session = LiveSession.objects.select_related('company', 'device').get(id=session_id)
+        except LiveSession.DoesNotExist:
+            return {"status": "error", "reason": "session_not_found"}
+
+        # Phase 1E-8: Use StreamProvider to obtain stream_url and platform-specific config.
+        # This supports both Shopee API mode (create_session -> push_url)
+        # and Manual RTMP mode (reads session.stream_url directly).
+        from live_sessions.stream_providers import get_stream_provider
+        from live_sessions.platforms.exceptions import PlatformAPIError, PlatformAuthError
+
+        try:
+            provider = get_stream_provider(session)
+            stream_target = provider.get_stream_target(session)
+        except (PlatformAPIError, PlatformAuthError) as e:
+            logger.error(f"[Session: {session_id}] StreamProvider error: {e}")
+            return {"status": "error", "reason": f"stream_provider_error: {e}"}
+        except Exception as e:
+            logger.error(f"[Session: {session_id}] Unexpected StreamProvider error: {e}")
+            return {"status": "error", "reason": "stream_provider_error"}
+
+        stream_url = stream_target.get("stream_url")
+        if not stream_url:
+            return {"status": "error", "reason": "missing_stream_url"}
+
+        command_id = str(uuid.uuid4())
+        message_id = str(uuid.uuid4())
+
+        payload = {
+            "command_id": command_id,
+            "stream_url": stream_url,
+            "width": stream_target.get("width", 800),
+            "height": stream_target.get("height", 600),
+            "fps": stream_target.get("fps", 30),
+            "video_codec": stream_target.get("video_codec", "libx264"),
+            "bitrate": stream_target.get("bitrate", "2500k"),
+            "audio_sample_rate": stream_target.get("audio_sample_rate", 44100),
+            "audio_channels": stream_target.get("audio_channels", 2),
+        }
+        
+        payload_serializer = StreamStartPayloadSerializer(data=payload)
+        if not payload_serializer.is_valid():
+            logger.error(f"Invalid StreamStart payload schema: {payload_serializer.errors}")
+            return {"status": "error", "reason": "invalid_payload_schema"}
+            
+        try:
+            sequence_number = LiveSequenceService.get_next_sequence(
+                company_id=str(session.company_id), 
+                session_id=str(session.id)
+            )
+        except SequenceUnavailableException as e:
+            return {"status": "failed", "reason": "SEQUENCE_UNAVAILABLE"}
+            
+        envelope = {
+            "protocol_version": "1.0",
+            "type": "command",
+            "name": "stream.start",
+            "message_id": message_id,
+            "timestamp": timezone.now().isoformat(),
+            "sequence_number": sequence_number,
+            "session_id": str(session.id),
+            "payload": payload_serializer.validated_data
+        }
+        
+        envelope_serializer = ProtocolEnvelopeSerializer(data=envelope)
+        if not envelope_serializer.is_valid():
+            return {"status": "error", "reason": "invalid_envelope_schema"}
+            
+        session_group_name = f"live_session_{session.id}_device"
+        try:
+            async_to_sync(self.channel_layer.group_send)(
+                session_group_name,
+                {
+                    "type": "send.command",
+                    "envelope": json.loads(json.dumps(envelope_serializer.data, default=str))
+                }
+            )
+            LiveConsoleEventService.emit(session_id, "live.stream_start.dispatched", {"command_id": command_id})
+        except Exception as e:
+            logger.error(f"Channel layer error: {e}")
+            return {"status": "error", "reason": "channel_layer_failure"}
+            
+        return {"status": "success", "command_id": command_id, "message_id": message_id}
+
+    def dispatch_stream_stop(self, session_id: str, reason: str = "") -> Dict[str, Any]:
+        logger.info(f"[Session: {session_id}] Dispatching stream.stop")
+        try:
+            session = LiveSession.objects.get(id=session_id)
+        except LiveSession.DoesNotExist:
+            return {"status": "error", "reason": "session_not_found"}
+
+        command_id = str(uuid.uuid4())
+        message_id = str(uuid.uuid4())
+        
+        payload = {
+            "command_id": command_id,
+            "reason": reason
+        }
+        
+        payload_serializer = StreamStopPayloadSerializer(data=payload)
+        if not payload_serializer.is_valid():
+            return {"status": "error", "reason": "invalid_payload_schema"}
+            
+        try:
+            sequence_number = LiveSequenceService.get_next_sequence(
+                company_id=str(session.company_id), 
+                session_id=str(session.id)
+            )
+        except SequenceUnavailableException:
+            return {"status": "failed", "reason": "SEQUENCE_UNAVAILABLE"}
+            
+        envelope = {
+            "protocol_version": "1.0",
+            "type": "command",
+            "name": "stream.stop",
+            "message_id": message_id,
+            "timestamp": timezone.now().isoformat(),
+            "sequence_number": sequence_number,
+            "session_id": str(session.id),
+            "payload": payload_serializer.validated_data
+        }
+        
+        envelope_serializer = ProtocolEnvelopeSerializer(data=envelope)
+        if not envelope_serializer.is_valid():
+            return {"status": "error", "reason": "invalid_envelope_schema"}
+            
+        session_group_name = f"live_session_{session.id}_device"
+        try:
+            async_to_sync(self.channel_layer.group_send)(
+                session_group_name,
+                {
+                    "type": "send.command",
+                    "envelope": json.loads(json.dumps(envelope_serializer.data, default=str))
+                }
+            )
+            LiveConsoleEventService.emit(session_id, "live.stream_stop.dispatched", {"command_id": command_id})
+        except Exception as e:
+            return {"status": "error", "reason": "channel_layer_failure"}
+            
+        return {"status": "success", "command_id": command_id, "message_id": message_id}
 
     def process_comment(self, session_id: str, user_message: str, correlation_id: Optional[str] = None) -> Dict[str, Any]:
         """

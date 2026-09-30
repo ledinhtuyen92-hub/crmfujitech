@@ -12,9 +12,16 @@ from .platforms.exceptions import CapabilityNotSupportedError
 
 class PlatformAdapterTests(TestCase):
     def setUp(self):
+        from cryptography.fernet import Fernet
+        from unittest.mock import patch
+        self.test_key = Fernet.generate_key()
+        self.patcher = patch('live_sessions.platforms.security.get_encryption_key')
+        self.mock_get_key = self.patcher.start()
+        self.mock_get_key.return_value = self.test_key
+        
         self.company = Company.objects.create(name="Test Company")
         self.company2 = Company.objects.create(name="Another Company", workspace_id=str(uuid.uuid4()), tax_code=str(uuid.uuid4())[:15])
-        
+
         self.account = PlatformAccount.objects.create(
             company=self.company,
             platform=LivePlatformProduct.PLATFORM_TIKTOK,
@@ -31,12 +38,16 @@ class PlatformAdapterTests(TestCase):
         self.product = Product.objects.create(
             company=self.company,
             name="Test Product",
-            sku="SKU-1"
+            sku="SKU-1",
+            price=100000
         )
         self.agent = AiAgent.objects.create(
             company=self.company,
             name="Test Agent"
         )
+
+    def tearDown(self):
+        self.patcher.stop()
 
     def test_tenant_isolation(self):
         # Should raise validation error if platform_account is from another company

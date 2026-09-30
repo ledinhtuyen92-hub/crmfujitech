@@ -126,7 +126,10 @@ class ShopeeCallbackView(APIView):
             
         access_token = data.get("access_token")
         refresh_token = data.get("refresh_token")
-        expire_in = data.get("expire_in", 14400) # 4 hours usually
+        expire_in = data.get("expire_in", 14400)  # 4 hours default
+        # user_id is required for Shopee Livestream API (user-level, not shop-level)
+        # Shopee returns user_id alongside access_token in the token response.
+        user_id = data.get("user_id") or data.get("user", {}).get("user_id")
         
         if not access_token or not refresh_token:
             return HttpResponseRedirect(f"{FRONTEND_URL}/settings/integrations?error=invalid_response")
@@ -143,7 +146,9 @@ class ShopeeCallbackView(APIView):
                 "access_token": access_token,
                 "refresh_token": refresh_token,
                 "token_expires_at": expires_at,
-                "status": "connected"
+                "status": "connected",
+                # Phase 1E-8: store user_id — required for Livestream API
+                "user_id": str(user_id) if user_id else None,
             }
         )
         

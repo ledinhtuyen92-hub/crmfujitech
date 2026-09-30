@@ -13,6 +13,8 @@ from live_studio.execution.audio_fetcher import AudioFetcher
 from live_studio.execution.audio_player import BaseAudioPlayer, DummyAudioPlayer
 from live_studio.execution.device_sequence import DeviceSequenceCounter
 from live_studio.execution.avatar_engine import BaseAvatarEngine
+from live_studio.execution.frame_source import PygameFrameSource, FrameQueue
+from live_studio.execution.stream_controller import StreamController
 from live_studio.protocol.constants import (
     ACK_COMPLETED, ACK_FAILED, ACK_INTERRUPTED, STATE_SYNCHRONIZED
 )
@@ -31,6 +33,21 @@ class LiveStudioApp:
         self.audio_player = audio_player
         self.avatar_engine = avatar_engine
         
+        # Phase 1E-2: Frame Extraction Foundation
+        self.frame_queue = FrameQueue(maxsize=30)
+        self.frame_source = None
+        if hasattr(self.avatar_engine, 'renderer'):
+            self.frame_source = PygameFrameSource(self.avatar_engine.renderer)
+            
+        # Phase 1E-4/5: Stream Controller
+        # Find if audio_player has stream_sink
+        audio_sink = getattr(self.audio_player, 'stream_sink', None)
+        self.stream_controller = StreamController(
+            frame_queue=self.frame_queue,
+            audio_sink=audio_sink,
+            on_state_change=self._on_stream_state_change
+        )
+        
         self.ws_client = WebSocketClient(
             ws_url=ws_url,
             token=token,
@@ -44,7 +61,8 @@ class LiveStudioApp:
             dedup_registry=self.dedup_registry,
             queue_manager=self.queue_manager,
             ack_manager=self.ack_manager,
-            send_ack_callback=self.ws_client.send
+            send_ack_callback=self.ws_client.send,
+            stream_controller=self.stream_controller
         )
 
         self._worker_task: Optional[asyncio.Task] = None
@@ -73,16 +91,35 @@ class LiveStudioApp:
                 self._current_playing_interrupted = True
                 self.audio_player.stop()
                 
-        # Check if we need to interrupt for human takeover (session.control pause/stop)
         elif msg_name == "session.control" and payload.get("action") in ["pause", "stop"]:
             if self._current_playing_command_id:
                 logger.info("Human Takeover control arrived. Interrupting current playback.")
                 self._current_playing_interrupted = True
                 self.audio_player.stop()
 
+    async def _on_stream_state_change(self, state):
+        import uuid
+        import datetime
+        logger.info(f"Stream state changed to {state.value}")
+        payload = {
+            "protocol_version": "1.0",
+            "type": "event",
+            "name": "stream.status",
+            "message_id": str(uuid.uuid4()),
+            "timestamp": datetime.datetime.now(datetime.timezone.utc).isoformat(),
+            "sequence_number": self.device_sequence_counter.next(),
+            "session_id": self.ws_client.session_id,
+            "payload": {
+                "state": state.value
+            }
+        }
+        await self.ws_client.send(payload)
+
     async def start(self):
         if self.avatar_engine:
             self.avatar_engine.initialize()
+            if self.frame_source:
+                self.frame_source.initialize()
             self._avatar_task = asyncio.create_task(self._avatar_render_loop())
             
         self._worker_task = asyncio.create_task(self._queue_worker_loop())
@@ -98,7 +135,14 @@ class LiveStudioApp:
         if self._avatar_task:
             self._avatar_task.cancel()
         if self.avatar_engine:
+            if self.frame_source:
+                self.frame_source.shutdown()
             self.avatar_engine.shutdown()
+        
+        # Stop stream if running
+        if self.stream_controller:
+            from live_studio.protocol.envelopes import StreamStopPayload
+            await self.stream_controller.handle_stop(StreamStopPayload(command_id="shutdown"))
             
     async def _avatar_render_loop(self):
         """Continuous render loop for the Avatar Engine (running at ~30 FPS)."""
@@ -107,6 +151,13 @@ class LiveStudioApp:
                 # Update avatar state based on current audio clock
                 pos = self.audio_player.get_position_ms()
                 self.avatar_engine.update(pos)
+                
+                # Phase 1E-2: Extract frame directly after rendering
+                if self.frame_source:
+                    frame = self.frame_source.read_frame()
+                    if frame:
+                        self.frame_queue.put(frame)
+                        
                 await asyncio.sleep(1/30.0)
             except asyncio.CancelledError:
                 break
@@ -215,12 +266,16 @@ async def run_app():
     session_id = sys.argv[3]
     
     from live_studio.execution.audio_player import PygameAudioPlayer
+    from live_studio.execution.media_pipeline import MediaClock, AudioStreamSink
+    
+    clock = MediaClock()
+    sink = AudioStreamSink(clock)
     
     app = LiveStudioApp(
         ws_url=ws_url,
         token=token,
         session_id=session_id,
-        audio_player=PygameAudioPlayer()
+        audio_player=PygameAudioPlayer(stream_sink=sink)
     )
     
     print(f"CONNECTING: {ws_url}")

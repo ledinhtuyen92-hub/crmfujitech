@@ -1,6 +1,10 @@
 from rest_framework import serializers
 from django.utils import timezone
-from .commands import SessionControlPayloadSerializer, SpeechSpeakPayloadSerializer, AvatarActionPayloadSerializer, SessionSyncPayloadSerializer
+from .commands import (
+    SessionControlPayloadSerializer, SpeechSpeakPayloadSerializer, 
+    AvatarActionPayloadSerializer, SessionSyncPayloadSerializer,
+    StreamStartPayloadSerializer, StreamStopPayloadSerializer
+)
 from .events import HeartbeatPayloadSerializer, CommentPayloadSerializer
 from .acks import AckPayloadSerializer
 from .errors import ErrorPayloadSerializer
@@ -11,6 +15,8 @@ PAYLOAD_SCHEMAS = {
         'speech.speak': SpeechSpeakPayloadSerializer,
         'avatar.action': AvatarActionPayloadSerializer,
         'session.sync': SessionSyncPayloadSerializer,
+        'stream.start': StreamStartPayloadSerializer,
+        'stream.stop': StreamStopPayloadSerializer,
     },
     'event': {
         'device.heartbeat': HeartbeatPayloadSerializer,

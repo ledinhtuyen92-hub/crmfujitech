@@ -33,7 +33,7 @@ class TestReconnect(unittest.IsolatedAsyncioTestCase):
         
         self.assertEqual(len(sent_data), 1)
         self.assertEqual(sent_data[0]["name"], "session.sync")
-        self.assertEqual(sent_data[0]["payload"]["last_received_sequence"], 2)
+        self.assertEqual(sent_data[0]["payload"]["cloud_to_device_sequence"], 2)
         
         # device_counter advanced by 1 for session.sync
         self.assertEqual(device_counter.get_current(), 3)

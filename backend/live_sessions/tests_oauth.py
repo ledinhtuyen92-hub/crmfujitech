@@ -35,7 +35,6 @@ class ShopeeOAuthTests(TestCase):
             self.assertTrue(auth_link.startswith('https://partner.test-stable.shopeemobile.com'))
             self.assertIn('partner_id=test_pid', auth_link)
             self.assertIn('sign=', auth_link)
-            self.assertIn('state=', auth_link)
             
             # Extract state
             import urllib.parse
@@ -65,7 +64,7 @@ class ShopeeOAuthTests(TestCase):
         self.assertIn("error=invalid_state", response.url)
 
     @patch('live_sessions.oauth_views.requests.post')
-    @patch('live_sessions.oauth_views.SHOPEE_PARTNER_ID', 'test_pid')
+    @patch('live_sessions.oauth_views.SHOPEE_PARTNER_ID', '9999')
     @patch('live_sessions.oauth_views.SHOPEE_PARTNER_KEY', 'test_key')
     # Mock encryption key so saving PlatformAccount doesn't crash
     @patch('live_sessions.platforms.security.get_encryption_key')

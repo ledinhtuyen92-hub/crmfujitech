@@ -19,13 +19,15 @@ class ProtocolDispatcher:
                  dedup_registry: DedupRegistry,
                  queue_manager: SpeechQueueManager,
                  ack_manager: AckManager,
-                 send_ack_callback: Callable):
+                 send_ack_callback: Callable,
+                 stream_controller=None):
         self.state = state
         self.sequence_validator = sequence_validator
         self.dedup_registry = dedup_registry
         self.queue_manager = queue_manager
         self.ack_manager = ack_manager
         self.send_ack = send_ack_callback
+        self.stream_controller = stream_controller
 
     async def dispatch(self, envelope: Dict[str, Any]):
         msg_type = envelope.get("type")
@@ -42,6 +44,16 @@ class ProtocolDispatcher:
             await self._handle_speech_speak(envelope)
         elif msg_type == "command" and msg_name == "session.control":
             await self._handle_session_control(envelope)
+        elif msg_type == "command" and msg_name == "stream.start":
+            if self.stream_controller:
+                await self._handle_stream_start(envelope)
+            else:
+                logger.error("stream.start received but stream_controller is not configured.")
+        elif msg_type == "command" and msg_name == "stream.stop":
+            if self.stream_controller:
+                await self._handle_stream_stop(envelope)
+            else:
+                logger.error("stream.stop received but stream_controller is not configured.")
         elif msg_type == "command" and msg_name == "avatar.action":
             # Protocol-valid handling only. No avatar implementation yet.
             logger.info("Received avatar.action, ignoring execution.")
@@ -146,3 +158,82 @@ class ProtocolDispatcher:
             if cmd_id:
                 ack_ctrl = self.ack_manager.build_ack(cmd_id, ACK_COMPLETED, msg_id)
                 await self.send_ack(ack_ctrl)
+
+    async def _handle_stream_start(self, envelope: Dict[str, Any]):
+        payload_data = envelope.get("payload", {})
+        cmd_id = payload_data.get("command_id")
+        seq_num = envelope.get("sequence_number")
+        msg_id = envelope.get("message_id")
+        
+        if not cmd_id or not payload_data.get("stream_url"):
+            return
+            
+        dedup_state = self.dedup_registry.register_or_get(cmd_id, ACK_RECEIVED, seq_num)
+        if dedup_state:
+            ack_msg = self.ack_manager.build_ack(cmd_id, dedup_state["status"], msg_id)
+            await self.send_ack(ack_msg)
+            return
+
+        ack_msg = self.ack_manager.build_ack(cmd_id, ACK_RECEIVED, msg_id)
+        await self.send_ack(ack_msg)
+        
+        from live_studio.protocol.envelopes import StreamStartPayload
+        payload = StreamStartPayload(
+            command_id=cmd_id,
+            stream_url=payload_data.get("stream_url"),
+            correlation_id=payload_data.get("correlation_id"),
+            width=payload_data.get("width", 800),
+            height=payload_data.get("height", 600),
+            fps=payload_data.get("fps", 30),
+            video_codec=payload_data.get("video_codec", "h264"),
+            bitrate=payload_data.get("bitrate", "2500k"),
+            audio_sample_rate=payload_data.get("audio_sample_rate", 44100),
+            audio_channels=payload_data.get("audio_channels", 2)
+        )
+        
+        success = await self.stream_controller.handle_start(payload)
+        
+        if success:
+            self.dedup_registry.update_status(cmd_id, ACK_COMPLETED)
+            ack_comp = self.ack_manager.build_ack(cmd_id, ACK_COMPLETED, msg_id)
+            await self.send_ack(ack_comp)
+        else:
+            self.dedup_registry.update_status(cmd_id, ACK_FAILED)
+            ack_fail = self.ack_manager.build_ack(cmd_id, ACK_FAILED, msg_id, "STARTUP_FAILED")
+            await self.send_ack(ack_fail)
+
+    async def _handle_stream_stop(self, envelope: Dict[str, Any]):
+        payload_data = envelope.get("payload", {})
+        cmd_id = payload_data.get("command_id")
+        seq_num = envelope.get("sequence_number")
+        msg_id = envelope.get("message_id")
+        
+        if not cmd_id:
+            return
+            
+        dedup_state = self.dedup_registry.register_or_get(cmd_id, ACK_RECEIVED, seq_num)
+        if dedup_state:
+            ack_msg = self.ack_manager.build_ack(cmd_id, dedup_state["status"], msg_id)
+            await self.send_ack(ack_msg)
+            return
+
+        ack_msg = self.ack_manager.build_ack(cmd_id, ACK_RECEIVED, msg_id)
+        await self.send_ack(ack_msg)
+        
+        from live_studio.protocol.envelopes import StreamStopPayload
+        payload = StreamStopPayload(
+            command_id=cmd_id,
+            correlation_id=payload_data.get("correlation_id"),
+            reason=payload_data.get("reason")
+        )
+        
+        success = await self.stream_controller.handle_stop(payload)
+        
+        if success:
+            self.dedup_registry.update_status(cmd_id, ACK_COMPLETED)
+            ack_comp = self.ack_manager.build_ack(cmd_id, ACK_COMPLETED, msg_id)
+            await self.send_ack(ack_comp)
+        else:
+            self.dedup_registry.update_status(cmd_id, ACK_FAILED)
+            ack_fail = self.ack_manager.build_ack(cmd_id, ACK_FAILED, msg_id, "SHUTDOWN_FAILED")
+            await self.send_ack(ack_fail)

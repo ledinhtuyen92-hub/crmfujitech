@@ -10,6 +10,7 @@ from channels.db import database_sync_to_async
 from .models import LiveSession
 from .services import LiveContextService
 from .protocol.envelope import ProtocolEnvelopeSerializer
+from .console_events import LiveConsoleEventService
 
 logger = logging.getLogger(__name__)
 
@@ -150,6 +151,20 @@ class DeviceAgentConsumer(AsyncWebsocketConsumer):
             await database_sync_to_async(LiveContextService.update_context)(
                 self.session.company_id, self.session_id, updates
             )
+        elif msg_type == 'event' and msg_name == 'stream.status':
+            state = payload.get('state')
+            updates = {
+                'stream_state': state
+            }
+            await database_sync_to_async(LiveContextService.update_context)(
+                self.session.company_id, self.session_id, updates
+            )
+            await database_sync_to_async(LiveConsoleEventService.emit)(
+                session_id=self.session_id,
+                event_type="live.stream.status",
+                payload={"state": state},
+                correlation_id=envelope['message_id']
+            )
         elif msg_type == 'command' and msg_name == 'session.sync':
             logger.info(f"Session Sync: {payload}")
             # Mark the connection as ready to receive/send commands
@@ -201,7 +216,7 @@ class DeviceAgentConsumer(AsyncWebsocketConsumer):
             "timestamp": timezone.now().isoformat(),
             "sequence_number": 0, # Errors can bypass sequence validation
             "session_id": str(getattr(self, 'session_id', uuid.uuid4())),
-            "reference_message_id": reference_message_id,
+            "reference_message_id": str(reference_message_id) if reference_message_id else None,
             "payload": {
                 "error_code": error_code,
                 "detail": detail

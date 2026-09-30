@@ -91,7 +91,16 @@ class PlatformAccount(models.Model):
     account_id = models.CharField(max_length=255, verbose_name="External Account ID")
     display_name = models.CharField(max_length=255, verbose_name="Tên hiển thị")
     
-    # Security Note: Should be encrypted in production
+    # user_id is required for Shopee Livestream API (separate from shop_id stored in account_id)
+    # This is the streamer's user_id returned by Shopee OAuth alongside access_token.
+    user_id = models.CharField(
+        max_length=255,
+        blank=True,
+        null=True,
+        verbose_name="Shopee User ID (Livestream)"
+    )
+    
+    # Security Note: Tokens encrypted via save() override using Fernet (platforms/security.py)
     access_token = models.TextField(blank=True, null=True, verbose_name="Access Token")
     refresh_token = models.TextField(blank=True, null=True, verbose_name="Refresh Token")
     token_expires_at = models.DateTimeField(blank=True, null=True, verbose_name="Token Hết hạn")
@@ -246,6 +255,29 @@ class LiveSession(models.Model):
         null=True, 
         blank=True, 
         verbose_name="RTMP Stream URL"
+    )
+    # stream_key is stored separately (never returned by API) to allow showing
+    # a "connected" state without re-exposing the key.
+    # It is also used to reconstruct the full RTMP URL for Manual RTMP mode.
+    stream_key = models.TextField(
+        null=True,
+        blank=True,
+        verbose_name="Stream Key (encrypted)"
+    )
+    
+    # Shopee connection mode — determines how stream_url is obtained
+    SHOPEE_CONNECTION_API = 'api'
+    SHOPEE_CONNECTION_MANUAL_RTMP = 'manual_rtmp'
+    SHOPEE_CONNECTION_CHOICES = [
+        (SHOPEE_CONNECTION_API, 'Shopee API (OAuth)'),
+        (SHOPEE_CONNECTION_MANUAL_RTMP, 'Shopee Manual RTMP'),
+    ]
+    shopee_connection_mode = models.CharField(
+        max_length=20,
+        choices=SHOPEE_CONNECTION_CHOICES,
+        null=True,
+        blank=True,
+        verbose_name="Chế độ kết nối Shopee"
     )
     started_at = models.DateTimeField(null=True, blank=True, verbose_name="Thời gian bắt đầu")
     ended_at = models.DateTimeField(null=True, blank=True, verbose_name="Thời gian kết thúc")

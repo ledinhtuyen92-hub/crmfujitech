@@ -90,6 +90,7 @@ class LiveSessionViewSet(viewsets.ModelViewSet):
         'human_takeover': 'ai_agent.manage_agents',
         'resume': 'ai_agent.manage_agents',
         'test_comment': 'ai_agent.manage_agents',
+        'setup_manual_rtmp': 'ai_agent.manage_agents',
     }
 
     def get_queryset(self):
@@ -101,6 +102,7 @@ class LiveSessionViewSet(viewsets.ModelViewSet):
     @action(detail=True, methods=['post'])
     def start(self, request, pk=None):
         from django.db import transaction
+        from .orchestrator import LiveOrchestrator
         session = self.get_object()
         
         with transaction.atomic():
@@ -108,13 +110,27 @@ class LiveSessionViewSet(viewsets.ModelViewSet):
                 session.change_status(LiveSession.STATUS_READY)
             session.change_status(LiveSession.STATUS_RUNNING)
             
-        return Response({'status': session.status})
+        orchestrator = LiveOrchestrator()
+        result = orchestrator.dispatch_stream_start(str(session.id))
+        
+        return Response({
+            'status': session.status,
+            'dispatch': result
+        })
 
     @action(detail=True, methods=['post'])
     def stop(self, request, pk=None):
+        from .orchestrator import LiveOrchestrator
         session = self.get_object()
         session.change_status(LiveSession.STATUS_STOPPED)
-        return Response({'status': session.status})
+        
+        orchestrator = LiveOrchestrator()
+        result = orchestrator.dispatch_stream_stop(str(session.id), reason="manual_stop")
+        
+        return Response({
+            'status': session.status,
+            'dispatch': result
+        })
 
     @action(detail=True, methods=['post'])
     def pause(self, request, pk=None):
@@ -152,6 +168,54 @@ class LiveSessionViewSet(viewsets.ModelViewSet):
             correlation_id=correlation_id
         )
         return Response({'status': 'dispatched', 'correlation_id': correlation_id})
+
+    @action(detail=True, methods=['post'], url_path='setup-manual-rtmp')
+    def setup_manual_rtmp(self, request, pk=None):
+        """
+        Phase 1E-8: Configure Manual RTMP mode for a Shopee session.
+        
+        Accepts Server URL + Stream Key (from Shopee Live PC).
+        Combines them into a canonical RTMP URL and stores securely.
+        The stream_key is NEVER returned in any response.
+        
+        Sets shopee_connection_mode = 'manual_rtmp' on the session.
+        """
+        from .serializers import ShopeeManualRtmpSetupSerializer
+        from .models import LiveSession
+        import logging
+        logger = logging.getLogger(__name__)
+        
+        session = self.get_object()
+        
+        if session.platform != 'shopee':
+            return Response(
+                {'detail': 'This endpoint is only for Shopee sessions.'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        serializer = ShopeeManualRtmpSetupSerializer(data=request.data)
+        if not serializer.is_valid():
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        
+        # Combine server_url + stream_key into RTMP URL
+        # NEVER log this value — it contains the stream_key credential
+        rtmp_url = serializer.get_combined_rtmp_url()
+        
+        session.stream_url = rtmp_url
+        session.shopee_connection_mode = LiveSession.SHOPEE_CONNECTION_MANUAL_RTMP
+        session.save(update_fields=['stream_url', 'shopee_connection_mode'])
+        
+        logger.info(
+            f"[Session: {session.id}] Manual RTMP configured. "
+            f"Server: {serializer.validated_data['server_url'][:30]}... [key redacted]"
+        )
+        
+        return Response({
+            'status': 'configured',
+            'connection_mode': 'manual_rtmp',
+            'server_url_preview': serializer.validated_data['server_url'][:50],
+            # stream_key deliberately omitted
+        })
 
 
 class IsAuthenticatedDevice(permissions.BasePermission):

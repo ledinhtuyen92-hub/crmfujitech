@@ -30,3 +30,22 @@ class SessionSyncPayload:
     cloud_to_device_sequence: int
     device_to_cloud_sequence: int
     status: str = "request"
+
+@dataclass
+class StreamStartPayload:
+    command_id: str
+    stream_url: str
+    correlation_id: Optional[str] = None
+    width: int = 800
+    height: int = 600
+    fps: int = 30
+    video_codec: str = "h264"
+    bitrate: str = "2500k"
+    audio_sample_rate: int = 44100
+    audio_channels: int = 2
+
+@dataclass
+class StreamStopPayload:
+    command_id: str
+    correlation_id: Optional[str] = None
+    reason: Optional[str] = None

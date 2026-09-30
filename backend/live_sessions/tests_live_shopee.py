@@ -70,6 +70,7 @@ class ShopeeAdapterLiveTests(TestCase):
             company=self.company,
             platform=LivePlatformProduct.PLATFORM_SHOPEE,
             account_id="123456",
+            user_id="user_123",
             access_token="fake_access",
             status="connected"
         )
@@ -250,7 +251,7 @@ class ShopeeAdapterLiveTests(TestCase):
         LivePlatformProduct.objects.create(
             company=self.company,
             platform=LivePlatformProduct.PLATFORM_SHOPEE,
-            platform_product_id="shopee_item_1",
+            platform_product_id="12345",
             product=self.product,
             is_active=True
         )
@@ -261,7 +262,7 @@ class ShopeeAdapterLiveTests(TestCase):
             "response": {}
         }
         
-        res = self.adapter.attach_product_to_live(str(self.session.id), "shopee_item_1")
+        res = self.adapter.attach_product_to_live(str(self.session.id), "12345")
         self.assertTrue(res)
         
     def test_attach_product_invalid_mapping(self):
@@ -278,17 +279,19 @@ class ShopeeAdapterLiveTests(TestCase):
         LivePlatformProduct.objects.create(
             company=self.other_company,
             platform=LivePlatformProduct.PLATFORM_SHOPEE,
-            platform_product_id="shopee_item_1",
+            platform_product_id="12345",
             product=Product.objects.create(company=self.other_company, name="Prod", price=1),
             is_active=True
         )
         
         with self.assertRaises(PlatformAPIError):
-            self.adapter.attach_product_to_live(str(self.session.id), "shopee_item_1")
+            self.adapter.attach_product_to_live(str(self.session.id), "12345")
             
     def test_capability_unsupported(self):
+        self.session.external_session_id = "ext_123"
+        self.session.save()
         with self.assertRaises(CapabilityNotSupportedError):
-            self.adapter.send_comment_reply(str(self.session.id), "hello")
+            self.adapter.publish_stream(str(self.session.id))
 
 class ShopeeAdapterCommentsTests(TestCase):
     @patch('live_sessions.platforms.security.get_encryption_key')
@@ -299,6 +302,7 @@ class ShopeeAdapterCommentsTests(TestCase):
             company=self.company,
             platform=LivePlatformProduct.PLATFORM_SHOPEE,
             account_id="123456",
+            user_id="user_123",
             access_token="fake_access",
             status="connected"
         )
@@ -410,6 +414,7 @@ class PollingTaskTests(TestCase):
             company=self.company,
             platform=LivePlatformProduct.PLATFORM_SHOPEE,
             account_id="123456",
+            user_id="user_123",
             access_token="fake_access",
             status="connected"
         )
