@@ -17,6 +17,9 @@ class DeliveryOrderSerializer(serializers.ModelSerializer):
     has_warranty = serializers.SerializerMethodField()
     factory_id = serializers.SerializerMethodField()
     factory_name = serializers.SerializerMethodField()
+    next_payment_amount = serializers.SerializerMethodField()
+    next_payment_title = serializers.SerializerMethodField()
+    next_payment_overdue_amount = serializers.SerializerMethodField()
 
     def get_has_warranty(self, obj):
         return hasattr(obj.order, 'warranty_card') and obj.order.warranty_card is not None
@@ -28,6 +31,50 @@ class DeliveryOrderSerializer(serializers.ModelSerializer):
     def get_factory_name(self, obj):
         prod = obj.order.production_orders.first()
         return prod.factory.name if prod and prod.factory else None
+
+    def _get_milestones_sorted(self, obj):
+        return sorted(obj.order.payment_milestones.all(), key=lambda m: m.id)
+
+    def get_next_payment_overdue_amount(self, obj):
+        """Số tiền còn thiếu từ các kỳ partial (đã thu một phần nhưng chưa đủ)."""
+        if float(obj.order.remaining_debt or 0) <= 0:
+            return None
+        milestones = self._get_milestones_sorted(obj)
+        total_overdue = sum(
+            float(ms.amount) - float(ms.paid_amount)
+            for ms in milestones
+            if ms.status == 'partial'
+        )
+        return total_overdue if total_overdue > 0 else None
+
+    def get_next_payment_amount(self, obj):
+        """Số tiền của kỳ pending tiếp theo (chưa thu đồng nào). None nếu đã thu đủ."""
+        if float(obj.order.remaining_debt or 0) <= 0:
+            return None
+        milestones = self._get_milestones_sorted(obj)
+        # Kỳ đầu tiên chưa thu đồng nào (status=pending)
+        for ms in milestones:
+            if ms.status == 'pending' and float(ms.amount) > 0:
+                return float(ms.amount)
+        # Fallback: không có pending → kỳ partial còn thiếu
+        for ms in milestones:
+            remaining = float(ms.amount) - float(ms.paid_amount)
+            if remaining > 0:
+                return remaining
+        return None
+
+    def get_next_payment_title(self, obj):
+        """Tiêu đề kỳ pending tiếp theo. None nếu đã thu đủ."""
+        if float(obj.order.remaining_debt or 0) <= 0:
+            return None
+        milestones = self._get_milestones_sorted(obj)
+        for ms in milestones:
+            if ms.status == 'pending' and float(ms.amount) > 0:
+                return ms.title
+        for ms in milestones:
+            if float(ms.amount) - float(ms.paid_amount) > 0:
+                return ms.title
+        return None
 
     def get_order_sales_name(self, obj):
         if obj.order and obj.order.customer and obj.order.customer.assigned_to:
@@ -68,6 +115,9 @@ class DeliveryOrderSerializer(serializers.ModelSerializer):
             "order_sales_phone",
             "factory_id",
             "factory_name",
+            "next_payment_amount",
+            "next_payment_title",
+            "next_payment_overdue_amount",
             "delivery_code",
             "status",
             "status_display",

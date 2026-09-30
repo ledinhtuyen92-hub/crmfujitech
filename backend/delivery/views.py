@@ -20,6 +20,9 @@ class DeliveryOrderViewSet(TenantQuerySetMixin, viewsets.ModelViewSet):
 
     queryset = DeliveryOrder.objects.select_related(
         "company", "order__customer"
+    ).prefetch_related(
+        "order__payment_milestones",
+        "order__production_orders__factory",
     ).order_by("-created_at")
     serializer_class = DeliveryOrderSerializer
     pagination_class = StandardPagination

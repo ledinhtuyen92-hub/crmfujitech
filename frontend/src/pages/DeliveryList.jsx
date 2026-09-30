@@ -21,7 +21,7 @@ import {
   Tooltip,
   AutoComplete,
 } from 'antd'
-import { CarOutlined, SearchOutlined, EditOutlined, EyeOutlined, PlusOutlined, DeleteOutlined, UserAddOutlined, FileTextOutlined, PrinterOutlined, CheckCircleOutlined, CloseCircleOutlined, SyncOutlined, TableOutlined, ExportOutlined, FilePdfOutlined, EnvironmentOutlined , SettingOutlined } from '@ant-design/icons'
+import { CarOutlined, SearchOutlined, EditOutlined, EyeOutlined, PlusOutlined, DeleteOutlined, UserAddOutlined, FileTextOutlined, PrinterOutlined, CheckCircleOutlined, CloseCircleOutlined, SyncOutlined, TableOutlined, ExportOutlined, FilePdfOutlined, EnvironmentOutlined, SettingOutlined, WarningOutlined } from '@ant-design/icons'
 import dayjs from 'dayjs'
 import { useResponsive } from '../hooks/useResponsive'
 import { DndContext, closestCenter } from '@dnd-kit/core';
@@ -63,6 +63,7 @@ export default function DeliveryList() {
     { label: 'Địa chỉ giao hàng', value: 'shipping_address' },
     { label: 'Nhà máy', value: 'factory' },
     { label: 'Công nợ', value: 'debt' },
+    { label: 'Thanh toán tiếp theo', value: 'next_payment' },
     { label: 'Trạng thái', value: 'status' },
     { label: 'Người giao', value: 'shipper' },
     { label: 'Thời gian', value: 'dates' },
@@ -71,7 +72,7 @@ export default function DeliveryList() {
 
   const DEFAULT_COLUMNS = [
     'delivery_code', 'order_number', 'customer', 'sales', 'shipping_address', 
-    'factory', 'debt', 'status', 'shipper', 'dates', 'actions'
+    'factory', 'debt', 'next_payment', 'status', 'shipper', 'dates', 'actions'
   ];
 
   const [columnOrder, setColumnOrder] = useState(() => {
@@ -692,6 +693,41 @@ export default function DeliveryList() {
           )}
         </div>
       ),
+    },
+    {
+      title: 'Thanh toán tiếp theo',
+      key: 'next_payment',
+      render: (_, r) => {
+        const hasOverdue = r.next_payment_overdue_amount != null && r.next_payment_overdue_amount > 0
+        const hasNext = r.next_payment_amount != null && r.next_payment_amount > 0
+        if (!hasOverdue && !hasNext) {
+          return <Text type="success" strong>Đã thu đủ</Text>
+        }
+        return (
+          <div style={{ fontSize: 13 }}>
+            {hasOverdue && (
+              <div style={{ marginBottom: hasNext ? 4 : 0 }}>
+                <Text type="danger" strong style={{ display: 'block' }}>
+                  <WarningOutlined /> Còn thiếu: {Number(r.next_payment_overdue_amount).toLocaleString('vi-VN')} đ
+                </Text>
+                <Text type="secondary" style={{ fontSize: 11 }}>Kỳ trước chưa thu đủ</Text>
+              </div>
+            )}
+            {hasNext && (
+              <div>
+                <Text type="warning" strong style={{ display: 'block' }}>
+                  {Number(r.next_payment_amount).toLocaleString('vi-VN')} đ
+                </Text>
+                {r.next_payment_title && (
+                  <Text type="secondary" style={{ fontSize: 11 }}>
+                    {r.next_payment_title}
+                  </Text>
+                )}
+              </div>
+            )}
+          </div>
+        )
+      },
     },
     {
       title: 'Trạng thái',
