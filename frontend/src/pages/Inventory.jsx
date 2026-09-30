@@ -74,6 +74,7 @@ export default function Inventory() {
   const [warehouses, setWarehouses] = useState([])
   const [factories, setFactories] = useState([])
   const [stockLevels, setStockLevels] = useState([])
+  const [approveStockLevels, setApproveStockLevels] = useState([]) // stock levels dùng riêng cho dialog duyệt xuất kho
   const [transactions, setTransactions] = useState([])
   const [loading, setLoading] = useState(false)
   const [currentTxnPage, setCurrentTxnPage] = useState(1)
@@ -605,7 +606,7 @@ export default function Inventory() {
   // Kiểm tra xem trong lịch sử có phiếu xuất kho nào có nhà máy không
   const hasFactoryInHistory = transactions.some(t => t.factory_name)
 
-  const handleOpenApproveExport = (txn) => {
+  const handleOpenApproveExport = async (txn) => {
     setSelectedExportTxn(txn)
     
     const txns = txn.items || [txn];
@@ -625,8 +626,21 @@ export default function Inventory() {
     }
     
     setApproveWarehouseIds(initialWarehouseIds)
-    fetchStockLevels()
     setExportApproveModalVisible(true)
+
+    // Query server-side đúng product IDs cần thiết — không phụ thuộc phân trang
+    try {
+      const txnsForFetch = txn.items || [txn]
+      const productIds = [...new Set(txnsForFetch.map(t => t.product).filter(Boolean))]
+      const res = await api.get('/inventory/stock-levels/', {
+        params: { product_ids: productIds.join(',') }
+      })
+      const data = Array.isArray(res.data) ? res.data : res.data?.results ?? []
+      setApproveStockLevels(data)
+    } catch {
+      // fallback: dùng stockLevels hiện tại nếu fetch lỗi
+      setApproveStockLevels(stockLevels)
+    }
   }
 
   const handleApproveExport = async () => {
@@ -640,7 +654,7 @@ export default function Inventory() {
     // Validate stock on frontend before any API calls to prevent partial failures
     for (const txn of txnsToApprove) {
       const wId = approveWarehouseIds[txn.id]
-      const stock = stockLevels.find(s => Number(s.warehouse) === Number(wId) && Number(s.product) === Number(txn.product))
+      const stock = approveStockLevels.find(s => Number(s.warehouse) === Number(wId) && Number(s.product) === Number(txn.product))
       const qty = stock ? Number(stock.quantity) : 0
       const reqQty = Number(txn.quantity)
       if (qty < reqQty) {
@@ -3050,7 +3064,7 @@ export default function Inventory() {
                 if (orderFactoryId) {
                   const factory = factories.find(f => f.id === orderFactoryId);
                   if (factory && factory.linked_warehouse) {
-                    const stock = stockLevels.find(s => Number(s.warehouse) === Number(factory.linked_warehouse) && Number(s.product) === Number(txn.product));
+                    const stock = approveStockLevels.find(s => Number(s.warehouse) === Number(factory.linked_warehouse) && Number(s.product) === Number(txn.product));
                     const qty = stock ? Number(stock.quantity) : 0;
                     if (qty >= Number(txn.quantity)) {
                       disableWarehouseSelect = true;
@@ -3090,7 +3104,7 @@ export default function Inventory() {
                           }}
                         >
                           {filteredWarehouses.map(w => {
-                            const stock = stockLevels.find(s => Number(s.warehouse) === Number(w.id) && Number(s.product) === Number(txn.product))
+                            const stock = approveStockLevels.find(s => Number(s.warehouse) === Number(w.id) && Number(s.product) === Number(txn.product))
                             const qty = stock ? Number(stock.quantity) : 0
                             const reqQty = Number(txn.quantity)
                             const isEnough = qty >= reqQty

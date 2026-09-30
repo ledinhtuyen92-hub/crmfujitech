@@ -496,6 +496,16 @@ class StockLevelViewSet(mixins.UpdateModelMixin, mixins.DestroyModelMixin, views
         warehouse_id = self.request.query_params.get("warehouse_id")
         if warehouse_id:
             qs = qs.filter(warehouse_id=warehouse_id)
+
+        # Filter theo danh sách product IDs (dùng khi dialog duyệt xuất kho cần query server-side)
+        product_ids_str = self.request.query_params.get("product_ids")
+        if product_ids_str:
+            try:
+                product_ids = [int(pid) for pid in product_ids_str.split(",") if pid.strip().isdigit()]
+                if product_ids:
+                    qs = qs.filter(product_id__in=product_ids)
+            except (ValueError, AttributeError):
+                pass
             
         search_query = self.request.query_params.get("search")
         if search_query:
