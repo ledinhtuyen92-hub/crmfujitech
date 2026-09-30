@@ -398,6 +398,49 @@ class CompanySettings(models.Model):
         blank=True,
         verbose_name="Tên tùy chỉnh các trạng thái Pipeline",
     )
+    customer_table_columns = models.JSONField(
+        default=list,
+        blank=True,
+        null=True,
+        verbose_name="Cột hiển thị bảng khách hàng mặc định",
+        help_text="Danh sách các cột được phép hiển thị trên bảng khách hàng (do Admin chọn).",
+    )
+    quotation_table_columns = models.JSONField(
+        default=list,
+        blank=True,
+        null=True,
+        verbose_name="Cột hiển thị bảng báo giá mặc định",
+    )
+    order_table_columns = models.JSONField(
+        default=list,
+        blank=True,
+        null=True,
+        verbose_name="Cột hiển thị bảng đơn hàng mặc định",
+    )
+    inventory_table_columns = models.JSONField(
+        default=list,
+        blank=True,
+        null=True,
+        verbose_name="Cột hiển thị bảng kho vận mặc định",
+    )
+    production_table_columns = models.JSONField(
+        default=list,
+        blank=True,
+        null=True,
+        verbose_name="Cột hiển thị bảng sản xuất mặc định",
+    )
+    delivery_table_columns = models.JSONField(
+        default=list,
+        blank=True,
+        null=True,
+        verbose_name="Cột hiển thị bảng giao hàng mặc định",
+    )
+    warranty_table_columns = models.JSONField(
+        default=list,
+        blank=True,
+        null=True,
+        verbose_name="Cột hiển thị bảng bảo hành mặc định",
+    )
     custom_info_templates = models.JSONField(
         default=list,
         blank=True,

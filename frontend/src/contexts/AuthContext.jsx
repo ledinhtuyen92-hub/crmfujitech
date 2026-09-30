@@ -32,6 +32,11 @@ export function AuthProvider({ children }) {
       .catch(() => {})
   }, [])
 
+  const refreshSettings = useCallback(() => {
+    fetchPublicSettings()
+    fetchCompanySettings()
+  }, [fetchPublicSettings, fetchCompanySettings])
+
   // ── Khi khởi động app: tải lại thông tin user từ token đã lưu ─────
   useEffect(() => {
     fetchPublicSettings()
@@ -173,13 +178,13 @@ export function AuthProvider({ children }) {
         api.get('users/me/').then(({ data: userData }) => setUser(userData)).catch(() => {})
         return data
       },
-      refreshSettings: fetchPublicSettings,
+      refreshSettings,
       activeModules,
       isModuleActive,
       pipelineStatusLabels,
       getPipelineLabel,
     }),
-    [user, loading, isAuthenticated, isSuperAdmin, isCompanyAdmin, maintenanceMode, checkMaintenance, login, logout, hasPermission, fetchPublicSettings, activeModules, isModuleActive, pipelineStatusLabels, getPipelineLabel],
+    [user, loading, isAuthenticated, isSuperAdmin, isCompanyAdmin, maintenanceMode, checkMaintenance, login, logout, hasPermission, refreshSettings, activeModules, isModuleActive, pipelineStatusLabels, getPipelineLabel, companySettings],
   )
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
