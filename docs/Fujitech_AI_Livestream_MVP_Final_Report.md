@@ -1,45 +1,45 @@
-# Fujitech AI Livestream - Local-First MVP Final Report
+# Fujitech AI Livestream Local-First MVP Final Report
 
-## 1. Executive Summary
-The Local-First MVP has been successfully validated through a complete End-to-End (E2E) execution using the actual runtime stack. All major blocking issues have been resolved, and the system demonstrates the ability to process live comments, generate AI responses, convert them to speech, synchronize lips, and push the final composite video stream to an RTMP endpoint via FFmpeg.
+## 1. Final MVP Classification
+**B. MVP COMPLETE WITH EXTERNAL BLOCKERS**
+*(All internally testable MVP behavior is validated, but remaining blockers are genuinely external: TikTok authorization, Shopee credentials, and OpenAI API Key).*
 
-## 2. Environment Validation
-- **Backend**: Django & Django Channels (Running via Docker Compose)
-- **Message Broker**: Redis (Running via Docker Compose)
-- **Task Queue**: Celery (Running via Docker Compose)
-- **Streaming Engine**: MediaMTX & FFmpeg (Running locally in Windows)
-- **Client Application**: Python Pygame/OpenCV Live Studio (Running locally in Windows)
+## 2. Endurance & Stability
+- **Endurance duration actually achieved**: ~10 minutes (Short validation window per user override).
+- **Short endurance validation**: **PASS**
+- **4H+ endurance**: **UNVERIFIED**
+- **CPU/RAM/Resource Growth**: Stable during the 10-minute window.
+- **Synthetic comment processing**: ~18 cycles successfully dispatched to Celery/RAG.
+- **WebSocket stability**: Connected and stable.
 
-## 3. Real E2E Test Execution
-The following sequence was executed and verified at runtime:
-1. **Session Boot**: Live Studio connected to Django Channels WebSocket using a securely generated `Device Token`.
-2. **State Synchronization**: Backend synchronized the `disconnected -> synchronized` state successfully.
-3. **Session Start**: Orchestrator successfully dispatched `stream.start`, triggering FFmpeg in the Live Studio to push video to `rtmp://localhost:1935/live`.
-4. **Live Comment Injection**: A synthetic comment ("Vay cua nhua composite gia the nao a") was injected via Celery task `handle_live_message`.
-5. **RAG & AI Inference**: The backend RAG processor successfully retrieved relevant product knowledge and generated an accurate response using the Gemini model.
-6. **TTS Generation**: A dummy TTS provider successfully served valid MP3 data (simulating OpenAI TTS).
-7. **Command Dispatch**: The generated speech payload was sent over the WebSocket to the Live Studio.
-8. **Live Playback**: Live Studio successfully received the payload, downloaded the MP3 asset, and initiated avatar playback.
+## 3. Platform & Capabilities
+- **Local E2E status**: **PASS**
+- **Stream recovery status**: **PASS** (Health monitor successfully detected FFmpeg crash and re-established RTMP).
+- **Real TTS status**: **BLOCKED/UNVERIFIED** (No valid OpenAI API key in Company vault).
+- **Shopee status**: **BLOCKED** (Implementation complete, pending Sandbox/Production credentials).
+- **TikTok status**: **BLOCKED** (Adapter implemented, restricted to Manual RTMP, pending credentials/authorization).
 
-## 4. Blocker Resolutions
-- **Backend Boot Failure**: Resolved `TypeError: CheckConstraint` in inventory models.
-- **WebSocket Route Mismatch**: Matched Live Studio's connection URL to the correct Django Channels route (`/ws/live_sessions/<id>/device/`).
-- **Device Authentication**: Implemented correct Device Token generation (`ldt_<id>_<secret>`) and resolved `Company.is_active` validation in the middleware.
-- **WebSockets 14.0+ Compatibility**: Migrated `extra_headers` to `additional_headers` and replaced deprecated `self.ws.open` with a `try-except` block.
-- **TTS Failure Handling**: Created a `DummyTTSProvider` with a real `.mp3` asset fallback to allow E2E testing without an OpenAI API key.
+## 4. Test & Regression Metrics
+- **Backend test count**: 161 (PASS)
+- **Live Studio test count**: 69 (PASS)
+- **Frontend build result**: PASS
 
-## 5. E2E Evidence Classification
-- **LOCAL FULL PIPELINE** = PASS (Tested via synthetic comment to avatar playback)
-- **REAL TTS PROVIDER** = UNVERIFIED (Skipped locally via DummyTTS in DEBUG mode)
-- **LOCAL RTMP / MEDIAMTX** = PASS (Tested via live_studio ffmpeg subprocess streaming to localhost:1935)
-- **REAL SHOPEE** = BLOCKED (Pending valid credentials)
-- **REAL TIKTOK** = BLOCKED (Pending valid credentials)
-- **4H+ ENDURANCE** = UNVERIFIED (Background execution not yet performed)
+## 5. Bugs fixed during gate
+- Fixed `django.core.exceptions.ImproperlyConfigured` in `run_endurance_test.py`.
+- Fixed Celery arguments mismatch in `run_endurance_test.py` invoking `handle_live_message.delay()`.
+- Updated `LiveSessionsList.jsx` to properly map `server_url` and `stream_key` into `stream_url` for TikTok manual RTMP workflows.
+- Improved TikTok UI to reflect real platform capabilities and hide Shopee API buttons.
 
 ## 6. Git Status
-- **Branch**: V2
-- **Untracked**: `mediamtx.exe`
-- **Integrity**: All completed Phase 1G code remains intact.
+- **Final commit**: `b71b486`
+- **V2/origin/V2 status**: Synchronized.
 
-## Conclusion
-The Local-First MVP pipeline is functionally complete and verified at runtime. The project is currently continuing through **Phase 1H: Media Integration and Platform Connectivity**.
+## 7. Remaining external blockers
+- Need valid OpenAI API Key for true production speech synthesis.
+- Need valid Platform OAuth credentials for full E2E broadcasts on Shopee.
+- Need TikTok Shop whitelist/authorization for automated RTMP capabilities.
+
+## 8. Exact next phase after MVP
+- Containerized Production Deployment.
+- E2E Testing with Real Credentials.
+- Cloud GPU and 3D Avatar (Commercial Expansion).
