@@ -1,50 +1,28 @@
 # CURRENT DEVELOPMENT STATUS
 
-## Timestamp
-2026-10-01
+## High-Level Status
+**Overall Project Phase:** **Local-First MVP (COMPLETE)**
+**Date:** 2026-10-01
+**Current Branch:** V2
 
-## Latest Checkpoint
-**PHASE 1G-6 — Control Room (Final Studio Polish): COMPLETE (NOT YET COMMITTED)**
+## Feature Matrix
+| Feature | Status | Notes |
+|---------|--------|-------|
+| Web App Session Management | 🟢 Complete | OAuth, Shopee linking, Product selection complete. |
+| Dual-Connection Backend | 🟢 Complete | Shopee API & Manual RTMP robustly implemented. |
+| Realtime Event Stream | 🟢 Complete | WebSocket console feed, heartbeat, and status sync complete. |
+| Human Takeover | 🟢 Complete | Amber banner, pause AI, clear isolation from Live running state. |
+| Media Integration (Phase 1H) | 🟢 Complete | Local MediaMTX iframe WebRTC preview integrated into Live Studio. |
+| Proactive AI Speaking | 🟢 Complete | Celery background task monitors 30s idle time and fires RAG speech. |
+| Conversation Memory | 🟢 Complete | Redis `LiveContextService` manages rolling conversation history for AI accuracy. |
+| Avatar Execution MVP | 🟢 Complete | Pygame 2D renderer drives simple avatar state changes locally. |
+| Lip Sync MVP | 🟢 Complete | Real PCM amplitude max RMS extraction from FFmpeg-decoded MP3. |
+| Scene Composition | 🟢 Complete | 720x1280 (9:16) rendering with Product image layout and CTA. |
+| Local Stream Execution | 🟢 Complete | Local TCP Socket -> FFmpeg -> RTMP push pipeline is stable. |
 
-## Branch
-V2
-
-## Latest Committed State
-- Commit: `8329e94`
-- Message: `feat(live): implement human takeover and live controls`
-- Includes: Phase 1G-1 through 1G-5
-
-## Working Tree State
-Dirty — Phase 1G-6 changes pending commit.
-
-## Test Results
-**Backend Tests:** 154 / 154 PASS.
-**Frontend Build:** `npm run build` → exit code 0, 2766 modules transformed.
-
-### Phase 1G-6 (Final Studio Polish)
-- **`LiveStudioBeta.jsx`** (Modified):
-  - Restructured to full 3-column dashboard layout.
-  - Added unified footer combining StreamHealthRow, Platform, and AI Host.
-- **`VideoPreview.jsx`** (New): Placeholder for future video feed.
-- **`LiveChat.jsx`** (New): Bounded (100-item) real-time chat feed capturing `live.comment.received`.
-
-### Previously Completed (Phase 1G)
-- **1G-5**: Human Takeover & Live Controls (`8329e94`)
-- **1G-4**: Stream Health tracking
-- **1G-3**: AI Event Timeline
-- **1G-2**: Session state tracking
-- **1G-1**: Device heartbeat processing
-
-## Pending Uncommitted Changes
-- `frontend/src/pages/live/LiveStudioBeta.jsx` (modified)
-- `frontend/src/pages/live/components/VideoPreview.jsx` (new)
-- `frontend/src/pages/live/components/LiveChat.jsx` (new)
-- `docs/Fujitech_AI_Livestream_Phase1G_1G6_Studio_Polish_Report.md` (new)
-- `docs/CURRENT_DEVELOPMENT_STATUS.md` (this file)
-- `docs/NEXT_SESSION_START.md`
-
-## Known Backend Limitation
-Invalid state transitions return HTTP 500 (not 400) because `django.core.exceptions.ValidationError` from `change_status()` is not caught by the view. Frontend handles defensively.
-
-## Next Step
-**Phase 1H — Media Integration** (see `NEXT_SESSION_START.md`).
+## Documentation Matrix
+| Document | Status |
+|----------|--------|
+| `Fujitech_AI_Livestream_Master_Development_Specification_v1.1.md` | ✅ Up to date |
+| `NEXT_SESSION_START.md` | ✅ Up to date (Points to production deployment) |
+| `Fujitech_AI_Livestream_Local_First_MVP_Report.md` | ✅ Created (Final comprehensive execution report) |
