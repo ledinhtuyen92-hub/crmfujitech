@@ -84,7 +84,7 @@ class StudioLauncher(ctk.CTk):
 
     def _api_login(self, server, username, password):
         try:
-            res = requests.post(f"{server}/api/auth/token/", json={"username": username, "password": password}, timeout=5)
+            res = requests.post(f"{server}/api/users/login/", json={"username": username, "password": password}, timeout=5)
             if res.status_code == 200:
                 self.api_token = res.json().get("access")
                 self.server_url = server
