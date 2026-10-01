@@ -19,6 +19,8 @@
 | Lip Sync MVP | 🟢 Complete | Real PCM amplitude max RMS extraction from FFmpeg-decoded MP3. |
 | Scene Composition | 🟢 Complete | 720x1280 (9:16) rendering with Product image layout and CTA. |
 | Local Stream Execution | 🟢 Complete | Local TCP Socket -> FFmpeg -> RTMP push pipeline is stable. |
+| Stream Recovery | 🟢 Complete | Health monitor automatically detects FFmpeg crashes and reconnects smoothly. |
+| TikTok Integration | 🟡 Partial | Account connection & Manual RTMP implemented; API mode restricted by platform limits. |
 
 ## Documentation Matrix
 | Document | Status |

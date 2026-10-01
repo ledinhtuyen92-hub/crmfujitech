@@ -106,15 +106,15 @@ export default function LivePlatforms() {
       </div>
 
       <Card style={{ borderRadius: 12, padding: '8px 0' }} bodyStyle={{ padding: '0 24px 24px' }}>
-        <Tabs defaultActiveKey="api" size="large">
+        <Tabs defaultActiveKey="shopee" size="large">
           <TabPane 
-            tab={<span><ApiOutlined />Kết nối API (Tự động)</span>} 
-            key="api"
+            tab={<span><img src="https://img.icons8.com/color/24/000000/shopee.png" style={{marginRight: 8, verticalAlign: 'middle'}} alt="shopee"/>Shopee Live</span>} 
+            key="shopee"
           >
             <div style={{ marginBottom: 24 }}>
               <Paragraph type="secondary" style={{ maxWidth: 800 }}>
                 Sử dụng API Mode để hệ thống tự động thiết lập luồng phát, đồng bộ bình luận và lấy danh sách sản phẩm.
-                Bạn chỉ cần cấp quyền cho ứng dụng trên nền tảng đích.
+                Bạn chỉ cần cấp quyền cho ứng dụng trên nền tảng đích. Hỗ trợ phát RTMP (Thủ công) qua Shopee Live PC.
               </Paragraph>
               <Button 
                 type="primary" 
@@ -128,38 +128,45 @@ export default function LivePlatforms() {
 
             <Table 
               columns={columns} 
-              dataSource={accounts} 
+              dataSource={accounts.filter(a => a.platform === 'shopee')} 
               rowKey="id" 
               loading={loading}
               pagination={false}
-              locale={{ emptyText: 'Chưa có tài khoản nào được kết nối qua API' }}
+              locale={{ emptyText: 'Chưa có tài khoản Shopee nào được kết nối qua API' }}
             />
           </TabPane>
           
           <TabPane 
-            tab={<span><VideoCameraOutlined />Kết nối RTMP (Thủ công)</span>} 
-            key="rtmp"
+            tab={<span><img src="https://img.icons8.com/color/24/000000/tiktok.png" style={{marginRight: 8, verticalAlign: 'middle'}} alt="tiktok"/>TikTok Shop</span>} 
+            key="tiktok"
           >
             <div style={{ maxWidth: 800 }}>
               <Alert 
-                message="Chế độ phát sóng linh hoạt"
-                description="Manual RTMP cho phép bạn đẩy luồng trực tiếp đến bất kỳ nền tảng nào có hỗ trợ Stream Key (Shopee PC, TikTok PC, Facebook, YouTube) mà không cần xác thực tài khoản qua hệ thống của chúng tôi."
+                message="Kết nối TikTok (Chế độ External Source)"
+                description="Tính năng tạo luồng phát tự động qua API của TikTok hiện yêu cầu cấp quyền đặc biệt từ nền tảng. Chế độ hiện tại hỗ trợ phát thông qua TikTok LIVE Studio hoặc Máy tính."
                 type="info" 
                 showIcon 
                 style={{ marginBottom: 24, borderRadius: 8 }}
               />
-              <Card title="Cách sử dụng Manual RTMP" size="small" style={{ borderRadius: 8, background: '#fafafa', border: '1px solid #e8e8e8' }}>
+              <Card title="Phương thức khả dụng" size="small" style={{ borderRadius: 8, marginBottom: 24 }}>
+                <ul style={{ paddingLeft: 20, lineHeight: 2 }}>
+                  <li><b>Tạo luồng (Phát sóng):</b> <Text type="success">Khả dụng qua Manual RTMP / TikTok LIVE Manager</Text></li>
+                  <li><b>Đọc bình luận:</b> <Text type="secondary">Chưa hỗ trợ (Yêu cầu quyền nền tảng)</Text></li>
+                  <li><b>Gắn sản phẩm:</b> <Text type="secondary">Chưa hỗ trợ (Yêu cầu quyền nền tảng)</Text></li>
+                </ul>
+              </Card>
+
+              <Card title="Cách sử dụng TikTok LIVE Manager" size="small" style={{ borderRadius: 8, background: '#fafafa', border: '1px solid #e8e8e8' }}>
                 <ol style={{ paddingLeft: 20, color: '#595959', lineHeight: 2 }}>
-                  <li>Tạo một <b>Phiên Livestream</b> mới tại tab quản lý Phiên.</li>
-                  <li>Mở ứng dụng hoặc trang web của nền tảng đích (Ví dụ: Shopee Live PC).</li>
-                  <li>Tạo một phiên Live trên nền tảng đó và copy thông số <b>Server URL</b> cùng <b>Stream Key</b>.</li>
-                  <li>Quay lại màn hình tạo Phiên của hệ thống, chọn <b>Nền tảng đích</b>.</li>
-                  <li>Chọn chế độ <b>RTMP (Thủ công)</b> và dán các thông số vừa copy vào.</li>
-                  <li>Hệ thống sẽ bảo mật mã Key của bạn và tự động đẩy luồng video đến địa chỉ đó.</li>
+                  <li>Tạo <b>Phiên Livestream</b> mới, chọn nền tảng <b>TikTok Shop</b>.</li>
+                  <li>Sử dụng tùy chọn <b>RTMP (Thủ công)</b>.</li>
+                  <li>Mở <b>TikTok LIVE Studio</b> hoặc trên web nhấn "Go LIVE", chọn "Phát qua phần mềm (External Source)".</li>
+                  <li>Copy <b>Server URL</b> và <b>Stream Key</b> được cấp từ TikTok.</li>
+                  <li>Dán thông số vào ứng dụng của chúng tôi. Hệ thống sẽ kết nối luồng phát an toàn.</li>
                 </ol>
                 <div style={{ marginTop: 16 }}>
                   <Text type="secondary" style={{ fontStyle: 'italic' }}>
-                    * Hệ thống <b>không lưu trữ</b> mật khẩu dạng plaintext và <b>không hiển thị</b> lại Stream Key trên giao diện. Trạng thái kết nối sẽ được hiển thị là "Đã cấu hình".
+                    * Lưu ý: TikTok Shop cấm phát song song cùng lúc (Simulcast) trên nhiều nền tảng.
                   </Text>
                 </div>
               </Card>

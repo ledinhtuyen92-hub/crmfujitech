@@ -9,18 +9,20 @@
 - **Product Association**: IMPLEMENTED (Product mapping and attach endpoints via `/api/v2/livestream/add_item`)
 
 ## 2. TikTok Capability Matrix
-- **Account Connection**: PARTIAL (Model structure allows representation, but official OAuth for LIVE is restricted)
-- **API Mode (RTMP Provision)**: EXTERNAL DEPENDENCY / RESTRICTED (TikTok API does not generally permit automatic RTMP generation without whitelisting)
-- **Manual RTMP Mode**: IMPLEMENTED (Available via TikTok Live Studio or "Go LIVE via external source" feature)
-- **Comment Ingestion**: EXTERNAL DEPENDENCY (Typically requires connecting to TikTok Webcast WebSockets, which needs an external service or unofficial wrapper)
-- **Product Association**: MISSING (Requires TikTok Shop API integration, separate from TikTok Live API)
+- **Account Connection**: PARTIAL (Model structure allows representation; UI instructs users regarding restrictions).
+- **API Mode (RTMP Provision)**: EXTERNAL DEPENDENCY / RESTRICTED (TikTok API does not generally permit automatic RTMP generation without whitelisting. UI accurately reflects this by removing the API button).
+- **Manual RTMP Mode**: IMPLEMENTED (Available via TikTok Live Studio or "Go LIVE via external source" feature. UI provides secure manual entry for Server URL and Stream Key).
+- **Comment Ingestion**: EXTERNAL DEPENDENCY (Typically requires connecting to TikTok Webcast WebSockets, which needs an external service or unofficial wrapper. Marked as "Yêu cầu quyền nền tảng" in UI).
+- **Product Association**: MISSING (Requires TikTok Shop API integration, separate from TikTok Live API. Marked as "Yêu cầu quyền nền tảng" in UI).
 
-*Note: The new `TikTokAdapter` explicitly omits the `LIVE_START` capability to reflect real-world platform restrictions, enforcing manual RTMP/external camera workflows.*
+*Note: The `TikTokAdapter` explicitly omits the `LIVE_START` capability. The `LivePlatforms.jsx` and `LiveSessionsList.jsx` UIs reflect real-world platform restrictions by hiding Shopee-specific API modes and enforcing the manual RTMP/external camera workflow for TikTok without inventing fake capabilities.*
 
 ## 3. Files Changed
 - `backend/live_sessions/platforms/tiktok.py` (Created adapter)
 - `live_studio/tests/stream_recovery_e2e.py` (Created recovery test)
 - `scripts/run_endurance_test.py` (Created background endurance tester)
+- `frontend/src/pages/live/LivePlatforms.jsx` (Redesigned platform management UI)
+- `frontend/src/pages/live/LiveSessionsList.jsx` (Updated Create Session flow to handle TikTok parameters)
 
 ## 4. Tests Executed & 5. Exact Test Counts
 - **live_studio Unit Tests**: Ran 69 tests in 9.780s -> **PASS**

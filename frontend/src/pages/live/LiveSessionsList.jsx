@@ -82,6 +82,15 @@ export default function LiveSessionsList() {
       
       // Transform payload slightly if needed
       const payload = { ...values }
+      if (values.server_url && values.stream_key) {
+        payload.stream_url = `${values.server_url.replace(/\/$/, '')}/${values.stream_key}`
+        delete payload.server_url // Not accepted by backend model
+      }
+      
+      // Map TikTok specific connection mode
+      if (payload.platform === 'tiktok') {
+        payload.tiktok_connection_mode = values.tiktok_connection_mode || 'manual_rtmp'
+      }
       
       await api.post('/live_sessions/sessions/', payload)
       message.success('Đã tạo phiên Livestream thành công')
@@ -207,6 +216,27 @@ export default function LiveSessionsList() {
                     </Form.Item>
                   </div>
                 )}
+              </>
+            )}
+            
+            {platform === 'tiktok' && (
+              <>
+                <Form.Item name="tiktok_connection_mode" label="Chế độ phát sóng TikTok" rules={[{ required: true }]} initialValue="manual_rtmp">
+                  <Radio.Group style={{ width: '100%' }}>
+                    <Radio.Button value="manual_rtmp" style={{ width: '100%', textAlign: 'center' }}>TikTok LIVE Studio / External Source</Radio.Button>
+                  </Radio.Group>
+                </Form.Item>
+                <div style={{ background: '#fafafa', padding: 16, borderRadius: 8, border: '1px solid #f0f0f0' }}>
+                  <Text type="secondary" style={{ display: 'block', marginBottom: 16 }}>
+                    API TikTok hiện chưa hỗ trợ lấy luồng tự động. Vui lòng mở TikTok LIVE Studio hoặc giao diện Web, chọn <b>Phát qua phần mềm (External Source)</b> và nhập thông số:
+                  </Text>
+                  <Form.Item name="server_url" label="Server URL" rules={[{ required: true }]}>
+                    <Input placeholder="rtmp://..." />
+                  </Form.Item>
+                  <Form.Item name="stream_key" label="Stream Key" rules={[{ required: true }]}>
+                    <Input.Password placeholder="Nhập mã bảo mật (Stream Key)" />
+                  </Form.Item>
+                </div>
               </>
             )}
 
