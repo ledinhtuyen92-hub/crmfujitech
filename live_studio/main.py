@@ -287,15 +287,23 @@ async def run_app():
         
     from live_studio.execution.audio_player import PygameAudioPlayer
     from live_studio.execution.media_pipeline import MediaClock, AudioStreamSink
+    from live_studio.execution.avatar_engine import Local2DAvatarEngine
+    from live_studio.execution.avatar_renderer import PygameAvatarRenderer
+    from live_studio.execution.lip_sync import LipSyncAnalyzer
     
     clock = MediaClock()
     sink = AudioStreamSink(clock)
+    
+    renderer = PygameAvatarRenderer()
+    lip_sync = LipSyncAnalyzer()
+    avatar_engine = Local2DAvatarEngine(renderer, lip_sync)
     
     app = LiveStudioApp(
         ws_url=ws_url,
         token=token,
         session_id=session_id,
-        audio_player=PygameAudioPlayer(stream_sink=sink)
+        audio_player=PygameAudioPlayer(stream_sink=sink),
+        avatar_engine=avatar_engine
     )
     
     print(f"CONNECTING: {ws_url}")
