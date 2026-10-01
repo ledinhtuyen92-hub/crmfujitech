@@ -284,6 +284,11 @@ function MainLayout({ children, isDarkMode, toggleTheme }) {
                 label: <Link to="/live/platforms">Kết nối (Shopee)</Link>,
               },
               {
+                key: '/live/devices',
+                icon: <DesktopOutlined />,
+                label: <Link to="/live/devices">Máy chủ (Devices)</Link>,
+              },
+              {
                 key: '/live/studio',
                 icon: <DesktopOutlined />,
                 label: <Link to="/live/studio">Live Studio (Beta)</Link>,

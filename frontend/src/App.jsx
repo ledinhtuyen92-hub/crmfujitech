@@ -54,6 +54,7 @@ import LiveStudioBeta from './pages/live/LiveStudioBeta'
 import LiveDashboard from './pages/live/LiveDashboard'
 import LivePlatforms from './pages/live/LivePlatforms'
 import LiveSessionsList from './pages/live/LiveSessionsList'
+import LiveDevices from './pages/live/LiveDevices'
 
 function DynamicTitle() {
   const location = useLocation();
@@ -83,6 +84,7 @@ function DynamicTitle() {
     else if (path.startsWith('/live/dashboard')) title = 'Live Dashboard | Fujitech Group CRM';
     else if (path.startsWith('/live/platforms')) title = 'Live Platforms | Fujitech Group CRM';
     else if (path.startsWith('/live/sessions')) title = 'Live Sessions | Fujitech Group CRM';
+    else if (path.startsWith('/live/devices')) title = 'Live Devices | Fujitech Group CRM';
 
     document.title = title;
   }, [location.pathname]);
@@ -168,6 +170,12 @@ function App() {
               <Route path="/live/sessions" element={
                 <PermissionRoute permissionCode="ai_agent.manage_agents">
                   <LiveSessionsList />
+                </PermissionRoute>
+              } />
+
+              <Route path="/live/devices" element={
+                <PermissionRoute permissionCode="ai_agent.manage_agents">
+                  <LiveDevices />
                 </PermissionRoute>
               } />
 

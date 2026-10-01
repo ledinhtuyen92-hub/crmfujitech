@@ -1,9 +1,11 @@
 import React, { useState, useEffect } from 'react'
-import { Card, Typography, Button, Table, Tag, Space, message, Row, Col } from 'antd'
-import { ApiOutlined, PlusOutlined, DeleteOutlined } from '@ant-design/icons'
+import { Card, Typography, Button, Table, Space, message, Tabs, Alert, Modal, Input } from 'antd'
+import { ApiOutlined, DeleteOutlined, VideoCameraOutlined } from '@ant-design/icons'
 import api from '../../utils/api'
+import LiveStatusBadge from './components/LiveStatusBadge'
 
-const { Title, Text } = Typography
+const { Title, Text, Paragraph } = Typography
+const { TabPane } = Tabs
 
 export default function LivePlatforms() {
   const [accounts, setAccounts] = useState([])
@@ -37,14 +39,23 @@ export default function LivePlatforms() {
     }
   }
 
-  const handleDelete = async (id) => {
-    try {
-      await api.delete(`/live_sessions/platform-accounts/${id}/`)
-      message.success('Đã xóa kết nối')
-      fetchAccounts()
-    } catch (err) {
-      message.error('Không thể xóa kết nối')
-    }
+  const handleDelete = (id) => {
+    Modal.confirm({
+      title: 'Hủy kết nối tài khoản này?',
+      content: 'Luồng phát đang sử dụng tài khoản này có thể bị gián đoạn.',
+      okText: 'Đồng ý',
+      cancelText: 'Hủy',
+      okButtonProps: { danger: true },
+      onOk: async () => {
+        try {
+          await api.delete(`/live_sessions/platform-accounts/${id}/`)
+          message.success('Đã xóa kết nối')
+          fetchAccounts()
+        } catch (err) {
+          message.error('Không thể xóa kết nối')
+        }
+      }
+    })
   }
 
   const columns = [
@@ -52,85 +63,110 @@ export default function LivePlatforms() {
       title: 'Nền tảng',
       dataIndex: 'platform',
       key: 'platform',
-      render: (text) => <Tag color="orange">{text?.toUpperCase()}</Tag>,
+      render: (text) => (
+        <Text strong style={{ color: text === 'shopee' ? '#ee4d2d' : '#000' }}>
+          {text === 'shopee' ? 'Shopee Live' : text?.toUpperCase()}
+        </Text>
+      ),
     },
     {
-      title: 'Tên hiển thị',
+      title: 'Tên cửa hàng',
       dataIndex: 'display_name',
       key: 'display_name',
+      render: (text) => <Text strong>{text}</Text>
     },
     {
-      title: 'Account ID',
+      title: 'Shop ID',
       dataIndex: 'account_id',
       key: 'account_id',
+      render: (text) => <Text type="secondary">{text}</Text>
     },
     {
       title: 'Trạng thái',
       dataIndex: 'status',
       key: 'status',
-      render: (status) => (
-        <Tag color={status === 'connected' ? 'green' : 'default'}>
-          {status === 'connected' ? 'Đã kết nối' : status}
-        </Tag>
-      ),
+      render: (status) => <LiveStatusBadge status={status} />
     },
     {
       title: 'Thao tác',
       key: 'action',
       render: (_, record) => (
-        <Space size="middle">
-          <Button danger icon={<DeleteOutlined />} onClick={() => handleDelete(record.id)}>Xóa</Button>
-        </Space>
+        <Button type="text" danger icon={<DeleteOutlined />} onClick={() => handleDelete(record.id)}>Xóa</Button>
       ),
     },
   ]
 
   return (
-    <div style={{ padding: 24 }}>
+    <div style={{ padding: 24, width: '100%', boxSizing: 'border-box' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
-        <Title level={3} style={{ margin: 0 }}>Kết nối Nền tảng</Title>
+        <div>
+          <Title level={3} style={{ margin: 0 }}>Kết nối Nền tảng (Platform Connections)</Title>
+          <Text type="secondary">Quản lý cách hệ thống kết nối với các nền tảng Livestream</Text>
+        </div>
       </div>
 
-      <Row gutter={[24, 24]}>
-        <Col xs={24} lg={8}>
-          <Card title="Thêm kết nối mới">
-            <Space direction="vertical" style={{ width: '100%' }}>
+      <Card style={{ borderRadius: 12, padding: '8px 0' }} bodyStyle={{ padding: '0 24px 24px' }}>
+        <Tabs defaultActiveKey="api" size="large">
+          <TabPane 
+            tab={<span><ApiOutlined />Kết nối API (Tự động)</span>} 
+            key="api"
+          >
+            <div style={{ marginBottom: 24 }}>
+              <Paragraph type="secondary" style={{ maxWidth: 800 }}>
+                Sử dụng API Mode để hệ thống tự động thiết lập luồng phát, đồng bộ bình luận và lấy danh sách sản phẩm.
+                Bạn chỉ cần cấp quyền cho ứng dụng trên nền tảng đích.
+              </Paragraph>
               <Button 
                 type="primary" 
-                block 
                 icon={<ApiOutlined />}
                 onClick={handleConnectShopee}
-                style={{ backgroundColor: '#ee4d2d', borderColor: '#ee4d2d' }}
+                style={{ backgroundColor: '#ee4d2d', borderColor: '#ee4d2d', height: 40, borderRadius: 6 }}
               >
-                Kết nối Shopee Live (API Mode)
+                Kết nối Shopee Live (OAuth)
               </Button>
-              <Text type="secondary" style={{ display: 'block' }}>
-                Lưu ý: API Mode yêu cầu tài khoản Shopee đã được cấp quyền Livestream. Nền tảng sẽ tự động thiết lập luồng phát.
-              </Text>
-            </Space>
-          </Card>
+            </div>
 
-          <Card title="Chế độ Manual RTMP" style={{ marginTop: 24 }}>
-            <Text type="secondary" style={{ display: 'block', marginBottom: 12 }}>
-              Manual RTMP là chế độ thủ công, không yêu cầu kết nối tài khoản trước.
-            </Text>
-            <Text type="secondary" style={{ display: 'block' }}>
-              Bạn có thể nhập <b>Server URL</b> và <b>Stream Key</b> trực tiếp khi tạo Phiên Livestream mới.
-            </Text>
-          </Card>
-        </Col>
-        <Col xs={24} lg={16}>
-          <Card title="Tài khoản đã kết nối">
             <Table 
               columns={columns} 
               dataSource={accounts} 
               rowKey="id" 
               loading={loading}
               pagination={false}
+              locale={{ emptyText: 'Chưa có tài khoản nào được kết nối qua API' }}
             />
-          </Card>
-        </Col>
-      </Row>
+          </TabPane>
+          
+          <TabPane 
+            tab={<span><VideoCameraOutlined />Kết nối RTMP (Thủ công)</span>} 
+            key="rtmp"
+          >
+            <div style={{ maxWidth: 800 }}>
+              <Alert 
+                message="Chế độ phát sóng linh hoạt"
+                description="Manual RTMP cho phép bạn đẩy luồng trực tiếp đến bất kỳ nền tảng nào có hỗ trợ Stream Key (Shopee PC, TikTok PC, Facebook, YouTube) mà không cần xác thực tài khoản qua hệ thống của chúng tôi."
+                type="info" 
+                showIcon 
+                style={{ marginBottom: 24, borderRadius: 8 }}
+              />
+              <Card title="Cách sử dụng Manual RTMP" size="small" style={{ borderRadius: 8, background: '#fafafa', border: '1px solid #e8e8e8' }}>
+                <ol style={{ paddingLeft: 20, color: '#595959', lineHeight: 2 }}>
+                  <li>Tạo một <b>Phiên Livestream</b> mới tại tab quản lý Phiên.</li>
+                  <li>Mở ứng dụng hoặc trang web của nền tảng đích (Ví dụ: Shopee Live PC).</li>
+                  <li>Tạo một phiên Live trên nền tảng đó và copy thông số <b>Server URL</b> cùng <b>Stream Key</b>.</li>
+                  <li>Quay lại màn hình tạo Phiên của hệ thống, chọn <b>Nền tảng đích</b>.</li>
+                  <li>Chọn chế độ <b>RTMP (Thủ công)</b> và dán các thông số vừa copy vào.</li>
+                  <li>Hệ thống sẽ bảo mật mã Key của bạn và tự động đẩy luồng video đến địa chỉ đó.</li>
+                </ol>
+                <div style={{ marginTop: 16 }}>
+                  <Text type="secondary" style={{ fontStyle: 'italic' }}>
+                    * Hệ thống <b>không lưu trữ</b> mật khẩu dạng plaintext và <b>không hiển thị</b> lại Stream Key trên giao diện. Trạng thái kết nối sẽ được hiển thị là "Đã cấu hình".
+                  </Text>
+                </div>
+              </Card>
+            </div>
+          </TabPane>
+        </Tabs>
+      </Card>
     </div>
   )
 }
