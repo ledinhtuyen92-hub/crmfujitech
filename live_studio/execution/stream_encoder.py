@@ -29,7 +29,12 @@ class FfmpegLocator:
         if self.override_path:
             candidates.append(self.override_path)
             
-        bundled = os.path.join(os.path.dirname(os.path.dirname(__file__)), "bin", "ffmpeg.exe")
+        import sys
+        if getattr(sys, 'frozen', False):
+            base_dir = os.path.dirname(sys.executable)
+        else:
+            base_dir = os.path.dirname(os.path.dirname(__file__))
+        bundled = os.path.join(base_dir, "bin", "ffmpeg.exe")
         candidates.append(bundled)
         candidates.append("ffmpeg")
         

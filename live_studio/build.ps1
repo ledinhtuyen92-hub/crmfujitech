@@ -38,7 +38,7 @@ $env:Path = "$VenvDir\Scripts;" + $env:Path
 Write-Host "Installing dependencies..." -ForegroundColor Yellow
 pip install --upgrade pip
 # Install standard dependencies
-pip install -r "$ProjectRoot\requirements.txt"
+pip install -r "$LiveStudioDir\requirements.txt"
 # Install pyinstaller
 pip install pyinstaller
 
@@ -55,7 +55,6 @@ pyinstaller --name "FujitechLiveStudio" `
             --noconfirm `
             --onedir `
             --icon=NONE `
-            --add-data "assets;assets" `
             --hidden-import "pygame" `
             --hidden-import "websockets" `
             --hidden-import "requests" `
