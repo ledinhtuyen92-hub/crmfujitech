@@ -267,12 +267,19 @@ async def run_app():
         ws_url = sys.argv[1]
         token = sys.argv[2]
         session_id = sys.argv[3]
-    elif os.path.exists("config.json"):
-        with open("config.json", "r") as f:
-            cfg = json.load(f)
-            ws_url = cfg.get("ws_url")
-            token = cfg.get("token")
-            session_id = cfg.get("session_id")
+    else:
+        # Resolve config.json relative to the executable (frozen) or script directory
+        if getattr(sys, 'frozen', False):
+            base_dir = os.path.dirname(sys.executable)
+        else:
+            base_dir = os.path.dirname(os.path.abspath(__file__))
+        config_path = os.path.join(base_dir, "config.json")
+        if os.path.exists(config_path):
+            with open(config_path, "r") as f:
+                cfg = json.load(f)
+                ws_url = cfg.get("ws_url")
+                token = cfg.get("token")
+                session_id = cfg.get("session_id")
             
     if not ws_url or not token or not session_id:
         print("Usage: python main.py <ws_url> <token> <session_id> OR provide config.json with these keys")
