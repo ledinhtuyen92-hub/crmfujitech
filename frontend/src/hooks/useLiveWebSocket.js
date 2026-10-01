@@ -49,7 +49,11 @@ export const useLiveWebSocket = (sessionId) => {
         try {
           const data = JSON.parse(event.data);
           setLastEvent(data);
-          setEvents(prev => [...prev, data]);
+          // Bounded buffer: cap at 100 to prevent memory growth during long streams
+          setEvents(prev => {
+            const next = [...prev, data];
+            return next.length > 100 ? next.slice(next.length - 100) : next;
+          });
         } catch (err) {
           console.error('Failed to parse WebSocket message:', err);
         }

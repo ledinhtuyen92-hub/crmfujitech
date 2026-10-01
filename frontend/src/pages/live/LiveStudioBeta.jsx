@@ -1,10 +1,11 @@
 import React, { useState, useEffect } from 'react'
 import { Card, Typography, Row, Col, Spin, Tag, Badge, Space, Button, message, Popconfirm, Divider } from 'antd'
 import { useParams } from 'react-router-dom'
-import { DesktopOutlined, ApiOutlined, PlayCircleOutlined, ClockCircleOutlined } from '@ant-design/icons'
+import { DesktopOutlined, PlayCircleOutlined, ClockCircleOutlined } from '@ant-design/icons'
 import { useLiveWebSocket } from '../../hooks/useLiveWebSocket'
 import api from '../../utils/api'
 import LiveStatusBadge from './components/LiveStatusBadge'
+import AITimeline from './components/AITimeline'
 
 const { Title, Text } = Typography
 
@@ -164,11 +165,7 @@ export default function LiveStudioBeta() {
         </Col>
 
         <Col span={24}>
-          <Card title="Workspace Concept (Placeholder)" style={{ borderRadius: 12, opacity: 0.6 }}>
-            <Text type="secondary">
-              Video Preview, AI Event Timeline, and Live Chat will be implemented in subsequent steps.
-            </Text>
-          </Card>
+          <AITimeline lastEvent={lastEvent} connected={connected} />
         </Col>
       </Row>
     </div>
