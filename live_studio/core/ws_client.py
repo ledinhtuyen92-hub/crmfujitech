@@ -24,7 +24,7 @@ class WebSocketClient:
         
         while self._running:
             try:
-                async with websockets.connect(self.ws_url, extra_headers=extra_headers) as ws:
+                async with websockets.connect(self.ws_url, additional_headers=extra_headers) as ws:
                     self.ws = ws
                     logger.info(f"Connected to {self.ws_url}")
                     self._reconnect_delay = 1.0
@@ -76,8 +76,11 @@ class WebSocketClient:
                 logger.error(f"Error dispatching message: {e}")
 
     async def send(self, data: dict):
-        if self.ws and self.ws.open:
-            await self.ws.send(json.dumps(data))
+        if self.ws:
+            try:
+                await self.ws.send(json.dumps(data))
+            except websockets.exceptions.ConnectionClosed:
+                logger.warning("Attempted to send on closed WebSocket (Ack/Message dropped)")
         else:
             logger.warning("Attempted to send on closed WebSocket (Ack/Message dropped)")
             # In a real implementation with a recovery buffer, we'd queue these acks.

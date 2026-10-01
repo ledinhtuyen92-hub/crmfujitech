@@ -27,6 +27,27 @@ class BaseTTSProvider(ABC):
         """
         pass
 
+class DummyTTSProvider(BaseTTSProvider):
+    def generate(self, text: str, voice_config: Optional[Dict[str, Any]] = None) -> AudioResult:
+        logger.info(f"DummyTTS generating audio for text: {text}")
+        import os
+        fallback = '/app/media/dummy.mp3'
+        if not os.path.exists(fallback):
+            # Just create a minimal valid mp3 header if possible, or an empty file 
+            # Pygame mixer might crash on empty file, so we try to find any .mp3 in project
+            audio_bytes = b''
+        else:
+            with open(fallback, 'rb') as f:
+                audio_bytes = f.read()
+                
+        return AudioResult(
+            audio_bytes=audio_bytes,
+            mime_type="audio/mp3",
+            format="mp3",
+            sample_rate=24000,
+            channels=1
+        )
+
 class OpenAITTSProvider(BaseTTSProvider):
     """
     OpenAI TTS Provider for MVP.

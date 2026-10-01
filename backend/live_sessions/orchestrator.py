@@ -9,7 +9,7 @@ from asgiref.sync import async_to_sync
 from live_sessions.models import LiveSession
 from ai_agents.services import generate_ai_reply
 from ai_agents.rag_processor import search_knowledge
-from live_sessions.audio.tts import OpenAITTSProvider
+from live_sessions.audio.tts import OpenAITTSProvider, DummyTTSProvider
 from live_sessions.audio.storage import LocalAudioStorageBackend
 from live_sessions.protocol.commands import SpeechSpeakPayloadSerializer, StreamStartPayloadSerializer, StreamStopPayloadSerializer
 from live_sessions.protocol.envelope import ProtocolEnvelopeSerializer
@@ -327,7 +327,10 @@ class LiveOrchestrator:
             tts_keys = get_api_keys(session.company, 'openai')
             resolved_key = tts_keys[0] if tts_keys else None
             
-            self.tts_provider = OpenAITTSProvider(api_key=resolved_key)
+            if not resolved_key or resolved_key == 'dummy':
+                self.tts_provider = DummyTTSProvider()
+            else:
+                self.tts_provider = OpenAITTSProvider(api_key=resolved_key)
             audio_result = self.tts_provider.generate(reply_text, voice_config)
             
             logger.info(f"[Session: {session_id}][Corr: {correlation_id}] TTS completed.")
@@ -481,7 +484,10 @@ class LiveOrchestrator:
             from ai_agents.services import get_api_keys
             tts_keys = get_api_keys(session.company, 'openai')
             resolved_key = tts_keys[0] if tts_keys else None
-            self.tts_provider = OpenAITTSProvider(api_key=resolved_key)
+            if not resolved_key or resolved_key == 'dummy':
+                self.tts_provider = DummyTTSProvider()
+            else:
+                self.tts_provider = OpenAITTSProvider(api_key=resolved_key)
             audio_result = self.tts_provider.generate(reply_text, voice_config)
         except Exception as e:
             logger.error(f"[Session: {session_id}] TTS error: {e}")
