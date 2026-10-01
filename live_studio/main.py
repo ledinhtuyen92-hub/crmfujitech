@@ -255,16 +255,29 @@ class LiveStudioApp:
         self.queue_manager.mark_done(item)
 
 import sys
+import json
+import os
 
 async def run_app():
-    if len(sys.argv) < 4:
-        print("Usage: python main.py <ws_url> <token> <session_id>")
+    ws_url = None
+    token = None
+    session_id = None
+    
+    if len(sys.argv) >= 4:
+        ws_url = sys.argv[1]
+        token = sys.argv[2]
+        session_id = sys.argv[3]
+    elif os.path.exists("config.json"):
+        with open("config.json", "r") as f:
+            cfg = json.load(f)
+            ws_url = cfg.get("ws_url")
+            token = cfg.get("token")
+            session_id = cfg.get("session_id")
+            
+    if not ws_url or not token or not session_id:
+        print("Usage: python main.py <ws_url> <token> <session_id> OR provide config.json with these keys")
         sys.exit(1)
         
-    ws_url = sys.argv[1]
-    token = sys.argv[2]
-    session_id = sys.argv[3]
-    
     from live_studio.execution.audio_player import PygameAudioPlayer
     from live_studio.execution.media_pipeline import MediaClock, AudioStreamSink
     
