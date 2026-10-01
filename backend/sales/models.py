@@ -201,11 +201,11 @@ class Quotation(models.Model):
                 name="unique_quotation_number_per_company",
             ),
             models.CheckConstraint(
-                check=models.Q(total_amount__gte=0),
+                condition=models.Q(total_amount__gte=0),
                 name="quotation_total_amount_gte_0",
             ),
             models.CheckConstraint(
-                check=models.Q(discount_total__gte=0),
+                condition=models.Q(discount_total__gte=0),
                 name="quotation_discount_total_gte_0",
             ),
         ]
@@ -376,15 +376,15 @@ class QuotationItem(models.Model):
         verbose_name_plural = "Dòng báo giá"
         constraints = [
             models.CheckConstraint(
-                check=models.Q(quantity__gt=0),
+                condition=models.Q(quantity__gt=0),
                 name="quotation_item_quantity_gt_0",
             ),
             models.CheckConstraint(
-                check=models.Q(unit_price__gte=0),
+                condition=models.Q(unit_price__gte=0),
                 name="quotation_item_unit_price_gte_0",
             ),
             models.CheckConstraint(
-                check=models.Q(discount_percent__gte=0) & models.Q(discount_percent__lte=100),
+                condition=models.Q(discount_percent__gte=0) & models.Q(discount_percent__lte=100),
                 name="quotation_item_discount_percent_valid",
             ),
         ]
@@ -458,3 +458,4 @@ class SavedTemplateBlock(models.Model):
 
     def __str__(self):
         return f"{self.name} ({self.block_type})"
+

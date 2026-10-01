@@ -16,6 +16,7 @@ class Migration(migrations.Migration):
         ),
         migrations.AddConstraint(
             model_name='inventorytransaction',
-            constraint=models.CheckConstraint(check=models.Q(quantity__gte=0), name='inventory_transaction_quantity_gte_0'),
+            constraint=models.CheckConstraint(condition=models.Q(quantity__gte=0), name='inventory_transaction_quantity_gte_0'),
         ),
     ]
+

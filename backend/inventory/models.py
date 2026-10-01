@@ -278,11 +278,11 @@ class Product(models.Model):
                 name="unique_product_sku_per_company",
             ),
             models.CheckConstraint(
-                check=models.Q(price__gte=0),
+                condition=models.Q(price__gte=0),
                 name="product_price_gte_0",
             ),
             models.CheckConstraint(
-                check=models.Q(cost_price__gte=0),
+                condition=models.Q(cost_price__gte=0),
                 name="product_cost_price_gte_0",
             ),
         ]
@@ -348,7 +348,7 @@ class StockLevel(models.Model):
                 name="unique_stock_level_product_warehouse",
             ),
             models.CheckConstraint(
-                check=models.Q(quantity__gte=0),
+                condition=models.Q(quantity__gte=0),
                 name="stock_level_quantity_gte_0",
             ),
         ]
@@ -484,14 +484,15 @@ class InventoryTransaction(models.Model):
         ordering = ["-created_at"]
         constraints = [
             models.CheckConstraint(
-                check=models.Q(quantity__gte=0),
+                condition=models.Q(quantity__gte=0),
                 name="inventory_transaction_quantity_gte_0",
             ),
             models.CheckConstraint(
-                check=models.Q(unit_cost__gte=0),
+                condition=models.Q(unit_cost__gte=0),
                 name="inventory_transaction_unit_cost_gte_0",
             ),
         ]
 
     def __str__(self):
         return f"[{self.get_type_display()}] {self.transaction_code} — {self.product.sku} x{self.quantity}"
+

@@ -105,7 +105,7 @@ class ProductionOrder(models.Model):
         ordering = ["-created_at"]
         constraints = [
             models.CheckConstraint(
-                check=(
+                condition=(
                     models.Q(start_date__isnull=True)
                     | models.Q(end_date__isnull=True)
                     | models.Q(end_date__gte=models.F("start_date"))
@@ -167,7 +167,7 @@ class ProductionStep(models.Model):
         ordering = ["production_order", "sequence"]
         constraints = [
             models.CheckConstraint(
-                check=(
+                condition=(
                     models.Q(started_at__isnull=True)
                     | models.Q(completed_at__isnull=True)
                     | models.Q(completed_at__gte=models.F("started_at"))
@@ -210,3 +210,4 @@ class ProductionStep(models.Model):
                     except Exception as exc:
                         import logging
                         logging.getLogger(__name__).error("Workflow trigger failed after production completion: %s", exc)
+
