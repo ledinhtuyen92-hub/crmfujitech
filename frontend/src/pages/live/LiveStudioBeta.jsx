@@ -14,6 +14,8 @@ import api from '../../utils/api'
 import LiveStatusBadge from './components/LiveStatusBadge'
 import AITimeline from './components/AITimeline'
 import StreamHealthRow from './components/StreamHealthRow'
+import VideoPreview from './components/VideoPreview'
+import LiveChat from './components/LiveChat'
 
 const { Title, Text } = Typography
 
@@ -306,37 +308,67 @@ export default function LiveStudioBeta() {
       {/* ── Status Banners ─────────────────────────────────────────────────── */}
       {renderStatusBanner()}
 
-      {/* ── Cards ─────────────────────────────────────────────────────────── */}
-      <Row gutter={[24, 24]}>
-        <Col span={24}>
-          <Card
-            title={<span><DesktopOutlined /> Realtime Status</span>}
-            style={{
-              borderRadius: 12,
-              border: connected ? '1px solid #1890ff' : '1px solid #d9d9d9',
-            }}
-            extra={
+      {/* ── 3-Column Studio Layout ─────────────────────────────────────────── */}
+      <Row gutter={[16, 16]} style={{ flex: 1, minHeight: 600 }}>
+        {/* Left Column: Video Preview */}
+        <Col xs={24} lg={8} style={{ display: 'flex', flexDirection: 'column' }}>
+          <VideoPreview />
+        </Col>
+
+        {/* Center Column: AI Timeline */}
+        <Col xs={24} lg={10} style={{ display: 'flex', flexDirection: 'column', height: 600 }}>
+          <AITimeline lastEvent={lastEvent} connected={connected} />
+        </Col>
+
+        {/* Right Column: Live Chat */}
+        <Col xs={24} lg={6} style={{ display: 'flex', flexDirection: 'column', height: 600 }}>
+          <LiveChat lastEvent={lastEvent} />
+        </Col>
+      </Row>
+
+      {/* ── Studio Footer ─────────────────────────────────────────────────── */}
+      <Card
+        style={{
+          marginTop: 16,
+          borderRadius: 12,
+          border: connected ? '1px solid #1890ff' : '1px solid #d9d9d9',
+        }}
+        bodyStyle={{ padding: '16px 24px' }}
+      >
+        <Row align="middle" justify="space-between">
+          <Col>
+            <Space size="large">
+              <span style={{ fontWeight: 600 }}>
+                <DesktopOutlined style={{ marginRight: 8 }} />
+                Realtime Status
+              </span>
               <Badge
                 status={connected ? 'success' : 'error'}
                 text={connected ? 'WS Connected' : 'WS Disconnected'}
               />
-            }
-          >
-            <StreamHealthRow
-              deviceHealth={deviceHealth}
-              lastHeartbeatAt={lastHeartbeatAt}
-              streamState={streamState}
-              startDispatched={startDispatched}
-              stopDispatched={stopDispatched}
-              sessionStatus={session?.status}
-            />
-          </Card>
-        </Col>
+              <Divider type="vertical" />
+              <Text type="secondary">
+                Nền tảng: <Text strong>{session.platform_display || session.platform}</Text>
+              </Text>
+              <Divider type="vertical" />
+              <Text type="secondary">
+                AI Host: <Text strong>{session.ai_agent_name || 'Đang tải...'}</Text>
+              </Text>
+            </Space>
+          </Col>
+        </Row>
 
-        <Col span={24}>
-          <AITimeline lastEvent={lastEvent} connected={connected} />
-        </Col>
-      </Row>
+        <Divider style={{ margin: '12px 0' }} />
+
+        <StreamHealthRow
+          deviceHealth={deviceHealth}
+          lastHeartbeatAt={lastHeartbeatAt}
+          streamState={streamState}
+          startDispatched={startDispatched}
+          stopDispatched={stopDispatched}
+          sessionStatus={session?.status}
+        />
+      </Card>
     </div>
   )
 }

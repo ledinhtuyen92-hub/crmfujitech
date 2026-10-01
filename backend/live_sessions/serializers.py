@@ -36,6 +36,9 @@ class LiveSessionSerializer(serializers.ModelSerializer):
         help_text="Stream Key (never returned after save)"
     )
     
+    platform_display = serializers.CharField(source='get_platform_display', read_only=True)
+    ai_agent_name = serializers.CharField(source='ai_agent.name', read_only=True)
+
     class Meta:
         model = LiveSession
         fields = '__all__'
