@@ -9,8 +9,8 @@ class TestStreamEncoderFoundation(unittest.IsolatedAsyncioTestCase):
     
     async def test_stream_config_defaults(self):
         config = StreamConfig()
-        self.assertEqual(config.width, 800)
-        self.assertEqual(config.height, 600)
+        self.assertEqual(config.width, 720)
+        self.assertEqual(config.height, 1280)
         self.assertEqual(config.fps, 30)
         self.assertEqual(config.video_pixel_format, "rgb24")
         self.assertEqual(config.video_codec, "libx264")
