@@ -28,10 +28,13 @@ The following sequence was executed and verified at runtime:
 - **WebSockets 14.0+ Compatibility**: Migrated `extra_headers` to `additional_headers` and replaced deprecated `self.ws.open` with a `try-except` block.
 - **TTS Failure Handling**: Created a `DummyTTSProvider` with a real `.mp3` asset fallback to allow E2E testing without an OpenAI API key.
 
-## 5. Known Limitations & Next Steps (Phase 1H / Platform Integration)
-- **Platform E2E Verification**: Real Shopee/TikTok integration is blocked pending valid credentials.
-- **Long-Running Endurance (4H+)**: The 4H endurance test has not been executed yet due to environment constraints. This should be run as a background task overnight.
-- **Cloud GPU & 3D Avatar**: These remain out of scope for the current MVP and will be addressed in future phases.
+## 5. E2E Evidence Classification
+- **LOCAL FULL PIPELINE** = PASS (Tested via synthetic comment to avatar playback)
+- **REAL TTS PROVIDER** = UNVERIFIED (Skipped locally via DummyTTS in DEBUG mode)
+- **LOCAL RTMP / MEDIAMTX** = PASS (Tested via live_studio ffmpeg subprocess streaming to localhost:1935)
+- **REAL SHOPEE** = BLOCKED (Pending valid credentials)
+- **REAL TIKTOK** = BLOCKED (Pending valid credentials)
+- **4H+ ENDURANCE** = UNVERIFIED (Background execution not yet performed)
 
 ## 6. Git Status
 - **Branch**: V2
@@ -39,4 +42,4 @@ The following sequence was executed and verified at runtime:
 - **Integrity**: All completed Phase 1G code remains intact.
 
 ## Conclusion
-The Local-First MVP is now functionally complete and verified at runtime. The project is ready to proceed to Phase 1H: Media Integration and Platform Connectivity.
+The Local-First MVP pipeline is functionally complete and verified at runtime. The project is currently continuing through **Phase 1H: Media Integration and Platform Connectivity**.

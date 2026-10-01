@@ -15,7 +15,7 @@ async def device_emulator(ws_url, token, session_id, fail_audio=False):
     }
 
     try:
-        async with websockets.connect(ws_url, extra_headers=extra_headers) as websocket:
+        async with websockets.connect(ws_url, additional_headers=extra_headers) as websocket:
             logging.info(f"Connected to {ws_url}")
             
             # Send session.sync

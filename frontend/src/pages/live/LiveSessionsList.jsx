@@ -180,11 +180,17 @@ export default function LiveSessionsList() {
 
                 {shopeeMode === 'api' && (
                   <Form.Item name="platform_account" label="Tài khoản Shopee" rules={[{ required: true }]}>
-                    <Select placeholder="Chọn tài khoản đã kết nối">
-                      {deps.accounts.filter(a => a.platform === 'shopee').map(a => (
-                        <Select.Option key={a.id} value={a.id}>{a.display_name} ({a.status})</Select.Option>
-                      ))}
-                    </Select>
+                    {deps.accounts.filter(a => a.platform === 'shopee').length > 0 ? (
+                      <Select placeholder="Chọn tài khoản đã kết nối">
+                        {deps.accounts.filter(a => a.platform === 'shopee').map(a => (
+                          <Select.Option key={a.id} value={a.id}>{a.display_name} ({a.status})</Select.Option>
+                        ))}
+                      </Select>
+                    ) : (
+                      <div style={{ padding: 12, backgroundColor: '#fffbe6', border: '1px solid #ffe58f', borderRadius: 4 }}>
+                        <Text type="warning">Chưa có tài khoản Shopee nào được kết nối. Vui lòng kết nối trong phần Cài Đặt hoặc chuyển sang chế độ <b>RTMP (Thủ công)</b> để kiểm thử Local.</Text>
+                      </div>
+                    )}
                   </Form.Item>
                 )}
 

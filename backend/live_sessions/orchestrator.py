@@ -5,6 +5,7 @@ from typing import Dict, Any, Optional
 from django.utils import timezone
 from channels.layers import get_channel_layer
 from asgiref.sync import async_to_sync
+from django.conf import settings
 
 from live_sessions.models import LiveSession
 from ai_agents.services import generate_ai_reply
@@ -327,7 +328,7 @@ class LiveOrchestrator:
             tts_keys = get_api_keys(session.company, 'openai')
             resolved_key = tts_keys[0] if tts_keys else None
             
-            if not resolved_key or resolved_key == 'dummy':
+            if getattr(settings, 'DEBUG', False) and resolved_key == 'dummy':
                 self.tts_provider = DummyTTSProvider()
             else:
                 self.tts_provider = OpenAITTSProvider(api_key=resolved_key)
@@ -484,7 +485,7 @@ class LiveOrchestrator:
             from ai_agents.services import get_api_keys
             tts_keys = get_api_keys(session.company, 'openai')
             resolved_key = tts_keys[0] if tts_keys else None
-            if not resolved_key or resolved_key == 'dummy':
+            if getattr(settings, 'DEBUG', False) and resolved_key == 'dummy':
                 self.tts_provider = DummyTTSProvider()
             else:
                 self.tts_provider = OpenAITTSProvider(api_key=resolved_key)
