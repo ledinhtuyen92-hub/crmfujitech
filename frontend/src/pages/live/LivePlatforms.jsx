@@ -101,7 +101,7 @@ export default function LivePlatforms() {
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
         <div>
           <Title level={3} style={{ margin: 0 }}>Kết nối Nền tảng (Platform Connections)</Title>
-          <Text type="secondary">Quản lý cách hệ thống kết nối với các nền tảng Livestream</Text>
+          <Text type="secondary">Quản lý kết nối và phương thức phát livestream trên các nền tảng được hỗ trợ.</Text>
         </div>
       </div>
 

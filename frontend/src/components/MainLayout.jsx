@@ -283,7 +283,7 @@ function MainLayout({ children, isDarkMode, toggleTheme }) {
               {
                 key: '/live/platforms',
                 icon: <ApiOutlined />,
-                label: <Link to="/live/platforms">Kết nối (Shopee)</Link>,
+                label: <Link to="/live/platforms">Kết nối nền tảng</Link>,
               },
               {
                 key: '/live/devices',
