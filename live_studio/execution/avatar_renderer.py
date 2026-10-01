@@ -41,14 +41,14 @@ class DummyAvatarRenderer(BaseAvatarRenderer):
 
 class PygameAvatarRenderer(BaseAvatarRenderer):
     """
-    Simple 2D Avatar Renderer using Pygame.
-    Suitable for OBS Window Capture.
+    2D Scene Composition Renderer using Pygame.
+    Outputs a 9:16 (720x1280) frame with Product Area, CTA, and Avatar.
     """
     def __init__(self):
         self.screen = None
         self.clock = None
-        self.width = 800
-        self.height = 600
+        self.width = 720
+        self.height = 1280
         
         try:
             import pygame
@@ -64,9 +64,19 @@ class PygameAvatarRenderer(BaseAvatarRenderer):
             return
             
         self.pygame.init()
-        # Create a window suitable for OBS capture
+        self.pygame.font.init()
+        try:
+            self.font_title = self.pygame.font.SysFont("Arial", 40, bold=True)
+            self.font_subtitle = self.pygame.font.SysFont("Arial", 32)
+            self.font_cta = self.pygame.font.SysFont("Arial", 48, bold=True)
+        except Exception:
+            self.font_title = None
+            self.font_subtitle = None
+            self.font_cta = None
+            
+        # Create a window suitable for OBS capture or internal frame extraction
         self.screen = self.pygame.display.set_mode((self.width, self.height))
-        self.pygame.display.set_caption("Fujitech AI Live Avatar (OBS Capture)")
+        self.pygame.display.set_caption("Fujitech AI Live Studio (Scene Composition)")
         self.clock = self.pygame.time.Clock()
         
     def render(self, is_speaking: bool, mouth_state: str, is_blinking: bool):
@@ -76,35 +86,66 @@ class PygameAvatarRenderer(BaseAvatarRenderer):
         # Process Pygame events to keep the window responsive
         for event in self.pygame.event.get():
             if event.type == self.pygame.QUIT:
-                pass # Usually we don't quit from the X button in automated livestream, but could handle it
+                pass 
                 
-        # Clear screen with transparent/chroma-key green
-        self.screen.fill((0, 255, 0)) # Green screen
+        # 1. Background (Warm pastel)
+        self.screen.fill((250, 240, 245))
         
-        # Draw placeholder avatar body
-        self.pygame.draw.rect(self.screen, (100, 100, 250), (300, 300, 200, 300)) # Body
-        self.pygame.draw.circle(self.screen, (255, 220, 200), (400, 250), 100)    # Head
+        # 2. Product Box (Top)
+        self.pygame.draw.rect(self.screen, (255, 255, 255), (40, 80, 640, 250), border_radius=15)
+        self.pygame.draw.rect(self.screen, (220, 220, 220), (40, 80, 640, 250), width=2, border_radius=15)
+        # Product Image Placeholder
+        self.pygame.draw.rect(self.screen, (230, 230, 230), (60, 100, 210, 210), border_radius=10)
         
-        # Draw eyes (Blinking)
+        if self.font_title:
+            prod_text = self.font_title.render("Sản phẩm nổi bật", True, (40, 40, 40))
+            self.screen.blit(prod_text, (290, 120))
+            
+            price_text = self.font_subtitle.render("Giá Flash Sale: 99.000đ", True, (230, 40, 40))
+            self.screen.blit(price_text, (290, 180))
+            
+            feat_text = self.font_subtitle.render("Giao hàng miễn phí", True, (40, 160, 80))
+            self.screen.blit(feat_text, (290, 240))
+
+        # 3. Avatar (Center/Bottom)
+        avatar_cx = 360
+        avatar_cy = 700
+        
+        # Body
+        self.pygame.draw.rect(self.screen, (100, 140, 250), (avatar_cx - 150, avatar_cy + 150, 300, 450)) 
+        # Head
+        self.pygame.draw.circle(self.screen, (255, 220, 200), (avatar_cx, avatar_cy), 180)    
+        
+        # Eyes
+        eye_y = avatar_cy - 40
         if not is_blinking:
-            self.pygame.draw.circle(self.screen, (255, 255, 255), (360, 220), 15)
-            self.pygame.draw.circle(self.screen, (255, 255, 255), (440, 220), 15)
-            self.pygame.draw.circle(self.screen, (0, 0, 0), (360, 220), 5)
-            self.pygame.draw.circle(self.screen, (0, 0, 0), (440, 220), 5)
+            self.pygame.draw.circle(self.screen, (255, 255, 255), (avatar_cx - 60, eye_y), 25)
+            self.pygame.draw.circle(self.screen, (255, 255, 255), (avatar_cx + 60, eye_y), 25)
+            self.pygame.draw.circle(self.screen, (0, 0, 0), (avatar_cx - 60, eye_y), 12)
+            self.pygame.draw.circle(self.screen, (0, 0, 0), (avatar_cx + 60, eye_y), 12)
         else:
-            self.pygame.draw.line(self.screen, (0, 0, 0), (345, 220), (375, 220), 3)
-            self.pygame.draw.line(self.screen, (0, 0, 0), (425, 220), (455, 220), 3)
+            self.pygame.draw.line(self.screen, (0, 0, 0), (avatar_cx - 85, eye_y), (avatar_cx - 35, eye_y), 5)
+            self.pygame.draw.line(self.screen, (0, 0, 0), (avatar_cx + 35, eye_y), (avatar_cx + 85, eye_y), 5)
             
-        # Draw mouth based on state
+        # Mouth
+        mouth_y = avatar_cy + 80
         if mouth_state == "CLOSED":
-            self.pygame.draw.line(self.screen, (0, 0, 0), (370, 300), (430, 300), 3)
+            self.pygame.draw.line(self.screen, (0, 0, 0), (avatar_cx - 40, mouth_y), (avatar_cx + 40, mouth_y), 5)
         elif mouth_state == "SMALL":
-            self.pygame.draw.ellipse(self.screen, (0, 0, 0), (380, 295, 40, 10))
+            self.pygame.draw.ellipse(self.screen, (0, 0, 0), (avatar_cx - 20, mouth_y - 10, 40, 20))
         elif mouth_state == "MEDIUM":
-            self.pygame.draw.ellipse(self.screen, (0, 0, 0), (375, 290, 50, 20))
+            self.pygame.draw.ellipse(self.screen, (0, 0, 0), (avatar_cx - 30, mouth_y - 15, 60, 30))
         elif mouth_state == "OPEN":
-            self.pygame.draw.ellipse(self.screen, (0, 0, 0), (370, 280, 60, 40))
+            self.pygame.draw.ellipse(self.screen, (0, 0, 0), (avatar_cx - 40, mouth_y - 30, 80, 60))
             
+        # 4. CTA Box (Bottom)
+        cta_y = 1100
+        self.pygame.draw.rect(self.screen, (238, 77, 45), (40, cta_y, 640, 100), border_radius=50) # Shopee orange
+        if self.font_cta:
+            cta_surf = self.font_cta.render("MUA NGAY TẠI GIỎ HÀNG!", True, (255, 255, 255))
+            cta_rect = cta_surf.get_rect(center=(360, cta_y + 50))
+            self.screen.blit(cta_surf, cta_rect)
+
         self.pygame.display.flip()
 
     def shutdown(self):

@@ -9,8 +9,8 @@ logger = logging.getLogger(__name__)
 
 @dataclass
 class StreamConfig:
-    width: int = 800
-    height: int = 600
+    width: int = 720
+    height: int = 1280
     fps: int = 30
     video_pixel_format: str = "rgb24"
     video_codec: str = "libx264"
