@@ -1,5 +1,5 @@
 import React, { useState } from 'react'
-import { Link, useLocation } from 'react-router-dom'
+import { Link, useLocation, useNavigate } from 'react-router-dom'
 import api from '../utils/api'
 import {
   Alert,
@@ -61,6 +61,7 @@ import {
   RocketOutlined,
   VideoCameraOutlined,
   DesktopOutlined,
+  ExperimentOutlined,
 } from '@ant-design/icons'
 import { useAuth } from '../contexts/AuthContext'
 
@@ -70,6 +71,7 @@ const { useBreakpoint } = Grid
 
 function MainLayout({ children, isDarkMode, toggleTheme }) {
   const location = useLocation()
+  const navigate = useNavigate()
   const { token } = theme.useToken()
   const screens = useBreakpoint()
   const isMobile = screens.lg === false
@@ -287,7 +289,38 @@ function MainLayout({ children, isDarkMode, toggleTheme }) {
                 key: '/live/devices',
                 icon: <DesktopOutlined />,
                 label: <Link to="/live/devices">Máy chủ (Devices)</Link>,
-              }
+              },
+              {
+                key: 'live-studio-smart',
+                icon: <ExperimentOutlined style={{ color: '#fa8c16' }} />,
+                label: (
+                  <span
+                    onClick={async (e) => {
+                      e.stopPropagation()
+                      const ACTIVE_STATUSES = ['running', 'paused', 'human_takeover']
+                      try {
+                        const res = await api.get('/live_sessions/sessions/')
+                        const sessions = Array.isArray(res.data) ? res.data : (res.data?.results ?? [])
+                        const active = sessions.filter(s => ACTIVE_STATUSES.includes(s.status))
+                        if (active.length === 1) {
+                          navigate(`/live/studio/${active[0].id}`)
+                        } else if (active.length > 1) {
+                          navigate('/live/sessions')
+                          message.info('Có nhiều phiên LIVE đang hoạt động. Hãy chọn một phiên để mở Live Studio.')
+                        } else {
+                          navigate('/live/sessions')
+                          message.info('Chưa có phiên LIVE đang hoạt động. Hãy chọn một phiên để mở Live Studio.')
+                        }
+                      } catch {
+                        navigate('/live/sessions')
+                      }
+                    }}
+                    style={{ cursor: 'pointer', display: 'block', width: '100%' }}
+                  >
+                    Live Studio <span style={{ fontSize: 10, color: '#fa8c16', fontWeight: 700 }}>Beta</span>
+                  </span>
+                ),
+              },
             ],
           }
         ] : []),

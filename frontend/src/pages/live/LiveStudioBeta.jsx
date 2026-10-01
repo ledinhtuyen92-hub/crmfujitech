@@ -1,11 +1,12 @@
 import React, { useState, useEffect } from 'react'
-import { Card, Typography, Row, Col, Spin, Tag, Badge, Space, Button, message, Popconfirm, Divider } from 'antd'
+import { Card, Typography, Row, Col, Spin, Badge, Space, Button, message, Popconfirm, Divider } from 'antd'
 import { useParams } from 'react-router-dom'
-import { DesktopOutlined, PlayCircleOutlined, ClockCircleOutlined } from '@ant-design/icons'
+import { DesktopOutlined, PlayCircleOutlined } from '@ant-design/icons'
 import { useLiveWebSocket } from '../../hooks/useLiveWebSocket'
 import api from '../../utils/api'
 import LiveStatusBadge from './components/LiveStatusBadge'
 import AITimeline from './components/AITimeline'
+import StreamHealthRow from './components/StreamHealthRow'
 
 const { Title, Text } = Typography
 
@@ -22,6 +23,10 @@ export default function LiveStudioBeta() {
     uptime: 0,
     executionState: 'idle'
   })
+  const [streamState, setStreamState]       = useState(null)          // IDLE|STARTING|LIVE|...
+  const [lastHeartbeatAt, setLastHeartbeatAt] = useState(null)        // ms timestamp
+  const [startDispatched, setStartDispatched] = useState(false)
+  const [stopDispatched, setStopDispatched]   = useState(false)
 
   useEffect(() => {
     // Fetch initial session details
@@ -39,35 +44,47 @@ export default function LiveStudioBeta() {
   }, [id])
 
   useEffect(() => {
-    // Process real-time events
-    if (lastEvent) {
-      if (lastEvent.event_type === 'live.device.heartbeat') {
-        const p = lastEvent.payload
-        setDeviceHealth({
-          status: 'online',
-          uptime: p.uptime_seconds || 0,
-          executionState: p.execution_state || 'idle'
-        })
-      } else if (lastEvent.event_type === 'live.session.status_changed') {
-        const p = lastEvent.payload
-        if (p.session_id === id) {
-          setSession(prev => prev ? { ...prev, status: p.new_status } : prev)
+    if (!lastEvent) return
+    const { event_type, payload } = lastEvent
+
+    if (event_type === 'live.device.heartbeat') {
+      setDeviceHealth({
+        status: 'online',
+        uptime: payload.uptime_seconds || 0,
+        executionState: payload.execution_state || 'idle',
+      })
+      setLastHeartbeatAt(Date.now())
+
+    } else if (event_type === 'live.stream.status') {
+      setStreamState(payload.state || null)
+      // Receiving LIVE means a successful start → clear pending flag
+      if (payload.state === 'LIVE')    setStartDispatched(false)
+      // Receiving STOPPED means stop confirmed → clear pending flag
+      if (payload.state === 'STOPPED') setStopDispatched(false)
+
+    } else if (event_type === 'live.stream_start.dispatched') {
+      setStartDispatched(true)
+      setStopDispatched(false)
+
+    } else if (event_type === 'live.stream_stop.dispatched') {
+      setStopDispatched(true)
+      setStartDispatched(false)
+
+    } else if (event_type === 'live.session.status_changed') {
+      if (payload.session_id === id) {
+        setSession(prev => prev ? { ...prev, status: payload.new_status } : prev)
+        // Session terminal states reset dispatched flags
+        if (['stopped', 'error'].includes(payload.new_status)) {
+          setStartDispatched(false)
+          setStopDispatched(false)
         }
       }
     }
-  }, [lastEvent])
+  }, [lastEvent, id])
 
   if (loading) return <div style={{ padding: 48, textAlign: 'center' }}><Spin size="large" /></div>
   if (!session) return <div style={{ padding: 48, textAlign: 'center' }}><Text type="danger">Không tìm thấy phiên Livestream.</Text></div>
 
-  // Format uptime
-  const formatUptime = (seconds) => {
-    if (!seconds) return '0s'
-    const h = Math.floor(seconds / 3600)
-    const m = Math.floor((seconds % 3600) / 60)
-    const s = seconds % 60
-    return `${h > 0 ? h + 'h ' : ''}${m > 0 ? m + 'm ' : ''}${s}s`
-  }
 
   const handleAction = async (action) => {
     try {
@@ -126,41 +143,27 @@ export default function LiveStudioBeta() {
 
       <Row gutter={[24, 24]}>
         <Col span={24}>
-          <Card 
-            title={<span><DesktopOutlined /> Realtime Device Health (1G-1)</span>}
-            style={{ borderRadius: 12, border: deviceHealth.status === 'online' ? '1px solid #1890ff' : '1px solid #d9d9d9' }}
+          <Card
+            title={<span><DesktopOutlined /> Realtime Status</span>}
+            style={{
+              borderRadius: 12,
+              border: connected ? '1px solid #1890ff' : '1px solid #d9d9d9',
+            }}
             extra={
-              <Badge 
-                status={connected ? 'success' : 'error'} 
-                text={connected ? 'WS Connected' : 'WS Disconnected'} 
+              <Badge
+                status={connected ? 'success' : 'error'}
+                text={connected ? 'WS Connected' : 'WS Disconnected'}
               />
             }
           >
-            <Row gutter={[24, 24]}>
-              <Col span={8}>
-                <Text type="secondary">Device Connection</Text>
-                <div>
-                  <Tag color={deviceHealth.status === 'online' ? 'blue' : 'default'} style={{ marginTop: 8 }}>
-                    {deviceHealth.status.toUpperCase()}
-                  </Tag>
-                </div>
-              </Col>
-              <Col span={8}>
-                <Text type="secondary">Execution State</Text>
-                <div>
-                  <Tag color={deviceHealth.executionState === 'playing' ? 'green' : 'default'} style={{ marginTop: 8 }}>
-                    {deviceHealth.executionState.toUpperCase()}
-                  </Tag>
-                </div>
-              </Col>
-              <Col span={8}>
-                <Text type="secondary">Uptime</Text>
-                <div style={{ marginTop: 8, fontSize: 16, fontWeight: 500 }}>
-                  <ClockCircleOutlined style={{ marginRight: 6 }} />
-                  {formatUptime(deviceHealth.uptime)}
-                </div>
-              </Col>
-            </Row>
+            <StreamHealthRow
+              deviceHealth={deviceHealth}
+              lastHeartbeatAt={lastHeartbeatAt}
+              streamState={streamState}
+              startDispatched={startDispatched}
+              stopDispatched={stopDispatched}
+              sessionStatus={session?.status}
+            />
           </Card>
         </Col>
 
