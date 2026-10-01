@@ -318,6 +318,7 @@ class LiveSession(models.Model):
         if new_status not in valid_transitions.get(self.status, []):
             raise ValidationError(f"Không thể chuyển từ trạng thái {self.status} sang {new_status}")
         
+        old_status = self.status
         self.status = new_status
         if new_status == self.STATUS_RUNNING and not self.started_at:
             self.started_at = timezone.now()
@@ -325,4 +326,26 @@ class LiveSession(models.Model):
             self.ended_at = timezone.now()
         
         self.save()
+
+        # Emit websocket event to admin frontend on transaction commit
+        from django.db import transaction
+        
+        def emit_status_event():
+            try:
+                from .console_events import LiveConsoleEventService
+                LiveConsoleEventService.emit(
+                    session_id=str(self.id),
+                    event_type="live.session.status_changed",
+                    payload={
+                        "previous_status": old_status,
+                        "new_status": new_status,
+                        "session_id": str(self.id)
+                    }
+                )
+            except Exception as e:
+                import logging
+                logger = logging.getLogger(__name__)
+                logger.error(f"Failed to emit status_changed event: {e}")
+                
+        transaction.on_commit(emit_status_event)
 

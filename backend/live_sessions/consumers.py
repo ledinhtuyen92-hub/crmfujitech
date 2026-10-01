@@ -151,6 +151,19 @@ class DeviceAgentConsumer(AsyncWebsocketConsumer):
             await database_sync_to_async(LiveContextService.update_context)(
                 self.session.company_id, self.session_id, updates
             )
+            
+            # Emit safe payload to admin console
+            safe_payload = {
+                'uptime_seconds': payload.get('uptime_seconds'),
+                'execution_state': payload.get('execution_state'),
+                'capabilities_version': payload.get('capabilities_version')
+            }
+            await database_sync_to_async(LiveConsoleEventService.emit)(
+                session_id=self.session_id,
+                event_type="live.device.heartbeat",
+                payload=safe_payload,
+                correlation_id=envelope['message_id']
+            )
         elif msg_type == 'event' and msg_name == 'stream.status':
             state = payload.get('state')
             updates = {

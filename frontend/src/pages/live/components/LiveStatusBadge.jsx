@@ -17,7 +17,7 @@ export const STATUS_COLORS = {
 }
 
 export const STATUS_TEXT = {
-  running: 'Đang chạy',
+  running: 'Đang LIVE',
   live: 'Live',
   ready: 'Sẵn sàng',
   online: 'Online',
@@ -25,7 +25,8 @@ export const STATUS_TEXT = {
   offline: 'Offline',
   stopped: 'Đã dừng',
   error: 'Lỗi',
-  human_takeover: 'Người kiểm soát',
+  paused: 'Đang tạm dừng AI',
+  human_takeover: 'Đang tạm dừng AI',
   connected: 'Đã kết nối'
 }
 

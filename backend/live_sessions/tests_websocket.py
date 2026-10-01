@@ -4,6 +4,7 @@ from datetime import timedelta
 from unittest.mock import patch
 
 from channels.testing import WebsocketCommunicator
+from channels.db import database_sync_to_async
 from django.test import TransactionTestCase
 from django.utils import timezone
 from django.contrib.auth.hashers import make_password
@@ -233,4 +234,73 @@ class DeviceWebSocketTests(TransactionTestCase):
         # We can't easily assert "no message" without timing out, but if it doesn't fail, it's fine.
         
         await communicator.disconnect()
+
+    @patch('live_sessions.consumers.LiveConsoleEventService.emit')
+    async def test_device_heartbeat_emits_event(self, mock_emit):
+        communicator = WebsocketCommunicator(
+            application, 
+            f"/ws/live_sessions/{self.session_id}/device/",
+            headers=[(b"authorization", f"Device {self.token}".encode())]
+        )
+        await communicator.connect()
+        
+        msg_id = str(uuid.uuid4())
+        payload = {
+            "protocol_version": "1.0",
+            "type": "event",
+            "name": "device.heartbeat",
+            "message_id": msg_id,
+            "timestamp": timezone.now().isoformat(),
+            "sequence_number": 1,
+            "session_id": self.session_id,
+            "payload": {
+                "uptime_seconds": 120,
+                "execution_state": "playing",
+                "capabilities_version": "1.0",
+                "capabilities": {
+                    "environment": {
+                        "type": "local_studio",
+                        "os": "Windows 11"
+                    },
+                    "rendering": {
+                        "avatar_engine": "unity",
+                        "max_resolution": "1080p",
+                        "lip_sync_supported": True
+                    },
+                    "audio": {
+                        "tts_mode": "remote",
+                        "local_models": []
+                    }
+                }
+            }
+        }
+        await communicator.send_json_to(payload)
+        
+        # Disconnect and let pending tasks finish
+        await communicator.disconnect()
+        
+        # Wait a tiny bit to allow async task to run
+        import asyncio
+        await asyncio.sleep(0.1)
+
+        # Assert LiveConsoleEventService.emit was called with safe payload
+        mock_emit.assert_called_once()
+        args, kwargs = mock_emit.call_args
+        self.assertEqual(kwargs['session_id'], self.session_id)
+        self.assertEqual(kwargs['event_type'], 'live.device.heartbeat')
+        self.assertEqual(str(kwargs['correlation_id']), msg_id)
+        
+        safe_payload = kwargs['payload']
+        self.assertEqual(safe_payload['uptime_seconds'], 120)
+        self.assertEqual(safe_payload['execution_state'], 'playing')
+        self.assertEqual(safe_payload['capabilities_version'], '1.0')
+        # Ensure no stream key or secret is leaked
+        self.assertNotIn('secret', safe_payload)
+        self.assertNotIn('token', safe_payload)
+
+        # Assert LiveContextService is updated
+        context = await database_sync_to_async(LiveContextService.get_context)(self.company.id, self.session_id)
+        self.assertEqual(context.get('uptime_seconds'), 120)
+        self.assertEqual(context.get('execution_state'), 'playing')
+
 

@@ -179,7 +179,7 @@ function App() {
                 </PermissionRoute>
               } />
 
-              <Route path="/live/studio" element={
+              <Route path="/live/studio/:id" element={
                 <PermissionRoute permissionCode="ai_agent.manage_agents">
                   <LiveStudioBeta />
                 </PermissionRoute>

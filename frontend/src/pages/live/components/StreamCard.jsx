@@ -1,11 +1,14 @@
 import React from 'react'
 import { Card, Typography, Space, Button, Divider, Tooltip, Row, Col } from 'antd'
 import { PlayCircleOutlined, StopOutlined, RobotOutlined, DesktopOutlined, ShopOutlined, ApiOutlined } from '@ant-design/icons'
+import { useNavigate } from 'react-router-dom'
 import LiveStatusBadge from './LiveStatusBadge'
 
 const { Text, Title } = Typography
 
 export default function StreamCard({ session, onStart, onStop, onClick }) {
+  const navigate = useNavigate()
+  
   const { 
     platform, 
     status, 
@@ -29,7 +32,7 @@ export default function StreamCard({ session, onStart, onStop, onClick }) {
   return (
     <Card 
       hoverable
-      onClick={onClick}
+      onClick={() => onClick ? onClick() : navigate(`/live/studio/${session.id}`)}
       style={{ 
         borderRadius: 12, 
         overflow: 'hidden',
