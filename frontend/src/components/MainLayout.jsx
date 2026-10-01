@@ -59,6 +59,8 @@ import {
   FacebookOutlined,
   CloudUploadOutlined,
   RocketOutlined,
+  VideoCameraOutlined,
+  DesktopOutlined,
 } from '@ant-design/icons'
 import { useAuth } from '../contexts/AuthContext'
 
@@ -259,6 +261,36 @@ function MainLayout({ children, isDarkMode, toggleTheme }) {
           icon: <ApiOutlined style={{ color: '#eb2f96' }} />,
           label: <Link to="/settings/website">Tích hợp Website</Link>,
         }] : []),
+        ...(isModuleActive('ai_agent') && hasPermission('ai_agent.manage_agents') ? [
+          { type: 'divider' },
+          {
+            key: 'live-group',
+            icon: <VideoCameraOutlined style={{ color: '#f5222d' }} />,
+            label: 'Live (Livestream)',
+            children: [
+              {
+                key: '/live/dashboard',
+                icon: <DashboardOutlined />,
+                label: <Link to="/live/dashboard">Live Dashboard</Link>,
+              },
+              {
+                key: '/live/sessions',
+                icon: <VideoCameraOutlined />,
+                label: <Link to="/live/sessions">Phiên Livestream</Link>,
+              },
+              {
+                key: '/live/platforms',
+                icon: <ApiOutlined />,
+                label: <Link to="/live/platforms">Kết nối (Shopee)</Link>,
+              },
+              {
+                key: '/live/studio',
+                icon: <DesktopOutlined />,
+                label: <Link to="/live/studio">Live Studio (Beta)</Link>,
+              }
+            ],
+          }
+        ] : []),
         ...(isModuleActive('ai_agent') && (hasPermission('ai_agent.view_dashboard') || hasPermission('ai_agent.manage_agents') || hasPermission('ai_agent.manage_knowledge') || hasPermission('ai_agent.manage_keys')) ? [
           { type: 'divider' },
           {

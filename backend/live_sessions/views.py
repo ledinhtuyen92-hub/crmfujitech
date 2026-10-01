@@ -21,6 +21,27 @@ class LivePlatformProductViewSet(viewsets.ModelViewSet):
     def perform_create(self, serializer):
         serializer.save(company=self.request.user.company)
 
+from .models import PlatformAccount
+from .serializers import PlatformAccountSerializer
+
+class PlatformAccountViewSet(viewsets.ModelViewSet):
+    serializer_class = PlatformAccountSerializer
+    permission_classes = [permissions.IsAuthenticated, ActionBasedPermission]
+    action_permissions = {
+        'list': 'ai_agent.manage_agents',
+        'retrieve': 'ai_agent.manage_agents',
+        'create': 'ai_agent.manage_agents',
+        'update': 'ai_agent.manage_agents',
+        'partial_update': 'ai_agent.manage_agents',
+        'destroy': 'ai_agent.manage_agents',
+    }
+
+    def get_queryset(self):
+        return PlatformAccount.objects.filter(company=self.request.user.company)
+
+    def perform_create(self, serializer):
+        serializer.save(company=self.request.user.company)
+
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from django.contrib.auth.hashers import make_password

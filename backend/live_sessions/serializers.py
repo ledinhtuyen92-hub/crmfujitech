@@ -101,3 +101,11 @@ class ShopeeManualRtmpSetupSerializer(serializers.Serializer):
         server_url = self.validated_data['server_url'].rstrip('/')
         stream_key = self.validated_data['stream_key']
         return f"{server_url}/{stream_key}"
+
+from .models import PlatformAccount
+
+class PlatformAccountSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = PlatformAccount
+        fields = ['id', 'platform', 'account_id', 'display_name', 'status', 'created_at']
+        read_only_fields = ['id', 'created_at']

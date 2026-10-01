@@ -50,6 +50,10 @@ import AiAgentSettings from './pages/settings/AiAgentSettings'
 import AiKnowledgeBase from './pages/settings/AiKnowledgeBase'
 import Announcements from './pages/Announcements'
 import LiveConsolePage from './pages/live/LiveConsolePage'
+import LiveStudioBeta from './pages/live/LiveStudioBeta'
+import LiveDashboard from './pages/live/LiveDashboard'
+import LivePlatforms from './pages/live/LivePlatforms'
+import LiveSessionsList from './pages/live/LiveSessionsList'
 
 function DynamicTitle() {
   const location = useLocation();
@@ -76,6 +80,9 @@ function DynamicTitle() {
     else if (path.startsWith('/approvals')) title = 'Phê duyệt | Fujitech Group CRM';
     else if (path.startsWith('/announcements')) title = 'Thông báo | Fujitech Group CRM';
     else if (path.startsWith('/live/console')) title = 'Live Console | Fujitech Group CRM';
+    else if (path.startsWith('/live/dashboard')) title = 'Live Dashboard | Fujitech Group CRM';
+    else if (path.startsWith('/live/platforms')) title = 'Live Platforms | Fujitech Group CRM';
+    else if (path.startsWith('/live/sessions')) title = 'Live Sessions | Fujitech Group CRM';
 
     document.title = title;
   }, [location.pathname]);
@@ -143,6 +150,31 @@ function App() {
                 <CompanyAdminRoute>
                   <LiveConsolePage />
                 </CompanyAdminRoute>
+              } />
+
+              <Route path="/live" element={<Navigate to="/live/dashboard" replace />} />
+              <Route path="/live/dashboard" element={
+                <PermissionRoute permissionCode="ai_agent.manage_agents">
+                  <LiveDashboard />
+                </PermissionRoute>
+              } />
+              
+              <Route path="/live/platforms" element={
+                <PermissionRoute permissionCode="ai_agent.manage_agents">
+                  <LivePlatforms />
+                </PermissionRoute>
+              } />
+
+              <Route path="/live/sessions" element={
+                <PermissionRoute permissionCode="ai_agent.manage_agents">
+                  <LiveSessionsList />
+                </PermissionRoute>
+              } />
+
+              <Route path="/live/studio" element={
+                <PermissionRoute permissionCode="ai_agent.manage_agents">
+                  <LiveStudioBeta />
+                </PermissionRoute>
               } />
 
               <Route path="/approvals" element={
