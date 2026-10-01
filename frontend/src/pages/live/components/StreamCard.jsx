@@ -1,13 +1,14 @@
-import React from 'react'
-import { Card, Typography, Space, Button, Divider, Tooltip, Row, Col } from 'antd'
-import { PlayCircleOutlined, StopOutlined, RobotOutlined, DesktopOutlined, ShopOutlined, ApiOutlined } from '@ant-design/icons'
+import React, { useState } from 'react'
+import { Card, Typography, Space, Button, Divider, Tooltip, Row, Col, Dropdown, Modal } from 'antd'
+import { PlayCircleOutlined, StopOutlined, RobotOutlined, DesktopOutlined, ShopOutlined, ApiOutlined, MoreOutlined, DeleteOutlined, ExclamationCircleOutlined } from '@ant-design/icons'
 import { useNavigate } from 'react-router-dom'
 import LiveStatusBadge from './LiveStatusBadge'
 
 const { Text, Title } = Typography
 
-export default function StreamCard({ session, onStart, onStop, onClick }) {
+export default function StreamCard({ session, onStart, onStop, onDelete, onClick }) {
   const navigate = useNavigate()
+  const [isDeleting, setIsDeleting] = useState(false)
   
   const { 
     platform, 
@@ -21,6 +22,38 @@ export default function StreamCard({ session, onStart, onStop, onClick }) {
 
   const isRunning = status === 'running'
   const isReady = status === 'ready' || status === 'draft'
+  const isDeletable = ['draft', 'stopped', 'error'].includes(status)
+
+  const handleDeleteClick = (e) => {
+    if (e.domEvent) e.domEvent.stopPropagation()
+    Modal.confirm({
+      title: 'Bạn có chắc muốn xóa phiên livestream này?',
+      icon: <ExclamationCircleOutlined />,
+      content: 'Thao tác này không thể hoàn tác.',
+      okText: 'Xóa',
+      okType: 'danger',
+      cancelText: 'Hủy',
+      onOk: async () => {
+        setIsDeleting(true)
+        try {
+          if (onDelete) await onDelete(session.id)
+        } finally {
+          setIsDeleting(false)
+        }
+      }
+    })
+  }
+
+  const menuItems = [
+    {
+      key: 'delete',
+      label: 'Xóa phiên',
+      icon: <DeleteOutlined />,
+      danger: true,
+      disabled: !isDeletable || isDeleting,
+      onClick: handleDeleteClick
+    }
+  ]
 
   // Determine platform identity
   const getPlatformLabel = () => {
@@ -37,7 +70,8 @@ export default function StreamCard({ session, onStart, onStop, onClick }) {
         borderRadius: 12, 
         overflow: 'hidden',
         border: isRunning ? '1px solid #52c41a' : '1px solid #f0f0f0',
-        boxShadow: isRunning ? '0 4px 12px rgba(82,196,26,0.1)' : '0 2px 8px rgba(0,0,0,0.04)'
+        boxShadow: isRunning ? '0 4px 12px rgba(82,196,26,0.1)' : '0 2px 8px rgba(0,0,0,0.04)',
+        opacity: isDeleting ? 0.6 : 1
       }}
       bodyStyle={{ padding: 0 }}
     >
@@ -48,11 +82,16 @@ export default function StreamCard({ session, onStart, onStop, onClick }) {
           <Divider type="vertical" />
           <LiveStatusBadge status={status} />
         </Space>
-        {shopee_connection_mode && (
-          <Tooltip title={shopee_connection_mode === 'api' ? 'API Mode' : 'Manual RTMP'}>
-            <ApiOutlined style={{ color: '#8c8c8c' }} />
-          </Tooltip>
-        )}
+        <Space>
+          {shopee_connection_mode && (
+            <Tooltip title={shopee_connection_mode === 'api' ? 'API Mode' : 'Manual RTMP'}>
+              <ApiOutlined style={{ color: '#8c8c8c' }} />
+            </Tooltip>
+          )}
+          <Dropdown menu={{ items: menuItems }} trigger={['click']}>
+            <Button type="text" icon={<MoreOutlined />} size="small" onClick={(e) => e.stopPropagation()} loading={isDeleting} />
+          </Dropdown>
+        </Space>
       </div>
 
       {/* Body */}
@@ -114,5 +153,4 @@ export default function StreamCard({ session, onStart, onStop, onClick }) {
       </div>
     </Card>
   )
-
 }

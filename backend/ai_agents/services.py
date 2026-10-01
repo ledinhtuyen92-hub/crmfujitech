@@ -467,7 +467,7 @@ TRẢ LỜI BẮT BUỘC THEO ĐỊNH DẠNG JSON SAU (chỉ trả về JSON thu
     # Trả về cờ lỗi để task.py biết mà TẮT AI và ĐẢY HANDOFF - TUYỆT ĐỐI KHÔNG GỬi ra cho khách
     return {
         'error': True,
-        'reply': f'[Hệ thống AI] Lỗi API Key {provider.upper()}: {str(last_error)[:150]}...',
+        'reply': f'[Hệ thống AI] Lỗi API Key {primary_provider.upper()}: {str(last_error)[:150]}...',
         'sentiment': 'handoff',
         'summary': ''
     }

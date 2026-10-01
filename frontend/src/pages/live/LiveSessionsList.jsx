@@ -75,6 +75,20 @@ export default function LiveSessionsList() {
     }
   }
 
+  const handleDelete = async (id) => {
+    try {
+      await api.delete(`/live_sessions/sessions/${id}/`)
+      message.success('Đã xóa phiên livestream')
+      fetchSessions()
+    } catch (err) {
+      if (err.response?.status === 409) {
+        message.error(err.response.data?.detail || 'Không thể xóa phiên livestream ở trạng thái này')
+      } else {
+        message.error('Lỗi khi xóa phiên livestream')
+      }
+    }
+  }
+
   const handleCreate = async () => {
     try {
       const values = await form.validateFields()
@@ -129,8 +143,9 @@ export default function LiveSessionsList() {
               <Col xs={24} sm={12} lg={8} xl={6} key={session.id}>
                 <StreamCard 
                   session={session} 
-                  onStart={handleAction}
-                  onStop={handleAction}
+                  onStart={(id) => handleAction(id, 'start')}
+                  onStop={(id) => handleAction(id, 'stop')}
+                  onDelete={handleDelete}
                 />
               </Col>
             ))}

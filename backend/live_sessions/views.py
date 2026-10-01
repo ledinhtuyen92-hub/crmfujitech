@@ -120,6 +120,23 @@ class LiveSessionViewSet(viewsets.ModelViewSet):
     def perform_create(self, serializer):
         serializer.save(company=self.request.user.company)
 
+    def destroy(self, request, *args, **kwargs):
+        session = self.get_object()
+        
+        allowed_states = [
+            LiveSession.STATUS_DRAFT,
+            LiveSession.STATUS_STOPPED,
+            LiveSession.STATUS_ERROR
+        ]
+        
+        if session.status not in allowed_states:
+            return Response(
+                {"detail": f"Không thể xóa phiên livestream đang ở trạng thái {session.get_status_display()}."},
+                status=status.HTTP_409_CONFLICT
+            )
+            
+        return super().destroy(request, *args, **kwargs)
+
     @action(detail=True, methods=['post'])
     def start(self, request, pk=None):
         from django.db import transaction
@@ -155,21 +172,27 @@ class LiveSessionViewSet(viewsets.ModelViewSet):
 
     @action(detail=True, methods=['post'])
     def pause(self, request, pk=None):
+        from .orchestrator import LiveOrchestrator
         session = self.get_object()
         session.change_status(LiveSession.STATUS_PAUSED)
-        return Response({'status': session.status})
+        result = LiveOrchestrator().dispatch_session_control(str(session.id), "pause")
+        return Response({'status': session.status, 'dispatch': result})
 
     @action(detail=True, methods=['post'], url_path='human-takeover')
     def human_takeover(self, request, pk=None):
+        from .orchestrator import LiveOrchestrator
         session = self.get_object()
         session.change_status(LiveSession.STATUS_HUMAN_TAKEOVER)
-        return Response({'status': session.status})
+        result = LiveOrchestrator().dispatch_session_control(str(session.id), "pause")
+        return Response({'status': session.status, 'dispatch': result})
 
     @action(detail=True, methods=['post'])
     def resume(self, request, pk=None):
+        from .orchestrator import LiveOrchestrator
         session = self.get_object()
         session.change_status(LiveSession.STATUS_RUNNING)
-        return Response({'status': session.status})
+        result = LiveOrchestrator().dispatch_session_control(str(session.id), "resume")
+        return Response({'status': session.status, 'dispatch': result})
         
     @action(detail=True, methods=['post'], url_path='test-comment')
     def test_comment(self, request, pk=None):

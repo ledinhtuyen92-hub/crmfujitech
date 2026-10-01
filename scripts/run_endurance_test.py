@@ -22,7 +22,7 @@ def main():
             print(f"[{datetime.now().isoformat()}] Running...", flush=True)
             
             # Send a synthetic comment using curl or django shell
-            os.system('docker-compose exec -T web python -c "from live_sessions.tasks import handle_live_message; handle_live_message.delay(1, \\"Endurance test comment\\", \\"test_user\\", \\"tiktok\\")"')
+            os.system('docker-compose exec -T web python -c "import os, django; os.environ.setdefault(\'DJANGO_SETTINGS_MODULE\', \'core.settings\'); django.setup(); from live_sessions.models import LiveSession; from live_sessions.tasks import handle_live_message; sess = LiveSession.objects.first(); handle_live_message.delay(str(sess.id) if sess else \'test\', \\"Endurance test comment\\")"')
             
             time.sleep(30) # Wait 30s before next comment
             

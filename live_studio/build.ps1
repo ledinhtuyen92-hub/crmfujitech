@@ -58,6 +58,8 @@ pyinstaller --name "FujitechLiveStudio" `
             --hidden-import "pygame" `
             --hidden-import "websockets" `
             --hidden-import "requests" `
+            --hidden-import "customtkinter" `
+            --collect-all "customtkinter" `
             main.py
 
 Write-Host "=========================================" -ForegroundColor Green

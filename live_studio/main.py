@@ -258,32 +258,10 @@ import sys
 import json
 import os
 
-async def run_app():
-    ws_url = None
-    token = None
-    session_id = None
-    
-    if len(sys.argv) >= 4:
-        ws_url = sys.argv[1]
-        token = sys.argv[2]
-        session_id = sys.argv[3]
-    else:
-        # Resolve config.json relative to the executable (frozen) or script directory
-        if getattr(sys, 'frozen', False):
-            base_dir = os.path.dirname(sys.executable)
-        else:
-            base_dir = os.path.dirname(os.path.abspath(__file__))
-        config_path = os.path.join(base_dir, "config.json")
-        if os.path.exists(config_path):
-            with open(config_path, "r") as f:
-                cfg = json.load(f)
-                ws_url = cfg.get("ws_url")
-                token = cfg.get("token")
-                session_id = cfg.get("session_id")
-            
-    if not ws_url or not token or not session_id:
-        print("Usage: python main.py <ws_url> <token> <session_id> OR provide config.json with these keys")
-        sys.exit(1)
+async def run_app(config):
+    ws_url = config.get("ws_url")
+    token = config.get("token")
+    session_id = config.get("session_id")
         
     from live_studio.execution.audio_player import PygameAudioPlayer
     from live_studio.execution.media_pipeline import MediaClock, AudioStreamSink
@@ -317,7 +295,14 @@ async def run_app():
     finally:
         await app.stop()
 
-if __name__ == '__main__':
+def _start_gui():
+    import logging
     logging.basicConfig(level=logging.INFO, format='%(asctime)s [%(levelname)s] %(name)s: %(message)s')
-    asyncio.run(run_app())
+    
+    from live_studio.gui.launcher import StudioLauncher
+    app = StudioLauncher(on_connect_callback=run_app)
+    app.mainloop()
+
+if __name__ == '__main__':
+    _start_gui()
 

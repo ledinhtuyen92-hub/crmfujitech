@@ -116,6 +116,64 @@ class LiveOrchestrator:
             
         return {"status": "success", "command_id": command_id, "message_id": message_id}
 
+    def dispatch_session_control(self, session_id: str, action: str) -> Dict[str, Any]:
+        logger.info(f"[Session: {session_id}] Dispatching session.control {action}")
+        try:
+            session = LiveSession.objects.get(id=session_id)
+        except LiveSession.DoesNotExist:
+            return {"status": "error", "reason": "session_not_found"}
+
+        command_id = str(uuid.uuid4())
+        message_id = str(uuid.uuid4())
+        
+        from live_sessions.protocol.commands import SessionControlPayloadSerializer
+        payload = {
+            "command_id": command_id,
+            "action": action
+        }
+        
+        payload_serializer = SessionControlPayloadSerializer(data=payload)
+        if not payload_serializer.is_valid():
+            return {"status": "error", "reason": "invalid_payload_schema"}
+            
+        try:
+            sequence_number = LiveSequenceService.get_next_sequence(
+                company_id=str(session.company_id), 
+                session_id=str(session.id)
+            )
+        except SequenceUnavailableException:
+            return {"status": "failed", "reason": "SEQUENCE_UNAVAILABLE"}
+            
+        envelope = {
+            "protocol_version": "1.0",
+            "type": "command",
+            "name": "session.control",
+            "message_id": message_id,
+            "timestamp": timezone.now().isoformat(),
+            "sequence_number": sequence_number,
+            "session_id": str(session.id),
+            "payload": payload_serializer.validated_data
+        }
+        
+        envelope_serializer = ProtocolEnvelopeSerializer(data=envelope)
+        if not envelope_serializer.is_valid():
+            return {"status": "error", "reason": "invalid_envelope_schema"}
+            
+        session_group_name = f"live_session_{session.id}_device"
+        try:
+            async_to_sync(self.channel_layer.group_send)(
+                session_group_name,
+                {
+                    "type": "send.command",
+                    "envelope": json.loads(json.dumps(envelope_serializer.data, default=str))
+                }
+            )
+            LiveConsoleEventService.emit(session_id, f"live.session_control.dispatched", {"command_id": command_id, "action": action})
+        except Exception as e:
+            return {"status": "error", "reason": "channel_layer_failure"}
+            
+        return {"status": "success", "command_id": command_id, "message_id": message_id}
+
     def dispatch_stream_stop(self, session_id: str, reason: str = "") -> Dict[str, Any]:
         logger.info(f"[Session: {session_id}] Dispatching stream.stop")
         try:

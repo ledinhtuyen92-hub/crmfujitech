@@ -26,7 +26,7 @@ class LiveDeviceSerializer(serializers.ModelSerializer):
 class LiveSessionSerializer(serializers.ModelSerializer):
     # stream_url and stream_key are write_only — NEVER returned in API responses
     # They contain RTMP credentials which must not be exposed.
-    stream_url = serializers.URLField(write_only=True, required=False, allow_null=True)
+    stream_url = serializers.CharField(write_only=True, required=False, allow_null=True, allow_blank=True)
     stream_key = serializers.CharField(
         write_only=True,
         required=False,
@@ -38,6 +38,8 @@ class LiveSessionSerializer(serializers.ModelSerializer):
     
     platform_display = serializers.CharField(source='get_platform_display', read_only=True)
     ai_agent_name = serializers.CharField(source='ai_agent.name', read_only=True)
+    device_name = serializers.CharField(source='device.name', read_only=True)
+    product_name = serializers.CharField(source='product.name', read_only=True)
 
     class Meta:
         model = LiveSession
