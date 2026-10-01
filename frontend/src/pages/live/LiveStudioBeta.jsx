@@ -312,7 +312,7 @@ export default function LiveStudioBeta() {
       <Row gutter={[16, 16]} style={{ flex: 1, minHeight: 600 }}>
         {/* Left Column: Video Preview */}
         <Col xs={24} lg={8} style={{ display: 'flex', flexDirection: 'column' }}>
-          <VideoPreview />
+          <VideoPreview session={session} />
         </Col>
 
         {/* Center Column: AI Timeline */}
