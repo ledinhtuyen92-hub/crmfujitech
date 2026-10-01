@@ -303,6 +303,8 @@ class LiveOrchestrator:
             LiveContextService.add_to_history(str(session.company_id), str(session.id), "user", user_message)
             if reply_text and reply_text != "[STOP]":
                 LiveContextService.add_to_history(str(session.company_id), str(session.id), "assistant", reply_text)
+                import time
+                LiveContextService.update_context(str(session.company_id), str(session.id), {"last_speech_time": time.time()})
 
         if action == "IGNORE":
             logger.info(f"[Session: {session_id}][Corr: {correlation_id}] AI ignored comment.")
@@ -409,3 +411,129 @@ class LiveOrchestrator:
             "message_id": message_id,
             "audio_url": audio_asset_dict.get("signed_url")
         }
+
+    def process_proactive_speech(self, session_id: str, correlation_id: Optional[str] = None) -> Dict[str, Any]:
+        """
+        Generates proactive speech when the session is idle (no comments).
+        """
+        logger.info(f"[Session: {session_id}][Corr: {correlation_id}] Proactive speech started.")
+
+        if not correlation_id:
+            correlation_id = str(uuid.uuid4())
+            
+        try:
+            session = LiveSession.objects.select_related('device', 'company', 'product', 'ai_agent').get(id=session_id)
+        except LiveSession.DoesNotExist:
+            return {"status": "error", "reason": "session_not_found"}
+
+        if session.status != LiveSession.STATUS_RUNNING:
+            return {"status": "suppressed", "reason": "not_running"}
+
+        agent = session.ai_agent
+        if not agent:
+            return {"status": "error", "reason": "missing_agent"}
+
+        # Use same product truth
+        product = session.product
+        product_truth = f"THÔNG TIN SẢN PHẨM ĐANG LIVE (BẮT BUỘC SỬ DỤNG LÀM CHUẨN):\n- Tên: {product.name}\n- Mã (SKU): {product.sku}\n- Giá tiêu chuẩn: {product.price}\n- Mô tả cơ bản: {product.description}\n"
+        
+        try:
+            from live_sessions.models import LivePlatformProduct
+            platform_product = LivePlatformProduct.objects.filter(
+                company_id=session.company_id,
+                product_id=product.id,
+                platform=session.platform
+            ).first()
+            if platform_product and platform_product.live_price_override:
+                product_truth += f"- GIÁ ĐANG CHẠY FLASH SALE TRÊN LIVE: {platform_product.live_price_override} (Ưu tiên báo giá này cho khách livestream)\n"
+        except Exception:
+            pass
+
+        conversation_history = [
+            {"role": "system", "content": product_truth},
+            {"role": "system", "content": "BẮT BUỘC: Không có ai bình luận trong thời gian qua. Hãy chủ động nói một câu ngắn gọn (1-2 câu) để giới thiệu sản phẩm đang ghim, nêu bật điểm mạnh hoặc kêu gọi người xem chốt đơn. Định dạng trả về JSON với 'intent'='PROACTIVE', 'action'='RESPOND', và 'reply' chứa câu nói của bạn."}
+        ]
+        
+        from live_sessions.services import LiveContextService
+        context_data = LiveContextService.get_context(str(session.company_id), str(session.id))
+        recent_history = context_data.get("recent_history", [])
+        if isinstance(recent_history, list):
+            for msg in recent_history:
+                conversation_history.append(msg)
+                
+        try:
+            ai_result = generate_ai_reply(agent, conversation_history, "Khách hàng Livestream")
+        except Exception as e:
+            logger.error(f"[Session: {session_id}] AI error in proactive speech: {e}")
+            return {"status": "error", "reason": "ai_failure"}
+
+        reply_text = ai_result.get("reply", "").strip()
+        if not reply_text or reply_text == "[STOP]":
+            return {"status": "suppressed", "reason": "empty_reply"}
+
+        LiveContextService.add_to_history(str(session.company_id), str(session.id), "assistant", reply_text)
+        import time
+        LiveContextService.update_context(str(session.company_id), str(session.id), {"last_speech_time": time.time()})
+
+        # Generate TTS
+        try:
+            voice_config = {"voice": getattr(agent, 'tts_voice', 'alloy'), "speed": getattr(agent, 'tts_speed', 1.0)}
+            from ai_agents.services import get_api_keys
+            tts_keys = get_api_keys(session.company, 'openai')
+            resolved_key = tts_keys[0] if tts_keys else None
+            self.tts_provider = OpenAITTSProvider(api_key=resolved_key)
+            audio_result = self.tts_provider.generate(reply_text, voice_config)
+        except Exception as e:
+            logger.error(f"[Session: {session_id}] TTS error: {e}")
+            return {"status": "error", "reason": "tts_failure"}
+
+        try:
+            audio_asset_dict = self.audio_storage.store(audio_result, session.company_id, session.id)
+        except Exception as e:
+            logger.error(f"[Session: {session_id}] Storage error: {e}")
+            return {"status": "error", "reason": "storage_failure"}
+
+        command_id = str(uuid.uuid4())
+        message_id = str(uuid.uuid4())
+        payload = {
+            "command_id": command_id,
+            "text": reply_text,
+            "audio_url": audio_asset_dict["url"],
+            "signature": audio_asset_dict["signature"],
+            "expires_at": audio_asset_dict["expires_at"]
+        }
+        
+        payload_serializer = SpeechSpeakPayloadSerializer(data=payload)
+        if not payload_serializer.is_valid():
+            return {"status": "error", "reason": "invalid_payload_schema"}
+            
+        try:
+            sequence_number = LiveSequenceService.get_next_sequence(str(session.company_id), str(session.id))
+        except SequenceUnavailableException:
+            return {"status": "failed", "reason": "SEQUENCE_UNAVAILABLE"}
+            
+        envelope = {
+            "protocol_version": "1.0",
+            "type": "command",
+            "name": "speech.speak",
+            "message_id": message_id,
+            "timestamp": timezone.now().isoformat(),
+            "sequence_number": sequence_number,
+            "session_id": str(session.id),
+            "payload": payload_serializer.validated_data
+        }
+        
+        envelope_serializer = ProtocolEnvelopeSerializer(data=envelope)
+        if not envelope_serializer.is_valid():
+            return {"status": "error", "reason": "invalid_envelope_schema"}
+            
+        session_group_name = f"live_session_{session.id}_device"
+        try:
+            async_to_sync(self.channel_layer.group_send)(
+                session_group_name,
+                {"type": "send.command", "envelope": json.loads(json.dumps(envelope_serializer.data, default=str))}
+            )
+        except Exception as e:
+            return {"status": "error", "reason": "channel_layer_failure"}
+            
+        return {"status": "success", "command_id": command_id}

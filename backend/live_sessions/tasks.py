@@ -125,3 +125,38 @@ def poll_shopee_live_comments(self, session_id: str):
         except self.MaxRetriesExceededError:
             session.change_status(LiveSession.STATUS_ERROR)
         return
+
+@shared_task(bind=True, max_retries=3)
+def trigger_proactive_speech(self, session_id: str):
+    """
+    Checks if the session has been idle (no speech) for a certain threshold (e.g., 30 seconds).
+    If so, triggers a proactive speech generation.
+    """
+    logger.info(f"Checking proactive speech for session {session_id}")
+    try:
+        session = LiveSession.objects.get(id=session_id)
+        if session.status != LiveSession.STATUS_RUNNING:
+            return
+            
+        from .services import LiveContextService
+        import time
+        
+        context = LiveContextService.get_context(str(session.company_id), str(session.id))
+        last_speech_time = context.get("last_speech_time", 0)
+        
+        # Threshold for proactive speech (e.g., 30 seconds)
+        idle_time = time.time() - float(last_speech_time)
+        
+        if idle_time > 30.0:
+            logger.info(f"[Session {session_id}] Idle for {idle_time}s. Triggering proactive speech.")
+            orchestrator = LiveOrchestrator()
+            orchestrator.process_proactive_speech(session_id=session_id)
+            
+        # Reschedule itself
+        if session.status == LiveSession.STATUS_RUNNING:
+            trigger_proactive_speech.apply_async(kwargs={"session_id": session_id}, countdown=10)
+            
+    except LiveSession.DoesNotExist:
+        pass
+    except Exception as e:
+        logger.error(f"Error in proactive speech task for session {session_id}: {e}")

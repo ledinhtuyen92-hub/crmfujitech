@@ -347,5 +347,17 @@ class LiveSession(models.Model):
                 logger = logging.getLogger(__name__)
                 logger.error(f"Failed to emit status_changed event: {e}")
                 
+            if new_status == self.STATUS_RUNNING:
+                try:
+                    import time
+                    from .services import LiveContextService
+                    from .tasks import trigger_proactive_speech
+                    LiveContextService.update_context(str(self.company_id), str(self.id), {"last_speech_time": time.time()})
+                    trigger_proactive_speech.apply_async(kwargs={"session_id": str(self.id)}, countdown=30)
+                except Exception as e:
+                    import logging
+                    logger = logging.getLogger(__name__)
+                    logger.error(f"Failed to start proactive speech tracking: {e}")
+                
         transaction.on_commit(emit_status_event)
 
