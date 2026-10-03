@@ -117,7 +117,8 @@ class StudioLauncher(ctk.CTk):
             # Get Devices
             d_res = requests.get(f"{self.server_url}/api/live_sessions/devices/", headers=headers, timeout=5)
             if d_res.status_code == 200:
-                self.devices = d_res.json()
+                data = d_res.json()
+                self.devices = data.get("results", data) if isinstance(data, dict) else data
             else:
                 self.devices = []
                 
@@ -131,7 +132,8 @@ class StudioLauncher(ctk.CTk):
             # Get Sessions
             s_res = requests.get(f"{self.server_url}/api/live_sessions/sessions/", headers=headers, timeout=5)
             if s_res.status_code == 200:
-                self.sessions = s_res.json()
+                s_data = s_res.json()
+                self.sessions = s_data.get("results", s_data) if isinstance(s_data, dict) else s_data
             else:
                 self.sessions = []
                 
