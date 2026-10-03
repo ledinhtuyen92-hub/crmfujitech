@@ -38,6 +38,9 @@ class StudioLauncher(ctk.CTk):
         self.server_entry.pack(pady=10, padx=20, fill="x")
         self.server_entry.insert(0, "http://localhost:8000")
         
+        self.workspace_entry = ctk.CTkEntry(self.frame, placeholder_text="Mã Công ty (Workspace ID)")
+        self.workspace_entry.pack(pady=10, padx=20, fill="x")
+        
         self.username_entry = ctk.CTkEntry(self.frame, placeholder_text="Tài khoản CRM")
         self.username_entry.pack(pady=10, padx=20, fill="x")
         
@@ -72,19 +75,20 @@ class StudioLauncher(ctk.CTk):
         server = self.server_entry.get().strip("/")
         username = self.username_entry.get()
         password = self.password_entry.get()
+        workspace = self.workspace_entry.get()
         
-        if not server or not username or not password:
+        if not server or not username or not password or not workspace:
             self.show_error("Vui lòng điền đủ thông tin")
             return
             
         self.login_btn.configure(state="disabled", text="Đang đăng nhập...")
         
         # Run in thread
-        threading.Thread(target=self._api_login, args=(server, username, password), daemon=True).start()
+        threading.Thread(target=self._api_login, args=(server, username, password, workspace), daemon=True).start()
 
-    def _api_login(self, server, username, password):
+    def _api_login(self, server, username, password, workspace):
         try:
-            res = requests.post(f"{server}/api/users/login/", json={"username": username, "password": password}, timeout=5)
+            res = requests.post(f"{server}/api/users/login/", json={"username": username, "password": password, "workspace_id": workspace}, timeout=5)
             if res.status_code == 200:
                 self.api_token = res.json().get("access")
                 self.server_url = server
