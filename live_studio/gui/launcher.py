@@ -148,6 +148,7 @@ class StudioLauncher(ctk.CTk):
     def _update_combos(self):
         if not self.devices:
             self.device_combo.configure(values=["Không tìm thấy máy chủ"])
+            self.device_combo.set("Không tìm thấy máy chủ")
         else:
             self.device_combo.configure(values=[d['name'] for d in self.devices])
             if hasattr(self, 'current_device_name') and self.current_device_name:
@@ -157,6 +158,7 @@ class StudioLauncher(ctk.CTk):
             
         if not self.sessions:
             self.session_combo.configure(values=["Không có phiên Live nào"])
+            self.session_combo.set("Không có phiên Live nào")
         else:
             self.session_combo.configure(values=[s['id'] for s in self.sessions])
             self.session_combo.set(self.sessions[0]['id'])
