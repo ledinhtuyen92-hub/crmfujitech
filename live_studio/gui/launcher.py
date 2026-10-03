@@ -122,12 +122,16 @@ class StudioLauncher(ctk.CTk):
             else:
                 self.devices = []
                 
-            # If no device, create one automatically
-            if not self.devices:
-                hostname = socket.gethostname()
+            # Check if this hostname is registered, if not auto-create it
+            hostname = socket.gethostname()
+            current_device = next((d for d in self.devices if d["name"] == hostname), None)
+            if not current_device:
                 create_res = requests.post(f"{self.server_url}/api/live_sessions/devices/", json={"name": hostname, "is_active": True}, headers=headers)
                 if create_res.status_code in [201, 200]:
-                    self.devices = [create_res.json()]
+                    new_device = create_res.json()
+                    self.devices.append(new_device)
+                    current_device = new_device
+            self.current_device_name = current_device["name"] if current_device else None
             
             # Get Sessions
             s_res = requests.get(f"{self.server_url}/api/live_sessions/sessions/", headers=headers, timeout=5)
@@ -146,7 +150,10 @@ class StudioLauncher(ctk.CTk):
             self.device_combo.configure(values=["Không tìm thấy máy chủ"])
         else:
             self.device_combo.configure(values=[d['name'] for d in self.devices])
-            self.device_combo.set(self.devices[0]['name'])
+            if hasattr(self, 'current_device_name') and self.current_device_name:
+                self.device_combo.set(self.current_device_name)
+            else:
+                self.device_combo.set(self.devices[0]['name'])
             
         if not self.sessions:
             self.session_combo.configure(values=["Không có phiên Live nào"])
