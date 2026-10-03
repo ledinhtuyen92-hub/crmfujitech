@@ -113,7 +113,15 @@ class StreamController:
             audio_channels=self._current_payload.audio_channels
         )
         
-        self.encoder = StreamEncoder(config, ffmpeg_path, self._current_target.get_full_url())
+        # Always push to local MediaMTX first.
+        # MediaMTX handles HLS preview and re-pushes to external (Shopee/TikTok).
+        try:
+            from live_studio.execution.mediamtx_manager import MEDIAMTX_LOCAL_RTMP_URL
+            output_url = MEDIAMTX_LOCAL_RTMP_URL
+        except ImportError:
+            output_url = self._current_target.get_full_url()
+        
+        self.encoder = StreamEncoder(config, ffmpeg_path, output_url)
         try:
             await self.encoder.start()
             self.state = StreamState.LIVE

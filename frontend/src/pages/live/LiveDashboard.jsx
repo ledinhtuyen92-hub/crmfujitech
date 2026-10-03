@@ -42,16 +42,16 @@ export default function LiveDashboard() {
     fetchData()
   }, [])
 
-  const activeSessions = data.sessions.filter(s => s.status === 'running')
-  const readySessions = data.sessions.filter(s => s.status === 'ready' || s.status === 'draft')
+  const activeSessions = data.sessions.filter(s => s.status === 'running' || s.status === 'human_takeover')
+  const readySessions = data.sessions.filter(s => ['ready', 'draft', 'stopped', 'error'].includes(s.status))
   
   const handleStartSession = async (id) => {
     try {
       await api.post(`/live_sessions/sessions/${id}/start/`)
-      // Optimistic or soft reload here
       window.location.reload()
-    } catch (e) {
-      // handle error
+    } catch (err) {
+      const errorDetail = err.response?.data?.detail || err.response?.data?.error || 'Lỗi khi bắt đầu phiên'
+      alert(errorDetail)
     }
   }
 
@@ -59,8 +59,9 @@ export default function LiveDashboard() {
     try {
       await api.post(`/live_sessions/sessions/${id}/stop/`)
       window.location.reload()
-    } catch (e) {
-      // handle error
+    } catch (err) {
+      const errorDetail = err.response?.data?.detail || err.response?.data?.error || 'Lỗi khi dừng phiên'
+      alert(errorDetail)
     }
   }
 

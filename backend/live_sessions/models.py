@@ -169,6 +169,10 @@ class LiveDevice(models.Model):
     token_hash = models.CharField(max_length=128, verbose_name="Token Hash")
     is_active = models.BooleanField(default=True, verbose_name="Đang hoạt động")
     last_seen_at = models.DateTimeField(null=True, blank=True, verbose_name="Lần cuối online")
+    metadata = models.JSONField(default=dict, blank=True, verbose_name="Hardware Metrics")
+    video_resolution = models.CharField(max_length=20, default='1280x720', verbose_name="Độ phân giải")
+    video_bitrate = models.CharField(max_length=20, default='2500k', verbose_name="Video Bitrate")
+    video_fps = models.IntegerField(default=30, verbose_name="FPS")
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -311,8 +315,8 @@ class LiveSession(models.Model):
             self.STATUS_RUNNING: [self.STATUS_PAUSED, self.STATUS_HUMAN_TAKEOVER, self.STATUS_STOPPED, self.STATUS_ERROR],
             self.STATUS_PAUSED: [self.STATUS_RUNNING, self.STATUS_STOPPED],
             self.STATUS_HUMAN_TAKEOVER: [self.STATUS_RUNNING, self.STATUS_STOPPED],
-            self.STATUS_STOPPED: [],  # Terminal state
-            self.STATUS_ERROR: [self.STATUS_STOPPED],
+            self.STATUS_STOPPED: [self.STATUS_READY, self.STATUS_RUNNING],
+            self.STATUS_ERROR: [self.STATUS_READY, self.STATUS_RUNNING, self.STATUS_STOPPED],
         }
 
         if new_status not in valid_transitions.get(self.status, []):

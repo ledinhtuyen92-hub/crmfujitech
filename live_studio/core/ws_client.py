@@ -17,6 +17,7 @@ class WebSocketClient:
         self.ws: Optional[websockets.WebSocketClientProtocol] = None
         self._running = False
         self._reconnect_delay = 1.0
+        self.state_getter = None
 
     async def connect(self, sequence_getter: Callable[[], int], device_sequence_counter):
         self._running = True
@@ -32,8 +33,14 @@ class WebSocketClient:
                     # session.sync
                     await self._send_session_sync(sequence_getter(), device_sequence_counter)
                     
-                    # Receive loop
-                    await self._receive_loop()
+                    # Heartbeat task
+                    heartbeat_task = asyncio.create_task(self._heartbeat_loop(device_sequence_counter))
+                    
+                    try:
+                        # Receive loop
+                        await self._receive_loop()
+                    finally:
+                        heartbeat_task.cancel()
                     
             except websockets.ConnectionClosed as e:
                 logger.warning(f"Connection closed: {e}")
@@ -44,6 +51,40 @@ class WebSocketClient:
                 logger.info(f"Reconnecting in {self._reconnect_delay} seconds...")
                 await asyncio.sleep(self._reconnect_delay)
                 self._reconnect_delay = min(self._reconnect_delay * 2, 30.0)
+
+    async def _heartbeat_loop(self, device_sequence_counter):
+        import time
+        start_time = time.time()
+        while True:
+            try:
+                await asyncio.sleep(5)
+                seq_num = device_sequence_counter.next()
+                
+                # Fetch state if state_getter is provided, else default to idle
+                exec_state = "idle"
+                if self.state_getter:
+                    exec_state = self.state_getter()
+                    
+                payload = {
+                    "protocol_version": "1.0",
+                    "type": "event",
+                    "name": "device.heartbeat",
+                    "message_id": str(uuid.uuid4()),
+                    "timestamp": datetime.datetime.now(datetime.timezone.utc).isoformat(),
+                    "sequence_number": seq_num,
+                    "session_id": self.session_id,
+                    "payload": {
+                        "uptime_seconds": int(time.time() - start_time),
+                        "execution_state": exec_state
+                    }
+                }
+                
+                # Use send direct string to avoid logging it constantly or just use self.send
+                await self.send(payload)
+            except asyncio.CancelledError:
+                break
+            except Exception as e:
+                logger.error(f"Heartbeat error: {e}")
 
     async def _send_session_sync(self, last_received_sequence: int, device_sequence_counter):
         seq_num = device_sequence_counter.next()

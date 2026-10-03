@@ -73,6 +73,7 @@ class LiveDeviceViewSet(viewsets.ModelViewSet):
         'partial_update': 'ai_agent.manage_agents',
         'destroy': 'ai_agent.manage_agents',
         'regenerate_token': 'ai_agent.manage_agents',
+        'ping': 'ai_agent.manage_agents',
     }
 
     def get_queryset(self):
@@ -93,6 +94,23 @@ class LiveDeviceViewSet(viewsets.ModelViewSet):
         device = self.get_object()
         raw_token = _generate_device_token(device)
         return Response({'token': raw_token})
+
+    @action(detail=True, methods=['post'], url_path='ping')
+    def ping(self, request, pk=None):
+        device = self.get_object()
+        device.last_seen_at = timezone.now()
+        
+        # Update hardware metrics if provided
+        metadata = device.metadata or {}
+        
+        for key in ['cpu_usage', 'ram_usage', 'total_ram_gb', 'os_version', 'cpu_model', 'gpu_model', 'disk_total_gb']:
+            if key in request.data:
+                metadata[key] = request.data[key]
+                
+        device.metadata = metadata
+        
+        device.save(update_fields=['last_seen_at', 'metadata'])
+        return Response({'status': 'ok'})
 
 
 class LiveSessionViewSet(viewsets.ModelViewSet):
@@ -141,20 +159,55 @@ class LiveSessionViewSet(viewsets.ModelViewSet):
     def start(self, request, pk=None):
         from django.db import transaction
         from .orchestrator import LiveOrchestrator
-        session = self.get_object()
+        import traceback
         
-        with transaction.atomic():
-            if session.status == LiveSession.STATUS_DRAFT:
-                session.change_status(LiveSession.STATUS_READY)
-            session.change_status(LiveSession.STATUS_RUNNING)
+        try:
+            session = self.get_object()
             
-        orchestrator = LiveOrchestrator()
-        result = orchestrator.dispatch_stream_start(str(session.id))
-        
-        return Response({
-            'status': session.status,
-            'dispatch': result
-        })
+            # Save previous status for potential rollback
+            previous_status = session.status
+            
+            with transaction.atomic():
+                if session.status == LiveSession.STATUS_DRAFT:
+                    session.change_status(LiveSession.STATUS_READY)
+                session.change_status(LiveSession.STATUS_RUNNING)
+                
+            orchestrator = LiveOrchestrator()
+            result = orchestrator.dispatch_stream_start(str(session.id))
+            
+            # If dispatch failed synchronously (e.g. invalid stream URL)
+            if result.get("status") in ["error", "failed"]:
+                session.change_status(LiveSession.STATUS_ERROR)
+                
+                raw_reason = result.get('reason', 'Lỗi không xác định')
+                friendly_reason = raw_reason
+                
+                if "stream_provider_error" in raw_reason:
+                    if "not a valid RTMP URL" in raw_reason:
+                        friendly_reason = "Đường dẫn máy chủ (Server URL / Stream Key) chưa đúng định dạng. Vui lòng kiểm tra lại (phải bắt đầu bằng rtmp://)."
+                    else:
+                        friendly_reason = "Lỗi kết nối đến nền tảng phát sóng. Vui lòng kiểm tra lại thông tin cài đặt."
+                elif raw_reason == "missing_stream_url":
+                    friendly_reason = "Chưa có đường dẫn phát sóng. Bạn hãy chỉnh sửa phiên và nhập Server URL / Stream Key."
+                elif raw_reason == "SEQUENCE_UNAVAILABLE":
+                    friendly_reason = "Lỗi cấp phát mã điều khiển thiết bị."
+                
+                return Response({
+                    'status': session.status,
+                    'detail': f"Không thể bắt đầu: {friendly_reason}",
+                    'dispatch': result
+                }, status=status.HTTP_400_BAD_REQUEST)
+            
+            return Response({
+                'status': session.status,
+                'dispatch': result
+            })
+        except Exception as e:
+            error_trace = traceback.format_exc()
+            return Response({
+                'detail': f"Internal Server Error: {str(e)}",
+                'traceback': error_trace
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
     @action(detail=True, methods=['post'])
     def stop(self, request, pk=None):

@@ -54,6 +54,7 @@ class LiveStudioApp:
             session_id=session_id,
             dispatcher_callback=self._on_message
         )
+        self.ws_client.state_getter = lambda: self.state.state
         
         self.dispatcher = ProtocolDispatcher(
             state=self.state,
@@ -100,7 +101,12 @@ class LiveStudioApp:
     async def _on_stream_state_change(self, state):
         import uuid
         import datetime
+        from live_studio.execution.stream_controller import StreamState
+        from live_studio.execution.mediamtx_manager import MEDIAMTX_LOCAL_HLS_URL
         logger.info(f"Stream state changed to {state.value}")
+        extra_payload = {"state": state.value}
+        if state == StreamState.LIVE:
+            extra_payload["hls_url"] = MEDIAMTX_LOCAL_HLS_URL
         payload = {
             "protocol_version": "1.0",
             "type": "event",
@@ -109,9 +115,7 @@ class LiveStudioApp:
             "timestamp": datetime.datetime.now(datetime.timezone.utc).isoformat(),
             "sequence_number": self.device_sequence_counter.next(),
             "session_id": self.ws_client.session_id,
-            "payload": {
-                "state": state.value
-            }
+            "payload": extra_payload
         }
         await self.ws_client.send(payload)
 
@@ -268,6 +272,20 @@ async def run_app(config):
     from live_studio.execution.avatar_engine import Local2DAvatarEngine
     from live_studio.execution.avatar_renderer import PygameAvatarRenderer
     from live_studio.execution.lip_sync import LipSyncAnalyzer
+    from live_studio.execution.mediamtx_manager import MediaMTXManager, MEDIAMTX_LOCAL_RTMP_URL
+    
+    # Determine if we need to re-stream externally
+    # stream_url from config is the final destination (Shopee/TikTok/custom)
+    # We always push FFmpeg → local MediaMTX, then MediaMTX re-streams externally
+    external_rtmp_url = config.get("external_rtmp_url")  # populated when Shopee/TikTok
+    
+    mediamtx = MediaMTXManager(external_rtmp_url=external_rtmp_url)
+    mediamtx_started = await mediamtx.start()
+    if not mediamtx_started:
+        logger.warning("MediaMTX failed to start. Stream will not be previewable.")
+    else:
+        # Give MediaMTX 1 second to fully boot before FFmpeg connects
+        await asyncio.sleep(1.0)
     
     clock = MediaClock()
     sink = AudioStreamSink(clock)
@@ -294,6 +312,8 @@ async def run_app(config):
         pass
     finally:
         await app.stop()
+        if mediamtx_started:
+            await mediamtx.stop()
 
 def _start_gui():
     import logging

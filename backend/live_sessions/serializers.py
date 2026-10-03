@@ -18,10 +18,19 @@ class LivePlatformProductSerializer(serializers.ModelSerializer):
 from .models import LiveDevice, LiveSession
 
 class LiveDeviceSerializer(serializers.ModelSerializer):
+    is_online = serializers.SerializerMethodField()
+
     class Meta:
         model = LiveDevice
-        fields = ['id', 'name', 'is_active', 'last_seen_at', 'created_at']
-        read_only_fields = ['id', 'last_seen_at', 'created_at']
+        fields = ['id', 'name', 'is_active', 'last_seen_at', 'created_at', 'is_online', 'metadata', 'video_resolution', 'video_bitrate', 'video_fps']
+        read_only_fields = ['id', 'last_seen_at', 'created_at', 'is_online', 'metadata']
+
+    def get_is_online(self, obj):
+        if not obj.last_seen_at:
+            return False
+        from django.utils import timezone
+        import datetime
+        return timezone.now() - obj.last_seen_at < datetime.timedelta(seconds=60)
 
 class LiveSessionSerializer(serializers.ModelSerializer):
     # stream_url and stream_key are write_only — NEVER returned in API responses

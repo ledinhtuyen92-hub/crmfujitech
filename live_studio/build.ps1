@@ -50,7 +50,7 @@ if (Test-Path $BuildDir) { Remove-Item -Recurse -Force $BuildDir }
 # 4. Run PyInstaller
 Write-Host "Running PyInstaller..." -ForegroundColor Yellow
 Set-Location $LiveStudioDir
-pyinstaller --name "FujitechLiveStudio" `
+pyinstaller --name "AutotechLiveStudio" `
             --clean `
             --noconfirm `
             --onedir `
@@ -60,12 +60,20 @@ pyinstaller --name "FujitechLiveStudio" `
             --hidden-import "websockets" `
             --hidden-import "requests" `
             --hidden-import "customtkinter" `
+            --hidden-import "PIL" `
+            --hidden-import "PIL._tkinter_finder" `
             --collect-all "customtkinter" `
             main.py
 
+Write-Host "Copying configuration and assets..." -ForegroundColor Cyan
+Copy-Item -Path "server_config.txt" -Destination "$DistDir\AutotechLiveStudio\server_config.txt" -Force
+if (Test-Path "assets") {
+    Copy-Item -Path "assets" -Destination "$DistDir\AutotechLiveStudio\assets" -Recurse -Force
+}
+
 Write-Host "=========================================" -ForegroundColor Green
 Write-Host " Build Complete! " -ForegroundColor Green
-Write-Host " Output available at: $DistDir\FujitechLiveStudio" -ForegroundColor Green
+Write-Host " Output available at: $DistDir\AutotechLiveStudio" -ForegroundColor Green
 Write-Host "=========================================" -ForegroundColor Green
 
 Write-Host "`nTo prepare a pilot machine, you must also provide FFmpeg and MediaMTX binaries" -ForegroundColor Yellow

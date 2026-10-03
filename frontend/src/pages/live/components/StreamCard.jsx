@@ -6,7 +6,7 @@ import LiveStatusBadge from './LiveStatusBadge'
 
 const { Text, Title } = Typography
 
-export default function StreamCard({ session, onStart, onStop, onDelete, onClick }) {
+export default function StreamCard({ session, onStart, onStop, onDelete, onEdit, onClick }) {
   const navigate = useNavigate()
   const [isDeleting, setIsDeleting] = useState(false)
   
@@ -20,8 +20,8 @@ export default function StreamCard({ session, onStart, onStop, onDelete, onClick
     created_at
   } = session
 
-  const isRunning = status === 'running'
-  const isReady = status === 'ready' || status === 'draft'
+  const isRunning = status === 'running' || status === 'human_takeover'
+  const isReady = ['ready', 'draft', 'stopped', 'error'].includes(status)
   const isDeletable = ['draft', 'stopped', 'error'].includes(status)
 
   const handleDeleteClick = (e) => {
@@ -45,6 +45,19 @@ export default function StreamCard({ session, onStart, onStop, onDelete, onClick
   }
 
   const menuItems = [
+    {
+      key: 'edit',
+      label: 'Chỉnh sửa',
+      icon: <ApiOutlined />,
+      disabled: !isDeletable, // Only allow edit when stopped/draft/error
+      onClick: (e) => {
+        if (e.domEvent) e.domEvent.stopPropagation()
+        if (onEdit) onEdit(session)
+      }
+    },
+    {
+      type: 'divider',
+    },
     {
       key: 'delete',
       label: 'Xóa phiên',

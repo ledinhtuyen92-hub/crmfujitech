@@ -12,6 +12,7 @@ export default function LiveSessionsList() {
   
   // Create Form State
   const [createVisible, setCreateVisible] = useState(false)
+  const [editSession, setEditSession] = useState(null)
   const [form] = Form.useForm()
   const [submitting, setSubmitting] = useState(false)
   
@@ -71,7 +72,8 @@ export default function LiveSessionsList() {
       message.success(`Đã gửi lệnh ${action} thành công`)
       fetchSessions()
     } catch (err) {
-      message.error(`Lỗi khi thực hiện lệnh ${action}`)
+      const errorDetail = err.response?.data?.detail || err.response?.data?.error || `Lỗi khi thực hiện lệnh ${action}`
+      message.error(errorDetail)
     }
   }
 
@@ -87,6 +89,33 @@ export default function LiveSessionsList() {
         message.error('Lỗi khi xóa phiên livestream')
       }
     }
+  }
+
+  const handleEdit = (session) => {
+    setEditSession(session)
+    form.setFieldsValue({
+      device: session.device,
+      product: session.product,
+      ai_agent: session.ai_agent,
+      platform: session.platform,
+      shopee_connection_mode: session.shopee_connection_mode,
+      tiktok_connection_mode: session.tiktok_connection_mode,
+    })
+    
+    // Parse stream_url into server_url and stream_key for manual RTMP modes
+    if (session.stream_url) {
+       const lastSlash = session.stream_url.lastIndexOf('/')
+       if (lastSlash !== -1) {
+          form.setFieldsValue({
+            server_url: session.stream_url.substring(0, lastSlash),
+            stream_key: session.stream_url.substring(lastSlash + 1)
+          })
+       } else {
+          form.setFieldsValue({ stream_key: session.stream_url })
+       }
+    }
+    
+    setCreateVisible(true)
   }
 
   const handleCreate = async () => {
@@ -106,9 +135,16 @@ export default function LiveSessionsList() {
         payload.tiktok_connection_mode = values.tiktok_connection_mode || 'manual_rtmp'
       }
       
-      await api.post('/live_sessions/sessions/', payload)
-      message.success('Đã tạo phiên Livestream thành công')
+      if (editSession) {
+        await api.patch(`/live_sessions/sessions/${editSession.id}/`, payload)
+        message.success('Đã cập nhật phiên Livestream thành công')
+      } else {
+        await api.post('/live_sessions/sessions/', payload)
+        message.success('Đã tạo phiên Livestream thành công')
+      }
+      
       setCreateVisible(false)
+      setEditSession(null)
       form.resetFields()
       fetchSessions()
     } catch (err) {
@@ -128,7 +164,11 @@ export default function LiveSessionsList() {
         </div>
         <Space>
           <Button icon={<SyncOutlined />} onClick={fetchSessions}>Làm mới</Button>
-          <Button type="primary" style={{ backgroundColor: '#1649c9' }} icon={<PlusOutlined />} onClick={() => setCreateVisible(true)}>Tạo phiên mới</Button>
+          <Button type="primary" style={{ backgroundColor: '#1649c9' }} icon={<PlusOutlined />} onClick={() => {
+            setEditSession(null)
+            form.resetFields()
+            setCreateVisible(true)
+          }}>Tạo phiên mới</Button>
         </Space>
       </div>
 
@@ -146,6 +186,7 @@ export default function LiveSessionsList() {
                   onStart={(id) => handleAction(id, 'start')}
                   onStop={(id) => handleAction(id, 'stop')}
                   onDelete={handleDelete}
+                  onEdit={handleEdit}
                 />
               </Col>
             ))}
@@ -154,14 +195,24 @@ export default function LiveSessionsList() {
       </Spin>
 
       <Drawer
-        title="Tạo Phiên Livestream Mới"
+        title={editSession ? "Chỉnh Sửa Phiên Livestream" : "Tạo Phiên Livestream Mới"}
         width={600}
-        onClose={() => setCreateVisible(false)}
+        onClose={() => {
+          setCreateVisible(false)
+          setEditSession(null)
+          form.resetFields()
+        }}
         open={createVisible}
         extra={
           <Space>
-            <Button onClick={() => setCreateVisible(false)}>Hủy</Button>
-            <Button type="primary" style={{ backgroundColor: '#1649c9' }} onClick={handleCreate} loading={submitting}>Tạo Phiên</Button>
+            <Button onClick={() => {
+              setCreateVisible(false)
+              setEditSession(null)
+              form.resetFields()
+            }}>Hủy</Button>
+            <Button type="primary" style={{ backgroundColor: '#1649c9' }} onClick={handleCreate} loading={submitting}>
+              {editSession ? "Lưu Thay Đổi" : "Tạo Phiên"}
+            </Button>
           </Space>
         }
       >
@@ -169,7 +220,14 @@ export default function LiveSessionsList() {
           <Card size="small" title="Cấu hình Nội dung" style={{ marginBottom: 24, borderRadius: 8 }}>
             <Form.Item name="device" label="Máy chủ phát sóng (Live Studio Device)" rules={[{ required: true }]}>
               <Select placeholder="Chọn máy chủ Windows">
-                {deps.devices.map(d => <Select.Option key={d.id} value={d.id}>{d.name}</Select.Option>)}
+                {deps.devices.map(d => (
+                  <Select.Option key={d.id} value={d.id}>
+                    <Space>
+                      <div style={{ width: 8, height: 8, borderRadius: '50%', backgroundColor: d.is_online ? '#52c41a' : '#f5222d' }} />
+                      {d.name} {d.is_online ? '(Đang bật)' : '(Đang tắt)'}
+                    </Space>
+                  </Select.Option>
+                ))}
               </Select>
             </Form.Item>
             <Form.Item name="product" label="Sản phẩm trung tâm" rules={[{ required: true }]}>

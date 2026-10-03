@@ -74,9 +74,9 @@ class PygameAvatarRenderer(BaseAvatarRenderer):
             self.font_subtitle = None
             self.font_cta = None
             
-        # Create a window suitable for OBS capture or internal frame extraction
-        self.screen = self.pygame.display.set_mode((self.width, self.height))
-        self.pygame.display.set_caption("Fujitech AI Live Studio (Scene Composition)")
+        # Create a hidden window for internal frame extraction (rendering without popping up)
+        self.screen = self.pygame.display.set_mode((self.width, self.height), self.pygame.HIDDEN)
+        self.pygame.display.set_caption("Fujitech AI Live Studio (Background Renderer)")
         self.clock = self.pygame.time.Clock()
         
     def render(self, is_speaking: bool, mouth_state: str, is_blinking: bool):

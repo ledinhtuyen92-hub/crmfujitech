@@ -166,16 +166,19 @@ class DeviceAgentConsumer(AsyncWebsocketConsumer):
             )
         elif msg_type == 'event' and msg_name == 'stream.status':
             state = payload.get('state')
+            hls_url = payload.get('hls_url', '')
             updates = {
                 'stream_state': state
             }
+            if hls_url:
+                updates['hls_url'] = hls_url
             await database_sync_to_async(LiveContextService.update_context)(
                 self.session.company_id, self.session_id, updates
             )
             await database_sync_to_async(LiveConsoleEventService.emit)(
                 session_id=self.session_id,
                 event_type="live.stream.status",
-                payload={"state": state},
+                payload={"state": state, "hls_url": hls_url},
                 correlation_id=envelope['message_id']
             )
         elif msg_type == 'command' and msg_name == 'session.sync':

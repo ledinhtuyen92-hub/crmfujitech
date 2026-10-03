@@ -151,8 +151,8 @@ export default function LiveStudioBeta() {
         <LiveStatusBadge status={status} />
         <Divider type="vertical" />
 
-        {/* draft, ready → Bắt đầu LIVE */}
-        {['draft', 'ready'].includes(status) && (
+        {/* draft, ready, stopped, error → Bắt đầu LIVE */}
+        {['draft', 'ready', 'stopped', 'error'].includes(status) && (
           <Popconfirm
             title="Bắt đầu phiên Livestream?"
             okText="Bắt đầu"
@@ -220,8 +220,8 @@ export default function LiveStudioBeta() {
           </Button>
         )}
 
-        {/* running, paused, human_takeover, error → Dừng LIVE (destructive) */}
-        {['running', 'paused', 'human_takeover', 'error'].includes(status) && (
+        {/* running, paused, human_takeover → Dừng LIVE (destructive) */}
+        {['running', 'paused', 'human_takeover'].includes(status) && (
           <Popconfirm
             title={
               <div style={{ maxWidth: 280 }}>
@@ -312,7 +312,7 @@ export default function LiveStudioBeta() {
       <Row gutter={[16, 16]} style={{ flex: 1, minHeight: 600 }}>
         {/* Left Column: Video Preview */}
         <Col xs={24} lg={8} style={{ display: 'flex', flexDirection: 'column' }}>
-          <VideoPreview session={session} />
+          <VideoPreview session={session} streamEvent={lastEvent} />
         </Col>
 
         {/* Center Column: AI Timeline */}
