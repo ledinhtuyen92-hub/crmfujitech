@@ -54,6 +54,7 @@ pyinstaller --name "FujitechLiveStudio" `
             --clean `
             --noconfirm `
             --onedir `
+            --noconsole `
             --icon=NONE `
             --hidden-import "pygame" `
             --hidden-import "websockets" `
