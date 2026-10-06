@@ -95,23 +95,20 @@ export function AuthProvider({ children }) {
   const hasPermission = useCallback(
     (permissionCode) => {
       if (!user) return false
-      
+
       const firstCode = Array.isArray(permissionCode) ? permissionCode[0] : permissionCode
       const moduleCode = firstCode.split('.')[0]
       const coreModules = ['dashboard', 'settings', 'reports']
-      
+
       // Nếu không phải module cốt lõi, bắt buộc module đó phải đang được kích hoạt
       if (!coreModules.includes(moduleCode) && !isModuleActive(moduleCode)) {
         return false
       }
 
-      if (user.is_superuser || user.is_company_admin) {
-        if (Array.isArray(permissionCode)) {
-          if (permissionCode.some(code => code.startsWith('settings.'))) return true
-        } else {
-          if (permissionCode.startsWith('settings.')) return true
-        }
-      }
+      // Chỉ superuser hệ thống (SaaS level) mới bypass toàn bộ quyền
+      if (user.is_superuser) return true
+
+      // Tất cả user còn lại (kể cả company admin) kiểm tra ĐÚNG theo role permissions
       if (Array.isArray(permissionCode)) {
         return permissionCode.some(code => (user.permissions || []).includes(code))
       }

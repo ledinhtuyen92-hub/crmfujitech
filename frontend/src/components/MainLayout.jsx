@@ -169,7 +169,7 @@ function MainLayout({ children, isDarkMode, toggleTheme }) {
           icon: <NotificationOutlined />,
           label: <Link to="/announcements">Thông báo nội bộ {unreadAnnouncementsCount > 0 && <Badge count={unreadAnnouncementsCount} style={{ marginLeft: 8 }} />}</Link>,
         }] : []),
-        ...(isModuleActive('approvals') ? [{
+        ...(isModuleActive('approvals') && hasPermission(['approvals.approve', 'approvals.delete']) ? [{
           key: '/approvals',
           icon: <CheckCircleOutlined />,
           label: <Link to="/approvals">Phê duyệt {pendingApprovalCount > 0 && <Badge count={pendingApprovalCount} style={{ marginLeft: 8 }} />}</Link>,
