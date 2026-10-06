@@ -29,8 +29,8 @@ class LiveConsoleEventService:
             "event_type": event_type,
             "timestamp": timezone.now().isoformat(),
             "session_id": str(session_id),
-            "message_id": message_id or str(uuid.uuid4()),
-            "correlation_id": correlation_id,
+            "message_id": str(message_id) if message_id else str(uuid.uuid4()),
+            "correlation_id": str(correlation_id) if correlation_id else None,
             "payload": payload
         }
         
@@ -44,3 +44,35 @@ class LiveConsoleEventService:
             )
         except Exception as e:
             logger.error(f"[ConsoleEventService] Failed to emit event {event_type} for session {session_id}: {e}")
+
+    @staticmethod
+    async def aemit(session_id: str, event_type: str, payload: Dict[str, Any], correlation_id: str = None, message_id: str = None):
+        """
+        Async version of emit.
+        """
+        channel_layer = get_channel_layer()
+        if not channel_layer:
+            return
+
+        group_name = f"live_session_{session_id}_admin"
+        
+        envelope = {
+            "event_version": "1.0",
+            "event_type": event_type,
+            "timestamp": timezone.now().isoformat(),
+            "session_id": str(session_id),
+            "message_id": str(message_id) if message_id else str(uuid.uuid4()),
+            "correlation_id": str(correlation_id) if correlation_id else None,
+            "payload": payload
+        }
+        
+        try:
+            await channel_layer.group_send(
+                group_name,
+                {
+                    "type": "admin.event",
+                    "envelope": envelope
+                }
+            )
+        except Exception as e:
+            logger.error(f"[ConsoleEventService] Failed to emit async event {event_type} for session {session_id}: {e}")

@@ -122,7 +122,9 @@ export default function LiveStudioBeta() {
     if (actionLoading) return
     try {
       setActionLoading(true)
-      await api.post(`/live_sessions/sessions/${id}/${action}/`)
+      const [path, query] = action.split('?')
+      const url = query ? `/live_sessions/sessions/${id}/${path}/?${query}` : `/live_sessions/sessions/${id}/${path}/`
+      await api.post(url)
       // REST 200 only means the command was accepted — NOT that the state changed.
       // The live.session.status_changed WS event is the real confirmation.
       message.info('Đã gửi lệnh — đang chờ xác nhận...')
@@ -144,7 +146,6 @@ export default function LiveStudioBeta() {
   // ── Control bar — derived strictly from backend state ─────────────────────
   // Only show controls for transitions the backend will accept.
   const renderControls = () => {
-    if (status === 'stopped') return null
 
     return (
       <Space wrap>
@@ -154,7 +155,7 @@ export default function LiveStudioBeta() {
         {/* draft, ready, stopped, error → Bắt đầu LIVE */}
         {['draft', 'ready', 'stopped', 'error'].includes(status) && (
           <Popconfirm
-            title="Bắt đầu phiên Livestream?"
+            title="Bắt đầu phiên Livestream thật (Phát lên Shopee)?"
             okText="Bắt đầu"
             cancelText="Huỷ"
             onConfirm={() => handleAction('start')}
@@ -167,6 +168,26 @@ export default function LiveStudioBeta() {
               id="btn-start-live"
             >
               Bắt đầu LIVE
+            </Button>
+          </Popconfirm>
+        )}
+
+        {/* draft, ready, stopped, error → Chạy thử (Dry Run) */}
+        {['draft', 'ready', 'stopped', 'error'].includes(status) && (
+          <Popconfirm
+            title="Chạy thử nghiệm AI (Preview) mà không phát sóng ra ngoài?"
+            okText="Chạy thử"
+            cancelText="Huỷ"
+            onConfirm={() => handleAction('start?test_mode=1')}
+            disabled={actionLoading}
+          >
+            <Button
+              loading={actionLoading}
+              icon={<PlayCircleOutlined />}
+              id="btn-dry-run"
+              style={{ color: '#fa8c16', borderColor: '#fa8c16' }}
+            >
+              Chạy thử nghiệm (Dry Run)
             </Button>
           </Popconfirm>
         )}
@@ -226,14 +247,14 @@ export default function LiveStudioBeta() {
             title={
               <div style={{ maxWidth: 280 }}>
                 <div style={{ fontWeight: 600, marginBottom: 4 }}>
-                  Bạn có chắc chắn muốn kết thúc phiên Live?
+                  Bạn có muốn dừng phát luồng video?
                 </div>
                 <div style={{ color: '#8c8c8c', fontSize: 12 }}>
-                  Hành động này không thể hoàn tác. Phiên sẽ bị kết thúc vĩnh viễn.
+                  Bạn có thể bắt đầu lại (hoặc phát thật) sau khi dừng.
                 </div>
               </div>
             }
-            okText="Dừng LIVE"
+            okText="Dừng luồng"
             okButtonProps={{ danger: true }}
             cancelText="Huỷ"
             onConfirm={() => handleAction('stop')}
@@ -245,7 +266,7 @@ export default function LiveStudioBeta() {
               icon={<PoweroffOutlined />}
               id="btn-stop-live"
             >
-              Dừng LIVE
+              Dừng luồng
             </Button>
           </Popconfirm>
         )}
@@ -282,10 +303,10 @@ export default function LiveStudioBeta() {
     if (status === 'stopped') {
       return (
         <Alert
-          type="error"
+          type="info"
           showIcon
-          message="Phiên Live đã kết thúc."
-          description="Phiên này không thể được khởi động lại. Tạo một phiên mới để bắt đầu lại."
+          message="Phiên Live đang tắt luồng."
+          description="Bạn có thể bắt đầu phiên Live thật hoặc tiếp tục chạy thử nghiệm bất cứ lúc nào."
           style={{ marginBottom: 24, borderRadius: 10 }}
         />
       )

@@ -30,28 +30,37 @@ class LiveOrchestrator:
         self.audio_storage = LocalAudioStorageBackend()
         self.channel_layer = get_channel_layer()
 
-    def dispatch_stream_start(self, session_id: str) -> Dict[str, Any]:
-        logger.info(f"[Session: {session_id}] Dispatching stream.start")
+    def dispatch_stream_start(self, session_id: str, test_mode: bool = False) -> Dict[str, Any]:
+        logger.info(f"[Session: {session_id}] Dispatching stream.start (test_mode={test_mode})")
         try:
             session = LiveSession.objects.select_related('company', 'device').get(id=session_id)
         except LiveSession.DoesNotExist:
             return {"status": "error", "reason": "session_not_found"}
 
-        # Phase 1E-8: Use StreamProvider to obtain stream_url and platform-specific config.
-        # This supports both Shopee API mode (create_session -> push_url)
-        # and Manual RTMP mode (reads session.stream_url directly).
-        from live_sessions.stream_providers import get_stream_provider
-        from live_sessions.platforms.exceptions import PlatformAPIError, PlatformAuthError
+        if test_mode:
+            stream_target = {
+                "stream_url": "test_mode",
+                "width": 720,
+                "height": 1280,
+                "fps": 30,
+                "video_codec": "libx264",
+                "bitrate": "2500k",
+                "audio_sample_rate": 44100,
+                "audio_channels": 2
+            }
+        else:
+            from live_sessions.stream_providers import get_stream_provider
+            from live_sessions.platforms.exceptions import PlatformAPIError, PlatformAuthError
 
-        try:
-            provider = get_stream_provider(session)
-            stream_target = provider.get_stream_target(session)
-        except (PlatformAPIError, PlatformAuthError) as e:
-            logger.error(f"[Session: {session_id}] StreamProvider error: {e}")
-            return {"status": "error", "reason": f"stream_provider_error: {e}"}
-        except Exception as e:
-            logger.error(f"[Session: {session_id}] Unexpected StreamProvider error: {e}")
-            return {"status": "error", "reason": "stream_provider_error"}
+            try:
+                provider = get_stream_provider(session)
+                stream_target = provider.get_stream_target(session)
+            except (PlatformAPIError, PlatformAuthError) as e:
+                logger.error(f"[Session: {session_id}] StreamProvider error: {e}")
+                return {"status": "error", "reason": f"stream_provider_error: {e}"}
+            except Exception as e:
+                logger.error(f"[Session: {session_id}] Unexpected StreamProvider error: {e}")
+                return {"status": "error", "reason": "stream_provider_error"}
 
         stream_url = stream_target.get("stream_url")
         if not stream_url:

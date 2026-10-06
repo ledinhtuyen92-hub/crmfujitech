@@ -262,7 +262,7 @@ rtspAuthMethods: [basic]
 # Enable publishing and reading streams with the RTMP protocol.
 rtmp: yes
 # Address of the RTMP listener. This is needed only when encryption is "no" or "optional".
-rtmpAddress: :11935
+rtmpAddress: :1935
 # Encrypt connections with TLS (RTMPS).
 # Available values are "no", "strict", "optional".
 rtmpEncryption: "no"

@@ -59,6 +59,14 @@ if _extra_csrf:
 USE_X_FORWARDED_HOST = True
 SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
 
+# ── MediaMTX Settings ─────────────────────────────────────────────────────
+# When running on VPS, MediaMTX should run on the VPS itself.
+# Set MEDIAMTX_SERVER_URL in .env to the VPS's MediaMTX base URL.
+# Example (VPS): MEDIAMTX_SERVER_URL=http://your-vps-ip:8888
+# Example (local dev): leave empty or set to http://127.0.0.1:8888
+MEDIAMTX_SERVER_URL = env.str('MEDIAMTX_SERVER_URL', default='http://127.0.0.1:8888')
+MEDIAMTX_RTMP_URL = env.str('MEDIAMTX_RTMP_URL', default='rtmp://127.0.0.1:1935/live')
+
 
 # Application definition
 

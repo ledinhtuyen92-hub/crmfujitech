@@ -31,7 +31,7 @@ class AckManager:
         envelope = {
             "protocol_version": "1.0",
             "type": "ack",
-            "name": "ack",
+            "name": "command.ack",
             "message_id": str(uuid.uuid4()),
             "timestamp": datetime.datetime.now(datetime.timezone.utc).isoformat(),
             "sequence_number": seq_num,

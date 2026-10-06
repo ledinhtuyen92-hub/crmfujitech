@@ -165,7 +165,7 @@ class ProtocolDispatcher:
         seq_num = envelope.get("sequence_number")
         msg_id = envelope.get("message_id")
         
-        if not cmd_id or not payload_data.get("stream_url"):
+        if not cmd_id:
             return
             
         dedup_state = self.dedup_registry.register_or_get(cmd_id, ACK_RECEIVED, seq_num)

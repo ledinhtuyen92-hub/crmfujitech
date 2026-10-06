@@ -41,7 +41,7 @@ class DeviceAgentConsumer(AsyncWebsocketConsumer):
             await self.close(code=4003)
             return
 
-        if self.session.status in ['stopped', 'error']:
+        if self.session.status in ['error']:
             logger.warning(f"Device WS rejected: Session {self.session_id} is in terminal state ({self.session.status}).")
             await self.close(code=4004)
             return
@@ -158,13 +158,13 @@ class DeviceAgentConsumer(AsyncWebsocketConsumer):
                 'execution_state': payload.get('execution_state'),
                 'capabilities_version': payload.get('capabilities_version')
             }
-            await database_sync_to_async(LiveConsoleEventService.emit)(
+            await LiveConsoleEventService.aemit(
                 session_id=self.session_id,
                 event_type="live.device.heartbeat",
                 payload=safe_payload,
                 correlation_id=envelope['message_id']
             )
-        elif msg_type == 'event' and msg_name == 'stream.status':
+        elif msg_type == 'event' and msg_name in ('stream.status', 'live.stream.status'):
             state = payload.get('state')
             hls_url = payload.get('hls_url', '')
             updates = {
@@ -175,10 +175,21 @@ class DeviceAgentConsumer(AsyncWebsocketConsumer):
             await database_sync_to_async(LiveContextService.update_context)(
                 self.session.company_id, self.session_id, updates
             )
-            await database_sync_to_async(LiveConsoleEventService.emit)(
+            
+            # Rewrite the device-local HLS URL to a backend proxy URL
+            # so the browser can access the stream without direct device access
+            proxy_hls_url = hls_url
+            if hls_url and ('127.0.0.1' in hls_url or 'localhost' in hls_url):
+                from urllib.parse import urlparse
+                parsed = urlparse(hls_url)
+                # Extract path: /live/index.m3u8 -> live/index.m3u8
+                path = parsed.path.lstrip('/')
+                proxy_hls_url = f"/api/live_sessions/sessions/{self.session_id}/hls-proxy/{path}"
+            
+            await LiveConsoleEventService.aemit(
                 session_id=self.session_id,
                 event_type="live.stream.status",
-                payload={"state": state, "hls_url": hls_url},
+                payload={"state": state, "hls_url": proxy_hls_url},
                 correlation_id=envelope['message_id']
             )
         elif msg_type == 'command' and msg_name == 'session.sync':

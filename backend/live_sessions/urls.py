@@ -18,4 +18,5 @@ urlpatterns = [
     path('platforms/shopee/callback/', ShopeeCallbackView.as_view(), name='shopee-callback'),
     path('platforms/shopee/products/', ShopeeProductListView.as_view(), name='shopee-products'),
     path('platforms/shopee/mapping/', ShopeeProductMappingView.as_view(), name='shopee-mapping'),
+    path('sessions/<str:pk>/hls-proxy/<path:hls_path>', LiveSessionViewSet.as_view({'get': 'hls_proxy_custom'}), name='session-hls-proxy'),
 ] + router.urls

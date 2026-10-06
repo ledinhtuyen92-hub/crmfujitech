@@ -130,6 +130,7 @@ class LiveSessionViewSet(viewsets.ModelViewSet):
         'resume': 'ai_agent.manage_agents',
         'test_comment': 'ai_agent.manage_agents',
         'setup_manual_rtmp': 'ai_agent.manage_agents',
+        'hls_proxy': 'ai_agent.manage_agents',
     }
 
     def get_queryset(self):
@@ -173,7 +174,8 @@ class LiveSessionViewSet(viewsets.ModelViewSet):
                 session.change_status(LiveSession.STATUS_RUNNING)
                 
             orchestrator = LiveOrchestrator()
-            result = orchestrator.dispatch_stream_start(str(session.id))
+            test_mode = request.data.get('test_mode') is True or request.query_params.get('test_mode') == '1'
+            result = orchestrator.dispatch_stream_start(str(session.id), test_mode=test_mode)
             
             # If dispatch failed synchronously (e.g. invalid stream URL)
             if result.get("status") in ["error", "failed"]:
@@ -246,7 +248,100 @@ class LiveSessionViewSet(viewsets.ModelViewSet):
         session.change_status(LiveSession.STATUS_RUNNING)
         result = LiveOrchestrator().dispatch_session_control(str(session.id), "resume")
         return Response({'status': session.status, 'dispatch': result})
+
+    # Custom route defined in urls.py to avoid trailing slash enforcement
+    def hls_proxy_custom(self, request, pk=None, hls_path=None):
+        """
+        Proxy HLS stream from device's local MediaMTX to the browser.
+        The device streams RTMP to the MediaMTX server (local dev: 127.0.0.1:1935, VPS: configured via MEDIAMTX_RTMP_URL).
+        MediaMTX converts to HLS at MEDIAMTX_SERVER_URL.
+        This endpoint fetches the HLS content from MediaMTX and relays it to the browser.
         
+        URL: /api/live_sessions/sessions/<session_id>/hls-proxy/<hls_path>/
+        e.g. /api/live_sessions/sessions/<id>/hls-proxy/live/index.m3u8
+        """
+        import requests as http_client
+        from django.http import HttpResponse, Http404
+        from django.conf import settings
+        from .models import LiveSession
+        
+        try:
+            session = LiveSession.objects.get(pk=pk)
+        except LiveSession.DoesNotExist:
+            raise Http404('Session not found.')
+        
+        # Check there's an active stream for this session
+        context = LiveContextService.get_context(session.company_id, session.id)
+        stream_state = context.get('stream_state', '')
+        
+        if stream_state not in ('LIVE', 'playing', 'STARTING'):
+            raise Http404('No active HLS stream for this session.')
+        
+        # DRF's DefaultRouter might strip suffixes like .ts into a format kwarg.
+        # To be safe, we extract the exact path after 'hls-proxy/' from the raw URL.
+        raw_path = request.path
+        if '/hls-proxy/' in raw_path:
+            hls_path = raw_path.split('/hls-proxy/')[-1]
+            # Strip trailing slash if any, to avoid 404s on MediaMTX
+            hls_path = hls_path.rstrip('/')
+
+        # Use the configured MediaMTX server URL (works for both local and VPS)
+        mediamtx_base = getattr(settings, 'MEDIAMTX_SERVER_URL', 'http://127.0.0.1:8888').rstrip('/')
+        upstream_url = f"{mediamtx_base}/{hls_path}"
+        
+        try:
+            import time
+            max_retries = 5 if hls_path.endswith('.m3u8') else 1
+            for attempt in range(max_retries):
+                resp = http_client.get(upstream_url, timeout=10, stream=True)
+                if resp.status_code == 404 and attempt < max_retries - 1:
+                    time.sleep(1.5)
+                    continue
+                break
+            
+            content_type = resp.headers.get('Content-Type', 'application/vnd.apple.mpegurl')
+            
+            if resp.status_code == 404:
+                raise Http404('HLS segment not found on MediaMTX.')
+            
+            # For m3u8 playlists, rewrite the segment URLs to point to this proxy
+            if 'mpegurl' in content_type or hls_path.endswith('.m3u8'):
+                content = resp.text
+                session_id_str = str(session.id)
+                proxy_base = f"/api/live_sessions/sessions/{session_id_str}/hls-proxy"
+                
+                def rewrite_line(line):
+                    line = line.strip()
+                    if line and not line.startswith('#'):
+                        if not line.startswith('http'):
+                            path_dir = '/'.join(hls_path.split('/')[:-1])
+                            full_path = f"{path_dir}/{line}" if path_dir else line
+                            # Do NOT add a trailing slash to the segment URL!
+                            return f"{proxy_base}/{full_path}"
+                        else:
+                            return line
+                    return line
+                
+                rewritten = '\n'.join(rewrite_line(line) for line in content.splitlines())
+                
+                response = HttpResponse(rewritten, content_type='application/vnd.apple.mpegurl')
+                response['Access-Control-Allow-Origin'] = '*'
+                response['Cache-Control'] = 'no-cache'
+                return response
+            else:
+                # Binary content (TS segments)
+                response = HttpResponse(resp.content, content_type=content_type)
+                response['Access-Control-Allow-Origin'] = '*'
+                response['Cache-Control'] = 'no-cache'
+                return response
+                
+        except Http404:
+            raise
+        except Exception as e:
+            import logging
+            logging.getLogger(__name__).error(f'HLS proxy error for {upstream_url}: {e}')
+            return HttpResponse(status=502, content=f'HLS proxy error: {e}')
+
     @action(detail=True, methods=['post'], url_path='test-comment')
     def test_comment(self, request, pk=None):
         session = self.get_object()

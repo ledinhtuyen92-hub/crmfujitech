@@ -47,7 +47,12 @@ class StreamController:
         if self._state != value:
             self._state = value
             if self.on_state_change:
-                asyncio.create_task(self.on_state_change(value))
+                async def _wrap():
+                    try:
+                        await self.on_state_change(value)
+                    except Exception as e:
+                        logger.error(f"Error in on_state_change: {e}")
+                asyncio.create_task(_wrap())
 
     async def _on_audio_data(self, data: bytes):
         if self.state == StreamState.LIVE and self.encoder:
@@ -80,7 +85,7 @@ class StreamController:
             return False
             
         try:
-            target = RtmpStreamTarget(payload.stream_url)
+            target = None if not payload.stream_url or payload.stream_url == "test_mode" else RtmpStreamTarget(payload.stream_url)
         except ValueError as e:
             logger.error(f"Invalid RTMP URL: {e}")
             self.state = StreamState.ERROR
@@ -90,7 +95,8 @@ class StreamController:
         self._current_target = target
         self.retry_count = 0
         
-        logger.info(f"stream_start requested. target={target.get_safe_log_metadata()} resolution={payload.width}x{payload.height} fps={payload.fps}")
+        target_log = target.get_safe_log_metadata() if target else "test_mode_local_only"
+        logger.info(f"stream_start requested. target={target_log} resolution={payload.width}x{payload.height} fps={payload.fps}")
         
         return await self._start_internal()
 
@@ -119,7 +125,7 @@ class StreamController:
             from live_studio.execution.mediamtx_manager import MEDIAMTX_LOCAL_RTMP_URL
             output_url = MEDIAMTX_LOCAL_RTMP_URL
         except ImportError:
-            output_url = self._current_target.get_full_url()
+            output_url = self._current_target.get_full_url() if self._current_target else "rtmp://127.0.0.1:1935/live"
         
         self.encoder = StreamEncoder(config, ffmpeg_path, output_url)
         try:

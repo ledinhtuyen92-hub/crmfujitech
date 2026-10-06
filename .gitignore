@@ -37,3 +37,21 @@ crop*.ps1
 
 # Ignore large binaries
 live_studio/bin/*.exe
+
+# Live Studio builds and configs
+live_studio/build/
+live_studio/dist/
+live_studio/config.json
+live_studio/server_config.txt
+mediamtx.log
+mediamtx.err
+mediamtx.yml
+test_config.yml
+test_frame.png
+test_pygame.py
+test_seg.ts
+test_seg_frame.png
+session_credentials*.txt
+ascii.py
+live_studio/bin/ffmpeg/
+live_studio/bin/mediamtx/mediamtx.exe

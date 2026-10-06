@@ -207,6 +207,7 @@ class StudioLauncher(ctk.CTk):
 
     def on_login_success(self):
         self.show_success("Đăng nhập thành công!")
+        self.status_label.configure(text="")
         self.workspace_entry.pack_forget()
         self.username_entry.pack_forget()
         self.password_entry.pack_forget()
@@ -391,11 +392,28 @@ class StudioLauncher(ctk.CTk):
             self.after(0, lambda: self.connect_btn.configure(state="normal", text="Kết Nối & Bắt Đầu"))
 
     def _start_engine(self, config):
+        self.status_label.configure(text="")
         self.selection_frame.pack_forget()
         self.dashboard_frame.pack(fill="both", expand=True, padx=20, pady=10)
         self.dashboard_spinner.start()
         
         # Start async engine
         def run_async():
-            asyncio.run(self.on_connect_callback(config))
+            import traceback
+            try:
+                asyncio.run(self.on_connect_callback(config))
+            except Exception as e:
+                err_msg = traceback.format_exc()
+                logger.error(f"Engine crashed: {err_msg}")
+                # Show error on GUI thread
+                self.after(0, lambda: self._on_engine_crashed(err_msg))
+
         threading.Thread(target=run_async, daemon=True).start()
+
+    def _on_engine_crashed(self, err_msg):
+        self.dashboard_frame.pack_forget()
+        self.selection_frame.pack(fill="both", expand=True, padx=20, pady=20)
+        # Show first 300 chars of the traceback
+        short = err_msg[-400:] if len(err_msg) > 400 else err_msg
+        self.show_error(f"Lỗi khởi động engine:\n{short}")
+        self.connect_btn.configure(state="normal", text="Kết Nối & Bắt Đầu")

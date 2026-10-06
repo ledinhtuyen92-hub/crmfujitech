@@ -1,4 +1,4 @@
-﻿import React, { useState, useEffect, useRef } from 'react'
+import React, { useState, useEffect, useRef } from 'react'
 import { Card, Typography } from 'antd'
 import { VideoCameraOutlined, WifiOutlined, LoadingOutlined } from '@ant-design/icons'
 
@@ -16,12 +16,12 @@ export default function VideoPreview({ session, streamEvent }) {
   useEffect(() => {
     if (!streamEvent) return
     if (streamEvent.event_type === 'live.stream.status') {
-      const state = streamEvent.payload?.state
-      const url = streamEvent.payload?.hls_url
-      if (state === 'LIVE' && url) {
+      const state = streamEvent.payload?.stream_state || streamEvent.payload?.state
+      const url = streamEvent.payload?.hls_url || streamEvent.payload?.url
+      if ((state === 'playing' || state === 'LIVE') && url) {
         setHlsUrl(url)
         setHlsStatus('loading')
-      } else if (state === 'STOPPED' || state === 'IDLE' || state === 'ERROR') {
+      } else if (state === 'STOPPED' || state === 'IDLE' || state === 'ERROR' || state === 'stopped') {
         setHlsUrl(null)
         setHlsStatus('idle')
         if (hlsRef.current) { hlsRef.current.destroy(); hlsRef.current = null }
@@ -34,26 +34,61 @@ export default function VideoPreview({ session, streamEvent }) {
     if (!hlsUrl || !videoRef.current) return
     const video = videoRef.current
 
+    // Convert relative proxy URL to absolute
+    let absoluteUrl = hlsUrl
+    if (hlsUrl.startsWith('/api/')) {
+      const baseUrl = (import.meta.env.VITE_API_URL || 'http://localhost:8000/api/').replace(/\/api\/?$/, '')
+      absoluteUrl = `${baseUrl}${hlsUrl}`
+    } else if (hlsUrl.startsWith('/')) {
+      absoluteUrl = `${window.location.protocol}//${window.location.host}${hlsUrl}`
+    }
+
+    // Get auth token for proxy
+    const token = localStorage.getItem('accessToken') || sessionStorage.getItem('accessToken') || ''
+
     // Native HLS support (Safari)
     if (video.canPlayType('application/vnd.apple.mpegurl')) {
-      video.src = hlsUrl
-      video.play().then(() => setHlsStatus('live')).catch(() => setHlsStatus('error'))
+      video.src = absoluteUrl
+      video.play().then(() => setHlsStatus('live')).catch((e) => {
+        console.warn('Native autoplay prevented:', e)
+        setHlsStatus('live')
+      })
       return
     }
 
-    // HLS.js for Chrome/Firefox
+    // HLS.js for Chrome/Firefox with auth headers
     import('hls.js').then(({ default: Hls }) => {
       if (!Hls.isSupported()) { setHlsStatus('error'); return }
       if (hlsRef.current) hlsRef.current.destroy()
-      const hls = new Hls({ lowLatencyMode: true, maxLiveSyncPlaybackRate: 1.5 })
+      const hls = new Hls({
+        lowLatencyMode: true,
+        maxLiveSyncPlaybackRate: 1.5,
+        xhrSetup: (xhr) => {
+          if (token) xhr.setRequestHeader('Authorization', `Bearer ${token}`)
+        }
+      })
       hlsRef.current = hls
-      hls.loadSource(hlsUrl)
+      hls.loadSource(absoluteUrl)
       hls.attachMedia(video)
       hls.on(Hls.Events.MANIFEST_PARSED, () => {
-        video.play().then(() => setHlsStatus('live')).catch(() => setHlsStatus('error'))
+        video.play().then(() => setHlsStatus('live')).catch((e) => {
+          console.warn('Autoplay prevented:', e)
+          setHlsStatus('live')
+        })
       })
       hls.on(Hls.Events.ERROR, (_, data) => {
-        if (data.fatal) { setHlsStatus('error'); hls.destroy() }
+        if (data.fatal) {
+          if (data.type === Hls.ErrorTypes.NETWORK_ERROR) {
+            console.warn('Network error, retrying in 2s...', data)
+            setTimeout(() => {
+              if (hlsRef.current) hlsRef.current.startLoad()
+            }, 2000)
+          } else {
+            console.error('Fatal HLS Error:', data)
+            setHlsStatus('error')
+            hls.destroy()
+          }
+        }
       })
     }).catch(() => setHlsStatus('error'))
 

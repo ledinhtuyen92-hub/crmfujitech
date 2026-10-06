@@ -47,28 +47,23 @@ Write-Host "Cleaning previous builds..." -ForegroundColor Yellow
 if (Test-Path $DistDir) { Remove-Item -Recurse -Force $DistDir }
 if (Test-Path $BuildDir) { Remove-Item -Recurse -Force $BuildDir }
 
-# 4. Run PyInstaller
+# 4. Run PyInstaller using spec file (has all hidden imports for live_studio modules)
 Write-Host "Running PyInstaller..." -ForegroundColor Yellow
 Set-Location $LiveStudioDir
-pyinstaller --name "AutotechLiveStudio" `
-            --clean `
-            --noconfirm `
-            --onedir `
-            --noconsole `
-            --icon=NONE `
-            --hidden-import "pygame" `
-            --hidden-import "websockets" `
-            --hidden-import "requests" `
-            --hidden-import "customtkinter" `
-            --hidden-import "PIL" `
-            --hidden-import "PIL._tkinter_finder" `
-            --collect-all "customtkinter" `
-            main.py
+
+# PYTHONPATH must be the PARENT of live_studio/ so 'import live_studio.xxx' resolves
+# ProjectRoot = d:\...\fujitech  (contains live_studio/ as a sub-package)
+$env:PYTHONPATH = $ProjectRoot
+
+pyinstaller --clean --noconfirm AutotechLiveStudio.spec
 
 Write-Host "Copying configuration and assets..." -ForegroundColor Cyan
 Copy-Item -Path "server_config.txt" -Destination "$DistDir\AutotechLiveStudio\server_config.txt" -Force
 if (Test-Path "assets") {
     Copy-Item -Path "assets" -Destination "$DistDir\AutotechLiveStudio\assets" -Recurse -Force
+}
+if (Test-Path "bin") {
+    Copy-Item -Path "bin" -Destination "$DistDir\AutotechLiveStudio\bin" -Recurse -Force
 }
 
 Write-Host "=========================================" -ForegroundColor Green

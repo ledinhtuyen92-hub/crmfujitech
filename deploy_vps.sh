@@ -78,6 +78,12 @@ sed -i "s|^VITE_API_URL=.*|VITE_API_URL=$PROTOCOL://$DOMAIN|g" .env
 sed -i "s|^ALLOWED_HOSTS=.*|ALLOWED_HOSTS=$DOMAIN,localhost,127.0.0.1|g" .env
 sed -i "s|^DEBUG=.*|DEBUG=False|g" .env
 
+# MediaMTX config (Docker)
+sed -i "s|^MEDIAMTX_SERVER_URL=.*|MEDIAMTX_SERVER_URL=http://mediamtx:8888|g" .env
+sed -i "s|^MEDIAMTX_RTMP_URL=.*|MEDIAMTX_RTMP_URL=rtmp://$DOMAIN:1935/live|g" .env
+grep -q "MEDIAMTX_SERVER_URL" .env || echo "MEDIAMTX_SERVER_URL=http://mediamtx:8888" >> .env
+grep -q "MEDIAMTX_RTMP_URL" .env || echo "MEDIAMTX_RTMP_URL=rtmp://$DOMAIN:1935/live" >> .env
+
 # Cap quyen cho Nginx doc thu muc root
 chmod 711 /root
 chmod -R 755 $(pwd)/frontend/dist

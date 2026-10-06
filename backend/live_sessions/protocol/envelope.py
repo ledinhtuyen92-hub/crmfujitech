@@ -8,6 +8,9 @@ from .commands import (
 from .events import HeartbeatPayloadSerializer, CommentPayloadSerializer
 from .acks import AckPayloadSerializer
 from .errors import ErrorPayloadSerializer
+class StreamStatusPayloadSerializer(serializers.Serializer):
+    state = serializers.CharField(required=False, allow_blank=True)
+    hls_url = serializers.CharField(required=False, allow_blank=True)
 
 PAYLOAD_SCHEMAS = {
     'command': {
@@ -21,6 +24,8 @@ PAYLOAD_SCHEMAS = {
     'event': {
         'device.heartbeat': HeartbeatPayloadSerializer,
         'event.comment': CommentPayloadSerializer,
+        'stream.status': StreamStatusPayloadSerializer,
+        'live.stream.status': StreamStatusPayloadSerializer,
     },
     'ack': {
         'command.ack': AckPayloadSerializer,

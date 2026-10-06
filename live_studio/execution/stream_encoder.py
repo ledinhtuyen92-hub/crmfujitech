@@ -1,4 +1,5 @@
 import os
+import sys
 import asyncio
 import logging
 import time
@@ -180,6 +181,8 @@ class StreamEncoder:
         cmd = [
             self.ffmpeg_path,
             "-y",
+            "-nostats",
+            "-loglevel", "error",
             # Video Input (TCP)
             "-f", "rawvideo",
             "-pixel_format", self.config.video_pixel_format,
@@ -196,6 +199,8 @@ class StreamEncoder:
             "-b:v", self.config.bitrate,
             "-preset", "veryfast",
             "-pix_fmt", "yuv420p",
+            "-g", "60",
+            "-keyint_min", "60",
             # Audio Output encoding
             "-c:a", "aac",
             "-b:a", "128k",
@@ -205,10 +210,12 @@ class StreamEncoder:
         ]
         
         logger.info(f"FFmpeg command: {' '.join(cmd)}")
+        flags = 0x08000000 if sys.platform == 'win32' else 0
         self.process = await asyncio.create_subprocess_exec(
             *cmd,
             stdout=asyncio.subprocess.PIPE,
-            stderr=asyncio.subprocess.PIPE
+            stderr=asyncio.subprocess.PIPE,
+            creationflags=flags
         )
         self.is_running = True
         

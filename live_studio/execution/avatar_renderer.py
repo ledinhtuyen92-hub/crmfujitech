@@ -74,9 +74,8 @@ class PygameAvatarRenderer(BaseAvatarRenderer):
             self.font_subtitle = None
             self.font_cta = None
             
-        # Create a hidden window for internal frame extraction (rendering without popping up)
-        self.screen = self.pygame.display.set_mode((self.width, self.height), self.pygame.HIDDEN)
-        self.pygame.display.set_caption("Fujitech AI Live Studio (Background Renderer)")
+        # Use an off-screen surface for internal frame extraction (rendering without a window)
+        self.screen = self.pygame.Surface((self.width, self.height))
         self.clock = self.pygame.time.Clock()
         
     def render(self, is_speaking: bool, mouth_state: str, is_blinking: bool):
@@ -146,7 +145,7 @@ class PygameAvatarRenderer(BaseAvatarRenderer):
             cta_rect = cta_surf.get_rect(center=(360, cta_y + 50))
             self.screen.blit(cta_surf, cta_rect)
 
-        self.pygame.display.flip()
+        # self.pygame.display.flip() # Not needed for off-screen surface
 
     def shutdown(self):
         if self.available:

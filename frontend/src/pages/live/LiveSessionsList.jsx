@@ -279,12 +279,12 @@ export default function LiveSessionsList() {
                 {shopeeMode === 'manual_rtmp' && (
                   <div style={{ background: '#fafafa', padding: 16, borderRadius: 8, border: '1px solid #f0f0f0' }}>
                     <Text type="secondary" style={{ display: 'block', marginBottom: 16 }}>
-                      Vui lòng nhập Server URL và Stream Key được cung cấp từ Shopee Live PC:
+                      Vui lòng nhập Server URL và Stream Key được cung cấp từ Shopee Live PC (có thể bỏ trống nếu chỉ muốn tạo phiên để kiểm thử):
                     </Text>
-                    <Form.Item name="server_url" label="Server URL" rules={[{ required: true }]}>
+                    <Form.Item name="server_url" label="Server URL">
                       <Input placeholder="rtmp://..." />
                     </Form.Item>
-                    <Form.Item name="stream_key" label="Stream Key" rules={[{ required: true }]}>
+                    <Form.Item name="stream_key" label="Stream Key">
                       <Input.Password placeholder="Nhập mã bảo mật (Stream Key)" />
                     </Form.Item>
                   </div>
@@ -301,12 +301,12 @@ export default function LiveSessionsList() {
                 </Form.Item>
                 <div style={{ background: '#fafafa', padding: 16, borderRadius: 8, border: '1px solid #f0f0f0' }}>
                   <Text type="secondary" style={{ display: 'block', marginBottom: 16 }}>
-                    API TikTok hiện chưa hỗ trợ lấy luồng tự động. Vui lòng mở TikTok LIVE Studio hoặc giao diện Web, chọn <b>Phát qua phần mềm (External Source)</b> và nhập thông số:
+                    API TikTok hiện chưa hỗ trợ lấy luồng tự động. Vui lòng mở TikTok LIVE Studio hoặc giao diện Web, chọn <b>Phát qua phần mềm (External Source)</b> và nhập thông số (có thể bỏ trống nếu chỉ muốn tạo phiên để kiểm thử):
                   </Text>
-                  <Form.Item name="server_url" label="Server URL" rules={[{ required: true }]}>
+                  <Form.Item name="server_url" label="Server URL">
                     <Input placeholder="rtmp://..." />
                   </Form.Item>
-                  <Form.Item name="stream_key" label="Stream Key" rules={[{ required: true }]}>
+                  <Form.Item name="stream_key" label="Stream Key">
                     <Input.Password placeholder="Nhập mã bảo mật (Stream Key)" />
                   </Form.Item>
                 </div>
@@ -315,10 +315,13 @@ export default function LiveSessionsList() {
 
             {platform === 'custom' && (
               <div style={{ background: '#fafafa', padding: 16, borderRadius: 8, border: '1px solid #f0f0f0' }}>
-                <Form.Item name="server_url" label="RTMP Server URL" rules={[{ required: true }]}>
+                <Text type="secondary" style={{ display: 'block', marginBottom: 16 }}>
+                  Vui lòng nhập RTMP Server URL và Stream Key (có thể bỏ trống nếu chỉ muốn tạo phiên để kiểm thử):
+                </Text>
+                <Form.Item name="server_url" label="RTMP Server URL">
                   <Input placeholder="rtmp://..." />
                 </Form.Item>
-                <Form.Item name="stream_key" label="Stream Key" rules={[{ required: true }]}>
+                <Form.Item name="stream_key" label="Stream Key">
                   <Input.Password placeholder="Stream Key" />
                 </Form.Item>
               </div>

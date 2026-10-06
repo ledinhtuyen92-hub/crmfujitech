@@ -1,4 +1,4 @@
-﻿import asyncio
+import asyncio
 import logging
 import os
 import sys
@@ -51,17 +51,19 @@ class MediaMTXManager:
 logLevel: warn
 logDestinations: [stdout]
 
-rtmp:
-  address: :{MEDIAMTX_LOCAL_RTMP_PORT}
+rtmp: yes
+rtmpAddress: :{MEDIAMTX_LOCAL_RTMP_PORT}
 
-hls:
-  address: :{MEDIAMTX_LOCAL_HLS_PORT}
-  segmentCount: 3
-  segmentDuration: 1s
-  partDuration: 200ms
+hls: yes
+hlsAddress: :{MEDIAMTX_LOCAL_HLS_PORT}
+hlsAlwaysRemux: yes
+hlsVariant: mpegts
+hlsSegmentCount: 7
+hlsSegmentDuration: 2s
+hlsPartDuration: 500ms
 
-api:
-  address: :{MEDIAMTX_LOCAL_API_PORT}
+api: yes
+apiAddress: :{MEDIAMTX_LOCAL_API_PORT}
 
 paths:
   {MEDIAMTX_STREAM_PATH}:{rtmp_forward}
@@ -104,7 +106,7 @@ paths:
                 line = await self.process.stderr.readline()
                 if not line:
                     break
-                logger.debug(f'[MediaMTX] {line.decode(\"utf-8\", errors=\"ignore\").strip()}')
+                logger.debug(f"[MediaMTX] {line.decode('utf-8', errors='ignore').strip()}")
         except Exception:
             pass
         await self.process.wait()
@@ -127,3 +129,5 @@ paths:
                 os.remove(self._config_path)
             except OSError:
                 pass
+
+

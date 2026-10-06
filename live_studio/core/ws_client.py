@@ -3,6 +3,7 @@ import json
 import logging
 import uuid
 import datetime
+import os
 import websockets
 from typing import Callable, Optional
 
@@ -44,8 +45,12 @@ class WebSocketClient:
                     
             except websockets.ConnectionClosed as e:
                 logger.warning(f"Connection closed: {e}")
+                with open(os.path.join(os.path.expanduser("~"), "fujitech_ws_error.txt"), "a") as f:
+                    f.write(f"[{datetime.datetime.now()}] Connection closed: {e}\n")
             except Exception as e:
                 logger.error(f"WebSocket error: {e}")
+                with open(os.path.join(os.path.expanduser("~"), "fujitech_ws_error.txt"), "a") as f:
+                    f.write(f"[{datetime.datetime.now()}] WebSocket error: {e}\n")
                 
             if self._running:
                 logger.info(f"Reconnecting in {self._reconnect_delay} seconds...")
@@ -63,7 +68,18 @@ class WebSocketClient:
                 # Fetch state if state_getter is provided, else default to idle
                 exec_state = "idle"
                 if self.state_getter:
-                    exec_state = self.state_getter()
+                    raw_state = self.state_getter()
+                    state_map = {
+                        "disconnected": "initializing",
+                        "connecting": "initializing",
+                        "connected": "initializing",
+                        "synchronized": "idle",
+                        "paused": "idle",
+                        "running": "playing",
+                        "stopped": "idle",
+                        "error": "error"
+                    }
+                    exec_state = state_map.get(raw_state, "idle")
                     
                 payload = {
                     "protocol_version": "1.0",
@@ -75,7 +91,22 @@ class WebSocketClient:
                     "session_id": self.session_id,
                     "payload": {
                         "uptime_seconds": int(time.time() - start_time),
-                        "execution_state": exec_state
+                        "execution_state": exec_state,
+                        "capabilities_version": "1.0",
+                        "capabilities": {
+                            "environment": {
+                                "type": "local_studio",
+                                "os": "windows"
+                            },
+                            "rendering": {
+                                "avatar_engine": "pygame",
+                                "max_resolution": "720x1280",
+                                "lip_sync_supported": True
+                            },
+                            "audio": {
+                                "tts_mode": "remote"
+                            }
+                        }
                     }
                 }
                 

@@ -136,6 +136,25 @@ services:
     environment:
       - VITE_API_URL=${VITE_API_URL:-http://localhost:8000}
 
+  mediamtx:
+    image: bluenviron/mediamtx:latest-ffmpeg
+    container_name: crm_mediamtx
+    restart: unless-stopped
+    environment:
+      - MTX_WEBRTCADDRESS=:8889
+      - MTX_RTMPADDRESS=:1935
+      - MTX_HLSADDRESS=:8888
+      - MTX_APIADDRESS=:9997
+      - MTX_API=yes
+    ports:
+      - "1935:1935" # RTMP push (public)
+      - "8888:8888" # HLS proxy pull (can also be internal)
+      - "8889:8889" # WebRTC (public)
+      - "8189:8189/udp" # WebRTC ICE
+      - "9997:9997" # API
+    networks:
+      - crm_network
+
 volumes:
   postgres_data:
   redis_data:
