@@ -1,9 +1,10 @@
-import { useState, useEffect } from 'react'
+import { lazy, Suspense, useState, useEffect } from 'react'
 import { BrowserRouter, Navigate, Outlet, Route, Routes, useLocation } from 'react-router-dom'
-import { ConfigProvider, theme } from 'antd'
+import { ConfigProvider, Spin, theme } from 'antd'
 import 'antd/dist/reset.css'
 
 import { AuthProvider } from './contexts/AuthContext'
+import { useAuth } from './contexts/AuthContext'
 import MainLayout from './components/MainLayout'
 import {
   CompanyAdminRoute,
@@ -11,44 +12,54 @@ import {
   SuperAdminRoute,
   PermissionRoute,
   ModuleRoute,
+  SmartRedirect,
 } from './components/ProtectedRoute'
 
-// Pages
-import CustomerList from './pages/CustomerList'
-import Dashboard from './pages/Dashboard'
-import Inventory from './pages/Inventory'
-import Products from './pages/Products'
-import Login from './pages/Login'
-import OrderList from './pages/OrderList'
-import ProductionList from './pages/ProductionList'
-import DeliveryList from './pages/DeliveryList'
-import WarrantyList from './pages/WarrantyList'
-import QuotationList from './pages/QuotationList'
-import PublicQuotation from './pages/PublicQuotation'
-import ApprovalList from './pages/ApprovalList'
-import RegisterCompany from './pages/RegisterCompany'
-import AdminDashboard from './pages/admin/AdminDashboard'
-import AdminSettings from './pages/admin/AdminSettings'
-import SystemBackupSettings from './pages/admin/SystemBackupSettings'
-import CompanyManagement from './pages/admin/CompanyManagement'
-import SystemUserManagement from './pages/admin/SystemUserManagement'
-import QuotationTemplateManagement from './pages/admin/QuotationTemplateManagement'
-import QuotationBuilder from './pages/admin/QuotationBuilder'
-import RoleManagement from './pages/settings/RoleManagement'
-import UserManagement from './pages/settings/UserManagement'
-import DepartmentManagement from './pages/settings/DepartmentManagement'
-import FactoryManagement from './pages/settings/FactoryManagement'
-import CompanyGeneralSettings from './pages/settings/CompanyGeneralSettings'
-import ZaloInboxPage from './pages/ZaloInboxPage'
-import ZaloConfigPage from './pages/settings/ZaloConfigPage'
-import ZaloTemplatePage from './pages/settings/ZaloTemplatePage'
-import ZnsCampaignPage from './pages/settings/ZnsCampaignPage'
-import FacebookInboxPage from './pages/FacebookInboxPage'
-import FacebookConfigPage from './pages/settings/FacebookConfigPage'
-import WebsiteIntegration from './pages/settings/WebsiteIntegration'
-import AiAgentSettings from './pages/settings/AiAgentSettings'
-import AiKnowledgeBase from './pages/settings/AiKnowledgeBase'
-import Announcements from './pages/Announcements'
+// Pages — lazy loaded để tránh tải code module khi chưa cần
+const CustomerList = lazy(() => import('./pages/CustomerList'))
+const Dashboard = lazy(() => import('./pages/Dashboard'))
+const Inventory = lazy(() => import('./pages/Inventory'))
+const Products = lazy(() => import('./pages/Products'))
+const Login = lazy(() => import('./pages/Login'))
+const OrderList = lazy(() => import('./pages/OrderList'))
+const ProductionList = lazy(() => import('./pages/ProductionList'))
+const DeliveryList = lazy(() => import('./pages/DeliveryList'))
+const WarrantyList = lazy(() => import('./pages/WarrantyList'))
+const QuotationList = lazy(() => import('./pages/QuotationList'))
+const PublicQuotation = lazy(() => import('./pages/PublicQuotation'))
+const ApprovalList = lazy(() => import('./pages/ApprovalList'))
+const RegisterCompany = lazy(() => import('./pages/RegisterCompany'))
+const AdminDashboard = lazy(() => import('./pages/admin/AdminDashboard'))
+const AdminSettings = lazy(() => import('./pages/admin/AdminSettings'))
+const SystemBackupSettings = lazy(() => import('./pages/admin/SystemBackupSettings'))
+const CompanyManagement = lazy(() => import('./pages/admin/CompanyManagement'))
+const SystemUserManagement = lazy(() => import('./pages/admin/SystemUserManagement'))
+const QuotationTemplateManagement = lazy(() => import('./pages/admin/QuotationTemplateManagement'))
+const QuotationBuilder = lazy(() => import('./pages/admin/QuotationBuilder'))
+const RoleManagement = lazy(() => import('./pages/settings/RoleManagement'))
+const UserManagement = lazy(() => import('./pages/settings/UserManagement'))
+const DepartmentManagement = lazy(() => import('./pages/settings/DepartmentManagement'))
+const FactoryManagement = lazy(() => import('./pages/settings/FactoryManagement'))
+const CompanyGeneralSettings = lazy(() => import('./pages/settings/CompanyGeneralSettings'))
+const ZaloInboxPage = lazy(() => import('./pages/ZaloInboxPage'))
+const ZaloConfigPage = lazy(() => import('./pages/settings/ZaloConfigPage'))
+const ZaloTemplatePage = lazy(() => import('./pages/settings/ZaloTemplatePage'))
+const ZnsCampaignPage = lazy(() => import('./pages/settings/ZnsCampaignPage'))
+const FacebookInboxPage = lazy(() => import('./pages/FacebookInboxPage'))
+const FacebookConfigPage = lazy(() => import('./pages/settings/FacebookConfigPage'))
+const WebsiteIntegration = lazy(() => import('./pages/settings/WebsiteIntegration'))
+const AiAgentSettings = lazy(() => import('./pages/settings/AiAgentSettings'))
+const AiKnowledgeBase = lazy(() => import('./pages/settings/AiKnowledgeBase'))
+const Announcements = lazy(() => import('./pages/Announcements'))
+
+// Loading fallback chung
+function PageLoader() {
+  return (
+    <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '100vh' }}>
+      <Spin size="large" />
+    </div>
+  )
+}
 
 function DynamicTitle() {
   const location = useLocation();
@@ -82,6 +93,14 @@ function DynamicTitle() {
 }
 
 function ApplicationLayout({ isDarkMode, toggleTheme }) {
+  // Chờ auth loading xong mới render route để tránh flash/giật
+  // do ModuleRoute/PermissionRoute redirect ngay sau khi loading=false
+  const { loading } = useAuth()
+
+  if (loading) {
+    return <PageLoader />
+  }
+
   return (
     <ProtectedRoute>
       <MainLayout isDarkMode={isDarkMode} toggleTheme={toggleTheme}>
@@ -113,6 +132,7 @@ function App() {
         <DynamicTitle />
         {/* AuthProvider must be inside BrowserRouter so useNavigate works */}
         <AuthProvider>
+          <Suspense fallback={<PageLoader />}>
           <Routes>
             {/* ── Public routes ──────────────────────────────────── */}
             <Route path="/login" element={<Login />} />
@@ -121,8 +141,8 @@ function App() {
 
             {/* ── Protected routes (requires login) ──────────────── */}
             <Route element={<ApplicationLayout isDarkMode={isDarkMode} toggleTheme={toggleTheme} />}>
-              {/* Default redirect */}
-              <Route path="/" element={<Navigate to="/dashboard" replace />} />
+              {/* Default redirect - thông minh tìm module đầu tiên có quyền */}
+              <Route path="/" element={<SmartRedirect />} />
 
               {/* Main app routes */}
               <Route path="/dashboard" element={
@@ -138,61 +158,65 @@ function App() {
               } />
 
               <Route path="/approvals" element={
-                <ApprovalList />
+                <ModuleRoute moduleCode="approvals">
+                  <PermissionRoute permissionCode={['approvals.approve', 'approvals.delete']}>
+                    <ApprovalList />
+                  </PermissionRoute>
+                </ModuleRoute>
               } />
 
               <Route path="/customers" element={
                 <ModuleRoute moduleCode="crm">
-                  <PermissionRoute permissionCode="crm.view" fallback="/dashboard">
+                  <PermissionRoute permissionCode="crm.view">
                     <CustomerList />
                   </PermissionRoute>
                 </ModuleRoute>
               } />
               <Route path="/quotations" element={
                 <ModuleRoute moduleCode="sales">
-                  <PermissionRoute permissionCode="sales.view" fallback="/dashboard">
+                  <PermissionRoute permissionCode="sales.view">
                     <QuotationList />
                   </PermissionRoute>
                 </ModuleRoute>
               } />
               <Route path="/orders" element={
                 <ModuleRoute moduleCode="orders">
-                  <PermissionRoute permissionCode="orders.view" fallback="/dashboard">
+                  <PermissionRoute permissionCode="orders.view">
                     <OrderList />
                   </PermissionRoute>
                 </ModuleRoute>
               } />
               <Route path="/products" element={
                 <ModuleRoute moduleCode="products">
-                  <PermissionRoute permissionCode="products.view" fallback="/dashboard">
+                  <PermissionRoute permissionCode="products.view">
                     <Products />
                   </PermissionRoute>
                 </ModuleRoute>
               } />
               <Route path="/inventory" element={
                 <ModuleRoute moduleCode="inventory">
-                  <PermissionRoute permissionCode="inventory.view" fallback="/dashboard">
+                  <PermissionRoute permissionCode="inventory.view">
                     <Inventory />
                   </PermissionRoute>
                 </ModuleRoute>
               } />
               <Route path="/production" element={
                 <ModuleRoute moduleCode="production">
-                  <PermissionRoute permissionCode="production.view" fallback="/dashboard">
+                  <PermissionRoute permissionCode="production.view">
                     <ProductionList />
                   </PermissionRoute>
                 </ModuleRoute>
               } />
               <Route path="/delivery" element={
                 <ModuleRoute moduleCode="delivery">
-                  <PermissionRoute permissionCode="delivery.view" fallback="/dashboard">
+                  <PermissionRoute permissionCode="delivery.view">
                     <DeliveryList />
                   </PermissionRoute>
                 </ModuleRoute>
               } />
               <Route path="/warranty" element={
                 <ModuleRoute moduleCode="warranty">
-                  <PermissionRoute permissionCode="warranty.view" fallback="/dashboard">
+                  <PermissionRoute permissionCode="warranty.view">
                     <WarrantyList />
                   </PermissionRoute>
                 </ModuleRoute>
@@ -201,7 +225,7 @@ function App() {
               {/* Zalo Integration */}
               <Route path="/zalo/inbox" element={
                 <ModuleRoute moduleCode="zalo">
-                  <PermissionRoute permissionCode="zalo.view" fallback="/dashboard">
+                  <PermissionRoute permissionCode="zalo.view">
                     <ZaloInboxPage />
                   </PermissionRoute>
                 </ModuleRoute>
@@ -209,7 +233,7 @@ function App() {
 
               <Route path="/zalo/campaigns" element={
                 <ModuleRoute moduleCode="zalo">
-                  <PermissionRoute permissionCode="zalo.campaigns" fallback="/dashboard">
+                  <PermissionRoute permissionCode="zalo.campaigns">
                     <ZnsCampaignPage />
                   </PermissionRoute>
                 </ModuleRoute>
@@ -217,14 +241,14 @@ function App() {
 
               <Route path="/settings/zalo" element={
                 <ModuleRoute moduleCode="zalo">
-                  <PermissionRoute permissionCode="zalo.config" fallback="/dashboard">
+                  <PermissionRoute permissionCode="zalo.config">
                     <ZaloConfigPage />
                   </PermissionRoute>
                 </ModuleRoute>
               } />
               <Route path="/settings/zalo-templates" element={
                 <ModuleRoute moduleCode="zalo">
-                  <PermissionRoute permissionCode={['zalo.config', 'zalo.manage_templates']} fallback="/dashboard">
+                  <PermissionRoute permissionCode={['zalo.config', 'zalo.manage_templates']}>
                     <ZaloTemplatePage />
                   </PermissionRoute>
                 </ModuleRoute>
@@ -233,7 +257,7 @@ function App() {
               {/* Facebook Multi-Page Integration */}
               <Route path="/facebook/inbox" element={
                 <ModuleRoute moduleCode="facebook">
-                  <PermissionRoute permissionCode="facebook.view_inbox" fallback="/dashboard">
+                  <PermissionRoute permissionCode="facebook.view_inbox">
                     <FacebookInboxPage />
                   </PermissionRoute>
                 </ModuleRoute>
@@ -241,7 +265,7 @@ function App() {
 
               <Route path="/settings/facebook" element={
                 <ModuleRoute moduleCode="facebook">
-                  <PermissionRoute permissionCode="facebook.manage_config" fallback="/dashboard">
+                  <PermissionRoute permissionCode="facebook.manage_config">
                     <FacebookConfigPage />
                   </PermissionRoute>
                 </ModuleRoute>
@@ -250,7 +274,7 @@ function App() {
               <Route
                 path="/settings/website"
                 element={
-                  <PermissionRoute permissionCode="website_integration.manage" fallback="/dashboard">
+                  <PermissionRoute permissionCode="website_integration.manage">
                     <WebsiteIntegration />
                   </PermissionRoute>
                 }
@@ -259,7 +283,7 @@ function App() {
                 path="/settings/ai-agents"
                 element={
                   <ModuleRoute moduleCode="ai_agent">
-                    <PermissionRoute permissionCode={['ai_agent.view_dashboard', 'ai_agent.manage_agents', 'ai_agent.manage_keys', 'ai_agent.manage_knowledge']} fallback="/dashboard">
+                    <PermissionRoute permissionCode={['ai_agent.view_dashboard', 'ai_agent.manage_agents', 'ai_agent.manage_keys', 'ai_agent.manage_knowledge']}>
                       <AiAgentSettings />
                     </PermissionRoute>
                   </ModuleRoute>
@@ -269,7 +293,7 @@ function App() {
                 path="/settings/ai-knowledge"
                 element={
                   <ModuleRoute moduleCode="ai_agent">
-                    <PermissionRoute permissionCode="ai_agent.manage_knowledge" fallback="/dashboard">
+                    <PermissionRoute permissionCode="ai_agent.manage_knowledge">
                       <AiKnowledgeBase />
                     </PermissionRoute>
                   </ModuleRoute>
@@ -379,6 +403,7 @@ function App() {
             {/* ── Fallback ────────────────────────────────────────── */}
             <Route path="*" element={<Navigate to="/dashboard" replace />} />
           </Routes>
+          </Suspense>
         </AuthProvider>
       </BrowserRouter>
     </ConfigProvider>

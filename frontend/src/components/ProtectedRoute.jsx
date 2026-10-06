@@ -1,6 +1,35 @@
 import { Navigate, useLocation } from 'react-router-dom'
-import { Spin } from 'antd'
 import { useAuth } from '../contexts/AuthContext'
+
+/**
+ * SmartRedirect — Tự động tính toán module đầu tiên user có quyền
+ * và redirect đến đó thay vì fix cứng về /dashboard.
+ */
+export function SmartRedirect() {
+  const { isSuperAdmin, hasPermission, isModuleActive } = useAuth()
+  
+  if (isSuperAdmin) return <Navigate to="/admin/dashboard" replace />
+
+  if (hasPermission('dashboard.view')) return <Navigate to="/dashboard" replace />
+  if (hasPermission('notifications.view_announcements')) return <Navigate to="/announcements" replace />
+  if (isModuleActive('approvals') && hasPermission(['approvals.approve', 'approvals.delete'])) return <Navigate to="/approvals" replace />
+  if (isModuleActive('crm') && hasPermission('crm.view')) return <Navigate to="/customers" replace />
+  if (isModuleActive('products') && hasPermission('products.view')) return <Navigate to="/products" replace />
+  if (isModuleActive('sales') && hasPermission('sales.view')) return <Navigate to="/quotations" replace />
+  if (isModuleActive('orders') && hasPermission('orders.view')) return <Navigate to="/orders" replace />
+  if (isModuleActive('inventory') && hasPermission('inventory.view')) return <Navigate to="/inventory" replace />
+  if (isModuleActive('production') && hasPermission('production.view')) return <Navigate to="/production" replace />
+  if (isModuleActive('delivery') && hasPermission('delivery.view')) return <Navigate to="/delivery" replace />
+  if (isModuleActive('warranty') && hasPermission('warranty.view')) return <Navigate to="/warranty" replace />
+  if (isModuleActive('zalo') && hasPermission('zalo.view')) return <Navigate to="/zalo/inbox" replace />
+  if (isModuleActive('facebook') && hasPermission('facebook.view_inbox')) return <Navigate to="/facebook/inbox" replace />
+  
+  // Trọng tài cuối cùng: nếu user có quyền config settings thì về trang setting general
+  if (hasPermission('settings.manage_general')) return <Navigate to="/settings/general" replace />
+
+  // Nếu không có quyền nào cả (trường hợp role trống), về tạm login
+  return <Navigate to="/login" replace />
+}
 
 /**
  * ProtectedRoute — Bảo vệ routes yêu cầu đăng nhập.
@@ -10,20 +39,8 @@ export function ProtectedRoute({ children }) {
   const { isAuthenticated, isSuperAdmin, loading } = useAuth()
   const location = useLocation()
 
-  if (loading) {
-    return (
-      <div
-        style={{
-          display: 'flex',
-          justifyContent: 'center',
-          alignItems: 'center',
-          minHeight: '100vh',
-        }}
-      >
-        <Spin size="large" />
-      </div>
-    )
-  }
+  // ApplicationLayout đã chặn loading ở cấp cao hơn, nhưng giữ lại để an toàn
+  if (loading) return null
 
   if (!isAuthenticated) {
     return <Navigate to="/login" state={{ from: location }} replace />
@@ -38,26 +55,18 @@ export function ProtectedRoute({ children }) {
 
 /**
  * ModuleRoute — Bảo vệ các route thuộc về một module cụ thể.
- * Nếu module bị tắt (không nằm trong active_modules), redirect về /dashboard.
+ * Nếu module bị tắt, redirect về /dashboard.
  */
 export function ModuleRoute({ children, moduleCode }) {
-  const { isAuthenticated, isModuleActive, loading } = useAuth()
+  const { isAuthenticated, isModuleActive } = useAuth()
   const location = useLocation()
-
-  if (loading) {
-    return (
-      <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '100vh' }}>
-        <Spin size="large" />
-      </div>
-    )
-  }
 
   if (!isAuthenticated) {
     return <Navigate to="/login" state={{ from: location }} replace />
   }
 
   if (!isModuleActive(moduleCode)) {
-    return <Navigate to="/dashboard" replace />
+    return <SmartRedirect />
   }
 
   return children
@@ -68,43 +77,28 @@ export function ModuleRoute({ children, moduleCode }) {
  * Các tài khoản khác sẽ bị redirect về /dashboard.
  */
 export function SuperAdminRoute({ children }) {
-  const { isAuthenticated, isSuperAdmin, loading } = useAuth()
+  const { isAuthenticated, isSuperAdmin } = useAuth()
   const location = useLocation()
-
-  if (loading) {
-    return (
-      <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '100vh' }}>
-        <Spin size="large" />
-      </div>
-    )
-  }
 
   if (!isAuthenticated) {
     return <Navigate to="/login" state={{ from: location }} replace />
   }
 
   if (!isSuperAdmin) {
-    return <Navigate to="/dashboard" replace />
+    return <SmartRedirect />
   }
 
   return children
 }
 
 /**
- * CompanyAdminRoute — Cho phép Company Admin hoặc System Admin.
+ * CompanyAdminRoute — Cho phép Company Admin hoặc System Admin truy cập
+ * các trang quản lý công ty (settings/users, settings/roles, ...).
  * Nhân viên thường sẽ bị redirect về /dashboard.
  */
 export function CompanyAdminRoute({ children }) {
-  const { isAuthenticated, isCompanyAdmin, isSuperAdmin, loading } = useAuth()
+  const { isAuthenticated, isCompanyAdmin, isSuperAdmin } = useAuth()
   const location = useLocation()
-
-  if (loading) {
-    return (
-      <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '100vh' }}>
-        <Spin size="large" />
-      </div>
-    )
-  }
 
   if (!isAuthenticated) {
     return <Navigate to="/login" state={{ from: location }} replace />
@@ -115,7 +109,7 @@ export function CompanyAdminRoute({ children }) {
   }
 
   if (!isCompanyAdmin) {
-    return <Navigate to="/dashboard" replace />
+    return <SmartRedirect />
   }
 
   return children
@@ -134,25 +128,19 @@ export function usePermission(permissionCode) {
 
 /**
  * PermissionRoute — Chỉ cho phép nếu user có quyền tương ứng.
+ * fallback mặc định là /dashboard.
+ * Lưu ý: dashboard.view phải có trong role để tránh loop ở đây.
  */
-export function PermissionRoute({ permissionCode, fallback = '/customers', children }) {
-  const { isAuthenticated, hasPermission, loading } = useAuth()
+export function PermissionRoute({ permissionCode, fallback, children }) {
+  const { isAuthenticated, hasPermission } = useAuth()
   const location = useLocation()
-
-  if (loading) {
-    return (
-      <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '100vh' }}>
-        <Spin size="large" />
-      </div>
-    )
-  }
 
   if (!isAuthenticated) {
     return <Navigate to="/login" state={{ from: location }} replace />
   }
 
   if (!hasPermission(permissionCode)) {
-    return <Navigate to={fallback} replace />
+    return fallback ? <Navigate to={fallback} replace /> : <SmartRedirect />
   }
 
   return children

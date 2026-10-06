@@ -969,15 +969,13 @@ export default function Inventory() {
       type: defaultType, 
       items: [{ product: null, quantity: 1, unit_cost: 0 }]
     })
-    // For export/adjust/transfer we need ALL stock levels (no search filter) for product dropdown
-    if (defaultType !== 'import') {
-      api.get('/inventory/stock-levels/', { params: { page_size: 10000 } })
-        .then(res => {
-          const data = Array.isArray(res.data) ? res.data : res.data?.results ?? []
-          setModalStockLevels(data)
-        })
-        .catch(() => {})
-    }
+    // Fetch ALL stock levels to show correct current stock hints in the modal for any transaction type
+    api.get('/inventory/stock-levels/', { params: { page_size: 10000 } })
+      .then(res => {
+        const data = Array.isArray(res.data) ? res.data : res.data?.results ?? []
+        setModalStockLevels(data)
+      })
+      .catch(() => {})
     // Ensure products are loaded
     if (products.length === 0) {
       fetchProducts()
