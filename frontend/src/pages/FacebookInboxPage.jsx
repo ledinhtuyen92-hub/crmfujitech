@@ -425,7 +425,14 @@ function MessageBubble({ msg, lead, showAvatar = true }) {
               >
                 <PaperClipOutlined style={{ fontSize: 18 }} />
                 <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                  Tệp đính kèm ({msg.attachment_url.split('/').pop().split('?')[0] || 'file'})
+                  Tệp đính kèm ({(() => {
+                    const rawName = msg.attachment_url.split('/').pop().split('?')[0] || 'file';
+                    try {
+                      return decodeURIComponent(rawName);
+                    } catch (e) {
+                      return rawName;
+                    }
+                  })()})
                 </span>
                 <DownloadOutlined />
               </a>
