@@ -65,7 +65,10 @@ export default function LiveMediaAssets() {
       setFileList([])
       fetchAssets()
     } catch (err) {
-      message.error('Lỗi khi tải lên: ' + (err.response?.data?.detail || err.message))
+      console.error(err.response?.data)
+      const errorData = err.response?.data
+      const errorString = errorData ? (typeof errorData === 'object' ? JSON.stringify(errorData) : errorData) : err.message
+      message.error('Lỗi khi tải lên: ' + errorString)
     } finally {
       setUploading(false)
     }
