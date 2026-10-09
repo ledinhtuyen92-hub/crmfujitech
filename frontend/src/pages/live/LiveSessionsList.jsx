@@ -27,6 +27,7 @@ export default function LiveSessionsList() {
   // Watch form values for dynamic UI
   const platform = Form.useWatch('platform', form)
   const shopeeMode = Form.useWatch('shopee_connection_mode', form)
+  const productSource = Form.useWatch('product_source', form) || 'internal'
 
   const fetchSessions = async () => {
     setLoading(true)
@@ -95,7 +96,9 @@ export default function LiveSessionsList() {
     setEditSession(session)
     form.setFieldsValue({
       device: session.device,
+      product_source: session.external_product_link ? 'external' : 'internal',
       product: session.product,
+      external_product_link: session.external_product_link,
       ai_agent: session.ai_agent,
       platform: session.platform,
       shopee_connection_mode: session.shopee_connection_mode,
@@ -166,7 +169,9 @@ export default function LiveSessionsList() {
           <Button icon={<SyncOutlined />} onClick={fetchSessions}>Làm mới</Button>
           <Button type="primary" style={{ backgroundColor: '#1649c9' }} icon={<PlusOutlined />} onClick={() => {
             setEditSession(null)
+            setEditSession(null)
             form.resetFields()
+            form.setFieldsValue({ product_source: 'internal' })
             setCreateVisible(true)
           }}>Tạo phiên mới</Button>
         </Space>
@@ -230,11 +235,24 @@ export default function LiveSessionsList() {
                 ))}
               </Select>
             </Form.Item>
-            <Form.Item name="product" label="Sản phẩm trung tâm" rules={[{ required: true }]}>
-              <Select placeholder="Chọn sản phẩm">
-                {deps.products.map(p => <Select.Option key={p.id} value={p.id}>{p.code} - {p.name}</Select.Option>)}
-              </Select>
+            <Form.Item name="product_source" label="Nguồn sản phẩm (Giỏ hàng Live)" initialValue="internal">
+              <Radio.Group optionType="button" buttonStyle="solid">
+                <Radio.Button value="internal">Kho nội bộ (Tự doanh)</Radio.Button>
+                <Radio.Button value="external">Giỏ hàng Affiliate (Shopee/Tiktok)</Radio.Button>
+              </Radio.Group>
             </Form.Item>
+
+            {productSource === 'internal' ? (
+              <Form.Item name="product" label="Sản phẩm trung tâm" rules={[{ required: true, message: 'Vui lòng chọn sản phẩm' }]}>
+                <Select placeholder="Chọn sản phẩm trong kho">
+                  {deps.products.map(p => <Select.Option key={p.id} value={p.id}>{p.code} - {p.name}</Select.Option>)}
+                </Select>
+              </Form.Item>
+            ) : (
+              <Form.Item name="external_product_link" label="Link Giỏ hàng / Link Sản phẩm (Shopee/Tiktok)" rules={[{ required: true, message: 'Vui lòng nhập link sản phẩm' }]}>
+                <Input placeholder="https://shopee.vn/..." />
+              </Form.Item>
+            )}
             <Form.Item name="ai_agent" label="AI Agent (Host/Kịch bản)" rules={[{ required: true }]}>
               <Select placeholder="Chọn AI Agent">
                 {deps.agents.map(a => <Select.Option key={a.id} value={a.id}>{a.name}</Select.Option>)}
