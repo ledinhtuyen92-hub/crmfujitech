@@ -55,9 +55,7 @@ export default function LiveMediaAssets() {
       formData.append('asset_type', values.asset_type)
       formData.append('file', fileList[0].originFileObj)
       
-      await api.post('/live_sessions/media-assets/', formData, {
-        headers: { 'Content-Type': 'multipart/form-data' }
-      })
+      await api.post('/live_sessions/media-assets/', formData)
       
       message.success('Tải lên thành công')
       setUploadVisible(false)
