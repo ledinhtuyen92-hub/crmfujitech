@@ -65,14 +65,22 @@ class QueryParamJWTAuthentication(BaseAuthentication):
     """
     def authenticate(self, request):
         from rest_framework_simplejwt.authentication import JWTAuthentication
-        token = request.query_params.get('token') or request.GET.get('token')
+        token = request.GET.get('token')
+        print('QueryParamJWTAuthentication token:', token)
         if not token:
+            print('QueryParamJWTAuthentication: No token found')
             return None
         # Inject into Authorization header temporarily so JWTAuthentication works
         request.META['HTTP_AUTHORIZATION'] = f'Bearer {token}'
         try:
-            return JWTAuthentication().authenticate(request)
-        except Exception:
+            print('QueryParamJWTAuthentication: Authenticating...')
+            res = JWTAuthentication().authenticate(request)
+            print('QueryParamJWTAuthentication result:', res)
+            return res
+        except Exception as e:
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.error(f"QueryParamJWTAuthentication failed: {e}")
             return None
 
 def _generate_device_token(device):
@@ -155,7 +163,16 @@ class LiveSessionViewSet(viewsets.ModelViewSet):
     }
 
     def get_authenticators(self):
-        if getattr(self, 'action', None) in ('hls_proxy', 'hls_proxy_custom'):
+        action = getattr(self, 'action', None)
+        request = getattr(self, 'request', None)
+        is_hls = False
+        
+        if action in ('hls_proxy', 'hls_proxy_custom'):
+            is_hls = True
+        elif request and request.path and '/hls-proxy/' in request.path:
+            is_hls = True
+            
+        if is_hls:
             from rest_framework_simplejwt.authentication import JWTAuthentication
             return [JWTAuthentication(), QueryParamJWTAuthentication()]
         return super().get_authenticators()
