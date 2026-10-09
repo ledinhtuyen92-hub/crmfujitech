@@ -250,6 +250,38 @@ class LiveSession(models.Model):
         related_name="live_sessions",
         verbose_name="AI Agent",
     )
+    avatar_asset = models.ForeignKey(
+        "LiveMediaAsset",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="avatar_sessions",
+        verbose_name="Avatar (Tùy chọn)"
+    )
+    background_asset = models.ForeignKey(
+        "LiveMediaAsset",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="background_sessions",
+        verbose_name="Phông nền (Tùy chọn)"
+    )
+    overlay_asset = models.ForeignKey(
+        "LiveMediaAsset",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="overlay_sessions",
+        verbose_name="Lớp phủ/Logo (Tùy chọn)"
+    )
+    audio_asset = models.ForeignKey(
+        "LiveMediaAsset",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="audio_sessions",
+        verbose_name="Âm thanh nền (Tùy chọn)"
+    )
     status = models.CharField(
         max_length=20,
         choices=STATUS_CHOICES,

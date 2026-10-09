@@ -49,6 +49,25 @@ class LiveSessionSerializer(serializers.ModelSerializer):
     ai_agent_name = serializers.CharField(source='ai_agent.name', read_only=True)
     device_name = serializers.CharField(source='device.name', read_only=True)
     product_name = serializers.CharField(source='product.name', read_only=True)
+    
+    avatar_asset_url = serializers.SerializerMethodField()
+    background_asset_url = serializers.SerializerMethodField()
+    overlay_asset_url = serializers.SerializerMethodField()
+
+    def get_avatar_asset_url(self, obj):
+        if obj.avatar_asset and obj.avatar_asset.file:
+            return obj.avatar_asset.file.url
+        return None
+
+    def get_background_asset_url(self, obj):
+        if obj.background_asset and obj.background_asset.file:
+            return obj.background_asset.file.url
+        return None
+
+    def get_overlay_asset_url(self, obj):
+        if obj.overlay_asset and obj.overlay_asset.file:
+            return obj.overlay_asset.file.url
+        return None
 
     class Meta:
         model = LiveSession
