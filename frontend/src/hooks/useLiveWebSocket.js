@@ -76,7 +76,12 @@ export const useLiveWebSocket = (sessionId) => {
 
   const disconnect = useCallback(() => {
     if (wsRef.current) {
-      wsRef.current.close();
+      const ws = wsRef.current;
+      if (ws.readyState === 0) { // WebSocket.CONNECTING
+        ws.onopen = () => ws.close();
+      } else {
+        ws.close();
+      }
       wsRef.current = null;
     }
     setConnected(false);
