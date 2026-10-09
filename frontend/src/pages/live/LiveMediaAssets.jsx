@@ -95,7 +95,7 @@ export default function LiveMediaAssets() {
       return (
         <video 
           src={item.file} 
-          style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: 8 }} 
+          style={{ width: '100%', height: '100%', objectFit: 'contain', borderRadius: 8 }} 
           muted 
           playsInline
           onMouseEnter={(e) => e.target.play()}
@@ -149,14 +149,15 @@ export default function LiveMediaAssets() {
             ]}
           >
             <div style={{ 
-              height: 120, 
-              background: 'linear-gradient(135deg, #f5f7fa 0%, #e4ebf5 100%)', 
+              height: 180, 
+              background: 'linear-gradient(135deg, #1f1c2c 0%, #928dab 100%)', 
               display: 'flex', 
               justifyContent: 'center', 
               alignItems: 'center',
               marginBottom: 16,
               borderRadius: 8,
-              position: 'relative'
+              position: 'relative',
+              overflow: 'hidden'
             }}>
               {renderAssetThumbnail(item)}
             </div>
