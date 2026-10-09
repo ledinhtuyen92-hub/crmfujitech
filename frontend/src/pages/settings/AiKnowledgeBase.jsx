@@ -1377,11 +1377,11 @@ export default function AiKnowledgeBase() {
                               listType="picture-card"
                               multiple
                               beforeUpload={() => false}
-                              accept="image/*"
+                              accept="image/*,.pdf,.doc,.docx,.xls,.xlsx,.txt"
                             >
                               <div>
                                 <PlusOutlined />
-                                <div style={{ marginTop: 8 }}>Thêm ảnh</div>
+                                <div style={{ marginTop: 8 }}>Thêm ảnh/file</div>
                               </div>
                             </Upload>
                           </Form.Item>
@@ -1550,11 +1550,11 @@ export default function AiKnowledgeBase() {
                               listType="picture-card"
                               multiple
                               beforeUpload={() => false}
-                              accept="image/*"
+                              accept="image/*,.pdf,.doc,.docx,.xls,.xlsx,.txt"
                             >
                               <div>
                                 <PlusOutlined />
-                                <div style={{ marginTop: 8 }}>Thêm ảnh mới</div>
+                                <div style={{ marginTop: 8 }}>Thêm ảnh/file mới</div>
                               </div>
                             </Upload>
                           </Form.Item>
