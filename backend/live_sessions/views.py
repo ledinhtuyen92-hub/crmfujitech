@@ -361,6 +361,8 @@ class LiveSessionViewSet(viewsets.ModelViewSet):
                 session_id_str = str(session.id)
                 proxy_base = f"/api/live_sessions/sessions/{session_id_str}/hls-proxy"
                 
+                token = request.GET.get('token')
+                
                 def rewrite_line(line):
                     line = line.strip()
                     if line and not line.startswith('#'):
@@ -368,7 +370,10 @@ class LiveSessionViewSet(viewsets.ModelViewSet):
                             path_dir = '/'.join(hls_path.split('/')[:-1])
                             full_path = f"{path_dir}/{line}" if path_dir else line
                             # Do NOT add a trailing slash to the segment URL!
-                            return f"{proxy_base}/{full_path}"
+                            rewritten_url = f"{proxy_base}/{full_path}"
+                            if token:
+                                rewritten_url += f"?token={token}"
+                            return rewritten_url
                         else:
                             return line
                     return line
