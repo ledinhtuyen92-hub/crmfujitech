@@ -345,7 +345,7 @@ def process_ai_reply_zalo(lead_id, is_followup=False, trigger_msg_id=None):
         reply_text = result.get('reply')
         
         image_urls_to_send = []
-        raw_image_urls = result.get('image_urls')
+        raw_image_urls = result.get('attachment_urls') or result.get('image_urls')
         if isinstance(raw_image_urls, str):
             raw_image_urls = [raw_image_urls]
             
@@ -677,7 +677,7 @@ def process_ai_reply_facebook(lead_id, is_followup=False, trigger_msg_id=None):
         reply_text = result.get('reply')
         
         image_urls_to_send = []
-        raw_image_urls = result.get('image_urls')
+        raw_image_urls = result.get('attachment_urls') or result.get('image_urls')
         if isinstance(raw_image_urls, str):
             raw_image_urls = [raw_image_urls]
             
