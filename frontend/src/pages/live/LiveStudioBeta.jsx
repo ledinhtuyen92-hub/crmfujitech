@@ -354,7 +354,7 @@ export default function LiveStudioBeta() {
           borderRadius: 12,
           border: connected ? '1px solid #1890ff' : '1px solid #d9d9d9',
         }}
-        bodyStyle={{ padding: '16px 24px' }}
+        styles={{ body: { padding: '16px 24px' } }}
       >
         <Row align="middle" justify="space-between">
           <Col>

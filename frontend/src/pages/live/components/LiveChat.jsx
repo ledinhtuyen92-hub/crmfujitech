@@ -48,7 +48,7 @@ export default function LiveChat({ lastEvent }) {
       title="LIVE CHAT & PRODUCTS" 
       size="small"
       style={{ height: '100%', borderRadius: 12, display: 'flex', flexDirection: 'column' }}
-      bodyStyle={{ flex: 1, overflow: 'hidden', padding: 0 }}
+      styles={{ body: { flex: 1, overflow: 'hidden', padding: 0 } }}
     >
       <div 
         ref={listRef} 

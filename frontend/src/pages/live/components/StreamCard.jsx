@@ -86,7 +86,7 @@ export default function StreamCard({ session, onStart, onStop, onDelete, onEdit,
         boxShadow: isRunning ? '0 4px 12px rgba(82,196,26,0.1)' : '0 2px 8px rgba(0,0,0,0.04)',
         opacity: isDeleting ? 0.6 : 1
       }}
-      bodyStyle={{ padding: 0 }}
+      styles={{ body: { padding: 0 } }}
     >
       {/* Header */}
       <div style={{ padding: '16px 20px', background: isRunning ? '#f6ffed' : '#fafafa', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>

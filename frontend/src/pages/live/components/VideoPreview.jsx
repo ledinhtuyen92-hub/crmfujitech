@@ -197,10 +197,12 @@ export default function VideoPreview({ session, streamEvent }) {
         borderRadius: 12, display: 'flex', alignItems: 'center',
         justifyContent: 'center', border: '1px solid #262626', overflow: 'hidden',
       }}
-      bodyStyle={{
-        textAlign: 'center', width: '100%', padding: 0, height: '100%',
-        display: 'flex', alignItems: 'center', justifyContent: 'center',
-        position: 'relative',
+      styles={{
+        body: {
+          textAlign: 'center', width: '100%', padding: 0, height: '100%',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          position: 'relative',
+        }
       }}
     >
       {/* Video element - always mounted, hidden unless live */}

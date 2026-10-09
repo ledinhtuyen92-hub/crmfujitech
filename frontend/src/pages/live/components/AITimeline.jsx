@@ -397,7 +397,7 @@ export default function AITimeline({ lastEvent, connected }) {
         </Space>
       }
       style={{ borderRadius: 12 }}
-      bodyStyle={{ padding: 0 }}
+      styles={{ body: { padding: 0 } }}
     >
       <div
         ref={containerRef}

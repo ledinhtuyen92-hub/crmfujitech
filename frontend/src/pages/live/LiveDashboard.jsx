@@ -95,7 +95,7 @@ export default function LiveDashboard() {
           {/* Top Metrics Row */}
           <Row gutter={[16, 16]} style={{ marginBottom: 24 }}>
             <Col xs={12} sm={8}>
-              <Card bodyStyle={{ padding: '16px 24px' }} style={{ borderRadius: 12 }}>
+              <Card styles={{ body: { padding: '16px 24px' } }} style={{ borderRadius: 12 }}>
                 <Statistic 
                   title="Đang Live" 
                   value={activeSessions.length} 
@@ -105,7 +105,7 @@ export default function LiveDashboard() {
               </Card>
             </Col>
             <Col xs={12} sm={8}>
-              <Card bodyStyle={{ padding: '16px 24px' }} style={{ borderRadius: 12 }}>
+              <Card styles={{ body: { padding: '16px 24px' } }} style={{ borderRadius: 12 }}>
                 <Statistic 
                   title="Máy chủ (Online)" 
                   value={data.devices.filter(d => d.is_online).length} 
@@ -115,7 +115,7 @@ export default function LiveDashboard() {
               </Card>
             </Col>
             <Col xs={24} sm={8}>
-              <Card bodyStyle={{ padding: '16px 24px' }} style={{ borderRadius: 12 }}>
+              <Card styles={{ body: { padding: '16px 24px' } }} style={{ borderRadius: 12 }}>
                 <Statistic 
                   title="Tổng Viewers" 
                   value="--"
@@ -125,7 +125,7 @@ export default function LiveDashboard() {
             </Col>
           </Row>
 
-          <Card title="Luồng đang phát (Active Streams)" style={{ borderRadius: 12, marginBottom: 24 }} bodyStyle={{ padding: '20px' }}>
+          <Card title="Luồng đang phát (Active Streams)" style={{ borderRadius: 12, marginBottom: 24 }} styles={{ body: { padding: '20px' } }}>
             {activeSessions.length > 0 ? (
               <Row gutter={[16, 16]}>
                 {activeSessions.map(session => (

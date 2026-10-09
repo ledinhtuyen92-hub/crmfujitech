@@ -105,7 +105,7 @@ export default function LivePlatforms() {
         </div>
       </div>
 
-      <Card style={{ borderRadius: 12, padding: '8px 0' }} bodyStyle={{ padding: '0 24px 24px' }}>
+      <Card style={{ borderRadius: 12, padding: '8px 0' }} styles={{ body: { padding: '0 24px 24px' } }}>
         <Tabs defaultActiveKey="shopee" size="large">
           <TabPane 
             tab={<span><img src="https://img.icons8.com/color/24/000000/shopee.png" style={{marginRight: 8, verticalAlign: 'middle'}} alt="shopee"/>Shopee Live</span>} 
