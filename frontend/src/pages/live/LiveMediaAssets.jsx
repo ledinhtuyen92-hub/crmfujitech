@@ -71,62 +71,92 @@ export default function LiveMediaAssets() {
     }
   }
 
-  const columns = [
-    {
-      title: 'Tên tài nguyên',
-      dataIndex: 'name',
-      key: 'name',
-      render: (text, record) => (
-        <Space>
-          {record.asset_type === 'avatar' && <VideoCameraOutlined style={{ color: '#1890ff' }} />}
-          {record.asset_type === 'background' && <PictureOutlined style={{ color: '#52c41a' }} />}
-          {record.asset_type === 'overlay' && <BlockOutlined style={{ color: '#faad14' }} />}
-          {record.asset_type === 'audio' && <AudioOutlined style={{ color: '#eb2f96' }} />}
-          <Text strong>{text}</Text>
-          {record.is_system && <Tag color="gold">Hệ thống</Tag>}
-        </Space>
-      )
-    },
-    {
-      title: 'Loại',
-      dataIndex: 'asset_type_display',
-      key: 'asset_type_display',
-    },
-    {
-      title: 'File',
-      key: 'file',
-      render: (_, record) => (
-        <a href={record.file} target="_blank" rel="noreferrer">Xem / Tải về</a>
-      )
-    },
-    {
-      title: 'Ngày tạo',
-      dataIndex: 'created_at',
-      key: 'created_at',
-      render: (val) => new Date(val).toLocaleString('vi-VN')
-    },
-    {
-      title: 'Thao tác',
-      key: 'action',
-      render: (_, record) => (
-        <Popconfirm title="Chắc chắn xóa?" onConfirm={() => handleDelete(record.id)} disabled={record.is_system}>
-          <Button danger type="text" icon={<DeleteOutlined />} disabled={record.is_system} />
-        </Popconfirm>
-      )
-    }
-  ]
-
   const getFilteredAssets = (type) => {
     if (type === 'all') return assets
     return assets.filter(a => a.asset_type === type)
   }
 
+  const renderAssetIcon = (type) => {
+    switch (type) {
+      case 'avatar': return <VideoCameraOutlined style={{ fontSize: 32, color: '#1890ff' }} />
+      case 'background': return <PictureOutlined style={{ fontSize: 32, color: '#52c41a' }} />
+      case 'overlay': return <BlockOutlined style={{ fontSize: 32, color: '#faad14' }} />
+      case 'audio': return <AudioOutlined style={{ fontSize: 32, color: '#eb2f96' }} />
+      default: return <PictureOutlined style={{ fontSize: 32 }} />
+    }
+  }
+
+  const renderAssetGrid = (type) => {
+    const filtered = getFilteredAssets(type)
+    if (filtered.length === 0 && !loading) {
+      return (
+        <div style={{ padding: '40px 0', textAlign: 'center' }}>
+          <Typography.Text type="secondary">Chưa có tài nguyên nào. Hãy tải lên!</Typography.Text>
+        </div>
+      )
+    }
+    
+    return (
+      <div style={{ 
+        display: 'grid', 
+        gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', 
+        gap: '20px',
+        padding: '10px 0'
+      }}>
+        {filtered.map(item => (
+          <Card 
+            key={item.id} 
+            hoverable
+            style={{ borderRadius: 16, overflow: 'hidden', border: '1px solid #f0f0f0' }}
+            bodyStyle={{ padding: 16 }}
+            actions={[
+              <a href={item.file} target="_blank" rel="noreferrer" key="view">Xem file</a>,
+              <Popconfirm 
+                title="Xóa tài nguyên này?" 
+                onConfirm={() => handleDelete(item.id)} 
+                disabled={item.is_system}
+                key="delete"
+              >
+                <Button type="text" danger icon={<DeleteOutlined />} disabled={item.is_system} size="small" />
+              </Popconfirm>
+            ]}
+          >
+            <div style={{ 
+              height: 120, 
+              background: 'linear-gradient(135deg, #f5f7fa 0%, #e4ebf5 100%)', 
+              display: 'flex', 
+              justifyContent: 'center', 
+              alignItems: 'center',
+              marginBottom: 16,
+              borderRadius: 8
+            }}>
+              {renderAssetIcon(item.asset_type)}
+            </div>
+            
+            <div style={{ display: 'flex', flexDirection: 'column' }}>
+              <Text strong style={{ fontSize: 14, marginBottom: 4 }} ellipsis={{ tooltip: item.name }}>
+                {item.name}
+              </Text>
+              <Space size={4} style={{ marginBottom: 8 }}>
+                {item.is_system && <Tag color="gold" style={{ margin: 0 }}>Hệ thống</Tag>}
+                <Tag color="blue" style={{ margin: 0 }}>{item.asset_type_display}</Tag>
+              </Space>
+              <Text type="secondary" style={{ fontSize: 12 }}>
+                Tải lên: {new Date(item.created_at).toLocaleDateString('vi-VN')}
+              </Text>
+            </div>
+          </Card>
+        ))}
+      </div>
+    )
+  }
+
   const tabItems = [
-    { key: 'all', label: 'Tất cả', children: <Table columns={columns} dataSource={getFilteredAssets('all')} rowKey="id" loading={loading} /> },
-    { key: 'avatar', label: 'Avatar (Phông xanh)', children: <Table columns={columns} dataSource={getFilteredAssets('avatar')} rowKey="id" loading={loading} /> },
-    { key: 'background', label: 'Phông nền', children: <Table columns={columns} dataSource={getFilteredAssets('background')} rowKey="id" loading={loading} /> },
-    { key: 'overlay', label: 'Lớp phủ / Logo', children: <Table columns={columns} dataSource={getFilteredAssets('overlay')} rowKey="id" loading={loading} /> },
-    { key: 'audio', label: 'Âm thanh', children: <Table columns={columns} dataSource={getFilteredAssets('audio')} rowKey="id" loading={loading} /> },
+    { key: 'all', label: 'Tất cả', children: renderAssetGrid('all') },
+    { key: 'avatar', label: 'Avatar (Phông xanh)', children: renderAssetGrid('avatar') },
+    { key: 'background', label: 'Phông nền', children: renderAssetGrid('background') },
+    { key: 'overlay', label: 'Lớp phủ / Logo', children: renderAssetGrid('overlay') },
+    { key: 'audio', label: 'Âm thanh nền (BGM)', children: renderAssetGrid('audio') },
   ]
 
   return (
@@ -162,7 +192,7 @@ export default function LiveMediaAssets() {
               <Select.Option value="avatar">Avatar (Video Phông Xanh .mp4, .webm)</Select.Option>
               <Select.Option value="background">Phông nền (Ảnh .png, .jpg hoặc Video loop)</Select.Option>
               <Select.Option value="overlay">Lớp phủ (Logo, Khung hình trong suốt .png)</Select.Option>
-              <Select.Option value="audio">Âm thanh (Nhạc nền .mp3)</Select.Option>
+              <Select.Option value="audio">Âm thanh nền (Nhạc BGM .mp3)</Select.Option>
             </Select>
           </Form.Item>
 
