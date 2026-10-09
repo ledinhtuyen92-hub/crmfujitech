@@ -232,9 +232,17 @@ class LiveSession(models.Model):
     )
     product = models.ForeignKey(
         "inventory.Product",
-        on_delete=models.PROTECT,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
         related_name="live_sessions",
         verbose_name="Sản phẩm đang live",
+    )
+    external_product_link = models.URLField(
+        max_length=500,
+        blank=True,
+        null=True,
+        verbose_name="Link sản phẩm Affiliate/Shopee/Tiktok",
     )
     ai_agent = models.ForeignKey(
         "ai_agents.AiAgent",

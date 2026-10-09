@@ -62,10 +62,24 @@ class LiveSessionSerializer(serializers.ModelSerializer):
             return attrs
         if 'device' in attrs and attrs['device'].company != company:
             raise serializers.ValidationError({"device": "Thiết bị không hợp lệ."})
-        if 'product' in attrs and attrs['product'].company != company:
+        if 'product' in attrs and attrs['product'] and attrs['product'].company != company:
             raise serializers.ValidationError({"product": "Sản phẩm không hợp lệ."})
         if 'ai_agent' in attrs and attrs['ai_agent'].company != company:
             raise serializers.ValidationError({"ai_agent": "AI Agent không hợp lệ."})
+            
+        product = attrs.get('product')
+        external_link = attrs.get('external_product_link')
+        
+        # If updating an existing instance, fallback to its values if not in attrs
+        if self.instance:
+            if 'product' not in attrs:
+                product = self.instance.product
+            if 'external_product_link' not in attrs:
+                external_link = self.instance.external_product_link
+                
+        if not product and not external_link:
+            raise serializers.ValidationError("Vui lòng chọn Sản phẩm từ kho nội bộ hoặc nhập Link giỏ hàng Affiliate.")
+            
         return attrs
 
 
