@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react'
-import { Card, Typography, List, Avatar, Space } from 'antd'
+import { Card, Typography, Avatar, Space } from 'antd'
 import { UserOutlined } from '@ant-design/icons'
 
 const { Text } = Typography
@@ -58,23 +58,25 @@ export default function LiveChat({ lastEvent }) {
           padding: '12px 16px' 
         }}
       >
-        <List
-          dataSource={comments}
-          renderItem={(item) => (
-            <List.Item style={{ borderBottom: 'none', padding: '8px 0' }}>
-              <Space align="start" size={12}>
-                <Avatar size="small" icon={<UserOutlined />} />
-                <div>
-                  <Text strong style={{ fontSize: 13, marginRight: 8, color: '#1890ff' }}>
-                    {item.username}
-                  </Text>
-                  <Text style={{ fontSize: 14 }}>{item.text}</Text>
-                </div>
-              </Space>
-            </List.Item>
-          )}
-          locale={{ emptyText: 'Chưa có bình luận nào.' }}
-        />
+        {comments.length === 0 ? (
+          <div style={{ textAlign: 'center', color: '#8c8c8c', padding: '20px 0' }}>Chưa có bình luận nào.</div>
+        ) : (
+          <div style={{ display: 'flex', flexDirection: 'column' }}>
+            {comments.map((item, idx) => (
+              <div key={idx} style={{ padding: '8px 0' }}>
+                <Space align="start" size={12}>
+                  <Avatar size="small" icon={<UserOutlined />} />
+                  <div>
+                    <Text strong style={{ fontSize: 13, marginRight: 8, color: '#1890ff' }}>
+                      {item.username}
+                    </Text>
+                    <Text style={{ fontSize: 14 }}>{item.text}</Text>
+                  </div>
+                </Space>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
     </Card>
   )

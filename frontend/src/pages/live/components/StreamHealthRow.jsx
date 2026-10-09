@@ -196,7 +196,7 @@ export default function StreamHealthRow({
   if (sessionStatus === 'error')   displayStreamState = 'ERROR'
 
   return (
-    <Space direction="vertical" size={10} style={{ width: '100%' }}>
+    <Space orientation="vertical" size={10} style={{ width: '100%' }}>
       <DeviceRow deviceHealth={deviceHealth} deviceFreshness={deviceFreshness} />
       <StreamRow
         streamState={displayStreamState}

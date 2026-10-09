@@ -150,7 +150,7 @@ export default function LiveStudioBeta() {
     return (
       <Space wrap>
         <LiveStatusBadge status={status} />
-        <Divider type="vertical" />
+        <Divider orientation="vertical" />
 
         {/* draft, ready, stopped, error → Bắt đầu LIVE */}
         {['draft', 'ready', 'stopped', 'error'].includes(status) && (
@@ -367,11 +367,11 @@ export default function LiveStudioBeta() {
                 status={connected ? 'success' : 'error'}
                 text={connected ? 'WS Connected' : 'WS Disconnected'}
               />
-              <Divider type="vertical" />
+              <Divider orientation="vertical" />
               <Text type="secondary">
                 Nền tảng: <Text strong>{session.platform_display || session.platform}</Text>
               </Text>
-              <Divider type="vertical" />
+              <Divider orientation="vertical" />
               <Text type="secondary">
                 AI Host: <Text strong>{session.ai_agent_name || 'Đang tải...'}</Text>
               </Text>

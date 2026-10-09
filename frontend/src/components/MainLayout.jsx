@@ -974,7 +974,7 @@ function MainLayout({ children, isDarkMode, toggleTheme }) {
         open={passwordModalOpen}
         onCancel={() => setPasswordModalOpen(false)}
         footer={null}
-        destroyOnClose
+        destroyOnHidden
       >
         <Form
           form={passwordForm}

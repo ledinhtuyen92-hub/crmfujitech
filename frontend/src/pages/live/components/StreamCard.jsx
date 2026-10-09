@@ -92,7 +92,7 @@ export default function StreamCard({ session, onStart, onStop, onDelete, onEdit,
       <div style={{ padding: '16px 20px', background: isRunning ? '#f6ffed' : '#fafafa', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <Space>
           {getPlatformLabel()}
-          <Divider type="vertical" />
+          <Divider orientation="vertical" />
           <LiveStatusBadge status={status} />
         </Space>
         <Space>
@@ -109,7 +109,7 @@ export default function StreamCard({ session, onStart, onStop, onDelete, onEdit,
 
       {/* Body */}
       <div style={{ padding: '20px' }}>
-        <Space direction="vertical" size="middle" style={{ width: '100%' }}>
+        <Space orientation="vertical" size="middle" style={{ width: '100%' }}>
           
           <div>
             <Text type="secondary" style={{ fontSize: 12 }}>Sản phẩm trung tâm</Text>
