@@ -13,9 +13,10 @@ export default function VideoPreview({ session, streamEvent }) {
 
   const isSessionLive = session?.status === 'running' || session?.status === 'human_takeover'
 
-  // Build the HLS proxy URL for this session
+  // Build absolute HLS proxy URL for this session
   const buildHlsProxyUrl = (sessionId) => {
-    return `/api/live_sessions/sessions/${sessionId}/hls-proxy/live/index.m3u8`
+    const base = (import.meta.env.VITE_API_URL || 'http://localhost:8000/api').replace(/\/api\/?$/, '')
+    return `${base}/api/live_sessions/sessions/${sessionId}/hls-proxy/live/index.m3u8`
   }
 
   // Listen for stream.status events pushed via WebSocket (streamEvent prop from parent)
@@ -88,14 +89,8 @@ export default function VideoPreview({ session, streamEvent }) {
     if (!hlsUrl || !videoRef.current) return
     const video = videoRef.current
 
-    // Convert relative proxy URL to absolute
-    let absoluteUrl = hlsUrl
-    if (hlsUrl.startsWith('/api/')) {
-      const baseUrl = (import.meta.env.VITE_API_URL || 'http://localhost:8000/api/').replace(/\/api\/?$/, '')
-      absoluteUrl = `${baseUrl}${hlsUrl}`
-    } else if (hlsUrl.startsWith('/')) {
-      absoluteUrl = `${window.location.protocol}//${window.location.host}${hlsUrl}`
-    }
+    // hlsUrl is always absolute (built by buildHlsProxyUrl)
+    const absoluteUrl = hlsUrl
 
     const token = localStorage.getItem('accessToken') || sessionStorage.getItem('accessToken') || ''
 
