@@ -52,7 +52,7 @@ class AiAgentViewSet(viewsets.ModelViewSet):
     }
     
     def get_queryset(self):
-        return AiAgent.objects.filter(company=self.request.user.company)
+        return AiAgent.objects.filter(company=self.request.user.company).prefetch_related('knowledge_docs')
 
     @action(detail=False, methods=['get'], url_path='default-prompt')
     def default_prompt(self, request):

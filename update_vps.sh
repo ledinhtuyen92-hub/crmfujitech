@@ -160,6 +160,21 @@ echo "✅ Backend va Celery da duoc khoi dong lai!"
 # 7. Reload Nginx de phuc vu file moi nhat
 echo ""
 echo "🔥 [6/6] Dang reload Nginx de ap dung giao dien moi..."
+# Bat tinh nang GZIP cua Nginx de giam thoi gian load ReactJS / API payload
+if [ -f /etc/nginx/sites-available/crm ] && ! grep -q "gzip_types" /etc/nginx/sites-available/crm; then
+    sed -i '/client_max_body_size/a \
+\
+    # Bat GZIP de giam dung luong load web\
+    gzip on;\
+    gzip_disable "msie6";\
+    gzip_vary on;\
+    gzip_proxied any;\
+    gzip_comp_level 6;\
+    gzip_buffers 16 8k;\
+    gzip_http_version 1.1;\
+    gzip_types text/plain text/css application/json application/javascript text/xml application/xml application/xml+rss text/javascript application/vnd.ms-fontobject application/x-font-ttf font/opentype image/svg+xml image/x-icon;' /etc/nginx/sites-available/crm
+    echo "⚡ Da bat GZIP trong Nginx crm site giup tang toc load module!"
+fi
 systemctl reload nginx
 echo "✅ Nginx da duoc reload!"
 

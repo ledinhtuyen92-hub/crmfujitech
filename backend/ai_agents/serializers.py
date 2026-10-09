@@ -31,8 +31,13 @@ class AiKnowledgeDocumentSerializer(serializers.ModelSerializer):
         
         return data
 
+class SimpleAiKnowledgeDocumentSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = AiKnowledgeDocument
+        fields = ['id', 'title', 'doc_type', 'status', 'embedding_provider', 'created_at', 'updated_at']
+
 class AiAgentSerializer(serializers.ModelSerializer):
-    knowledge_docs = AiKnowledgeDocumentSerializer(many=True, read_only=True)
+    knowledge_docs = SimpleAiKnowledgeDocumentSerializer(many=True, read_only=True)
     class Meta:
         model = AiAgent
         fields = '__all__'

@@ -345,7 +345,20 @@ def process_ai_reply_zalo(lead_id, is_followup=False, trigger_msg_id=None):
         reply_text = result.get('reply')
         
         image_urls_to_send = []
-        raw_image_urls = result.get('image_urls')
+        url_to_title = {}
+        
+        def process_and_add_url(url, title=None):
+            if not url: return
+            if url.startswith('/'):
+                url = f"{get_public_domain()}{url}"
+            elif 'localhost:' in url or '127.0.0.1:' in url:
+                from urllib.parse import urlparse
+                url = f"{get_public_domain()}{urlparse(url).path}"
+            image_urls_to_send.append(url)
+            if title and title != "image.jpg":
+                url_to_title[url] = title
+
+        raw_image_urls = result.get('attachment_urls') or result.get('image_urls')
         if isinstance(raw_image_urls, str):
             raw_image_urls = [raw_image_urls]
             
@@ -353,31 +366,32 @@ def process_ai_reply_zalo(lead_id, is_followup=False, trigger_msg_id=None):
             import re
             for u in raw_image_urls:
                 if isinstance(u, str):
-                    md_match = re.search(r'!\[.*?\]\((.*?)\)', u)
+                    md_match = re.search(r'!\[(.*?)\]\((.*?)\)', u)
                     if md_match:
-                        image_urls_to_send.append(md_match.group(1).strip())
+                        process_and_add_url(md_match.group(2).strip(), md_match.group(1).strip())
                     else:
-                        image_urls_to_send.append(u.strip())
+                        process_and_add_url(u.strip())
+                        
         if isinstance(result.get('image_url'), str) and result.get('image_url').strip():
-            image_urls_to_send.append(result['image_url'])
+            import re
+            u = result['image_url']
+            md_match = re.search(r'!\[(.*?)\]\((.*?)\)', u)
+            if md_match:
+                process_and_add_url(md_match.group(2).strip(), md_match.group(1).strip())
+            else:
+                process_and_add_url(u.strip())
 
         if reply_text and isinstance(reply_text, str):
             reply_text = reply_text.replace('[STOP]', '').strip()
             
             import re
-            md_urls = re.findall(r'!\[.*?\]\((.*?)\)', reply_text)
-            for md_url in md_urls:
-                image_urls_to_send.append(md_url.strip())
+            md_urls = re.findall(r'!\[(.*?)\]\((.*?)\)', reply_text)
+            for title, md_url in md_urls:
+                process_and_add_url(md_url.strip(), title.strip())
             reply_text = re.sub(r'!\[.*?\]\(.*?\)', '', reply_text).strip()
 
         unique_images = []
         for url in image_urls_to_send:
-            if not url: continue
-            if url.startswith('/'):
-                url = f"{get_public_domain()}{url}"
-            elif 'localhost:' in url or '127.0.0.1:' in url:
-                from urllib.parse import urlparse
-                url = f"{get_public_domain()}{urlparse(url).path}"
             if url not in unique_images:
                 unique_images.append(url)
 
@@ -444,13 +458,37 @@ def process_ai_reply_zalo(lead_id, is_followup=False, trigger_msg_id=None):
             
             # Gửi TẤT CẢ ảnh trước tiên
             for img_url in unique_images:
-                resp = send_zalo_chat_message(lead.oa_config, lead.social_id, text="", image_url=img_url)
+                is_file = any(img_url.lower().split('?')[0].endswith(ext) for ext in ['.pdf', '.doc', '.docx', '.xls', '.xlsx', '.txt'])
+                if is_file:
+                    file_token = None
+                    try:
+                        from .services import get_image_bytes
+                        import io
+                        file_bytes, fname = get_image_bytes(img_url)
+                        if file_bytes and fname:
+                            file_obj = io.BytesIO(file_bytes)
+                            file_obj.name = url_to_title.get(img_url) or fname
+                            import mimetypes
+                            mt, _ = mimetypes.guess_type(fname)
+                            file_obj.content_type = mt or "application/octet-stream"
+                            from zalo_integration.services import upload_file_to_zalo
+                            file_token = upload_file_to_zalo(lead.oa_config, file_obj)
+                    except Exception as e:
+                        logger.error(f"[AI Zalo] Không lấy được file {img_url}: {e}")
+                    
+                    if file_token:
+                        resp = send_zalo_chat_message(lead.oa_config, lead.social_id, text="", file_token=file_token)
+                    else:
+                        resp = {"error": -1, "message": "Lỗi upload file lên Zalo"}
+                else:
+                    resp = send_zalo_chat_message(lead.oa_config, lead.social_id, text="", image_url=img_url)
+
                 if resp.get("error", 0) == 0:
                     ZaloMessage.objects.create(
                         company=lead.company,
                         social_lead=lead,
                         direction=ZaloMessage.DIRECTION_OUTBOUND,
-                        content="[Hình ảnh]",
+                        content="[File đính kèm]" if is_file else "[Hình ảnh]",
                         attachment_url=img_url,
                         zalo_msg_id=resp.get("data", {}).get("message_id", "") if resp and "data" in resp else "",
                         sender_role="ai",
@@ -653,7 +691,20 @@ def process_ai_reply_facebook(lead_id, is_followup=False, trigger_msg_id=None):
         reply_text = result.get('reply')
         
         image_urls_to_send = []
-        raw_image_urls = result.get('image_urls')
+        url_to_title = {}
+        
+        def process_and_add_url(url, title=None):
+            if not url: return
+            if url.startswith('/'):
+                url = f"{get_public_domain()}{url}"
+            elif 'localhost:' in url or '127.0.0.1:' in url:
+                from urllib.parse import urlparse
+                url = f"{get_public_domain()}{urlparse(url).path}"
+            image_urls_to_send.append(url)
+            if title and title != "image.jpg":
+                url_to_title[url] = title
+
+        raw_image_urls = result.get('attachment_urls') or result.get('image_urls')
         if isinstance(raw_image_urls, str):
             raw_image_urls = [raw_image_urls]
             
@@ -661,37 +712,32 @@ def process_ai_reply_facebook(lead_id, is_followup=False, trigger_msg_id=None):
             import re
             for u in raw_image_urls:
                 if isinstance(u, str):
-                    md_match = re.search(r'!\[.*?\]\((.*?)\)', u)
+                    md_match = re.search(r'!\[(.*?)\]\((.*?)\)', u)
                     if md_match:
-                        image_urls_to_send.append(md_match.group(1).strip())
+                        process_and_add_url(md_match.group(2).strip(), md_match.group(1).strip())
                     else:
-                        image_urls_to_send.append(u.strip())
+                        process_and_add_url(u.strip())
+                        
         if isinstance(result.get('image_url'), str) and result.get('image_url').strip():
             import re
             u = result['image_url']
-            md_match = re.search(r'!\[.*?\]\((.*?)\)', u)
+            md_match = re.search(r'!\[(.*?)\]\((.*?)\)', u)
             if md_match:
-                image_urls_to_send.append(md_match.group(1).strip())
+                process_and_add_url(md_match.group(2).strip(), md_match.group(1).strip())
             else:
-                image_urls_to_send.append(u.strip())
+                process_and_add_url(u.strip())
 
         if reply_text and isinstance(reply_text, str):
             reply_text = reply_text.replace('[STOP]', '').strip()
             
             import re
-            md_urls = re.findall(r'!\[.*?\]\((.*?)\)', reply_text)
-            for md_url in md_urls:
-                image_urls_to_send.append(md_url.strip())
+            md_urls = re.findall(r'!\[(.*?)\]\((.*?)\)', reply_text)
+            for title, md_url in md_urls:
+                process_and_add_url(md_url.strip(), title.strip())
             reply_text = re.sub(r'!\[.*?\]\(.*?\)', '', reply_text).strip()
 
         unique_images = []
         for url in image_urls_to_send:
-            if not url: continue
-            if url.startswith('/'):
-                url = f"{get_public_domain()}{url}"
-            elif 'localhost:' in url or '127.0.0.1:' in url:
-                from urllib.parse import urlparse
-                url = f"{get_public_domain()}{urlparse(url).path}"
             if url not in unique_images:
                 unique_images.append(url)
 
@@ -760,27 +806,35 @@ def process_ai_reply_facebook(lead_id, is_followup=False, trigger_msg_id=None):
             
             # Gửi TẤT CẢ ảnh trước tiên
             for img_url in unique_images:
+                is_file = any(img_url.lower().split('?')[0].endswith(ext) for ext in ['.pdf', '.doc', '.docx', '.xls', '.xlsx', '.txt'])
                 file_obj = None
                 try:
                     import io
+                    from .services import get_image_bytes
                     file_bytes, fname = get_image_bytes(img_url)
                     if file_bytes and fname:
                         file_obj = io.BytesIO(file_bytes)
-                        file_obj.name = fname
-                        file_obj.content_type = "image/png" if fname.lower().endswith('.png') else "image/jpeg"
+                        file_obj.name = url_to_title.get(img_url) or fname
+                        if is_file:
+                            import mimetypes
+                            mt, _ = mimetypes.guess_type(fname)
+                            file_obj.content_type = mt or "application/octet-stream"
+                        else:
+                            file_obj.content_type = "image/png" if fname.lower().endswith('.png') else "image/jpeg"
                 except Exception as e:
-                    logger.warning(f"[AI Facebook] Không lấy được ảnh {img_url}: {e}")
+                    logger.warning(f"[AI Facebook] Không lấy được ảnh/file {img_url}: {e}")
 
-                
+                att_type = "file" if is_file else "image"
                 if file_obj:
-                    resp = send_facebook_message(lead.page_config.page_access_token, lead.fb_user_id, message_text="", file_obj=file_obj, attachment_type="image")
+                    resp = send_facebook_message(lead.page_config.page_access_token, lead.fb_user_id, message_text="", file_obj=file_obj, attachment_type=att_type)
                 else:
-                    resp = send_facebook_message(lead.page_config.page_access_token, lead.fb_user_id, message_text="", attachment_url=img_url)
+                    resp = send_facebook_message(lead.page_config.page_access_token, lead.fb_user_id, message_text="", attachment_url=img_url, attachment_type=att_type)
+                    
                 if resp.get("success"):
                     FacebookMessage.objects.create(
                         lead=lead,
                         sender_type='page',
-                        text="[Hình ảnh]",
+                        text="[File đính kèm]" if is_file else "[Hình ảnh]",
                         attachment_url=img_url,
                         fb_message_id=resp.get("message_id", ""),
                         sender_role="ai",
@@ -788,11 +842,11 @@ def process_ai_reply_facebook(lead_id, is_followup=False, trigger_msg_id=None):
                     )
                 else:
                     err_msg = resp.get("error", "Unknown error")
-                    logger.error(f"[AI Facebook Error] Facebook API Image Error: {err_msg}")
+                    logger.error(f"[AI Facebook Error] Facebook API Error: {err_msg}")
                     FacebookMessage.objects.create(
                         lead=lead,
                         sender_type='page',
-                        text="Lỗi gửi ảnh",
+                        text="Lỗi gửi file" if is_file else "Lỗi gửi ảnh",
                         payload={"is_system_alert": True, "error_message": err_msg},
                         sender_role="ai",
                         sender_name="Trợ lý AI",

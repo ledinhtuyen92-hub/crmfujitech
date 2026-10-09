@@ -403,15 +403,15 @@ export default function AiKnowledgeBase() {
         if (parts.length >= 2) {
           let answerRaw = parts.slice(1).join('\nĐáp: ');
           
-          const imgRegex = /!\[.*?\]\((.*?)\)/g;
+          const imgRegex = /!\[(.*?)\]\((.*?)\)/g;
           const images = [];
           let match;
           while ((match = imgRegex.exec(answerRaw)) !== null) {
             images.push({
               uid: Math.random().toString(36).substring(7),
-              name: 'image.jpg',
+              name: match[1] || 'image.jpg',
               status: 'done',
-              url: match[1],
+              url: match[2],
               isExisting: true
             });
           }
@@ -1377,11 +1377,11 @@ export default function AiKnowledgeBase() {
                               listType="picture-card"
                               multiple
                               beforeUpload={() => false}
-                              accept="image/*"
+                              accept="image/*,.pdf,.doc,.docx,.xls,.xlsx,.txt"
                             >
                               <div>
                                 <PlusOutlined />
-                                <div style={{ marginTop: 8 }}>Thêm ảnh</div>
+                                <div style={{ marginTop: 8 }}>Thêm ảnh/file</div>
                               </div>
                             </Upload>
                           </Form.Item>
@@ -1550,11 +1550,11 @@ export default function AiKnowledgeBase() {
                               listType="picture-card"
                               multiple
                               beforeUpload={() => false}
-                              accept="image/*"
+                              accept="image/*,.pdf,.doc,.docx,.xls,.xlsx,.txt"
                             >
                               <div>
                                 <PlusOutlined />
-                                <div style={{ marginTop: 8 }}>Thêm ảnh mới</div>
+                                <div style={{ marginTop: 8 }}>Thêm ảnh/file mới</div>
                               </div>
                             </Upload>
                           </Form.Item>
