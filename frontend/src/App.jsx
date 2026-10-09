@@ -59,6 +59,7 @@ const LiveDashboard = lazy(() => import('./pages/live/LiveDashboard'))
 const LivePlatforms = lazy(() => import('./pages/live/LivePlatforms'))
 const LiveSessionsList = lazy(() => import('./pages/live/LiveSessionsList'))
 const LiveDevices = lazy(() => import('./pages/live/LiveDevices'))
+const LiveMediaAssets = lazy(() => import('./pages/live/LiveMediaAssets'))
 
 // Loading fallback chung
 function PageLoader() {
@@ -98,6 +99,7 @@ function DynamicTitle() {
     else if (path.startsWith('/live/platforms')) title = 'Live Platforms | Fujitech Group CRM';
     else if (path.startsWith('/live/sessions')) title = 'Live Sessions | Fujitech Group CRM';
     else if (path.startsWith('/live/devices')) title = 'Live Devices | Fujitech Group CRM';
+    else if (path.startsWith('/live/assets')) title = 'Live Media Assets | Fujitech Group CRM';
 
     document.title = title;
   }, [location.pathname]);
@@ -198,6 +200,12 @@ function App() {
               <Route path="/live/devices" element={
                 <PermissionRoute permissionCode="ai_agent.manage_agents">
                   <LiveDevices />
+                </PermissionRoute>
+              } />
+
+              <Route path="/live/assets" element={
+                <PermissionRoute permissionCode="ai_agent.manage_agents">
+                  <LiveMediaAssets />
                 </PermissionRoute>
               } />
 

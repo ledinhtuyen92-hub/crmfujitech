@@ -62,6 +62,7 @@ import {
   VideoCameraOutlined,
   DesktopOutlined,
   ExperimentOutlined,
+  PictureOutlined,
 } from '@ant-design/icons'
 import { useAuth } from '../contexts/AuthContext'
 
@@ -284,6 +285,11 @@ function MainLayout({ children, isDarkMode, toggleTheme }) {
                 key: '/live/platforms',
                 icon: <ApiOutlined />,
                 label: <Link to="/live/platforms">Kết nối nền tảng</Link>,
+              },
+              {
+                key: '/live/assets',
+                icon: <PictureOutlined />,
+                label: <Link to="/live/assets">Kho tài nguyên Live</Link>,
               },
               {
                 key: '/live/devices',
