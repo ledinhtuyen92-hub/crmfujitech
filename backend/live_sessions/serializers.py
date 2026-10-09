@@ -137,3 +137,17 @@ class PlatformAccountSerializer(serializers.ModelSerializer):
         model = PlatformAccount
         fields = ['id', 'platform', 'account_id', 'display_name', 'status', 'created_at']
         read_only_fields = ['id', 'created_at']
+
+from .models import LiveMediaAsset
+
+class LiveMediaAssetSerializer(serializers.ModelSerializer):
+    asset_type_display = serializers.CharField(source='get_asset_type_display', read_only=True)
+    is_system = serializers.SerializerMethodField()
+
+    class Meta:
+        model = LiveMediaAsset
+        fields = '__all__'
+        read_only_fields = ['company', 'created_at', 'updated_at']
+
+    def get_is_system(self, obj):
+        return obj.company is None

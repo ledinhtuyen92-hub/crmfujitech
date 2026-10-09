@@ -373,3 +373,40 @@ class LiveSession(models.Model):
                 
         transaction.on_commit(emit_status_event)
 
+
+class LiveMediaAsset(models.Model):
+    """
+    Kho tài nguyên Media (Hình ảnh, Video, Âm thanh) cho Livestream.
+    Nếu company = Null -> Đây là tài nguyên hệ thống (System Asset) dùng chung cho tất cả.
+    """
+    ASSET_TYPE_CHOICES = (
+        ('avatar', 'Avatar (Video Phông Xanh)'),
+        ('background', 'Phông nền (Background)'),
+        ('overlay', 'Lớp phủ (Overlay/Logo/Frame)'),
+        ('audio', 'Âm thanh (BGM/SFX)'),
+    )
+    
+    company = models.ForeignKey(
+        "users.Company",
+        on_delete=models.CASCADE,
+        null=True,
+        blank=True,
+        related_name="live_media_assets",
+        help_text="Bỏ trống nếu là tài nguyên hệ thống dùng chung"
+    )
+    name = models.CharField(max_length=255, verbose_name="Tên tài nguyên")
+    asset_type = models.CharField(max_length=20, choices=ASSET_TYPE_CHOICES, verbose_name="Loại tài nguyên")
+    file = models.FileField(upload_to="live_assets/%Y/%m/", verbose_name="File đính kèm")
+    thumbnail = models.ImageField(upload_to="live_assets/thumbnails/%Y/%m/", null=True, blank=True, verbose_name="Ảnh thu nhỏ (Nếu có)")
+    is_active = models.BooleanField(default=True)
+    
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = "Live Media Asset"
+        verbose_name_plural = "Live Media Assets"
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return f"[{self.get_asset_type_display()}] {self.name}"

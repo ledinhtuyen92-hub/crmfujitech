@@ -1,5 +1,5 @@
 from rest_framework.routers import DefaultRouter
-from .views import LivePlatformProductViewSet, LiveDeviceViewSet, LiveSessionViewSet, DeviceSessionViewSet, serve_audio_asset, PlatformAccountViewSet
+from .views import LivePlatformProductViewSet, LiveDeviceViewSet, LiveSessionViewSet, DeviceSessionViewSet, serve_audio_asset, PlatformAccountViewSet, LiveMediaAssetViewSet
 
 router = DefaultRouter()
 router.register(r'platform-products', LivePlatformProductViewSet, basename='platform-products')
@@ -7,6 +7,7 @@ router.register(r'platform-accounts', PlatformAccountViewSet, basename='platform
 router.register(r'devices', LiveDeviceViewSet, basename='devices')
 router.register(r'sessions', LiveSessionViewSet, basename='sessions')
 router.register(r'device/sessions', DeviceSessionViewSet, basename='device-sessions')
+router.register(r'media-assets', LiveMediaAssetViewSet, basename='media-assets')
 
 from django.urls import path
 from .oauth_views import ShopeeConnectView, ShopeeCallbackView

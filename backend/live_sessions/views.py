@@ -546,3 +546,31 @@ def serve_audio_asset(request, token):
         raise Http404("Audio file not found on server.")
         
     return FileResponse(open(file_path, 'rb'), content_type=f'audio/{payload["format"]}')
+
+from rest_framework.parsers import MultiPartParser, FormParser
+from django.db.models import Q
+from .models import LiveMediaAsset
+from .serializers import LiveMediaAssetSerializer
+
+class LiveMediaAssetViewSet(viewsets.ModelViewSet):
+    serializer_class = LiveMediaAssetSerializer
+    permission_classes = [permissions.IsAuthenticated, ActionBasedPermission]
+    parser_classes = [MultiPartParser, FormParser]
+    
+    action_permissions = {
+        'list': 'ai_agent.manage_agents',
+        'retrieve': 'ai_agent.manage_agents',
+        'create': 'ai_agent.manage_agents',
+        'update': 'ai_agent.manage_agents',
+        'partial_update': 'ai_agent.manage_agents',
+        'destroy': 'ai_agent.manage_agents',
+    }
+
+    def get_queryset(self):
+        # Users can see their own assets + system assets (company is null)
+        return LiveMediaAsset.objects.filter(
+            Q(company=self.request.user.company) | Q(company__isnull=True)
+        )
+
+    def perform_create(self, serializer):
+        serializer.save(company=self.request.user.company)
