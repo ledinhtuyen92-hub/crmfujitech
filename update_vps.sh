@@ -153,6 +153,11 @@ echo "✅ Backend va Celery da duoc khoi dong lai!"
 # 7. Reload Nginx de phuc vu file moi nhat
 echo ""
 echo "🔥 [6/6] Dang reload Nginx de ap dung giao dien moi..."
+# Bat tinh nang GZIP cua Nginx de giam thoi gian load ReactJS / API payload
+if grep -q "# gzip_types" /etc/nginx/nginx.conf; then
+    sed -i 's/# gzip_types/gzip_types/' /etc/nginx/nginx.conf
+    echo "⚡ Da bat GZIP trong Nginx giup tang toc load module!"
+fi
 systemctl reload nginx
 echo "✅ Nginx da duoc reload!"
 
