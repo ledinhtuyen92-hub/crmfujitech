@@ -8,6 +8,7 @@ import {
   UserSwitchOutlined,
   RobotOutlined,
   PoweroffOutlined,
+  PictureOutlined,
 } from '@ant-design/icons'
 import { useLiveWebSocket } from '../../hooks/useLiveWebSocket'
 import api from '../../utils/api'
@@ -16,6 +17,7 @@ import AITimeline from './components/AITimeline'
 import StreamHealthRow from './components/StreamHealthRow'
 import VideoPreview from './components/VideoPreview'
 import LiveChat from './components/LiveChat'
+import LiveSceneBuilder from './components/LiveSceneBuilder'
 
 const { Title, Text } = Typography
 
@@ -41,6 +43,7 @@ export default function LiveStudioBeta() {
   const [session, setSession] = useState(null)
   const [loading, setLoading] = useState(true)
   const [actionLoading, setActionLoading] = useState(false)
+  const [sceneBuilderVisible, setSceneBuilderVisible] = useState(false)
 
   // Realtime state
   const { connected, lastEvent } = useLiveWebSocket(id)
@@ -323,7 +326,16 @@ export default function LiveStudioBeta() {
           <Title level={4} style={{ margin: 0, color: '#1f1f1f' }}>Live Studio Workspace</Title>
           <Text type="secondary">Session: {session.id}</Text>
         </div>
-        {renderControls()}
+        <Space>
+          <Button 
+            type="dashed" 
+            icon={<PictureOutlined />} 
+            onClick={() => setSceneBuilderVisible(true)}
+          >
+            Thiết kế Cảnh (Scene)
+          </Button>
+          {renderControls()}
+        </Space>
       </div>
 
       {/* ── Status Banners ─────────────────────────────────────────────────── */}
@@ -390,6 +402,16 @@ export default function LiveStudioBeta() {
           sessionStatus={session?.status}
         />
       </Card>
+
+      <LiveSceneBuilder
+        visible={sceneBuilderVisible}
+        onClose={() => setSceneBuilderVisible(false)}
+        session={session}
+        onUpdateSuccess={() => {
+          // Re-fetch session to get updated assets
+          api.get(`/live_sessions/sessions/${id}/`).then(res => setSession(res.data))
+        }}
+      />
     </div>
   )
 }

@@ -218,11 +218,38 @@ export default function VideoPreview({ session, streamEvent }) {
       />
 
       {/* ── Status overlays ── */}
-      {hlsStatus === 'idle' && renderOverlay(
-        <VideoCameraOutlined />,
-        'STREAM PREVIEW',
-        'Nhấn "Bắt đầu LIVE" hoặc "Chạy thử nghiệm" để xem preview',
-        '#595959'
+      {hlsStatus === 'idle' && (
+        session?.background_asset_url || session?.avatar_asset_url || session?.overlay_asset_url ? (
+          <div style={{ position: 'relative', width: '100%', height: '100%', overflow: 'hidden' }}>
+            {session.background_asset_url && (
+              session.background_asset_url.match(/\.(mp4|webm)$/i) ? (
+                <video src={session.background_asset_url} autoPlay loop muted playsInline style={{ width: '100%', height: '100%', objectFit: 'cover', position: 'absolute', top: 0, left: 0 }} />
+              ) : (
+                <img src={session.background_asset_url} alt="Background" style={{ width: '100%', height: '100%', objectFit: 'cover', position: 'absolute', top: 0, left: 0 }} />
+              )
+            )}
+            {session.avatar_asset_url && (
+              session.avatar_asset_url.match(/\.(mp4|webm)$/i) ? (
+                <video src={session.avatar_asset_url} autoPlay loop muted playsInline style={{ width: 'auto', height: '80%', position: 'absolute', bottom: 0, left: '50%', transform: 'translateX(-50%)' }} />
+              ) : (
+                <img src={session.avatar_asset_url} alt="Avatar" style={{ width: 'auto', height: '80%', position: 'absolute', bottom: 0, left: '50%', transform: 'translateX(-50%)' }} />
+              )
+            )}
+            {session.overlay_asset_url && (
+              <img src={session.overlay_asset_url} alt="Overlay" style={{ width: '100%', height: '100%', objectFit: 'cover', position: 'absolute', top: 0, left: 0, pointerEvents: 'none' }} />
+            )}
+            <div style={{ position: 'absolute', bottom: 16, right: 16, background: 'rgba(0,0,0,0.6)', padding: '4px 12px', borderRadius: 4, color: 'white', fontSize: 12 }}>
+              Mockup Preview (Scene Builder)
+            </div>
+          </div>
+        ) : (
+          renderOverlay(
+            <VideoCameraOutlined />,
+            'STREAM PREVIEW',
+            'Bấm "Thiết kế Cảnh" để thêm Avatar/Background hoặc bấm "Bắt đầu LIVE"',
+            '#595959'
+          )
+        )
       )}
 
       {hlsStatus === 'waiting' && renderOverlay(
