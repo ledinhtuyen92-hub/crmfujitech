@@ -250,6 +250,12 @@ class LiveSession(models.Model):
         related_name="live_sessions",
         verbose_name="AI Agent",
     )
+    session_prompt = models.TextField(
+        blank=True,
+        null=True,
+        verbose_name="Gợi ý kịch bản (Chủ đề)",
+        help_text="Nhập chủ đề, chương trình khuyến mãi... AI sẽ tự động viết thành kịch bản hoàn chỉnh."
+    )
     avatar_asset = models.ForeignKey(
         "LiveMediaAsset",
         on_delete=models.SET_NULL,

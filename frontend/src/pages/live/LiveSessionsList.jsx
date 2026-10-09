@@ -100,6 +100,7 @@ export default function LiveSessionsList() {
       product: session.product,
       external_product_link: session.external_product_link,
       ai_agent: session.ai_agent,
+      session_prompt: session.session_prompt,
       platform: session.platform,
       shopee_connection_mode: session.shopee_connection_mode,
       tiktok_connection_mode: session.tiktok_connection_mode,
@@ -253,10 +254,17 @@ export default function LiveSessionsList() {
                 <Input placeholder="https://shopee.vn/..." />
               </Form.Item>
             )}
-            <Form.Item name="ai_agent" label="AI Agent (Host/Kịch bản)" rules={[{ required: true }]}>
+            <Form.Item name="ai_agent" label="AI Agent (Bộ não cố định)" rules={[{ required: true }]}>
               <Select placeholder="Chọn AI Agent">
                 {deps.agents.map(a => <Select.Option key={a.id} value={a.id}>{a.name}</Select.Option>)}
               </Select>
+            </Form.Item>
+
+            <Form.Item name="session_prompt" label="Kịch bản / Lưu ý riêng cho Phiên Live này (Tùy chọn)">
+              <Input.TextArea 
+                rows={3} 
+                placeholder="VD: Nhấn mạnh đây là Flash Sale 10/10, freeship toàn quốc, nhớ nhắc khách bấm vào góc trái màn hình..." 
+              />
             </Form.Item>
           </Card>
           

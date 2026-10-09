@@ -54,7 +54,7 @@ export default function LiveMediaAssets() {
       const uploadData = {
         name: values.name,
         asset_type: values.asset_type,
-        file: fileList[0].originFileObj
+        file: fileList[0].originFileObj || fileList[0]
       }
       
       await api.postForm('/live_sessions/media-assets/', uploadData)
