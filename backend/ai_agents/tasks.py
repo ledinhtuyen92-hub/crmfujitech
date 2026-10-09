@@ -345,6 +345,19 @@ def process_ai_reply_zalo(lead_id, is_followup=False, trigger_msg_id=None):
         reply_text = result.get('reply')
         
         image_urls_to_send = []
+        url_to_title = {}
+        
+        def process_and_add_url(url, title=None):
+            if not url: return
+            if url.startswith('/'):
+                url = f"{get_public_domain()}{url}"
+            elif 'localhost:' in url or '127.0.0.1:' in url:
+                from urllib.parse import urlparse
+                url = f"{get_public_domain()}{urlparse(url).path}"
+            image_urls_to_send.append(url)
+            if title and title != "image.jpg":
+                url_to_title[url] = title
+
         raw_image_urls = result.get('attachment_urls') or result.get('image_urls')
         if isinstance(raw_image_urls, str):
             raw_image_urls = [raw_image_urls]
@@ -353,31 +366,32 @@ def process_ai_reply_zalo(lead_id, is_followup=False, trigger_msg_id=None):
             import re
             for u in raw_image_urls:
                 if isinstance(u, str):
-                    md_match = re.search(r'!\[.*?\]\((.*?)\)', u)
+                    md_match = re.search(r'!\[(.*?)\]\((.*?)\)', u)
                     if md_match:
-                        image_urls_to_send.append(md_match.group(1).strip())
+                        process_and_add_url(md_match.group(2).strip(), md_match.group(1).strip())
                     else:
-                        image_urls_to_send.append(u.strip())
+                        process_and_add_url(u.strip())
+                        
         if isinstance(result.get('image_url'), str) and result.get('image_url').strip():
-            image_urls_to_send.append(result['image_url'])
+            import re
+            u = result['image_url']
+            md_match = re.search(r'!\[(.*?)\]\((.*?)\)', u)
+            if md_match:
+                process_and_add_url(md_match.group(2).strip(), md_match.group(1).strip())
+            else:
+                process_and_add_url(u.strip())
 
         if reply_text and isinstance(reply_text, str):
             reply_text = reply_text.replace('[STOP]', '').strip()
             
             import re
-            md_urls = re.findall(r'!\[.*?\]\((.*?)\)', reply_text)
-            for md_url in md_urls:
-                image_urls_to_send.append(md_url.strip())
+            md_urls = re.findall(r'!\[(.*?)\]\((.*?)\)', reply_text)
+            for title, md_url in md_urls:
+                process_and_add_url(md_url.strip(), title.strip())
             reply_text = re.sub(r'!\[.*?\]\(.*?\)', '', reply_text).strip()
 
         unique_images = []
         for url in image_urls_to_send:
-            if not url: continue
-            if url.startswith('/'):
-                url = f"{get_public_domain()}{url}"
-            elif 'localhost:' in url or '127.0.0.1:' in url:
-                from urllib.parse import urlparse
-                url = f"{get_public_domain()}{urlparse(url).path}"
             if url not in unique_images:
                 unique_images.append(url)
 
@@ -453,7 +467,7 @@ def process_ai_reply_zalo(lead_id, is_followup=False, trigger_msg_id=None):
                         file_bytes, fname = get_image_bytes(img_url)
                         if file_bytes and fname:
                             file_obj = io.BytesIO(file_bytes)
-                            file_obj.name = fname
+                            file_obj.name = url_to_title.get(img_url) or fname
                             import mimetypes
                             mt, _ = mimetypes.guess_type(fname)
                             file_obj.content_type = mt or "application/octet-stream"
@@ -677,6 +691,19 @@ def process_ai_reply_facebook(lead_id, is_followup=False, trigger_msg_id=None):
         reply_text = result.get('reply')
         
         image_urls_to_send = []
+        url_to_title = {}
+        
+        def process_and_add_url(url, title=None):
+            if not url: return
+            if url.startswith('/'):
+                url = f"{get_public_domain()}{url}"
+            elif 'localhost:' in url or '127.0.0.1:' in url:
+                from urllib.parse import urlparse
+                url = f"{get_public_domain()}{urlparse(url).path}"
+            image_urls_to_send.append(url)
+            if title and title != "image.jpg":
+                url_to_title[url] = title
+
         raw_image_urls = result.get('attachment_urls') or result.get('image_urls')
         if isinstance(raw_image_urls, str):
             raw_image_urls = [raw_image_urls]
@@ -685,37 +712,32 @@ def process_ai_reply_facebook(lead_id, is_followup=False, trigger_msg_id=None):
             import re
             for u in raw_image_urls:
                 if isinstance(u, str):
-                    md_match = re.search(r'!\[.*?\]\((.*?)\)', u)
+                    md_match = re.search(r'!\[(.*?)\]\((.*?)\)', u)
                     if md_match:
-                        image_urls_to_send.append(md_match.group(1).strip())
+                        process_and_add_url(md_match.group(2).strip(), md_match.group(1).strip())
                     else:
-                        image_urls_to_send.append(u.strip())
+                        process_and_add_url(u.strip())
+                        
         if isinstance(result.get('image_url'), str) and result.get('image_url').strip():
             import re
             u = result['image_url']
-            md_match = re.search(r'!\[.*?\]\((.*?)\)', u)
+            md_match = re.search(r'!\[(.*?)\]\((.*?)\)', u)
             if md_match:
-                image_urls_to_send.append(md_match.group(1).strip())
+                process_and_add_url(md_match.group(2).strip(), md_match.group(1).strip())
             else:
-                image_urls_to_send.append(u.strip())
+                process_and_add_url(u.strip())
 
         if reply_text and isinstance(reply_text, str):
             reply_text = reply_text.replace('[STOP]', '').strip()
             
             import re
-            md_urls = re.findall(r'!\[.*?\]\((.*?)\)', reply_text)
-            for md_url in md_urls:
-                image_urls_to_send.append(md_url.strip())
+            md_urls = re.findall(r'!\[(.*?)\]\((.*?)\)', reply_text)
+            for title, md_url in md_urls:
+                process_and_add_url(md_url.strip(), title.strip())
             reply_text = re.sub(r'!\[.*?\]\(.*?\)', '', reply_text).strip()
 
         unique_images = []
         for url in image_urls_to_send:
-            if not url: continue
-            if url.startswith('/'):
-                url = f"{get_public_domain()}{url}"
-            elif 'localhost:' in url or '127.0.0.1:' in url:
-                from urllib.parse import urlparse
-                url = f"{get_public_domain()}{urlparse(url).path}"
             if url not in unique_images:
                 unique_images.append(url)
 
@@ -792,7 +814,7 @@ def process_ai_reply_facebook(lead_id, is_followup=False, trigger_msg_id=None):
                     file_bytes, fname = get_image_bytes(img_url)
                     if file_bytes and fname:
                         file_obj = io.BytesIO(file_bytes)
-                        file_obj.name = fname
+                        file_obj.name = url_to_title.get(img_url) or fname
                         if is_file:
                             import mimetypes
                             mt, _ = mimetypes.guess_type(fname)
