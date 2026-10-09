@@ -55,7 +55,9 @@ from .authentication import DeviceTokenAuthentication
 from .services import LiveContextService
 
 
-class QueryParamJWTAuthentication:
+from rest_framework.authentication import BaseAuthentication
+
+class QueryParamJWTAuthentication(BaseAuthentication):
     """
     Minimal authenticator that reads a JWT token from ?token= query param.
     Used by HLS proxy so that HLS.js (which can't set custom headers for
@@ -152,13 +154,16 @@ class LiveSessionViewSet(viewsets.ModelViewSet):
         'hls_proxy': 'ai_agent.manage_agents',
     }
 
+    def get_authenticators(self):
+        if getattr(self, 'action', None) in ('hls_proxy', 'hls_proxy_custom'):
+            from rest_framework_simplejwt.authentication import JWTAuthentication
+            return [JWTAuthentication(), QueryParamJWTAuthentication()]
+        return super().get_authenticators()
+
     def get_permissions(self):
-        # HLS proxy accepts both Authorization header AND ?token= query param
+        # Allow access if they pass the authentication above
         if getattr(self, 'action', None) in ('hls_proxy', 'hls_proxy_custom'):
             from rest_framework.permissions import IsAuthenticated
-            from rest_framework_simplejwt.authentication import JWTAuthentication
-            # Allow query-param token auth for this action
-            self.authentication_classes = [JWTAuthentication, QueryParamJWTAuthentication]
             return [IsAuthenticated()]
         return super().get_permissions()
 
