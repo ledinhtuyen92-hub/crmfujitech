@@ -54,6 +54,25 @@ from .serializers import LiveDeviceSerializer, LiveSessionSerializer
 from .authentication import DeviceTokenAuthentication
 from .services import LiveContextService
 
+
+class QueryParamJWTAuthentication:
+    """
+    Minimal authenticator that reads a JWT token from ?token= query param.
+    Used by HLS proxy so that HLS.js (which can't set custom headers for
+    media segments) can still authenticate via a URL token.
+    """
+    def authenticate(self, request):
+        from rest_framework_simplejwt.authentication import JWTAuthentication
+        token = request.query_params.get('token') or request.GET.get('token')
+        if not token:
+            return None
+        # Inject into Authorization header temporarily so JWTAuthentication works
+        request.META['HTTP_AUTHORIZATION'] = f'Bearer {token}'
+        try:
+            return JWTAuthentication().authenticate(request)
+        except Exception:
+            return None
+
 def _generate_device_token(device):
     raw_secret = secrets.token_urlsafe(32)
     raw_token = f"ldt_{device.id.hex}_{raw_secret}"
@@ -132,6 +151,16 @@ class LiveSessionViewSet(viewsets.ModelViewSet):
         'setup_manual_rtmp': 'ai_agent.manage_agents',
         'hls_proxy': 'ai_agent.manage_agents',
     }
+
+    def get_permissions(self):
+        # HLS proxy accepts both Authorization header AND ?token= query param
+        if getattr(self, 'action', None) in ('hls_proxy', 'hls_proxy_custom'):
+            from rest_framework.permissions import IsAuthenticated
+            from rest_framework_simplejwt.authentication import JWTAuthentication
+            # Allow query-param token auth for this action
+            self.authentication_classes = [JWTAuthentication, QueryParamJWTAuthentication]
+            return [IsAuthenticated()]
+        return super().get_permissions()
 
     def get_queryset(self):
         return LiveSession.objects.filter(company=self.request.user.company)

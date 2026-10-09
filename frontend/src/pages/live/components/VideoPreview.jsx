@@ -13,10 +13,12 @@ export default function VideoPreview({ session, streamEvent }) {
 
   const isSessionLive = session?.status === 'running' || session?.status === 'human_takeover'
 
-  // Build absolute HLS proxy URL for this session
+  // Build absolute HLS proxy URL for this session (with ?token= for HLS.js segment auth)
   const buildHlsProxyUrl = (sessionId) => {
     const base = (import.meta.env.VITE_API_URL || 'http://localhost:8000/api').replace(/\/api\/?$/, '')
-    return `${base}/api/live_sessions/sessions/${sessionId}/hls-proxy/live/index.m3u8`
+    const token = localStorage.getItem('accessToken') || ''
+    const tokenParam = token ? `?token=${encodeURIComponent(token)}` : ''
+    return `${base}/api/live_sessions/sessions/${sessionId}/hls-proxy/live/index.m3u8${tokenParam}`
   }
 
   // Listen for stream.status events pushed via WebSocket (streamEvent prop from parent)
