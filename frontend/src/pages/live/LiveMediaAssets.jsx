@@ -79,14 +79,38 @@ export default function LiveMediaAssets() {
     return assets.filter(a => a.asset_type === type)
   }
 
-  const renderAssetIcon = (type) => {
-    switch (type) {
-      case 'avatar': return <VideoCameraOutlined style={{ fontSize: 32, color: '#1890ff' }} />
-      case 'background': return <PictureOutlined style={{ fontSize: 32, color: '#52c41a' }} />
-      case 'overlay': return <BlockOutlined style={{ fontSize: 32, color: '#faad14' }} />
-      case 'audio': return <AudioOutlined style={{ fontSize: 32, color: '#eb2f96' }} />
-      default: return <PictureOutlined style={{ fontSize: 32 }} />
+  const renderAssetThumbnail = (item) => {
+    if (item.asset_type === 'audio' || !item.file) {
+      switch (item.asset_type) {
+        case 'avatar': return <VideoCameraOutlined style={{ fontSize: 32, color: '#1890ff' }} />
+        case 'background': return <PictureOutlined style={{ fontSize: 32, color: '#52c41a' }} />
+        case 'overlay': return <BlockOutlined style={{ fontSize: 32, color: '#faad14' }} />
+        case 'audio': return <AudioOutlined style={{ fontSize: 32, color: '#eb2f96' }} />
+        default: return <PictureOutlined style={{ fontSize: 32 }} />
+      }
     }
+
+    const isVideo = item.file.match(/\.(mp4|webm)$/i)
+    if (isVideo) {
+      return (
+        <video 
+          src={item.file} 
+          style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: 8 }} 
+          muted 
+          playsInline
+          onMouseEnter={(e) => e.target.play()}
+          onMouseLeave={(e) => { e.target.pause(); e.target.currentTime = 0 }}
+        />
+      )
+    }
+
+    return (
+      <img 
+        src={item.file} 
+        alt={item.name} 
+        style={{ width: '100%', height: '100%', objectFit: 'contain', borderRadius: 8 }} 
+      />
+    )
   }
 
   const renderAssetGrid = (type) => {
@@ -131,9 +155,10 @@ export default function LiveMediaAssets() {
               justifyContent: 'center', 
               alignItems: 'center',
               marginBottom: 16,
-              borderRadius: 8
+              borderRadius: 8,
+              position: 'relative'
             }}>
-              {renderAssetIcon(item.asset_type)}
+              {renderAssetThumbnail(item)}
             </div>
             
             <div style={{ display: 'flex', flexDirection: 'column' }}>
