@@ -129,6 +129,7 @@ class LiveConsoleTests(TestCase):
             platform="custom",
             product=self.product,
             ai_agent=self.agent,
+            stream_url="rtmp://test.live/stream",
             status=LiveSession.STATUS_DRAFT
         )
         url = reverse('sessions-start', args=[session.id])
@@ -145,6 +146,7 @@ class LiveConsoleTests(TestCase):
             platform="custom",
             product=self.product,
             ai_agent=self.agent,
+            stream_url="rtmp://test.live/stream",
             status=LiveSession.STATUS_READY
         )
         url = reverse('sessions-start', args=[session.id])
@@ -161,6 +163,7 @@ class LiveConsoleTests(TestCase):
             platform="custom",
             product=self.product,
             ai_agent=self.agent,
+            stream_url="rtmp://test.live/stream",
             status=LiveSession.STATUS_STOPPED
         )
         from django.core.exceptions import ValidationError
@@ -178,6 +181,7 @@ class LiveConsoleTests(TestCase):
             platform="custom",
             product=self.product,
             ai_agent=self.agent,
+            stream_url="rtmp://test.live/stream",
             status=LiveSession.STATUS_DRAFT
         )
         

@@ -182,4 +182,4 @@ class LiveSessionsPhase1BTests(APITestCase):
         
         from django.core.exceptions import ValidationError
         with self.assertRaises(ValidationError):
-            session.change_status(LiveSession.STATUS_RUNNING)
+            session.change_status(LiveSession.STATUS_PAUSED)
