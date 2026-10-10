@@ -372,7 +372,8 @@ class LiveSessionViewSet(viewsets.ModelViewSet):
                             # Do NOT add a trailing slash to the segment URL!
                             rewritten_url = f"{proxy_base}/{full_path}"
                             if token:
-                                rewritten_url += f"?token={token}"
+                                separator = '&' if '?' in rewritten_url else '?'
+                                rewritten_url += f"{separator}token={token}"
                             return rewritten_url
                         else:
                             return line
