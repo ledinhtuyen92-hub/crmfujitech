@@ -221,14 +221,14 @@ class StreamEncoder:
                 inputs.extend(["-loop", "1", "-i", bg])
                 
             # Chroma key avatar and put on background
-            filter_complex.append(f"[0:v]colorkey=0x00FF00:0.1:0.1[ckout];[{input_idx}:v]scale={self.config.width}:{self.config.height}[bg];[bg][ckout]overlay=(W-w)/2:(H-h)/2[v1]")
+            filter_complex.append(f"[0:v]chromakey=0x2BB754:0.15:0.02,scale=-1:{self.config.height}[ckout];[{input_idx}:v]scale={self.config.width}:{self.config.height}[bg];[bg][ckout]overlay=(W-w)/2:(H-h)/2[v1]")
             video_out = "[v1]"
             input_idx += 1
             
         # Overlay
         if self.cached_assets.get('overlay'):
             inputs.extend(["-loop", "1", "-i", self.cached_assets['overlay']])
-            filter_complex.append(f"{video_out}[{input_idx}:v]scale={self.config.width}:{self.config.height}[ovl];{video_out}[ovl]overlay=0:0[v2]")
+            filter_complex.append(f"[{input_idx}:v]scale={self.config.width}:{self.config.height}[ovl];{video_out}[ovl]overlay=0:0[v2]")
             video_out = "[v2]"
             input_idx += 1
             
@@ -244,7 +244,9 @@ class StreamEncoder:
         
         if filter_complex:
             cmd.extend(["-filter_complex", ";".join(filter_complex)])
-            cmd.extend(["-map", video_out, "-map", audio_out])
+            map_v = video_out.strip("[]") if ":" in video_out else video_out
+            map_a = audio_out.strip("[]") if ":" in audio_out else audio_out
+            cmd.extend(["-map", map_v, "-map", map_a])
             
         # Output params
         cmd.extend([

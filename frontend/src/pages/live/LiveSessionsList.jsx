@@ -44,18 +44,20 @@ export default function LiveSessionsList() {
 
   const fetchDependencies = async () => {
     try {
-      const [devRes, prodRes, agtRes, accRes] = await Promise.all([
+      const [devRes, prodRes, agtRes, accRes, assetRes] = await Promise.all([
         api.get('/live_sessions/devices/').catch(() => ({ data: [] })),
         api.get('/inventory/products/').catch(() => ({ data: [] })),
         api.get('/ai_agents/agents/').catch(() => ({ data: [] })),
-        api.get('/live_sessions/platform-accounts/').catch(() => ({ data: [] }))
+        api.get('/live_sessions/platform-accounts/').catch(() => ({ data: [] })),
+        api.get('/live_sessions/media-assets/').catch(() => ({ data: [] }))
       ])
       
       setDeps({
         devices: Array.isArray(devRes.data) ? devRes.data : (devRes.data?.results || []),
         products: Array.isArray(prodRes.data) ? prodRes.data : (prodRes.data?.results || []),
         agents: Array.isArray(agtRes.data) ? agtRes.data : (agtRes.data?.results || []),
-        accounts: Array.isArray(accRes.data) ? accRes.data : (accRes.data?.results || [])
+        accounts: Array.isArray(accRes.data) ? accRes.data : (accRes.data?.results || []),
+        assets: Array.isArray(assetRes.data) ? assetRes.data : (assetRes.data?.results || [])
       })
     } catch (err) {
       console.error(err)
@@ -104,6 +106,10 @@ export default function LiveSessionsList() {
       platform: session.platform,
       shopee_connection_mode: session.shopee_connection_mode,
       tiktok_connection_mode: session.tiktok_connection_mode,
+      avatar_asset: session.avatar_asset,
+      background_asset: session.background_asset,
+      overlay_asset: session.overlay_asset,
+      audio_asset: session.audio_asset,
     })
     
     // Parse stream_url into server_url and stream_key for manual RTMP modes
@@ -265,6 +271,29 @@ export default function LiveSessionsList() {
                 rows={3} 
                 placeholder="VD: Nhấn mạnh đây là Flash Sale 10/10, freeship toàn quốc, nhớ nhắc khách bấm vào góc trái màn hình..." 
               />
+            </Form.Item>
+          </Card>
+          
+          <Card size="small" title="Thiết kế Cảnh (Scene)" style={{ marginBottom: 24, borderRadius: 8 }}>
+            <Form.Item name="avatar_asset" label="Người mẫu AI (Avatar)" rules={[{ required: false }]}>
+              <Select placeholder="Chọn Avatar đã tải lên" allowClear>
+                {(deps.assets || []).filter(a => a.asset_type === 'avatar').map(a => <Select.Option key={a.id} value={a.id}>{a.name}</Select.Option>)}
+              </Select>
+            </Form.Item>
+            <Form.Item name="background_asset" label="Phông nền (Background)" rules={[{ required: false }]}>
+              <Select placeholder="Chọn Phông nền đã tải lên" allowClear>
+                {(deps.assets || []).filter(a => a.asset_type === 'background').map(a => <Select.Option key={a.id} value={a.id}>{a.name}</Select.Option>)}
+              </Select>
+            </Form.Item>
+            <Form.Item name="overlay_asset" label="Lớp phủ / Logo (Overlay)" rules={[{ required: false }]}>
+              <Select placeholder="Chọn Lớp phủ đã tải lên (Tùy chọn)" allowClear>
+                {(deps.assets || []).filter(a => a.asset_type === 'overlay').map(a => <Select.Option key={a.id} value={a.id}>{a.name}</Select.Option>)}
+              </Select>
+            </Form.Item>
+            <Form.Item name="audio_asset" label="Âm thanh nền (BGM)" rules={[{ required: false }]}>
+              <Select placeholder="Chọn Âm thanh nền (Tùy chọn)" allowClear>
+                {(deps.assets || []).filter(a => a.asset_type === 'audio').map(a => <Select.Option key={a.id} value={a.id}>{a.name}</Select.Option>)}
+              </Select>
             </Form.Item>
           </Card>
           

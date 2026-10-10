@@ -340,11 +340,16 @@ class LiveSessionViewSet(viewsets.ModelViewSet):
         mediamtx_base = getattr(settings, 'MEDIAMTX_SERVER_URL', 'http://127.0.0.1:8888').rstrip('/')
         upstream_url = f"{mediamtx_base}/{hls_path}"
         
+        # Forward query parameters (e.g. ?session=...) to MediaMTX, but strip our auth token
+        upstream_params = request.GET.copy()
+        if 'token' in upstream_params:
+            del upstream_params['token']
+        
         try:
             import time
             max_retries = 5 if hls_path.endswith('.m3u8') else 1
             for attempt in range(max_retries):
-                resp = http_client.get(upstream_url, timeout=10, stream=True)
+                resp = http_client.get(upstream_url, params=upstream_params, timeout=10, stream=True)
                 if resp.status_code == 404 and attempt < max_retries - 1:
                     time.sleep(1.5)
                     continue
@@ -363,20 +368,28 @@ class LiveSessionViewSet(viewsets.ModelViewSet):
                 
                 token = request.GET.get('token')
                 
+                import re
+                def rewrite_url(url_str):
+                    if url_str.startswith('http'):
+                        return url_str
+                    path_dir = '/'.join(hls_path.split('/')[:-1])
+                    full_path = f"{path_dir}/{url_str}" if path_dir else url_str
+                    rewritten_url = f"{proxy_base}/{full_path}"
+                    if token:
+                        separator = '&' if '?' in rewritten_url else '?'
+                        rewritten_url += f"{separator}token={token}"
+                    return rewritten_url
+
                 def rewrite_line(line):
                     line = line.strip()
-                    if line and not line.startswith('#'):
-                        if not line.startswith('http'):
-                            path_dir = '/'.join(hls_path.split('/')[:-1])
-                            full_path = f"{path_dir}/{line}" if path_dir else line
-                            # Do NOT add a trailing slash to the segment URL!
-                            rewritten_url = f"{proxy_base}/{full_path}"
-                            if token:
-                                separator = '&' if '?' in rewritten_url else '?'
-                                rewritten_url += f"{separator}token={token}"
-                            return rewritten_url
-                        else:
-                            return line
+                    if not line:
+                        return line
+                    if line.startswith('#EXT-X-'):
+                        def repl(m):
+                            return f'URI="{rewrite_url(m.group(1))}"'
+                        return re.sub(r'URI="([^"]+)"', repl, line)
+                    elif not line.startswith('#'):
+                        return rewrite_url(line)
                     return line
                 
                 rewritten = '\n'.join(rewrite_line(line) for line in content.splitlines())

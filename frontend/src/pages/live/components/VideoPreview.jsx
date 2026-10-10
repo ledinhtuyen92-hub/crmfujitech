@@ -220,26 +220,38 @@ export default function VideoPreview({ session, streamEvent }) {
       {/* ── Status overlays ── */}
       {hlsStatus === 'idle' && (
         session?.background_asset_url || session?.avatar_asset_url || session?.overlay_asset_url ? (
-          <div style={{ position: 'relative', width: '100%', height: '100%', overflow: 'hidden' }}>
-            {session.background_asset_url && (
-              session.background_asset_url.match(/\.(mp4|webm)$/i) ? (
-                <video src={session.background_asset_url} autoPlay loop muted playsInline style={{ width: '100%', height: '100%', objectFit: 'cover', position: 'absolute', top: 0, left: 0 }} />
-              ) : (
-                <img src={session.background_asset_url} alt="Background" style={{ width: '100%', height: '100%', objectFit: 'cover', position: 'absolute', top: 0, left: 0 }} />
-              )
-            )}
-            {session.avatar_asset_url && (
-              session.avatar_asset_url.match(/\.(mp4|webm)$/i) ? (
-                <video src={session.avatar_asset_url} autoPlay loop muted playsInline style={{ width: 'auto', height: '80%', position: 'absolute', bottom: 0, left: '50%', transform: 'translateX(-50%)' }} />
-              ) : (
-                <img src={session.avatar_asset_url} alt="Avatar" style={{ width: 'auto', height: '80%', position: 'absolute', bottom: 0, left: '50%', transform: 'translateX(-50%)' }} />
-              )
-            )}
-            {session.overlay_asset_url && (
-              <img src={session.overlay_asset_url} alt="Overlay" style={{ width: '100%', height: '100%', objectFit: 'cover', position: 'absolute', top: 0, left: 0, pointerEvents: 'none' }} />
-            )}
-            <div style={{ position: 'absolute', bottom: 16, right: 16, background: 'rgba(0,0,0,0.6)', padding: '4px 12px', borderRadius: 4, color: 'white', fontSize: 12 }}>
-              Mockup Preview (Scene Builder)
+          <div style={{ position: 'relative', width: '100%', height: '100%', overflow: 'hidden', display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
+            <div style={{ position: 'relative', height: '100%', aspectRatio: '9/16', backgroundColor: '#000', overflow: 'hidden', boxShadow: '0 0 20px rgba(0,0,0,0.5)' }}>
+              {(() => {
+                const resolveUrl = (url) => url?.startsWith('/') ? `http://localhost:8000${url}` : url;
+                const bgUrl = resolveUrl(session.background_asset_url);
+                const avatarUrl = resolveUrl(session.avatar_asset_url);
+                const overlayUrl = resolveUrl(session.overlay_asset_url);
+                return (
+                  <>
+                    {bgUrl && (
+                      bgUrl.match(/\.(mp4|webm)$/i) ? (
+                        <video src={bgUrl} autoPlay loop muted playsInline style={{ width: '100%', height: '100%', objectFit: 'cover', position: 'absolute', top: 0, left: 0 }} />
+                      ) : (
+                        <img src={bgUrl} alt="Background" style={{ width: '100%', height: '100%', objectFit: 'cover', position: 'absolute', top: 0, left: 0 }} />
+                      )
+                    )}
+                    {avatarUrl && (
+                      avatarUrl.match(/\.(mp4|webm)$/i) ? (
+                        <video src={avatarUrl} autoPlay loop muted playsInline style={{ width: '100%', height: '100%', objectFit: 'contain', position: 'absolute', top: 0, left: 0 }} />
+                      ) : (
+                        <img src={avatarUrl} alt="Avatar" style={{ width: '100%', height: '100%', objectFit: 'contain', position: 'absolute', top: 0, left: 0 }} />
+                      )
+                    )}
+                    {overlayUrl && (
+                      <img src={overlayUrl} alt="Overlay" style={{ width: '100%', height: '100%', objectFit: 'cover', position: 'absolute', top: 0, left: 0, pointerEvents: 'none' }} />
+                    )}
+                  </>
+                );
+              })()}
+              <div style={{ position: 'absolute', bottom: 16, right: 16, background: 'rgba(0,0,0,0.8)', padding: '4px 12px', borderRadius: 4, color: 'white', fontSize: 12, border: '1px solid #434343' }}>
+                Mockup Preview (Scene Builder)
+              </div>
             </div>
           </div>
         ) : (
