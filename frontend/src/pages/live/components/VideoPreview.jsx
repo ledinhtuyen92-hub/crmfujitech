@@ -17,6 +17,7 @@ export default function VideoPreview({ session, streamEvent }) {
   const [hlsStatus, setHlsStatus] = useState('idle')
   const [hlsUrl, setHlsUrl] = useState(null)
   const [errorMsg, setErrorMsg] = useState(null)
+  const [isBuffering, setIsBuffering] = useState(true)
 
   const isSessionLive = session?.status === 'running' || session?.status === 'human_takeover'
 
@@ -170,7 +171,11 @@ export default function VideoPreview({ session, streamEvent }) {
         if (data.fatal) {
           if (data.type === Hls.ErrorTypes.NETWORK_ERROR) {
             // Network error on segment — retry
-            setTimeout(() => { if (hlsRef.current) hlsRef.current.startLoad() }, 3000)
+            if (data.details === Hls.ErrorDetails.MANIFEST_LOAD_ERROR || data.details === Hls.ErrorDetails.LEVEL_LOAD_ERROR) {
+               setTimeout(() => { if (hlsRef.current) hlsRef.current.loadSource(absoluteUrl) }, 3000)
+            } else {
+               setTimeout(() => { if (hlsRef.current) hlsRef.current.startLoad() }, 3000)
+            }
           } else if (data.type === Hls.ErrorTypes.MEDIA_ERROR) {
             hls.recoverMediaError()
           } else {
@@ -228,7 +233,22 @@ export default function VideoPreview({ session, streamEvent }) {
         }}
         muted
         playsInline
+        onWaiting={() => setIsBuffering(true)}
+        onPlaying={() => setIsBuffering(false)}
+        onCanPlay={() => setIsBuffering(false)}
       />
+
+      {/* Buffering overlay when video is live but stalling */}
+      {hlsStatus === 'live' && isBuffering && (
+        <div style={{
+          position: 'absolute', top: 0, left: 0, width: '100%', height: '100%',
+          display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+          backgroundColor: 'rgba(0,0,0,0.6)', zIndex: 10
+        }}>
+          <LoadingOutlined spin style={{ fontSize: 48, color: '#1890ff' }} />
+          <div style={{ color: '#fff', marginTop: 12 }}>Đang đồng bộ luồng...</div>
+        </div>
+      )}
 
       {/* ── Status overlays ── */}
       {hlsStatus === 'idle' && (
