@@ -60,13 +60,26 @@ export default function VideoPreview({ session, streamEvent }) {
 
     const proxyUrl = buildHlsProxyUrl(session.id)
 
+    const token = localStorage.getItem('accessToken') || sessionStorage.getItem('accessToken') || ''
+
     const probeHls = () => {
-      fetch(proxyUrl, { method: 'HEAD' })
+      fetch(proxyUrl, { method: 'GET', headers: token ? { 'Authorization': `Bearer ${token}` } : {} })
         .then((resp) => {
           if (resp.ok || resp.status === 200) {
-            setHlsUrl(proxyUrl)
-            setHlsStatus('loading')
-            setErrorMsg(null)
+            resp.text().then(text => {
+              // Ensure the playlist actually has streams or media segments
+              if (text.includes('EXT-X-STREAM-INF') || text.includes('EXTINF')) {
+                setHlsUrl(proxyUrl)
+                setHlsStatus('loading')
+                setErrorMsg(null)
+              } else {
+                setHlsStatus('waiting')
+                retryTimerRef.current = setTimeout(probeHls, 3000)
+              }
+            }).catch(() => {
+              setHlsStatus('waiting')
+              retryTimerRef.current = setTimeout(probeHls, 3000)
+            })
           } else if (resp.status === 401) {
             setHlsStatus('error')
             setErrorMsg(`Lỗi xác thực (401). Thử đăng xuất và đăng nhập lại.`)
