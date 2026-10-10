@@ -188,7 +188,13 @@ class ProtocolDispatcher:
             video_codec=payload_data.get("video_codec", "h264"),
             bitrate=payload_data.get("bitrate", "2500k"),
             audio_sample_rate=payload_data.get("audio_sample_rate", 44100),
-            audio_channels=payload_data.get("audio_channels", 2)
+            audio_channels=payload_data.get("audio_channels", 2),
+            ai_agent_id=payload_data.get("ai_agent_id"),
+            session_prompt=payload_data.get("session_prompt"),
+            avatar_asset_url=payload_data.get("avatar_asset_url"),
+            background_asset_url=payload_data.get("background_asset_url"),
+            overlay_asset_url=payload_data.get("overlay_asset_url"),
+            audio_asset_url=payload_data.get("audio_asset_url")
         )
         
         success = await self.stream_controller.handle_start(payload)

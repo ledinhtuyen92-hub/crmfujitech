@@ -18,7 +18,7 @@ class StreamState(Enum):
     RECONNECTING = "RECONNECTING"
 
 class StreamController:
-    def __init__(self, frame_queue=None, audio_sink=None, on_state_change=None):
+    def __init__(self, frame_queue=None, audio_sink=None, on_state_change=None, asset_fetcher=None):
         self._state = StreamState.IDLE
         self.encoder: Optional[StreamEncoder] = None
         self.locator = FfmpegLocator()
@@ -26,6 +26,7 @@ class StreamController:
         self.frame_queue = frame_queue
         self.audio_sink = audio_sink
         self.on_state_change = on_state_change
+        self.asset_fetcher = asset_fetcher
         
         self._frame_pump_task = None
         self._monitor_task = None
@@ -98,6 +99,41 @@ class StreamController:
         target_log = target.get_safe_log_metadata() if target else "test_mode_local_only"
         logger.info(f"stream_start requested. target={target_log} resolution={payload.width}x{payload.height} fps={payload.fps}")
         
+        # Phase 3: Download visual assets if needed
+        self.cached_assets = {}
+        if self.asset_fetcher:
+            logger.info("Downloading assets for Stream Start...")
+            downloads = []
+            
+            if payload.avatar_asset_url:
+                downloads.append(self.asset_fetcher.fetch(payload.avatar_asset_url, 'avatar'))
+            else:
+                downloads.append(asyncio.sleep(0))
+                
+            if payload.background_asset_url:
+                downloads.append(self.asset_fetcher.fetch(payload.background_asset_url, 'background'))
+            else:
+                downloads.append(asyncio.sleep(0))
+                
+            if payload.overlay_asset_url:
+                downloads.append(self.asset_fetcher.fetch(payload.overlay_asset_url, 'overlay'))
+            else:
+                downloads.append(asyncio.sleep(0))
+                
+            if payload.audio_asset_url:
+                downloads.append(self.asset_fetcher.fetch(payload.audio_asset_url, 'audio'))
+            else:
+                downloads.append(asyncio.sleep(0))
+
+            results = await asyncio.gather(*downloads, return_exceptions=True)
+            self.cached_assets = {
+                'avatar': results[0] if isinstance(results[0], str) else None,
+                'background': results[1] if isinstance(results[1], str) else None,
+                'overlay': results[2] if isinstance(results[2], str) else None,
+                'audio': results[3] if isinstance(results[3], str) else None,
+            }
+            logger.info(f"Asset cache paths: {self.cached_assets}")
+
         return await self._start_internal()
 
     async def _start_internal(self) -> bool:
@@ -127,7 +163,7 @@ class StreamController:
         except ImportError:
             output_url = self._current_target.get_full_url() if self._current_target else "rtmp://127.0.0.1:1935/live"
         
-        self.encoder = StreamEncoder(config, ffmpeg_path, output_url)
+        self.encoder = StreamEncoder(config, ffmpeg_path, output_url, self.cached_assets)
         try:
             await self.encoder.start()
             self.state = StreamState.LIVE

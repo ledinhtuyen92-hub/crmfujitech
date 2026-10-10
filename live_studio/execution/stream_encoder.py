@@ -164,10 +164,11 @@ class AVTimeline:
 
 
 class StreamEncoder:
-    def __init__(self, config: StreamConfig, ffmpeg_path: str, output_url: str):
+    def __init__(self, config: StreamConfig, ffmpeg_path: str, output_url: str, cached_assets: dict = None):
         self.config = config
         self.ffmpeg_path = ffmpeg_path
         self.output_url = output_url
+        self.cached_assets = cached_assets or {}
         self.video_transport = LocalTcpTransport()
         self.audio_transport = LocalTcpTransport()
         self.process = None
@@ -182,32 +183,82 @@ class StreamEncoder:
             self.ffmpeg_path,
             "-y",
             "-nostats",
-            "-loglevel", "error",
-            # Video Input (TCP)
-            "-f", "rawvideo",
-            "-pixel_format", self.config.video_pixel_format,
-            "-video_size", f"{self.config.width}x{self.config.height}",
-            "-framerate", str(self.config.fps),
-            "-i", f"tcp://127.0.0.1:{self.video_transport.port}",
-            # Audio Input (TCP)
+            "-loglevel", "error"
+        ]
+        
+        inputs = []
+        # Input 0: Video
+        if self.cached_assets.get('avatar'):
+            inputs.extend(["-stream_loop", "-1", "-i", self.cached_assets['avatar']])
+        else:
+            inputs.extend([
+                "-f", "rawvideo",
+                "-pixel_format", self.config.video_pixel_format,
+                "-video_size", f"{self.config.width}x{self.config.height}",
+                "-framerate", str(self.config.fps),
+                "-i", f"tcp://127.0.0.1:{self.video_transport.port}"
+            ])
+            
+        # Input 1: Audio (TCP)
+        inputs.extend([
             "-f", self.config.audio_format,
             "-ar", str(self.config.audio_sample_rate),
             "-ac", str(self.config.audio_channels),
-            "-i", f"tcp://127.0.0.1:{self.audio_transport.port}",
-            # Video Output encoding
+            "-i", f"tcp://127.0.0.1:{self.audio_transport.port}"
+        ])
+        
+        filter_complex = []
+        video_out = "[0:v]"
+        audio_out = "[1:a]"
+        input_idx = 2
+        
+        # Background
+        if self.cached_assets.get('background'):
+            bg = self.cached_assets['background']
+            if bg.endswith(('.mp4', '.webm')):
+                inputs.extend(["-stream_loop", "-1", "-i", bg])
+            else:
+                inputs.extend(["-loop", "1", "-i", bg])
+                
+            # Chroma key avatar and put on background
+            filter_complex.append(f"[0:v]colorkey=0x00FF00:0.1:0.1[ckout];[{input_idx}:v]scale={self.config.width}:{self.config.height}[bg];[bg][ckout]overlay=(W-w)/2:(H-h)/2[v1]")
+            video_out = "[v1]"
+            input_idx += 1
+            
+        # Overlay
+        if self.cached_assets.get('overlay'):
+            inputs.extend(["-loop", "1", "-i", self.cached_assets['overlay']])
+            filter_complex.append(f"{video_out}[{input_idx}:v]scale={self.config.width}:{self.config.height}[ovl];{video_out}[ovl]overlay=0:0[v2]")
+            video_out = "[v2]"
+            input_idx += 1
+            
+        # BGM
+        if self.cached_assets.get('audio'):
+            inputs.extend(["-stream_loop", "-1", "-i", self.cached_assets['audio']])
+            # volume=0.2 for bgm so it doesn't overpower TTS
+            filter_complex.append(f"[{input_idx}:a]volume=0.2[bgm];{audio_out}[bgm]amix=inputs=2:duration=first[a1]")
+            audio_out = "[a1]"
+            input_idx += 1
+            
+        cmd.extend(inputs)
+        
+        if filter_complex:
+            cmd.extend(["-filter_complex", ";".join(filter_complex)])
+            cmd.extend(["-map", video_out, "-map", audio_out])
+            
+        # Output params
+        cmd.extend([
             "-c:v", self.config.video_codec,
             "-b:v", self.config.bitrate,
             "-preset", "veryfast",
             "-pix_fmt", "yuv420p",
             "-g", "60",
             "-keyint_min", "60",
-            # Audio Output encoding
             "-c:a", "aac",
             "-b:a", "128k",
-            # Output format
             "-f", "flv" if self.output_url.startswith("rtmp") else "null",
             self.output_url
-        ]
+        ])
         
         logger.info(f"FFmpeg command: {' '.join(cmd)}")
         flags = 0x08000000 if sys.platform == 'win32' else 0

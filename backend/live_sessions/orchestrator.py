@@ -79,6 +79,12 @@ class LiveOrchestrator:
             "bitrate": stream_target.get("bitrate", "2500k"),
             "audio_sample_rate": stream_target.get("audio_sample_rate", 44100),
             "audio_channels": stream_target.get("audio_channels", 2),
+            "ai_agent_id": session.ai_agent_id if session.ai_agent else None,
+            "session_prompt": session.session_prompt,
+            "avatar_asset_url": session.avatar_asset.file.url if session.avatar_asset and session.avatar_asset.file else None,
+            "background_asset_url": session.background_asset.file.url if session.background_asset and session.background_asset.file else None,
+            "overlay_asset_url": session.overlay_asset.file.url if session.overlay_asset and session.overlay_asset.file else None,
+            "audio_asset_url": session.audio_asset.file.url if session.audio_asset and session.audio_asset.file else None,
         }
         
         payload_serializer = StreamStartPayloadSerializer(data=payload)

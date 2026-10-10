@@ -34,6 +34,14 @@ class StreamStartPayloadSerializer(serializers.Serializer):
     bitrate = serializers.CharField(default='2500k')
     audio_sample_rate = serializers.IntegerField(default=44100)
     audio_channels = serializers.IntegerField(default=2)
+    
+    # Scene Configuration
+    ai_agent_id = serializers.IntegerField(required=False, allow_null=True)
+    session_prompt = serializers.CharField(required=False, allow_null=True, allow_blank=True)
+    avatar_asset_url = serializers.CharField(required=False, allow_null=True, allow_blank=True)
+    background_asset_url = serializers.CharField(required=False, allow_null=True, allow_blank=True)
+    overlay_asset_url = serializers.CharField(required=False, allow_null=True, allow_blank=True)
+    audio_asset_url = serializers.CharField(required=False, allow_null=True, allow_blank=True)
 
 class StreamStopPayloadSerializer(serializers.Serializer):
     command_id = serializers.UUIDField(required=True)

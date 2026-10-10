@@ -43,6 +43,12 @@ class StreamStartPayload:
     bitrate: str = "2500k"
     audio_sample_rate: int = 44100
     audio_channels: int = 2
+    ai_agent_id: Optional[int] = None
+    session_prompt: Optional[str] = None
+    avatar_asset_url: Optional[str] = None
+    background_asset_url: Optional[str] = None
+    overlay_asset_url: Optional[str] = None
+    audio_asset_url: Optional[str] = None
 
 @dataclass
 class StreamStopPayload:

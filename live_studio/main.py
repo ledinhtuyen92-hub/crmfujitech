@@ -10,6 +10,7 @@ from live_studio.execution.dedup_registry import DedupRegistry
 from live_studio.execution.queue_manager import SpeechQueueManager
 from live_studio.execution.ack_manager import AckManager
 from live_studio.execution.audio_fetcher import AudioFetcher
+from live_studio.execution.asset_fetcher import AssetFetcher
 from live_studio.execution.audio_player import BaseAudioPlayer, DummyAudioPlayer
 from live_studio.execution.device_sequence import DeviceSequenceCounter
 from live_studio.execution.avatar_engine import BaseAvatarEngine
@@ -42,10 +43,12 @@ class LiveStudioApp:
         # Phase 1E-4/5: Stream Controller
         # Find if audio_player has stream_sink
         audio_sink = getattr(self.audio_player, 'stream_sink', None)
+        self.asset_fetcher = AssetFetcher(token)
         self.stream_controller = StreamController(
             frame_queue=self.frame_queue,
             audio_sink=audio_sink,
-            on_state_change=self._on_stream_state_change
+            on_state_change=self._on_stream_state_change,
+            asset_fetcher=self.asset_fetcher
         )
         
         self.ws_client = WebSocketClient(
