@@ -258,6 +258,7 @@ class StreamEncoder:
             "-keyint_min", "60",
             "-c:a", "aac",
             "-b:a", "128k",
+            "-flvflags", "no_duration_filesize",
             "-f", "flv" if self.output_url.startswith("rtmp") else "null",
             self.output_url
         ])

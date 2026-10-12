@@ -269,6 +269,7 @@ export default function VideoPreview({ session, streamEvent }) {
         enableWorker: true,
         lowLatencyMode: true,
         backBufferLength: 30,
+        liveDurationInfinity: true,
         // Live sync tuning: 3 segments buffer gives rock-solid smoothness
         liveSyncDurationCount: 3,
         liveMaxLatencyDurationCount: 6,
@@ -374,6 +375,10 @@ export default function VideoPreview({ session, streamEvent }) {
       {/* Video element - invisible until real frame is decoded to prevent black screen */}
       <video
         ref={videoRef}
+        autoPlay
+        loop
+        muted
+        playsInline
         style={{
           width: '100%',
           height: '100%',
@@ -387,14 +392,22 @@ export default function VideoPreview({ session, streamEvent }) {
           pointerEvents: (hlsStatus === 'live' && isPlaybackReady) ? 'auto' : 'none',
           zIndex: 2,
         }}
-        muted
-        playsInline
         onLoadedData={markFrameReady}
         onTimeUpdate={markFrameReady}
         onPlaying={markFrameReady}
         onCanPlay={markFrameReady}
         onWaiting={() => {
           if (isPlaybackReady) setIsBuffering(true)
+        }}
+        onEnded={() => {
+          if (videoRef.current) {
+            videoRef.current.play().catch(() => {})
+          }
+        }}
+        onPause={() => {
+          if (hlsStatus === 'live' && videoRef.current) {
+            videoRef.current.play().catch(() => {})
+          }
         }}
       />
 
