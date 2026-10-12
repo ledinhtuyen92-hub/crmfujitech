@@ -347,11 +347,11 @@ class LiveSessionViewSet(viewsets.ModelViewSet):
         
         try:
             import time
-            max_retries = 5 if hls_path.endswith('.m3u8') else 1
+            max_retries = 3 if hls_path.endswith('.m3u8') else 1
             for attempt in range(max_retries):
                 resp = http_client.get(upstream_url, params=upstream_params, timeout=10, stream=True)
                 if resp.status_code == 404 and attempt < max_retries - 1:
-                    time.sleep(1.5)
+                    time.sleep(0.4)
                     continue
                 break
             
