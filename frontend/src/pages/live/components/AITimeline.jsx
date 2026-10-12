@@ -13,6 +13,7 @@ import {
   PauseCircleFilled,
   DownOutlined,
   VerticalAlignBottomOutlined,
+  ReloadOutlined,
 } from '@ant-design/icons'
 
 const { Text, Paragraph } = Typography
@@ -315,7 +316,7 @@ const PIPELINE_EVENTS = new Set([
   'live.speech.dispatched', 'live.speech.error',
 ])
 
-export default function AITimeline({ lastEvent, connected }) {
+export default function AITimeline({ lastEvent, connected, onReconnect }) {
   const [interactions, setInteractions] = useState([])
   const containerRef = useRef(null)
   const [userScrolled, setUserScrolled] = useState(false)
@@ -381,6 +382,17 @@ export default function AITimeline({ lastEvent, connected }) {
             status={connected ? 'success' : 'error'}
             text={<Text style={{ fontSize: 12 }}>{connected ? 'Realtime' : 'Mất kết nối'}</Text>}
           />
+          {!connected && onReconnect && (
+            <Button
+              type="link"
+              size="small"
+              icon={<ReloadOutlined />}
+              onClick={onReconnect}
+              style={{ padding: 0, height: 'auto', fontSize: 12 }}
+            >
+              Thử lại
+            </Button>
+          )}
           {userScrolled && (
             <Tooltip title="Cuộn xuống dưới cùng">
               <Button
@@ -421,11 +433,24 @@ export default function AITimeline({ lastEvent, connected }) {
             <Empty
               image={Empty.PRESENTED_IMAGE_SIMPLE}
               description={
-                <Text type="secondary" style={{ fontSize: 13 }}>
-                  {connected
-                    ? 'Đang chờ tương tác từ khách hàng...'
-                    : 'Chưa kết nối WebSocket — timeline sẽ cập nhật sau khi kết nối.'}
-                </Text>
+                <Space direction="vertical" size={6} align="center">
+                  <Text type="secondary" style={{ fontSize: 13 }}>
+                    {connected
+                      ? 'Đang chờ tương tác từ khách hàng...'
+                      : 'Chưa kết nối WebSocket — timeline sẽ cập nhật sau khi kết nối.'}
+                  </Text>
+                  {!connected && onReconnect && (
+                    <Button
+                      size="small"
+                      type="primary"
+                      ghost
+                      icon={<ReloadOutlined />}
+                      onClick={onReconnect}
+                    >
+                      Kết nối lại ngay
+                    </Button>
+                  )}
+                </Space>
               }
             />
           </div>

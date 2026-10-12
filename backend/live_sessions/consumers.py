@@ -290,7 +290,14 @@ class AdminConsoleConsumer(AsyncWebsocketConsumer):
 
     async def receive(self, text_data):
         # Admin is strictly read-only for now via WS, commands are sent via REST
-        logger.info(f"Admin WS received message (ignored): {text_data}")
+        try:
+            data = json.loads(text_data)
+            if data.get("type") == "ping":
+                await self.send(text_data=json.dumps({"type": "pong"}))
+                return
+        except Exception:
+            pass
+        logger.debug(f"Admin WS received message (ignored): {text_data}")
 
     async def admin_event(self, event):
         """

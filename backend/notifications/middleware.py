@@ -37,6 +37,10 @@ class JWTAuthMiddleware(BaseMiddleware):
     """
 
     async def __call__(self, scope, receive, send):
+        # Bỏ qua nếu user đã được xác thực từ middleware ngoài
+        if "user" in scope and hasattr(scope["user"], "is_authenticated") and scope["user"].is_authenticated:
+            return await super().__call__(scope, receive, send)
+
         # Lấy token từ query string
         query_string = scope.get("query_string", b"").decode()
         params = parse_qs(query_string)

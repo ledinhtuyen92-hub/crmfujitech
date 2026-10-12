@@ -9,6 +9,7 @@ import {
   RobotOutlined,
   PoweroffOutlined,
   PictureOutlined,
+  ReloadOutlined,
 } from '@ant-design/icons'
 import { useLiveWebSocket } from '../../hooks/useLiveWebSocket'
 import api from '../../utils/api'
@@ -46,7 +47,7 @@ export default function LiveStudioBeta() {
   const [sceneBuilderVisible, setSceneBuilderVisible] = useState(false)
 
   // Realtime state
-  const { connected, lastEvent } = useLiveWebSocket(id)
+  const { connected, lastEvent, reconnect } = useLiveWebSocket(id)
   const [deviceHealth, setDeviceHealth] = useState({
     status: 'offline',
     uptime: 0,
@@ -350,7 +351,7 @@ export default function LiveStudioBeta() {
 
         {/* Center Column: AI Timeline */}
         <Col xs={24} lg={10} style={{ display: 'flex', flexDirection: 'column', height: 600 }}>
-          <AITimeline lastEvent={lastEvent} connected={connected} />
+          <AITimeline lastEvent={lastEvent} connected={connected} onReconnect={reconnect} />
         </Col>
 
         {/* Right Column: Live Chat */}
@@ -375,10 +376,23 @@ export default function LiveStudioBeta() {
                 <DesktopOutlined style={{ marginRight: 8 }} />
                 Realtime Status
               </span>
-              <Badge
-                status={connected ? 'success' : 'error'}
-                text={connected ? 'WS Connected' : 'WS Disconnected'}
-              />
+              <Space>
+                <Badge
+                  status={connected ? 'success' : 'error'}
+                  text={connected ? 'WS Connected' : 'WS Disconnected'}
+                />
+                {!connected && (
+                  <Button
+                    type="link"
+                    size="small"
+                    icon={<ReloadOutlined />}
+                    onClick={reconnect}
+                    style={{ padding: 0, height: 'auto', fontSize: 12 }}
+                  >
+                    Kết nối lại
+                  </Button>
+                )}
+              </Space>
               <Divider orientation="vertical" />
               <Text type="secondary">
                 Nền tảng: <Text strong>{session.platform_display || session.platform}</Text>
