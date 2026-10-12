@@ -421,9 +421,12 @@ export default function LiveStudioBeta() {
         visible={sceneBuilderVisible}
         onClose={() => setSceneBuilderVisible(false)}
         session={session}
-        onUpdateSuccess={() => {
-          // Re-fetch session to get updated assets
-          api.get(`/live_sessions/sessions/${id}/`).then(res => setSession(res.data))
+        onUpdateSuccess={(updated) => {
+          if (updated) {
+            setSession(updated)
+          } else {
+            api.get(`/live_sessions/sessions/${id}/`).then(res => setSession(res.data))
+          }
         }}
       />
     </div>

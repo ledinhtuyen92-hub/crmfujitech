@@ -17,10 +17,10 @@ export default function LiveSceneBuilder({ visible, onClose, session, onUpdateSu
       fetchAssets()
       if (session) {
         form.setFieldsValue({
-          avatar_asset: session.avatar_asset,
-          background_asset: session.background_asset,
-          overlay_asset: session.overlay_asset,
-          audio_asset: session.audio_asset,
+          avatar_asset: session.avatar_asset || undefined,
+          background_asset: session.background_asset || undefined,
+          overlay_asset: session.overlay_asset || undefined,
+          audio_asset: session.audio_asset || undefined,
         })
       }
     }
@@ -42,11 +42,21 @@ export default function LiveSceneBuilder({ visible, onClose, session, onUpdateSu
     try {
       setSaving(true)
       const values = await form.validateFields()
-      await api.patch(`/live_sessions/sessions/${session.id}/`, values)
+      // Explicitly convert undefined/falsy to null so DRF clears ForeignKey fields
+      const payload = {
+        avatar_asset: values.avatar_asset || null,
+        background_asset: values.background_asset || null,
+        overlay_asset: values.overlay_asset || null,
+        audio_asset: values.audio_asset || null,
+      }
+      const res = await api.patch(`/live_sessions/sessions/${session.id}/`, payload)
       message.success('Đã lưu cấu hình Cảnh (Scene)')
-      onUpdateSuccess() // Trigger parent to reload session
+      if (onUpdateSuccess) {
+        onUpdateSuccess(res.data)
+      }
       onClose()
     } catch (err) {
+      console.error('Failed to save scene:', err)
       message.error('Lỗi khi lưu cấu hình')
     } finally {
       setSaving(false)

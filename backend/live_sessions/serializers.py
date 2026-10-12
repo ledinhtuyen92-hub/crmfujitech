@@ -53,6 +53,7 @@ class LiveSessionSerializer(serializers.ModelSerializer):
     avatar_asset_url = serializers.SerializerMethodField()
     background_asset_url = serializers.SerializerMethodField()
     overlay_asset_url = serializers.SerializerMethodField()
+    audio_asset_url = serializers.SerializerMethodField()
 
     def get_avatar_asset_url(self, obj):
         if obj.avatar_asset and obj.avatar_asset.file:
@@ -67,6 +68,11 @@ class LiveSessionSerializer(serializers.ModelSerializer):
     def get_overlay_asset_url(self, obj):
         if obj.overlay_asset and obj.overlay_asset.file:
             return obj.overlay_asset.file.url
+        return None
+
+    def get_audio_asset_url(self, obj):
+        if obj.audio_asset and obj.audio_asset.file:
+            return obj.audio_asset.file.url
         return None
 
     class Meta:
