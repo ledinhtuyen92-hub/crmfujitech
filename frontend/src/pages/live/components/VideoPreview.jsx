@@ -315,16 +315,41 @@ export default function VideoPreview({ session, streamEvent }) {
       hls.loadSource(absoluteUrl)
       hls.attachMedia(video)
 
+      video.muted = true
+      video.defaultMuted = true
+
+      const seekToLiveEdge = () => {
+        if (!video) return
+        try {
+          if (video.buffered.length > 0) {
+            const bufStart = video.buffered.start(0)
+            const bufEnd = video.buffered.end(video.buffered.length - 1)
+            const target = (hls.liveSyncPosition && hls.liveSyncPosition > 0) 
+              ? hls.liveSyncPosition 
+              : Math.max(bufStart, bufEnd - 0.5)
+            if (video.currentTime < bufStart || video.currentTime === 0) {
+              video.currentTime = target
+            }
+          }
+          if (video.paused) {
+            video.play().catch(() => {})
+          }
+        } catch (_) {}
+      }
+
       hls.on(Hls.Events.FRAG_BUFFERED, () => {
+        seekToLiveEdge()
         hasStartedPlaybackRef.current = true
         setIsPlaybackReady(true)
         setIsBuffering(false)
       })
 
       hls.on(Hls.Events.MANIFEST_PARSED, () => {
+        video.muted = true
         video.play()
           .then(() => {
             setHlsStatus('live')
+            seekToLiveEdge()
           })
           .catch(() => {
             // Autoplay blocked by browser policy
@@ -334,6 +359,10 @@ export default function VideoPreview({ session, streamEvent }) {
 
       hls.on(Hls.Events.ERROR, (_, data) => {
         console.warn('[HLS Event]', data.type, data.details, data.fatal)
+        if (data.details === Hls.ErrorDetails.BUFFER_STALLED_ERROR || data.details === Hls.ErrorDetails.BUFFER_NUDGE_ON_STALL) {
+          seekToLiveEdge()
+          return
+        }
         if (data.fatal) {
           if (data.type === Hls.ErrorTypes.NETWORK_ERROR) {
             if (data.details === Hls.ErrorDetails.MANIFEST_LOAD_ERROR || data.details === Hls.ErrorDetails.LEVEL_LOAD_ERROR) {
