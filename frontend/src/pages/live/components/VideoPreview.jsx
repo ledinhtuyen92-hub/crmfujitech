@@ -25,6 +25,7 @@ export default function VideoPreview({ session, streamEvent }) {
   const [isPlaybackReady, setIsPlaybackReady] = useState(false)
   const [isBuffering, setIsBuffering] = useState(false)
   const [isMuted, setIsMuted] = useState(true)
+  const hasStartedPlaybackRef = useRef(false)
 
   const toggleMute = () => {
     if (videoRef.current) {
@@ -46,15 +47,23 @@ export default function VideoPreview({ session, streamEvent }) {
 
   const resolveProxyUrl = (urlStr, baseMasterUrl) => {
     if (!urlStr) return ''
-    if (urlStr.startsWith('http://') || urlStr.startsWith('https://')) {
+    try {
+      const base = new URL(baseMasterUrl)
+      const resolved = new URL(urlStr, base)
+      if (!resolved.search && base.search) {
+        resolved.search = base.search
+      }
+      return resolved.href
+    } catch {
+      if (urlStr.startsWith('http://') || urlStr.startsWith('https://')) {
+        return urlStr
+      }
+      const apiBase = (import.meta.env.VITE_API_URL || 'http://localhost:8000/api').replace(/\/api\/?$/, '')
+      if (urlStr.startsWith('/')) {
+        return `${apiBase}${urlStr}`
+      }
       return urlStr
     }
-    const apiBase = (import.meta.env.VITE_API_URL || 'http://localhost:8000/api').replace(/\/api\/?$/, '')
-    if (urlStr.startsWith('/')) {
-      return `${apiBase}${urlStr}`
-    }
-    const dir = baseMasterUrl ? baseMasterUrl.substring(0, baseMasterUrl.lastIndexOf('/')) : ''
-    return dir ? `${dir}/${urlStr}` : urlStr
   }
 
   const extractVariantUrl = (m3u8Content, masterUrl) => {
@@ -181,6 +190,7 @@ export default function VideoPreview({ session, streamEvent }) {
       setHlsUrl(null)
       setHlsStatus('idle')
       setIsPlaybackReady(false)
+      hasStartedPlaybackRef.current = false
       setErrorMsg(null)
       return
     }
@@ -196,29 +206,29 @@ export default function VideoPreview({ session, streamEvent }) {
     }
   }, [isSessionLive, session?.id, probeHls])
 
-  // Stall watchdog: auto-resync if stream attaches but freezes at currentTime = 0
+  // Stall watchdog: ONLY active during initial connection before playback has ever started.
+  // Once the stream is live, HLS.js manages error recovery internally and we NEVER destroy
+  // the playing instance on a timer!
   useEffect(() => {
-    if (!hlsUrl || isPlaybackReady) {
+    if (!hlsUrl || isPlaybackReady || hasStartedPlaybackRef.current) {
       if (watchdogTimerRef.current) clearTimeout(watchdogTimerRef.current)
       if (hardResetTimerRef.current) clearTimeout(hardResetTimerRef.current)
       return
     }
 
     watchdogTimerRef.current = setTimeout(() => {
-      if (!isPlaybackReady && hlsRef.current) {
-        console.warn('[VideoPreview Watchdog] Stream attached but no frames decoded after 5s. Reloading live edge...')
+      if (!hasStartedPlaybackRef.current && videoRef.current && videoRef.current.readyState < 2 && hlsRef.current) {
+        console.warn('[VideoPreview Watchdog] Initial stream frames taking >10s. Resyncing live edge...')
         try {
           hlsRef.current.stopLoad()
           hlsRef.current.startLoad(-1)
-        } catch (err) {
-          console.warn('[VideoPreview Watchdog] soft reload error:', err)
-        }
+        } catch (_) {}
       }
-    }, 5000)
+    }, 10000)
 
     hardResetTimerRef.current = setTimeout(() => {
-      if (!isPlaybackReady) {
-        console.warn('[VideoPreview Watchdog] Stream still not playing after 10s. Auto re-probing...')
+      if (!hasStartedPlaybackRef.current && videoRef.current && videoRef.current.readyState < 2) {
+        console.warn('[VideoPreview Watchdog] Cold start timed out after 20s. Re-probing...')
         if (hlsRef.current) {
           hlsRef.current.destroy()
           hlsRef.current = null
@@ -228,7 +238,7 @@ export default function VideoPreview({ session, streamEvent }) {
         setHlsStatus('waiting')
         probeHls()
       }
-    }, 10000)
+    }, 20000)
 
     return () => {
       if (watchdogTimerRef.current) clearTimeout(watchdogTimerRef.current)
@@ -280,14 +290,14 @@ export default function VideoPreview({ session, streamEvent }) {
 
       const hls = new Hls({
         enableWorker: true,
-        lowLatencyMode: true,
+        lowLatencyMode: false,
         backBufferLength: 30,
         liveDurationInfinity: true,
-        // Live sync tuning: 3 segments buffer gives rock-solid smoothness
         liveSyncDurationCount: 3,
-        liveMaxLatencyDurationCount: 6,
-        maxLiveSyncPlaybackRate: 1.2,
-        // Manifest & segment retry resilience
+        liveMaxLatencyDurationCount: 8,
+        maxLiveSyncPlaybackRate: 1.1,
+        maxBufferLength: 10,
+        maxMaxBufferLength: 20,
         manifestLoadingMaxRetry: 10,
         manifestLoadingRetryDelay: 1000,
         manifestLoadingMaxRetryTimeout: 15000,
@@ -304,6 +314,12 @@ export default function VideoPreview({ session, streamEvent }) {
       hlsRef.current = hls
       hls.loadSource(absoluteUrl)
       hls.attachMedia(video)
+
+      hls.on(Hls.Events.FRAG_BUFFERED, () => {
+        hasStartedPlaybackRef.current = true
+        setIsPlaybackReady(true)
+        setIsBuffering(false)
+      })
 
       hls.on(Hls.Events.MANIFEST_PARSED, () => {
         video.play()
@@ -350,9 +366,13 @@ export default function VideoPreview({ session, streamEvent }) {
 
   // Video frame readiness handler
   const markFrameReady = () => {
-    if (videoRef.current && videoRef.current.currentTime > 0) {
-      setIsPlaybackReady(true)
-      setIsBuffering(false)
+    if (videoRef.current) {
+      const v = videoRef.current
+      if (v.readyState >= 2 || v.currentTime > 0) {
+        hasStartedPlaybackRef.current = true
+        setIsPlaybackReady(true)
+        setIsBuffering(false)
+      }
     }
   }
 
@@ -407,7 +427,10 @@ export default function VideoPreview({ session, streamEvent }) {
         }}
         onLoadedData={markFrameReady}
         onTimeUpdate={markFrameReady}
-        onPlaying={markFrameReady}
+        onPlaying={() => {
+          markFrameReady()
+          setIsBuffering(false)
+        }}
         onCanPlay={markFrameReady}
         onWaiting={() => {
           if (isPlaybackReady) setIsBuffering(true)
@@ -418,8 +441,12 @@ export default function VideoPreview({ session, streamEvent }) {
           }
         }}
         onPause={() => {
-          if (hlsStatus === 'live' && videoRef.current) {
-            videoRef.current.play().catch(() => {})
+          if (hlsStatus === 'live' && videoRef.current && !videoRef.current.seeking) {
+            setTimeout(() => {
+              if (videoRef.current && videoRef.current.paused && hlsStatus === 'live') {
+                videoRef.current.play().catch(() => {})
+              }
+            }, 300)
           }
         }}
       />
@@ -446,15 +473,16 @@ export default function VideoPreview({ session, streamEvent }) {
         </div>
       )}
 
-      {/* Buffering overlay when video was playing but stalls */}
+      {/* Buffering badge: subtle non-intrusive indicator that never blacks out the video */}
       {hlsStatus === 'live' && isPlaybackReady && isBuffering && (
         <div style={{
-          position: 'absolute', top: 0, left: 0, width: '100%', height: '100%',
-          display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
-          backgroundColor: 'rgba(0,0,0,0.6)', zIndex: 10
+          position: 'absolute', top: 16, left: 16,
+          display: 'flex', alignItems: 'center', gap: 8,
+          backgroundColor: 'rgba(0,0,0,0.65)', padding: '4px 12px', borderRadius: 16,
+          zIndex: 10, backdropFilter: 'blur(4px)',
         }}>
-          <LoadingOutlined spin style={{ fontSize: 48, color: '#1890ff' }} />
-          <div style={{ color: '#fff', marginTop: 12 }}>Đang đồng bộ luồng...</div>
+          <LoadingOutlined spin style={{ fontSize: 14, color: '#1890ff' }} />
+          <span style={{ color: '#fff', fontSize: 12 }}>Đang đồng bộ...</span>
         </div>
       )}
 

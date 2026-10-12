@@ -202,7 +202,7 @@ export default function LiveSessionsList() {
 
       <Drawer
         title={editSession ? "Chỉnh Sửa Phiên Livestream" : "Tạo Phiên Livestream Mới"}
-        width={600}
+        styles={{ wrapper: { width: 600 } }}
         onClose={() => {
           setCreateVisible(false)
           setEditSession(null)

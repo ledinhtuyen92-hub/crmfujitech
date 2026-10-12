@@ -433,7 +433,7 @@ export default function AITimeline({ lastEvent, connected, onReconnect }) {
             <Empty
               image={Empty.PRESENTED_IMAGE_SIMPLE}
               description={
-                <Space direction="vertical" size={6} align="center">
+                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6 }}>
                   <Text type="secondary" style={{ fontSize: 13 }}>
                     {connected
                       ? 'Đang chờ tương tác từ khách hàng...'
@@ -450,7 +450,7 @@ export default function AITimeline({ lastEvent, connected, onReconnect }) {
                       Kết nối lại ngay
                     </Button>
                   )}
-                </Space>
+                </div>
               }
             />
           </div>

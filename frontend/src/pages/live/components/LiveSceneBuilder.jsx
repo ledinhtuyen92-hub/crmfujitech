@@ -75,7 +75,7 @@ export default function LiveSceneBuilder({ visible, onClose, session, onUpdateSu
       placement="right"
       onClose={onClose}
       open={visible}
-      width={450}
+      styles={{ wrapper: { width: 450 } }}
       extra={
         <Button type="primary" icon={<CheckCircleOutlined />} onClick={handleSave} loading={saving}>
           Lưu thiết kế
