@@ -235,8 +235,8 @@ class StreamEncoder:
         # BGM
         if self.cached_assets.get('audio'):
             inputs.extend(["-stream_loop", "-1", "-i", self.cached_assets['audio']])
-            # volume=0.2 for bgm so it doesn't overpower TTS
-            filter_complex.append(f"[{input_idx}:a]volume=0.2[bgm];{audio_out}[bgm]amix=inputs=2:duration=first[a1]")
+            # volume=0.5 for bgm so it is clearly audible while keeping TTS prominent
+            filter_complex.append(f"[{input_idx}:a]volume=0.5[bgm];{audio_out}[bgm]amix=inputs=2:duration=first:dropout_transition=0[a1]")
             audio_out = "[a1]"
             input_idx += 1
             

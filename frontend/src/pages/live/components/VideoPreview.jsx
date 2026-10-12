@@ -5,6 +5,8 @@ import {
   LoadingOutlined,
   PlayCircleOutlined,
   ExclamationCircleOutlined,
+  SoundOutlined,
+  MutedOutlined,
 } from '@ant-design/icons'
 
 const { Title, Text } = Typography
@@ -22,6 +24,15 @@ export default function VideoPreview({ session, streamEvent }) {
   const [errorMsg, setErrorMsg] = useState(null)
   const [isPlaybackReady, setIsPlaybackReady] = useState(false)
   const [isBuffering, setIsBuffering] = useState(false)
+  const [isMuted, setIsMuted] = useState(true)
+
+  const toggleMute = () => {
+    if (videoRef.current) {
+      const nextMuted = !videoRef.current.muted
+      videoRef.current.muted = nextMuted
+      setIsMuted(nextMuted)
+    }
+  }
 
   const isSessionLive = session?.status === 'running' || session?.status === 'human_takeover'
 
@@ -228,6 +239,8 @@ export default function VideoPreview({ session, streamEvent }) {
   // Manual play (bypass browser autoplay block)
   const handleManualPlay = () => {
     if (videoRef.current) {
+      videoRef.current.muted = false
+      setIsMuted(false)
       videoRef.current.play()
         .then(() => setHlsStatus('live'))
         .catch((e) => {
@@ -377,7 +390,7 @@ export default function VideoPreview({ session, streamEvent }) {
         ref={videoRef}
         autoPlay
         loop
-        muted
+        muted={isMuted}
         playsInline
         style={{
           width: '100%',
@@ -410,6 +423,28 @@ export default function VideoPreview({ session, streamEvent }) {
           }
         }}
       />
+
+      {/* Floating Audio Control Button */}
+      {hlsStatus === 'live' && isPlaybackReady && (
+        <div style={{ position: 'absolute', top: 16, right: 16, zIndex: 12 }}>
+          <Button
+            type={isMuted ? 'default' : 'primary'}
+            shape="round"
+            icon={isMuted ? <MutedOutlined /> : <SoundOutlined />}
+            onClick={toggleMute}
+            style={{
+              backgroundColor: isMuted ? 'rgba(0, 0, 0, 0.7)' : '#1649c9',
+              borderColor: isMuted ? 'rgba(255, 255, 255, 0.35)' : '#1649c9',
+              color: '#fff',
+              backdropFilter: 'blur(6px)',
+              boxShadow: '0 2px 8px rgba(0,0,0,0.5)',
+              fontWeight: 500,
+            }}
+          >
+            {isMuted ? 'Bật âm thanh' : 'Tắt âm thanh'}
+          </Button>
+        </div>
+      )}
 
       {/* Buffering overlay when video was playing but stalls */}
       {hlsStatus === 'live' && isPlaybackReady && isBuffering && (
