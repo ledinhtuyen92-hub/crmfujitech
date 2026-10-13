@@ -1,12 +1,12 @@
 import { useState, useEffect } from 'react'
 import {
-  Alert, Button, Card, Col, Collapse, Divider, Form, Input, InputNumber,
+  Alert, Avatar, Button, Card, Col, Collapse, Divider, Form, Input, InputNumber,
   message, Modal, Popconfirm, Row, Select, Space, Switch, Table, Tag, Tooltip, Typography
 } from 'antd'
 import {
-  ApiOutlined, CheckCircleOutlined, CloseCircleOutlined,
-  DeleteOutlined, DisconnectOutlined, HistoryOutlined, InfoCircleOutlined, KeyOutlined,
-  ReloadOutlined, SettingOutlined, WarningOutlined,
+  ApiOutlined, CheckCircleFilled, CheckCircleOutlined, CloseCircleOutlined,
+  DeleteOutlined, DisconnectOutlined, HistoryOutlined, IdcardOutlined, InfoCircleOutlined, KeyOutlined,
+  ReloadOutlined, SettingOutlined, ShopOutlined, WarningOutlined,
 } from '@ant-design/icons'
 import api from '../../utils/api'
 import { useAuth } from '../../contexts/AuthContext'
@@ -181,13 +181,56 @@ export default function ZaloConfigPage() {
     setVerifying(true)
     try {
       const res = await api.post(`/zalo/config/${cfg.id}/verify-token/`)
+      const oaInfo = res.data?.oa_info
       Modal.success({
         title: 'Xác thực chuẩn Token Zalo OA',
+        width: 480,
         content: (
-          <div style={{ marginTop: 12 }}>
-            <p><b>Tên OA thực tế từ Zalo:</b> {res.data?.oa_info?.name}</p>
-            <p><b>OA ID trên Zalo:</b> {res.data?.oa_info?.oa_id}</p>
-            <p style={{ color: '#16a34a' }}>✅ Token đang kết nối chuẩn xác với trang Zalo OA này!</p>
+          <div style={{ marginTop: 14 }}>
+            {oaInfo?.avatar && (
+              <div style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 12,
+                marginBottom: 14,
+                padding: '10px 14px',
+                background: '#f8fafc',
+                borderRadius: 8,
+                border: '1px solid #e2e8f0'
+              }}>
+                <Avatar src={oaInfo.avatar} size={46} shape="square" style={{ borderRadius: 8, flexShrink: 0 }} />
+                <div style={{ overflow: 'hidden' }}>
+                  <div style={{ fontWeight: 600, fontSize: 14, color: '#0f172a' }}>{oaInfo.name}</div>
+                  <div style={{ fontSize: 12, color: '#64748b', marginTop: 2 }}>OA ID: {oaInfo.oa_id}</div>
+                </div>
+              </div>
+            )}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 14, color: '#334155' }}>
+                <ShopOutlined style={{ color: '#0068ff', fontSize: 16, flexShrink: 0 }} />
+                <span><b>Tên OA thực tế từ Zalo:</b> {oaInfo?.name || 'Zalo OA'}</span>
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 14, color: '#334155' }}>
+                <IdcardOutlined style={{ color: '#6366f1', fontSize: 16, flexShrink: 0 }} />
+                <span><b>OA ID trên Zalo:</b> <span style={{ fontFamily: 'monospace', fontWeight: 600 }}>{oaInfo?.oa_id}</span></span>
+              </div>
+            </div>
+            <div style={{
+              marginTop: 14,
+              display: 'flex',
+              alignItems: 'center',
+              gap: 8,
+              padding: '9px 12px',
+              background: '#f0fdf4',
+              borderRadius: 6,
+              border: '1px solid #bbf7d0',
+              color: '#15803d',
+              fontSize: 13,
+              fontWeight: 500
+            }}>
+              <CheckCircleFilled style={{ color: '#16a34a', fontSize: 16, flexShrink: 0 }} />
+              <span>Token đang kết nối chuẩn xác với trang Zalo OA này!</span>
+            </div>
           </div>
         )
       })
