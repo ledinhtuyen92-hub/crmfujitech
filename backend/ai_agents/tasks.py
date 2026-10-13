@@ -366,20 +366,28 @@ def process_ai_reply_zalo(lead_id, is_followup=False, trigger_msg_id=None):
             import re
             for u in raw_image_urls:
                 if isinstance(u, str):
-                    md_match = re.search(r'!\[(.*?)\]\((.*?)\)', u)
-                    if md_match:
-                        process_and_add_url(md_match.group(2).strip(), md_match.group(1).strip())
+                    md_matches = re.findall(r'!\[(.*?)\]\((.*?)\)', u)
+                    if md_matches:
+                        for title, link in md_matches:
+                            process_and_add_url(link.strip(), title.strip())
                     else:
-                        process_and_add_url(u.strip())
+                        for part in u.split():
+                            part = part.strip()
+                            if part.startswith('http') or part.startswith('/media/'):
+                                process_and_add_url(part)
                         
         if isinstance(result.get('image_url'), str) and result.get('image_url').strip():
             import re
             u = result['image_url']
-            md_match = re.search(r'!\[(.*?)\]\((.*?)\)', u)
-            if md_match:
-                process_and_add_url(md_match.group(2).strip(), md_match.group(1).strip())
+            md_matches = re.findall(r'!\[(.*?)\]\((.*?)\)', u)
+            if md_matches:
+                for title, link in md_matches:
+                    process_and_add_url(link.strip(), title.strip())
             else:
-                process_and_add_url(u.strip())
+                for part in u.split():
+                    part = part.strip()
+                    if part.startswith('http') or part.startswith('/media/'):
+                        process_and_add_url(part)
 
         if reply_text and isinstance(reply_text, str):
             reply_text = reply_text.replace('[STOP]', '').strip()
@@ -711,20 +719,28 @@ def process_ai_reply_facebook(lead_id, is_followup=False, trigger_msg_id=None):
             import re
             for u in raw_image_urls:
                 if isinstance(u, str):
-                    md_match = re.search(r'!\[(.*?)\]\((.*?)\)', u)
-                    if md_match:
-                        process_and_add_url(md_match.group(2).strip(), md_match.group(1).strip())
+                    md_matches = re.findall(r'!\[(.*?)\]\((.*?)\)', u)
+                    if md_matches:
+                        for title, link in md_matches:
+                            process_and_add_url(link.strip(), title.strip())
                     else:
-                        process_and_add_url(u.strip())
+                        for part in u.split():
+                            part = part.strip()
+                            if part.startswith('http') or part.startswith('/media/'):
+                                process_and_add_url(part)
                         
         if isinstance(result.get('image_url'), str) and result.get('image_url').strip():
             import re
             u = result['image_url']
-            md_match = re.search(r'!\[(.*?)\]\((.*?)\)', u)
-            if md_match:
-                process_and_add_url(md_match.group(2).strip(), md_match.group(1).strip())
+            md_matches = re.findall(r'!\[(.*?)\]\((.*?)\)', u)
+            if md_matches:
+                for title, link in md_matches:
+                    process_and_add_url(link.strip(), title.strip())
             else:
-                process_and_add_url(u.strip())
+                for part in u.split():
+                    part = part.strip()
+                    if part.startswith('http') or part.startswith('/media/'):
+                        process_and_add_url(part)
 
         if reply_text and isinstance(reply_text, str):
             reply_text = reply_text.replace('[STOP]', '').strip()

@@ -33,14 +33,44 @@ def parse_document(file_path, doc_type):
         
     return text
 
+def chunk_qa_text(text: str, max_chunk_size: int = 3500) -> list:
+    """
+    Tách tài liệu Q&A theo từng cặp câu hỏi - trả lời hoàn chỉnh.
+    Đảm bảo mỗi câu hỏi kèm toàn bộ câu trả lời, hình ảnh, file PDF đính kèm
+    luôn nằm trọn vẹn trong 1 chunk duy nhất, không bao giờ bị cắt vụn.
+    """
+    import re
+    # Match các pattern bắt đầu câu hỏi: "Hỏi:", "Câu hỏi:", "Q:", "Question:" ở đầu dòng
+    pattern = r'(?=(?:^|\n+)(?:[Hh]ỏi\s*:|[Cc]âu\s*hỏi\s*:|[Qq]\s*:|[Qq]uestion\s*:))'
+    raw_blocks = re.split(pattern, text)
+    
+    chunks = []
+    for block in raw_blocks:
+        b = block.strip()
+        if not b:
+            continue
+        # Nếu block Q&A quá dài (vượt max_chunk_size), fallback sang chia nhỏ bằng RecursiveCharacterTextSplitter
+        if len(b) > max_chunk_size:
+            splitter = RecursiveCharacterTextSplitter(
+                chunk_size=max_chunk_size,
+                chunk_overlap=200,
+                length_function=len,
+                is_separator_regex=False,
+            )
+            chunks.extend(splitter.split_text(b))
+        else:
+            chunks.append(b)
+            
+    return chunks
+
 def chunk_text(text):
     """
-    Băm nhỏ text theo Semantic (ngữ nghĩa) hoặc Recursive (kích thước).
-    chunk_size=800 để mỗi Q&A pair là 1 chunk riêng → khớp semantic tốt hơn.
+    Băm nhỏ text theo Recursive (kích thước).
+    chunk_size=1800 để chứa trọn vẹn ngữ cảnh, bảng biểu và danh sách ảnh/link.
     """
     splitter = RecursiveCharacterTextSplitter(
-        chunk_size=800,
-        chunk_overlap=80,
+        chunk_size=1800,
+        chunk_overlap=180,
         length_function=len,
         is_separator_regex=False,
     )
@@ -119,7 +149,14 @@ def process_and_save_document(doc_id, api_keys, provider='openai'):
         if not text.strip():
             raise Exception("Tài liệu trắng, không có văn bản hoặc mô tả.")
             
-        chunks = chunk_text(text)
+        import re
+        is_qa = (doc.doc_type == 'qa') or bool(re.search(r'(?:^|\n+)(?:[Hh]ỏi\s*:|[Cc]âu\s*hỏi\s*:|[Qq]\s*:|[Qq]uestion\s*:)', text))
+        if is_qa:
+            chunks = chunk_qa_text(text)
+            if not chunks:
+                chunks = chunk_text(text)
+        else:
+            chunks = chunk_text(text)
         
         # Get embeddings - xoay vòng API key
         embeddings = None
