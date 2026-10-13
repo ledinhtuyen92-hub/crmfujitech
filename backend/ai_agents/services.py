@@ -44,7 +44,7 @@ DEFAULT_JSON_TEMPLATE = """{
     "reply": "Câu trả lời gửi khách. LUÔN KẾT THÚC bằng một câu hỏi mở để khách phản hồi, trừ khi đã chốt được SĐT. ĐIỀN '[STOP]' NẾU KHÁCH CHỈ NHẮN NGẮN GỌN XÁC NHẬN (Ok, vâng, dạ...) HOẶC THẢ TIM VÀ HỘI THOẠI ĐÃ KẾT THÚC.",
     "sentiment": "angry / handoff / neutral",
     "product_search_keyword": "BẮT BUỘC ĐIỀN TỪ KHÓA NẾU KHÁCH YÊU CẦU 'gửi ảnh', 'cho xem VÀI MẪU'. LƯU Ý: Phải điền CHÍNH XÁC và ĐẦY ĐỦ tên dòng sản phẩm (VD: 'Cửa composite 1 cánh', 'Tủ lạnh Samsung Inverter') thay vì điền chung chung ('Cửa', 'Tủ lạnh') để tránh hệ thống gửi nhầm sang các phụ kiện. Nếu không cần tìm ảnh thì ĐỂ TRỐNG.",
-    "attachment_urls": ["BẮT BUỘC COPY NGUYÊN BẢN CẢ ĐOẠN MÃ MARKDOWN ![Tên file/ảnh](url) của các ảnh/file muốn gửi. KHÔNG ĐƯỢC chỉ copy mỗi link. NẾU KHÔNG CÓ THÌ ĐỂ TRỐNG []"],
+    "attachment_urls": ["BẮT BUỘC COPY NGUYÊN VẸN TẤT CẢ các đoạn mã Markdown ![Tên](url) của MỌI ảnh VÀ file muốn gửi theo ĐÚNG THỨ TỰ xuất hiện trong tài liệu. TUYỆT ĐỐI không bỏ sót bất kỳ ảnh hay file nào — kể cả ảnh nằm SAU một file PDF/DOC. Mỗi phần tử là một đoạn markdown riêng biệt. KHÔNG ĐƯỢC chỉ copy mỗi link. NẾU KHÔNG CÓ THÌ ĐỂ TRỐNG []"],
     "extracted_info": {
         "phone": "Trích xuất SĐT nếu KHÁCH cung cấp (nếu không có thì để rỗng)",
         "address": "Trích xuất địa chỉ giao hàng/nhà riêng nếu KHÁCH cung cấp. CHỈ điền khi là địa chỉ THỰC SỰ (có số nhà, tên đường, phường/quận...). TUYỆT ĐỐI không điền câu hội thoại, câu cảm ơn hay câu hỏi vào đây. Nếu không rõ ràng là địa chỉ thì để rỗng",
