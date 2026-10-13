@@ -2,6 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { Slider, Switch } from 'antd';
 import QuotationRenderer from './QuotationRenderer';
 import { BLOCK_TYPES, DEFAULT_BLOCK_PROPS } from '../pages/admin/builder/constants';
+import { getSafeMediaUrl } from '../utils/mediaUtils';
 
 const DEFAULT_LAYOUT_BLOCKS = [
   { id: 'header_1', type: BLOCK_TYPES.HEADER_LOGO, props: { ...DEFAULT_BLOCK_PROPS[BLOCK_TYPES.HEADER_LOGO], companyName: 'CÔNG TY CỦA BẠN' } },
@@ -77,8 +78,8 @@ export default function QuotationPrintView({ quotation, type = 'quotation', docu
         ...item,
         product_name: item.product_name || (prodObj ? prodObj.name : ''),
         // Giữ nguyên ảnh snapshot - nếu snapshot bị lỗi (URL hết hạn), fallback sang ảnh catalog hiện tại
-        product_image: item.product_image || catalogImage,
-        fallback_product_image: catalogImage,
+        product_image: getSafeMediaUrl(item.product_image || catalogImage),
+        fallback_product_image: getSafeMediaUrl(catalogImage),
         spec: item.spec || (prodObj ? prodObj.description : ''),
         unit: item.custom_data?.unit || item.unit || (prodObj ? prodObj.unit : (item.item_type === 'service' ? 'lần' : 'cái'))
       };

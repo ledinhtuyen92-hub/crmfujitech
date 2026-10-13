@@ -184,7 +184,7 @@ class QuotationViewSet(TenantQuerySetMixin, viewsets.ModelViewSet):
         ext = os.path.splitext(image_file.name)[1]
         filename = f"item_images/{uuid.uuid4()}{ext}"
         saved_path = default_storage.save(filename, image_file)
-        url = request.build_absolute_uri(default_storage.url(saved_path))
+        url = default_storage.url(saved_path)
         
         return Response({"url": url})
 

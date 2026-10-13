@@ -166,10 +166,10 @@ docker restart crm_web crm_celery crm_celery_beat 2>/dev/null || {
     fi
 }
 
-# 9. Thay the URL domain cu trong noi dung RAG (neu nguoi dung cung cap domain cu)
+# 9. Thay the URL domain cu trong toan bo he thong (neu nguoi dung cung cap domain cu)
 if [ -n "$OLD_DOMAIN" ] && [ "$OLD_DOMAIN" != "$DOMAIN" ]; then
     echo ""
-    echo "🔄 [6/6] Thay the URL domain cu ($OLD_DOMAIN) bang domain moi ($DOMAIN) trong RAG..."
+    echo "🔄 [6/6] Thay the URL domain cu ($OLD_DOMAIN) bang domain moi ($DOMAIN) trong toan bo CSDL (Don hang, Bao gia, Tai chinh, Facebook, RAG)..."
     # Doi container crm_web san sang
     RETRIES=15
     until docker exec crm_web echo "ready" > /dev/null 2>&1; do
@@ -179,13 +179,13 @@ if [ -n "$OLD_DOMAIN" ] && [ "$OLD_DOMAIN" != "$DOMAIN" ]; then
     done
     if docker exec crm_web echo "ready" > /dev/null 2>&1; then
         docker exec crm_web python manage.py replace_rag_domain --old "$OLD_DOMAIN" --new "$DOMAIN"
-        echo "✅ Da cap nhat URL anh trong RAG tu domain cu sang domain moi!"
+        echo "✅ Da cap nhat URL anh trong toan bo he thong tu domain cu sang domain moi!"
     else
         echo "⚠️  Container crm_web chua san sang. Hay chay thu cong sau:"
         echo "    docker exec crm_web python manage.py replace_rag_domain --old \"$OLD_DOMAIN\" --new \"$DOMAIN\""
     fi
 else
-    echo "ℹ️  [6/6] Bo qua buoc thay the URL RAG (khong co domain cu)."
+    echo "ℹ️  [6/6] Bo qua buoc thay the URL domain (khong co domain cu)."
 fi
 
 systemctl reload nginx

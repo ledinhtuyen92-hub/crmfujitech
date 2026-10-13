@@ -1,3 +1,5 @@
+import { getSafeMediaUrl } from './mediaUtils';
+
 /**
  * Utility functions for parsing template variables in the Quotation Builder.
  */
@@ -55,9 +57,9 @@ export const parseVariables = (text, quotationData = {}, companyData = {}, total
     '{{company_website}}': companyData?.website || '[Website công ty]',
     '{{director_name}}': companyData?.director_name || '[Tên giám đốc]',
     '{{director_title}}': companyData?.director_title || 'Giám đốc',
-    '{{company_logo}}': companyData?.logo ? `<img src="${companyData.logo}" alt="Logo" style="max-height: 60px; object-fit: contain;" />` : '',
-    '{{company_stamp}}': companyData?.stamp_image ? `<img src="${companyData.stamp_image}" alt="Stamp" style="position: absolute; top: -20px; left: 50%; transform: translateX(-50%); max-height: 125px; opacity: 0.85; z-index: 0; object-fit: contain;" />` : '',
-    '{{company_signature}}': companyData?.director_signature ? `<img src="${companyData.director_signature}" alt="Signature" style="position: relative; max-height: 70px; z-index: 10; object-fit: contain;" />` : '',
+    '{{company_logo}}': companyData?.logo ? `<img src="${getSafeMediaUrl(companyData.logo)}" alt="Logo" style="max-height: 60px; object-fit: contain;" />` : '',
+    '{{company_stamp}}': companyData?.stamp_image ? `<img src="${getSafeMediaUrl(companyData.stamp_image)}" alt="Stamp" style="position: absolute; top: -20px; left: 50%; transform: translateX(-50%); max-height: 125px; opacity: 0.85; z-index: 0; object-fit: contain;" />` : '',
+    '{{company_signature}}': companyData?.director_signature ? `<img src="${getSafeMediaUrl(companyData.director_signature)}" alt="Signature" style="position: relative; max-height: 70px; z-index: 10; object-fit: contain;" />` : '',
     
     // Customer data — đọc từ nhiều nguồn có thể được truyền vào
     '{{customer_name}}': quotationData?.customer?.name || quotationData?.customer?.representative_name || '',
@@ -66,7 +68,7 @@ export const parseVariables = (text, quotationData = {}, companyData = {}, total
     '{{customer_address}}': quotationData?.delivery_address || [quotationData?.customer?.address, quotationData?.customer?.city].filter(Boolean).join(' - ') || '',
     '{{customer_phone}}': quotationData?.customer?.phone || '',
     '{{customer_email}}': quotationData?.customer?.email || '',
-    '{{customer_signature}}': (quotationData?.status === 'accepted' && quotationData?.signature_image) ? `<img src="${quotationData.signature_image}" alt="Signature" style="max-height: 80px; object-fit: contain;" />` : '',
+    '{{customer_signature}}': (quotationData?.status === 'accepted' && quotationData?.signature_image) ? `<img src="${getSafeMediaUrl(quotationData.signature_image)}" alt="Signature" style="max-height: 80px; object-fit: contain;" />` : '',
     
     // Quotation data
     '{{quotation_code}}': quotationData?.code || quotationData?.order_code || quotationData?.order_number || quotationData?.quotation_number || '',

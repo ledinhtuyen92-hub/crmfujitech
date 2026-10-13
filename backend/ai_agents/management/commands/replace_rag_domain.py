@@ -1,23 +1,20 @@
 """
 Management command: replace_rag_domain
 ---------------------------------------
-Thay thế domain cũ bằng domain mới trong toàn bộ nội dung RAG
-(AiKnowledgeDocument.content và AiKnowledgeChunk.content) trực tiếp trong DB.
+Thay thế domain cũ bằng domain mới trong toàn bộ hệ thống
+(Đơn hàng, Báo giá, Tài chính, RAG, Facebook messages...) trực tiếp trong DB.
 
 Cách dùng (chạy trên VPS bên trong container crm_web):
-    docker exec -i crm_web python manage.py replace_rag_domain \
+    docker exec crm_web python manage.py replace_rag_domain \
         --old crm.fujitechgroup.vn \
         --new crm.fujitechgroup.com
-
-Hoặc từ ngoài container:
-    docker exec crm_web python manage.py replace_rag_domain --old crm.fujitechgroup.vn --new crm.fujitechgroup.com
 """
 from django.core.management.base import BaseCommand
-from django.db import transaction
+from django.db import connection, transaction
 
 
 class Command(BaseCommand):
-    help = 'Thay thế domain cũ bằng domain mới trong toàn bộ nội dung RAG (AiKnowledgeDocument + AiKnowledgeChunk)'
+    help = 'Thay thế domain cũ bằng domain mới trong toàn bộ hệ thống (Đơn hàng, Báo giá, RAG, Facebook, Tài chính)'
 
     def add_arguments(self, parser):
         parser.add_argument(
@@ -40,8 +37,6 @@ class Command(BaseCommand):
         )
 
     def handle(self, *args, **options):
-        from ai_agents.models import AiKnowledgeDocument, AiKnowledgeChunk
-
         old_domain = options['old'].strip()
         new_domain = options['new'].strip()
         dry_run = options['dry_run']
@@ -57,49 +52,57 @@ class Command(BaseCommand):
         self.stdout.write(f'Domain cũ : {old_domain}')
         self.stdout.write(f'Domain mới: {new_domain}')
         if dry_run:
-            self.stdout.write(self.style.WARNING('[DRY RUN] Không có thay đổi thực sự nào được ghi vào DB.'))
+            self.stdout.write(self.style.WARNING('[DRY RUN] Không có thay đổi thực sự nào được ghi vào DB.\n'))
 
-        # ── 1. AiKnowledgeDocument.content ─────────────────────────────────────
-        docs_qs = AiKnowledgeDocument.objects.filter(content__icontains=old_domain)
-        doc_count = docs_qs.count()
-        self.stdout.write(f'\n[1/2] AiKnowledgeDocument.content: tìm thấy {doc_count} tài liệu cần cập nhật')
+        total_updated = 0
 
-        if not dry_run and doc_count > 0:
-            updated_docs = 0
-            with transaction.atomic():
-                for doc in docs_qs.iterator():
-                    new_content = doc.content.replace(old_domain, new_domain)
-                    if new_content != doc.content:
-                        doc.content = new_content
-                        doc.save(update_fields=['content'])
-                        updated_docs += 1
-            self.stdout.write(self.style.SUCCESS(f'    ✅ Đã cập nhật {updated_docs} AiKnowledgeDocument'))
+        # Quét tất cả các bảng và cột text/json trong PostgreSQL
+        cursor = connection.cursor()
+        cursor.execute("""
+            SELECT table_name, column_name, data_type 
+            FROM information_schema.columns 
+            WHERE data_type IN ('character varying', 'text', 'jsonb', 'json')
+            AND table_schema = 'public';
+        """)
+        cols = cursor.fetchall()
 
-        # ── 2. AiKnowledgeChunk.content ────────────────────────────────────────
-        chunks_qs = AiKnowledgeChunk.objects.filter(content__icontains=old_domain)
-        chunk_count = chunks_qs.count()
-        self.stdout.write(f'\n[2/2] AiKnowledgeChunk.content: tìm thấy {chunk_count} chunks cần cập nhật')
+        self.stdout.write(f'Đang quét {len(cols)} cột trong CSDL...')
 
-        if not dry_run and chunk_count > 0:
-            updated_chunks = 0
-            with transaction.atomic():
-                for chunk in chunks_qs.iterator():
-                    new_content = chunk.content.replace(old_domain, new_domain)
-                    if new_content != chunk.content:
-                        chunk.content = new_content
-                        chunk.save(update_fields=['content'])
-                        updated_chunks += 1
-            self.stdout.write(self.style.SUCCESS(f'    ✅ Đã cập nhật {updated_chunks} AiKnowledgeChunk'))
+        for table, col, dtype in cols:
+            try:
+                # Kiểm tra số lượng bản ghi chứa domain cũ
+                cursor.execute(
+                    f'SELECT COUNT(*) FROM "{table}" WHERE "{col}"::text LIKE %s;',
+                    [f'%{old_domain}%']
+                )
+                cnt = cursor.fetchone()[0]
+                if cnt > 0:
+                    self.stdout.write(f'  🔍 Tìm thấy {cnt} dòng trong {table}.{col}')
+                    if not dry_run:
+                        with transaction.atomic():
+                            if dtype in ('jsonb', 'json'):
+                                cursor.execute(
+                                    f'UPDATE "{table}" SET "{col}" = REPLACE("{col}"::text, %s, %s)::{dtype} WHERE "{col}"::text LIKE %s;',
+                                    [old_domain, new_domain, f'%{old_domain}%']
+                                )
+                            else:
+                                cursor.execute(
+                                    f'UPDATE "{table}" SET "{col}" = REPLACE("{col}", %s, %s) WHERE "{col}" LIKE %s;',
+                                    [old_domain, new_domain, f'%{old_domain}%']
+                                )
+                        self.stdout.write(self.style.SUCCESS(f'     ✅ Đã cập nhật {cnt} dòng trong {table}.{col}'))
+                    total_updated += cnt
+            except Exception as e:
+                self.stderr.write(self.style.WARNING(f'     ⚠️ Bỏ qua {table}.{col} do lỗi: {e}'))
 
-        # ── Kết quả ─────────────────────────────────────────────────────────────
         self.stdout.write('')
         if dry_run:
             self.stdout.write(self.style.WARNING(
-                f'[DRY RUN] Sẽ cập nhật {doc_count} document và {chunk_count} chunk.\n'
+                f'[DRY RUN] Sẽ cập nhật tổng cộng {total_updated} bản ghi trên toàn bộ hệ thống.\n'
                 f'Chạy lại không có --dry-run để thực hiện thực sự.'
             ))
         else:
             self.stdout.write(self.style.SUCCESS(
                 f'🎉 Hoàn tất! Đã thay thế "{old_domain}" → "{new_domain}" '
-                f'trong {doc_count} document và {chunk_count} chunk.'
+                f'cho tổng cộng {total_updated} bản ghi trong toàn bộ CSDL!'
             ))
