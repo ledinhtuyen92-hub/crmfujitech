@@ -321,11 +321,18 @@ class LiveSessionViewSet(viewsets.ModelViewSet):
         except LiveSession.DoesNotExist:
             raise Http404('Session not found.')
         
-        # Check there's an active stream for this session
+        # Check there's an active stream or running session
         context = LiveContextService.get_context(session.company_id, session.id)
         stream_state = context.get('stream_state', '')
         
-        if stream_state not in ('LIVE', 'playing', 'STARTING'):
+        session_is_active = session.status in (
+            LiveSession.STATUS_RUNNING,
+            LiveSession.STATUS_HUMAN_TAKEOVER,
+            LiveSession.STATUS_READY,
+        )
+        stream_is_active = stream_state in ('LIVE', 'playing', 'STARTING')
+
+        if not session_is_active and not stream_is_active:
             raise Http404('No active HLS stream for this session.')
         
         # DRF's DefaultRouter might strip suffixes like .ts into a format kwarg.

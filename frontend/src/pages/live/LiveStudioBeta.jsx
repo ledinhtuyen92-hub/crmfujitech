@@ -129,9 +129,8 @@ export default function LiveStudioBeta() {
       const [path, query] = action.split('?')
       const url = query ? `/live_sessions/sessions/${id}/${path}/?${query}` : `/live_sessions/sessions/${id}/${path}/`
       await api.post(url)
-      // REST 200 only means the command was accepted — NOT that the state changed.
-      // The live.session.status_changed WS event is the real confirmation.
       message.info('Đã gửi lệnh — đang chờ xác nhận...')
+      await reconcileSession()
     } catch (err) {
       message.error(getErrorMessage(err))
       // Always reconcile from backend after any command failure.

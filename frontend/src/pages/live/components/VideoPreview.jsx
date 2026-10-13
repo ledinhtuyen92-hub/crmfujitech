@@ -415,11 +415,11 @@ export default function VideoPreview({ session, streamEvent }) {
     }
   }, [hlsUrl])
 
-  // Video frame readiness handler
+  // Video frame readiness handler: only mark ready when real visual video dimensions exist!
   const markFrameReady = () => {
     if (videoRef.current) {
       const v = videoRef.current
-      if (v.readyState >= 2 || v.currentTime > 0) {
+      if (v.videoWidth > 0 && (v.readyState >= 2 || v.currentTime > 0)) {
         hasStartedPlaybackRef.current = true
         setIsPlaybackReady(true)
         setIsBuffering(false)
@@ -476,6 +476,7 @@ export default function VideoPreview({ session, streamEvent }) {
           pointerEvents: (hlsStatus === 'live' && isPlaybackReady) ? 'auto' : 'none',
           zIndex: 2,
         }}
+        onLoadedMetadata={markFrameReady}
         onLoadedData={markFrameReady}
         onTimeUpdate={markFrameReady}
         onPlaying={() => {
