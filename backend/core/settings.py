@@ -195,10 +195,14 @@ AUTH_USER_MODEL = 'users.User'
 
 
 # ── CORS ─────────────────────────────────────────────────────────────
-# Cho phép Frontend ở cổng 5173 được phép lấy dữ liệu
+# Cho phép Frontend ở cổng 5173, 5174, 3000 và các cổng localhost được phép lấy dữ liệu
 _cors_origins = [
     "http://localhost:5173",
     "http://127.0.0.1:5173",
+    "http://localhost:5174",
+    "http://127.0.0.1:5174",
+    "http://localhost:5175",
+    "http://127.0.0.1:5175",
     "http://localhost:3000",
     "http://127.0.0.1:3000",
 ]
@@ -215,6 +219,9 @@ _extra_cors = env.list('CORS_ALLOWED_ORIGINS', default=[])
 _cors_origins += _extra_cors
 
 CORS_ALLOWED_ORIGINS = list(set(_cors_origins))
+CORS_ALLOWED_ORIGIN_REGEXES = [
+    r"^http://(localhost|127\.0\.0\.1)(:\d+)?$",
+]
 CORS_ALLOW_CREDENTIALS = True
 
 
