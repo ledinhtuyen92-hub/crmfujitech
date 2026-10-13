@@ -2,6 +2,7 @@ import React from 'react'
 import { Typography } from 'antd'
 import dayjs from 'dayjs'
 import 'dayjs/locale/vi'
+import { getSafeMediaUrl } from '../utils/mediaUtils'
 
 dayjs.locale('vi')
 
@@ -29,7 +30,7 @@ const ReceiptPrintView = React.forwardRef(({ receipt, company, order }, ref) => 
         <div style={{ display: 'flex', gap: '16px', alignItems: 'flex-start' }}>
           {company.logo && (
             <img
-              src={company.logo}
+              src={getSafeMediaUrl(company.logo)}
               alt="Logo"
               style={{ width: 80, height: 80, objectFit: 'contain' }}
             />
@@ -90,10 +91,10 @@ const ReceiptPrintView = React.forwardRef(({ receipt, company, order }, ref) => 
               <Text style={{ fontStyle: 'italic' }}>(Ký, họ tên, đóng dấu)</Text>
               <div style={{ position: 'relative', height: 120, marginTop: 10, display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
                 {company?.stamp_image && (
-                  <img src={company.stamp_image} alt="Stamp" style={{ position: 'absolute', maxWidth: 120, maxHeight: 120, opacity: 0.8, zIndex: 1 }} />
+                  <img src={getSafeMediaUrl(company.stamp_image)} alt="Stamp" style={{ position: 'absolute', maxWidth: 120, maxHeight: 120, opacity: 0.8, zIndex: 1 }} />
                 )}
                 {company?.director_signature && (
-                  <img src={company.director_signature} alt="Signature" style={{ position: 'absolute', maxWidth: 100, maxHeight: 80, zIndex: 2 }} />
+                  <img src={getSafeMediaUrl(company.director_signature)} alt="Signature" style={{ position: 'absolute', maxWidth: 100, maxHeight: 80, zIndex: 2 }} />
                 )}
               </div>
               {company?.director_name && <Text strong>{company.director_name}</Text>}

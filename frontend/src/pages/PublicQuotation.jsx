@@ -4,6 +4,7 @@ import React, { useCallback, useEffect, useRef, useState } from 'react'
 import { useParams } from 'react-router-dom'
 import api from '../utils/api'
 import QuotationPrintView from '../components/QuotationPrintView'
+import { getSafeMediaUrl } from '../utils/mediaUtils'
 
 const { Title, Text } = Typography
 
@@ -136,7 +137,7 @@ export default function PublicQuotation() {
             renderCustomerSignature={() => (
               isAccepted ? (
                 <div style={{ height: 145, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', marginTop: 12 }}>
-                  <img src={quotation.signature_image} alt="Customer Sign" style={{ height: 100, borderBottom: '1px solid #e2e8f0', objectFit: 'contain' }} />
+                  <img src={getSafeMediaUrl(quotation.signature_image)} alt="Customer Sign" style={{ height: 100, borderBottom: '1px solid #e2e8f0', objectFit: 'contain' }} />
                   <div style={{ marginTop: 8 }}>
                     <Text strong style={{ fontSize: 16 }}>{quotation.customer_name_signed}</Text>
                   </div>

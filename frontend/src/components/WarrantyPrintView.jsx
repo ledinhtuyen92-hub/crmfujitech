@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react'
 import { Row, Col, Typography, Slider, Switch, Radio } from 'antd'
 import { ColumnWidthOutlined, ColumnHeightOutlined } from '@ant-design/icons'
 import dayjs from 'dayjs'
+import { getSafeMediaUrl } from '../utils/mediaUtils'
 
 const { Title, Text } = Typography
 
@@ -281,14 +282,14 @@ export default function WarrantyPrintView({
               <div style={{ height: isLandscape ? 90 : 120, display: 'flex', alignItems: 'center', justifyContent: 'center', position: 'relative', marginTop: 6 }}>
                 {companyInfo?.stamp_image && (
                   <img
-                    src={companyInfo.stamp_image}
+                    src={getSafeMediaUrl(companyInfo.stamp_image)}
                     alt="Stamp"
                     style={{ height: isLandscape ? 80 : 110, maxWidth: 140, position: 'absolute', top: 5, left: '50%', transform: 'translateX(-50%)', opacity: 0.88, zIndex: 1, objectFit: 'contain' }}
                   />
                 )}
                 {companyInfo?.director_signature && (
                   <img
-                    src={companyInfo.director_signature}
+                    src={getSafeMediaUrl(companyInfo.director_signature)}
                     alt="Signature"
                     style={{ height: isLandscape ? 70 : 90, maxWidth: 160, position: 'relative', zIndex: 2, objectFit: 'contain' }}
                   />

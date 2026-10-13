@@ -49,6 +49,7 @@ import { useCallback, useEffect, useState, useRef } from 'react'
 import { useAuth } from '../contexts/AuthContext'
 import useDebounce from '../hooks/useDebounce'
 import api from '../utils/api'
+import { getSafeMediaUrl } from '../utils/mediaUtils'
 import ProductTemplateTab from './inventory/ProductTemplateTab'
 import { useResponsive } from '../hooks/useResponsive'
 
@@ -187,7 +188,7 @@ export default function Products() {
     setProductImageFile(null)
     if (prod) {
       setProductImageFile(null)
-      setProductPreviewImage(prod.image_url || prod.image)
+      setProductPreviewImage(getSafeMediaUrl(prod.image_url || prod.image))
       productForm.setFieldsValue({
         ...prod,
         attributes_str: prod.attributes ? JSON.stringify(prod.attributes) : '',
@@ -370,7 +371,7 @@ export default function Products() {
       width: 95,
       align: 'center',
       render: (_, r) => {
-        const imgUrl = r.image_url || r.image
+        const imgUrl = getSafeMediaUrl(r.image_url || r.image)
         return imgUrl ? (
           <img src={imgUrl} alt={r.name} style={{ width: 48, height: 48, objectFit: 'cover', borderRadius: 6, border: '1px solid #e2e8f0' }} />
         ) : (
@@ -516,7 +517,7 @@ export default function Products() {
         onChange: (page) => fetchProducts(page)
       }}
       renderItem={(r) => {
-        const imgUrl = r.image_url || r.image
+        const imgUrl = getSafeMediaUrl(r.image_url || r.image)
         const cat = categories.find((c) => c.id === r.category)
         return (
           <List.Item

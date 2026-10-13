@@ -246,12 +246,5 @@ class QuickMediaAssetSerializer(serializers.ModelSerializer):
         read_only_fields = ["id", "company", "created_by", "created_at", "media_type_display"]
 
     def get_file_url(self, obj):
-        if not obj.file_url:
-            return ""
-        if obj.file_url.startswith("http://") or obj.file_url.startswith("https://"):
-            return obj.file_url
-        request = self.context.get("request")
-        if request and obj.file_url.startswith("/"):
-            return request.build_absolute_uri(obj.file_url)
-        return obj.file_url
+        return obj.file_url or ""
 

@@ -75,6 +75,8 @@ cp .env .env.bak.$(date +%Y%m%d_%H%M%S)
 grep -q "^SITE_URL=" .env && sed -i "s|^SITE_URL=.*|SITE_URL=$PROTOCOL://$DOMAIN|g" .env || echo "SITE_URL=$PROTOCOL://$DOMAIN" >> .env
 grep -q "^VITE_API_URL=" .env && sed -i "s|^VITE_API_URL=.*|VITE_API_URL=$PROTOCOL://$DOMAIN|g" .env || echo "VITE_API_URL=$PROTOCOL://$DOMAIN" >> .env
 grep -q "^ALLOWED_HOSTS=" .env && sed -i "s|^ALLOWED_HOSTS=.*|ALLOWED_HOSTS=$DOMAIN,localhost,127.0.0.1|g" .env || echo "ALLOWED_HOSTS=$DOMAIN,localhost,127.0.0.1" >> .env
+grep -q "^CSRF_TRUSTED_ORIGINS=" .env && sed -i "s|^CSRF_TRUSTED_ORIGINS=.*|CSRF_TRUSTED_ORIGINS=$PROTOCOL://$DOMAIN|g" .env
+grep -q "^CORS_ALLOWED_ORIGINS=" .env && sed -i "s|^CORS_ALLOWED_ORIGINS=.*|CORS_ALLOWED_ORIGINS=$PROTOCOL://$DOMAIN|g" .env
 grep -q "^DEBUG=" .env && sed -i "s|^DEBUG=.*|DEBUG=False|g" .env || echo "DEBUG=False" >> .env
 
 # Cap nhat bien moi truong cho Frontend
@@ -194,4 +196,15 @@ echo ""
 echo "=========================================================="
 echo "🎉 CHUYEN DOI TEN MIEN THANH CONG!"
 echo "👉 Truy cap he thong tai: $PROTOCOL://$DOMAIN"
+echo "=========================================================="
+echo ""
+echo "📌 LƯU Ý CÁC DỊCH VỤ BÊN THỨ 3 (NẾU CÓ SỬ DỤNG):"
+echo "  1. Meta/Facebook Webhook: Cap nhat Callback URL thanh:"
+echo "     $PROTOCOL://$DOMAIN/api/facebook/webhook/"
+echo "  2. Facebook Login / OAuth: Them URL chuyen huong hop le:"
+echo "     $PROTOCOL://$DOMAIN/"
+echo "  3. Zalo OA Webhook: Cap nhat Webhook URL thanh:"
+echo "     $PROTOCOL://$DOMAIN/api/zalo/webhook/"
+echo "  4. Casso / VietQR Webhook: Cap nhat Webhook URL thanh:"
+echo "     $PROTOCOL://$DOMAIN/api/finance/casso-webhook/"
 echo "=========================================================="

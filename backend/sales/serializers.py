@@ -17,23 +17,23 @@ def get_company_info_dict(serializer_instance, obj):
     logo_url = None
     if company.logo:
         try:
-            logo_url = request.build_absolute_uri(company.logo.url) if request else company.logo.url
-        except Exception:
             logo_url = company.logo.url
+        except Exception:
+            logo_url = None
 
     stamp_url = None
     if getattr(company, "stamp_image", None):
         try:
-            stamp_url = request.build_absolute_uri(company.stamp_image.url) if request else company.stamp_image.url
-        except Exception:
             stamp_url = company.stamp_image.url
+        except Exception:
+            stamp_url = None
 
     signature_url = None
     if getattr(company, "director_signature", None):
         try:
-            signature_url = request.build_absolute_uri(company.director_signature.url) if request else company.director_signature.url
-        except Exception:
             signature_url = company.director_signature.url
+        except Exception:
+            signature_url = None
 
     custom_quotation_title = ""
     custom_order_title = ""

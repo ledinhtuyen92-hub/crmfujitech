@@ -30,5 +30,5 @@ class UploadAPIView(APIView):
         url = default_storage.url(path)
         absolute_url = request.build_absolute_uri(url)
         
-        # Return the original file name so the frontend and AI can use the exact original name
-        return Response({'url': absolute_url, 'name': file_obj.name})
+        # Trả về url tương đối (/media/...) để tránh dính cứng domain khi đổi tên miền VPS
+        return Response({'url': url, 'absolute_url': absolute_url, 'name': file_obj.name})

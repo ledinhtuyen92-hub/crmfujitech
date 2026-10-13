@@ -2,6 +2,7 @@ import { useState, useEffect, useMemo } from 'react'
 import { Card, Table, Button, Space, Typography, Tag, Modal, Form, Input, Upload, message, Radio, Divider, Spin, Collapse, Alert, Checkbox, Segmented, Row, Col, List, Select } from 'antd'
 import { PlusOutlined, UploadOutlined, RobotOutlined, BookOutlined, EyeOutlined, EditOutlined, SyncOutlined, DeleteOutlined, BulbOutlined, MinusCircleOutlined, QuestionCircleOutlined, DownloadOutlined, ScissorOutlined } from '@ant-design/icons'
 import api from '../../utils/api'
+import { getSafeMediaUrl } from '../../utils/mediaUtils'
 import { useAuth } from '../../contexts/AuthContext'
 import { useResponsive } from '../../hooks/useResponsive'
 
@@ -266,13 +267,8 @@ export default function AiKnowledgeBase() {
       
       // Sửa lỗi tải xuống: Đảm bảo URL luôn cùng domain với Frontend 
       // (để tránh lỗi Mixed Content hoặc Cross-Origin block fetch)
-      let safePath = rawUrl
-      if (rawUrl.startsWith('http')) {
-        try {
-          safePath = new URL(rawUrl).pathname
-        } catch (e) {}
-      }
-      const absoluteUrl = `${window.location.origin}${safePath}`
+      const safePath = getSafeMediaUrl(rawUrl)
+      const absoluteUrl = safePath.startsWith('http') ? safePath : `${window.location.origin}${safePath}`
       
       const ext = absoluteUrl.split('.').pop().toLowerCase()
       const fileName = record.title + '.' + ext
@@ -629,7 +625,7 @@ export default function AiKnowledgeBase() {
                 <Space wrap style={{ marginTop: 4 }}>
                   {record.children.map(child => (
                     <div key={child.id} style={{ width: 40, height: 40, borderRadius: 4, overflow: 'hidden', border: '1px solid #d9d9d9' }}>
-                      <img src={child.file_attachment} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                      <img src={getSafeMediaUrl(child.file_attachment)} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                     </div>
                   ))}
                 </Space>
@@ -639,7 +635,7 @@ export default function AiKnowledgeBase() {
             return (
               <Space>
                 <div style={{ width: 32, height: 32, borderRadius: 4, overflow: 'hidden', border: '1px solid #d9d9d9' }}>
-                  <img src={record.file_attachment} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                  <img src={getSafeMediaUrl(record.file_attachment)} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                 </div>
                 <Text strong>{text}</Text>
               </Space>
@@ -977,7 +973,7 @@ export default function AiKnowledgeBase() {
                         <Space wrap size={4}>
                           {record.children.map(child => (
                             <div key={child.id} style={{ width: 40, height: 40, borderRadius: 4, overflow: 'hidden', border: '1px solid #d9d9d9' }}>
-                              <img src={child.file_attachment} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                              <img src={getSafeMediaUrl(child.file_attachment)} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                             </div>
                           ))}
                         </Space>
@@ -987,7 +983,7 @@ export default function AiKnowledgeBase() {
                     titleContent = (
                       <div style={{ marginBottom: 12, display: 'flex', alignItems: 'flex-start', gap: 8 }}>
                         <div style={{ width: 32, height: 32, borderRadius: 4, overflow: 'hidden', border: '1px solid #d9d9d9', flexShrink: 0 }}>
-                          <img src={record.file_attachment} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                          <img src={getSafeMediaUrl(record.file_attachment)} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                         </div>
                         <Text strong style={{ fontSize: 15 }}>{record.title}</Text>
                       </div>
@@ -1298,7 +1294,7 @@ export default function AiKnowledgeBase() {
                             />
                           </div>
                           <div style={{ width: 100, height: 100, flexShrink: 0, overflow: 'hidden', borderRadius: 6, border: '1px solid #d9d9d9', position: 'relative' }}>
-                            <img src={src} alt="thumb" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                                <img src={getSafeMediaUrl(src)} alt="thumb" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                             <Button 
                               type="primary" 
                               danger 
@@ -1432,7 +1428,7 @@ export default function AiKnowledgeBase() {
                 {doc?.doc_type === 'image' && doc?.file_attachment && (
                   <div style={{ textAlign: 'center', marginBottom: 16 }}>
                     <img 
-                      src={doc.file_attachment} 
+                      src={getSafeMediaUrl(doc.file_attachment)} 
                       alt={doc.title} 
                       style={{ maxWidth: '100%', maxHeight: 300, objectFit: 'contain', borderRadius: 8, border: '1px solid #d9d9d9' }} 
                     />
@@ -1443,17 +1439,14 @@ export default function AiKnowledgeBase() {
                     if (!doc?.content) return null;
                     
                     const parts = doc.content.split(/\|\s*Hình ảnh \(URL\):\s*([^\n]+)/g);
-                    const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:8000/api/';
-                    const baseUrl = apiUrl.split('/api')[0];
 
                     return parts.map((part, index) => {
                       if (index % 2 === 1) { 
                         const url = part.trim();
                         if (!url || url === 'None') return null;
-                        const fullUrl = url.startsWith('/') ? `${baseUrl}${url}` : url;
                         return (
                           <div key={index} style={{ margin: '12px 0', padding: 8, background: '#fff', borderRadius: 8, display: 'block', width: 'fit-content', border: '1px solid #e8e8e8' }}>
-                            <img src={fullUrl} alt="product" style={{ width: 120, height: 120, objectFit: 'cover', borderRadius: 4 }} />
+                            <img src={getSafeMediaUrl(url)} alt="product" style={{ width: 120, height: 120, objectFit: 'cover', borderRadius: 4 }} />
                           </div>
                         );
                       }
@@ -1677,7 +1670,7 @@ export default function AiKnowledgeBase() {
                                />
                              </div>
                              <div style={{ width: 100, height: 100, flexShrink: 0, overflow: 'hidden', borderRadius: 6, border: '1px solid #d9d9d9', position: 'relative' }}>
-                               <img src={src.startsWith('http') || src.startsWith('blob') ? src : `${(import.meta.env.VITE_API_URL || 'http://localhost:8000/api/').replace('/api', '')}${src}`} alt="thumb" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                                <img src={getSafeMediaUrl(src)} alt="thumb" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                                <Button 
                                  type="primary" 
                                  danger 

@@ -85,12 +85,11 @@ class ProductSerializer(serializers.ModelSerializer):
         read_only_fields = ["id", "company", "category_name", "template_name", "unit_display", "image_url", "created_at", "updated_at"]
 
     def get_image_url(self, obj):
-        request = self.context.get("request")
         if obj.image:
             try:
-                return request.build_absolute_uri(obj.image.url) if request else obj.image.url
-            except Exception:
                 return obj.image.url
+            except Exception:
+                return None
         return None
 
     def validate_sku(self, value):

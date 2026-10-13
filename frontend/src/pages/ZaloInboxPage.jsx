@@ -18,20 +18,14 @@ import dayjs from 'dayjs'
 import relativeTime from 'dayjs/plugin/relativeTime'
 import 'dayjs/locale/vi'
 import api from '../utils/api'
+import { getSafeMediaUrl } from '../utils/mediaUtils'
 import { useAuth } from '../contexts/AuthContext'
 import { useResponsive } from '../hooks/useResponsive'
 import useDebounce from '../hooks/useDebounce'
 
 const cleanUrl = (url) => {
   if (!url) return '';
-  try {
-    const u = new URL(url);
-    if (u.hostname.includes('ngrok-free.dev') || u.hostname.includes('ngrok.io')) {
-      const base = api.defaults.baseURL.replace(/\/api\/?$/, '');
-      return `${base}${u.pathname}`;
-    }
-  } catch (e) {}
-  return url;
+  return getSafeMediaUrl(url);
 }
 
 dayjs.extend(relativeTime)
@@ -1510,13 +1504,13 @@ export default function ZaloInboxPage() {
                               {msg.attachment_url && msg.attachment_type !== 'carousel' && (
                                 <div style={{ marginBottom: msg.content ? 8 : 0 }}>
                                   {['image', 'sticker', 'gif'].includes(msg.attachment_type) ? (
-                                    <img src={msg.attachment_url} alt="attachment" style={{ maxWidth: '100%', borderRadius: 8 }} />
+                                    <img src={cleanUrl(msg.attachment_url)} alt="attachment" style={{ maxWidth: '100%', borderRadius: 8 }} />
                                   ) : msg.attachment_type === 'video' ? (
-                                    <video controls src={msg.attachment_url} style={{ maxWidth: '100%', maxHeight: 260, borderRadius: 8, background: '#000' }} />
+                                    <video controls src={cleanUrl(msg.attachment_url)} style={{ maxWidth: '100%', maxHeight: 260, borderRadius: 8, background: '#000' }} />
                                   ) : msg.attachment_type === 'audio' ? (
-                                    <audio controls src={msg.attachment_url} style={{ maxWidth: 240 }} />
+                                    <audio controls src={cleanUrl(msg.attachment_url)} style={{ maxWidth: 240 }} />
                                   ) : (
-                                    <a href={msg.attachment_url} target="_blank" rel="noreferrer" style={{ color: isOutbound ? '#fff' : '#0068ff', textDecoration: 'underline' }}>
+                                    <a href={cleanUrl(msg.attachment_url)} target="_blank" rel="noreferrer" style={{ color: isOutbound ? '#fff' : '#0068ff', textDecoration: 'underline' }}>
                                       <PaperClipOutlined /> Tệp đính kèm ({msg.attachment_type})
                                     </a>
                                   )}
