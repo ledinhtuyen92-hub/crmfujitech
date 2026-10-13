@@ -2,6 +2,7 @@ import React from 'react';
 import { BLOCK_TYPES } from './constants';
 import { Card, Typography, Row, Col, Space, Divider } from 'antd';
 import { HolderOutlined, DeleteOutlined } from '@ant-design/icons';
+import { getSafeMediaUrl } from '../../../utils/mediaUtils';
 import { useSortable, SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable';
 import { useDroppable } from '@dnd-kit/core';
 import { CSS } from '@dnd-kit/utilities';
@@ -512,7 +513,7 @@ export default function BlockRenderer({ block, allBlocks, isActive, onSelect, on
       case BLOCK_TYPES.IMAGE:
         return block.props.url ? (
           <div style={{ textAlign: block.props.align }}>
-            <img src={block.props.url} alt="Block" style={{ width: block.props.width, maxWidth: '100%' }} />
+            <img src={getSafeMediaUrl(block.props.url)} alt="Block" style={{ width: block.props.width, maxWidth: '100%' }} />
           </div>
         ) : (
           <PlaceholderBlock title="Hình ảnh / Logo" description="Cấu hình đường dẫn ảnh ở cột phải" icon="🖼️" />

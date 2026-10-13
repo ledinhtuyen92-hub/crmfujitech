@@ -4425,7 +4425,7 @@ export default function OrderList() {
                                     uid: `existing_${idx}`,
                                     name: `Chung_tu_${idx + 1}`,
                                     status: 'done',
-                                    url: url
+                                    url: getSafeMediaUrl(url)
                                   }))
                                   setUpdateReceiptFileList(initialList)
                                   setUpdateAttachmentModalVisible(true)
@@ -4578,7 +4578,7 @@ export default function OrderList() {
                       {file.url && file.url.endsWith('.pdf') ? (
                         <FileTextOutlined style={{ fontSize: 32, color: '#1677ff' }} />
                       ) : (
-                        <Image src={file.url} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                        <Image src={getSafeMediaUrl(file.url)} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                       )}
                     </div>
                     <Button 
@@ -4636,7 +4636,7 @@ export default function OrderList() {
           }}
         >
           {previewAttachments.map((url, i) => (
-            <Image key={i} src={url} />
+            <Image key={i} src={getSafeMediaUrl(url)} />
           ))}
         </Image.PreviewGroup>
       </div>
@@ -4690,7 +4690,7 @@ export default function OrderList() {
                   {file.url && file.url.endsWith('.pdf') ? (
                     <FileTextOutlined style={{ fontSize: 32, color: '#1677ff' }} />
                   ) : (
-                    <Image src={file.url} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                    <Image src={getSafeMediaUrl(file.url)} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                   )}
                 </div>
                 <Button 

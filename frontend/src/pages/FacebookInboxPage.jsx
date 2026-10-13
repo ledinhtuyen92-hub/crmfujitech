@@ -68,19 +68,13 @@ import useDebounce from '../hooks/useDebounce'
 import { useEffect, useRef, useState } from 'react'
 import { useAuth } from '../contexts/AuthContext'
 import api from '../utils/api'
+import { getSafeMediaUrl } from '../utils/mediaUtils'
 
 import { useLocation } from 'react-router-dom'
 
 const cleanUrl = (url) => {
   if (!url) return '';
-  try {
-    const u = new URL(url);
-    if (u.hostname.includes('ngrok-free.dev') || u.hostname.includes('ngrok.io')) {
-      const base = api.defaults.baseURL.replace(/\/api\/?$/, '');
-      return `${base}${u.pathname}`;
-    }
-  } catch (e) {}
-  return url;
+  return getSafeMediaUrl(url);
 }
 
 const { Text } = Typography

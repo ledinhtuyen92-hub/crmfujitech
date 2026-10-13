@@ -41,6 +41,7 @@ import {
   Alert,
 } from 'antd'
 import api from '../../utils/api'
+import { getSafeMediaUrl } from '../../utils/mediaUtils'
 import { useAuth } from '../../contexts/AuthContext'
 import { useResponsive } from '../../hooks/useResponsive'
 import QuotationRenderer from '../../components/QuotationRenderer'
@@ -360,7 +361,7 @@ export default function CompanyGeneralSettings() {
                   <Text strong style={{ display: 'block', marginBottom: 8, fontSize: 12 }}>Logo Công Ty</Text>
                   {companyInfo?.logo ? (
                     <img
-                      src={companyInfo.logo}
+                      src={getSafeMediaUrl(companyInfo.logo)}
                       alt="Logo"
                       style={{ display: 'block', margin: '0 auto', maxHeight: 70, maxWidth: '100%', objectFit: 'contain', marginBottom: 8, border: '1px solid #e2e8f0', padding: 4, borderRadius: 6 }}
                     />
@@ -385,7 +386,7 @@ export default function CompanyGeneralSettings() {
                   <Text strong style={{ display: 'block', marginBottom: 8, fontSize: 12 }}>Con Dấu Công Ty</Text>
                   {companyInfo?.stamp_image ? (
                     <img
-                      src={companyInfo.stamp_image}
+                      src={getSafeMediaUrl(companyInfo.stamp_image)}
                       alt="Stamp"
                       style={{ display: 'block', margin: '0 auto', maxHeight: 70, maxWidth: '100%', objectFit: 'contain', marginBottom: 8, border: '1px solid #e2e8f0', padding: 4, borderRadius: 6 }}
                     />
@@ -410,7 +411,7 @@ export default function CompanyGeneralSettings() {
                   <Text strong style={{ display: 'block', marginBottom: 8, fontSize: 12 }}>Chữ Ký Giám Đốc</Text>
                   {companyInfo?.director_signature ? (
                     <img
-                      src={companyInfo.director_signature}
+                      src={getSafeMediaUrl(companyInfo.director_signature)}
                       alt="Signature"
                       style={{ display: 'block', margin: '0 auto', maxHeight: 70, maxWidth: '100%', objectFit: 'contain', marginBottom: 8, border: '1px solid #e2e8f0', padding: 4, borderRadius: 6 }}
                     />

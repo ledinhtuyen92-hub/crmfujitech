@@ -49,6 +49,7 @@ import { useCallback, useEffect, useState, useMemo, useRef, startTransition } fr
 import { useLocation } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
 import api from '../utils/api'
+import { getSafeMediaUrl } from '../utils/mediaUtils'
 import ProductTemplateTab from './inventory/ProductTemplateTab'
 import TransactionPrintView from '../components/TransactionPrintView'
 import { useResponsive } from '../hooks/useResponsive'
@@ -726,7 +727,7 @@ export default function Inventory() {
     setEditingProduct(prod)
     setProductImageFile(null)
     if (prod) {
-      setProductPreviewImage(prod.image_url || prod.image || null)
+      setProductPreviewImage(getSafeMediaUrl(prod.image_url || prod.image || null))
       productForm.setFieldsValue({
         sku: prod.sku,
         name: prod.name,
@@ -1096,7 +1097,7 @@ export default function Inventory() {
       width: 95,
       align: 'center',
       render: (_, r) => {
-        const imgUrl = r.image_url || r.image
+        const imgUrl = getSafeMediaUrl(r.image_url || r.image)
         return imgUrl ? (
           <img src={imgUrl} alt={r.name} style={{ width: 48, height: 48, objectFit: 'cover', borderRadius: 6, border: '1px solid #e2e8f0' }} />
         ) : (

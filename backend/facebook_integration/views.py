@@ -497,7 +497,7 @@ class FacebookLeadViewSet(mixins.UpdateModelMixin, mixins.DestroyModelMixin, vie
             try:
                 ext = file_obj.name.split(".")[-1] if "." in file_obj.name else "bin"
                 saved_path = default_storage.save(f"facebook_attachments/{uuid.uuid4().hex}.{ext}", file_obj)
-                saved_file_url = request.build_absolute_uri(default_storage.url(saved_path))
+                saved_file_url = default_storage.url(saved_path)
             except Exception as e:
                 logger.error(f"[Facebook] Lỗi lưu file local: {e}")
 

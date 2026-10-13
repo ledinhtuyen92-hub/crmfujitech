@@ -25,7 +25,7 @@ def get_public_domain():
     # Fallback for production or if ngrok not found
     from django.conf import settings
     import os
-    return getattr(settings, 'SITE_URL', os.environ.get('SITE_URL', 'https://crm.mlgautobot.click')).rstrip('/')
+    return getattr(settings, 'SITE_URL', os.environ.get('SITE_URL', '')).rstrip('/')
 
 
 def get_image_bytes(img_url: str):
