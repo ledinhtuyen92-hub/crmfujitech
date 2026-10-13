@@ -146,6 +146,14 @@ class PygameAudioPlayer(BaseAudioPlayer):
 
                 await asyncio.sleep(0.01) # Faster poll for tighter sync
                 
+            # If playback completed naturally, flush any remaining PCM chunk
+            if self._is_playing and self.stream_sink and self.stream_sink.is_streaming and pcm_data and pcm_offset < len(pcm_data):
+                try:
+                    remaining_chunk = pcm_data[pcm_offset:]
+                    self.stream_sink.write_pcm(remaining_chunk)
+                except Exception as e:
+                    logger.error(f"Stream sink flush failed: {e}")
+
             # If stopped via stop(), get_busy() becomes False
             completed = self._is_playing
             self._is_playing = False

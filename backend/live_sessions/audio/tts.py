@@ -27,26 +27,61 @@ class BaseTTSProvider(ABC):
         """
         pass
 
+class GoogleTTSProvider(BaseTTSProvider):
+    """
+    Google Translate TTS provider via gTTS.
+    Zero API keys required, free, reliable Vietnamese voice.
+    """
+    def generate(self, text: str, voice_config: Optional[Dict[str, Any]] = None) -> AudioResult:
+        if not text or not text.strip():
+            raise TTSProviderException("Text cannot be empty.")
+            
+        clean_text = text.replace("[STOP]", "").strip()
+        if not clean_text:
+            clean_text = "Dạ xin chào mọi người đang xem live ạ"
+            
+        logger.info(f"GoogleTTS generating audio for text: {clean_text[:60]}...")
+        try:
+            from gtts import gTTS
+            import io
+            lang = (voice_config or {}).get("lang", "vi")
+            tts = gTTS(text=clean_text, lang=lang)
+            fp = io.BytesIO()
+            tts.write_to_fp(fp)
+            audio_bytes = fp.getvalue()
+            
+            return AudioResult(
+                audio_bytes=audio_bytes,
+                mime_type="audio/mp3",
+                format="mp3",
+                sample_rate=24000,
+                channels=1
+            )
+        except Exception as e:
+            logger.error(f"Google TTS generation failed: {e}")
+            raise TTSProviderException(f"Google TTS generation failed: {e}")
+
 class DummyTTSProvider(BaseTTSProvider):
     def generate(self, text: str, voice_config: Optional[Dict[str, Any]] = None) -> AudioResult:
         logger.info(f"DummyTTS generating audio for text: {text}")
-        import os
-        fallback = '/app/media/dummy.mp3'
-        if not os.path.exists(fallback):
-            # Just create a minimal valid mp3 header if possible, or an empty file 
-            # Pygame mixer might crash on empty file, so we try to find any .mp3 in project
-            audio_bytes = b''
-        else:
-            with open(fallback, 'rb') as f:
-                audio_bytes = f.read()
-                
-        return AudioResult(
-            audio_bytes=audio_bytes,
-            mime_type="audio/mp3",
-            format="mp3",
-            sample_rate=24000,
-            channels=1
-        )
+        try:
+            return GoogleTTSProvider().generate(text, voice_config)
+        except Exception as e:
+            logger.warning(f"DummyTTS fallback to GoogleTTS failed: {e}")
+            import os
+            fallback = '/app/media/dummy.mp3'
+            if os.path.exists(fallback):
+                with open(fallback, 'rb') as f:
+                    audio_bytes = f.read()
+            else:
+                audio_bytes = b''
+            return AudioResult(
+                audio_bytes=audio_bytes,
+                mime_type="audio/mp3",
+                format="mp3",
+                sample_rate=24000,
+                channels=1
+            )
 
 class OpenAITTSProvider(BaseTTSProvider):
     """

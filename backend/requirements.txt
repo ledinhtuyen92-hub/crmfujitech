@@ -25,3 +25,4 @@ django-environ>=0.11.2
 boto3>=1.34.0
 GitPython>=3.1.40
 django-cleanup>=8.0
+gTTS>=2.5.0

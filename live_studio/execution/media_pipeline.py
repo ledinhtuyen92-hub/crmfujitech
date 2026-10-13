@@ -105,6 +105,26 @@ class AudioStreamSink:
             pass
 
 
+def get_ffmpeg_binary() -> str:
+    """Finds ffmpeg executable: bundled bin/ffmpeg.exe, system ffmpeg, or dist bin."""
+    import sys, os
+    if getattr(sys, 'frozen', False):
+        base_dir = os.path.dirname(sys.executable)
+    else:
+        base_dir = os.path.dirname(os.path.dirname(__file__))
+    candidates = [
+        os.path.join(base_dir, "bin", "ffmpeg.exe"),
+        os.path.join(base_dir, "bin", "ffmpeg", "ffmpeg.exe"),
+        os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "bin", "ffmpeg.exe"),
+        os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "bin", "ffmpeg", "ffmpeg.exe"),
+        "ffmpeg"
+    ]
+    for c in candidates:
+        if os.path.isfile(c):
+            return os.path.abspath(c)
+    return "ffmpeg"
+
+
 class Mp3Decoder:
     """
     Decodes MP3 to s16le, 44100Hz, 2 channel PCM using FFmpeg subprocess.
@@ -112,9 +132,10 @@ class Mp3Decoder:
     """
     @staticmethod
     def decode_to_pcm(filepath: str) -> bytes:
+        ffmpeg_bin = get_ffmpeg_binary()
         try:
             result = subprocess.run([
-                'ffmpeg', '-y', '-i', filepath,
+                ffmpeg_bin, '-y', '-i', filepath,
                 '-f', 's16le', '-acodec', 'pcm_s16le',
                 '-ar', '44100', '-ac', '2', '-'
             ], stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=True)
@@ -123,5 +144,5 @@ class Mp3Decoder:
             logger.warning("FFmpeg not found. Cannot decode MP3 to PCM. Stream sink will receive empty chunks.")
             return b""
         except subprocess.CalledProcessError as e:
-            logger.error(f"FFmpeg decode failed: {e.stderr.decode()}")
+            logger.error(f"FFmpeg decode failed: {e.stderr.decode('utf-8', errors='ignore')}")
             return b""

@@ -144,10 +144,10 @@ def trigger_proactive_speech(self, session_id: str):
         context = LiveContextService.get_context(str(session.company_id), str(session.id))
         last_speech_time = context.get("last_speech_time", 0)
         
-        # Threshold for proactive speech (e.g., 30 seconds)
-        idle_time = time.time() - float(last_speech_time)
+        # Threshold for proactive speech (e.g., 15 seconds) or initial start
+        idle_time = time.time() - float(last_speech_time) if float(last_speech_time) > 0 else 999.0
         
-        if idle_time > 30.0:
+        if idle_time > 15.0:
             logger.info(f"[Session {session_id}] Idle for {idle_time}s. Triggering proactive speech.")
             orchestrator = LiveOrchestrator()
             orchestrator.process_proactive_speech(session_id=session_id)

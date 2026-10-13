@@ -399,11 +399,10 @@ class LiveSession(models.Model):
                 
             if new_status == self.STATUS_RUNNING:
                 try:
-                    import time
                     from .services import LiveContextService
                     from .tasks import trigger_proactive_speech
-                    LiveContextService.update_context(str(self.company_id), str(self.id), {"last_speech_time": time.time()})
-                    trigger_proactive_speech.apply_async(kwargs={"session_id": str(self.id)}, countdown=30)
+                    LiveContextService.update_context(str(self.company_id), str(self.id), {"last_speech_time": 0})
+                    trigger_proactive_speech.apply_async(kwargs={"session_id": str(self.id)}, countdown=3)
                 except Exception as e:
                     import logging
                     logger = logging.getLogger(__name__)

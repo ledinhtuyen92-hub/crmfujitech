@@ -10,7 +10,7 @@ from django.conf import settings
 from live_sessions.models import LiveSession
 from ai_agents.services import generate_ai_reply
 from ai_agents.rag_processor import search_knowledge
-from live_sessions.audio.tts import OpenAITTSProvider, DummyTTSProvider
+from live_sessions.audio.tts import OpenAITTSProvider, DummyTTSProvider, GoogleTTSProvider
 from live_sessions.audio.storage import LocalAudioStorageBackend
 from live_sessions.protocol.commands import SpeechSpeakPayloadSerializer, StreamStartPayloadSerializer, StreamStopPayloadSerializer
 from live_sessions.protocol.envelope import ProtocolEnvelopeSerializer
@@ -403,9 +403,17 @@ class LiveOrchestrator:
             
             if getattr(settings, 'DEBUG', False) and resolved_key == 'dummy':
                 self.tts_provider = DummyTTSProvider()
+            elif resolved_key:
+                try:
+                    self.tts_provider = OpenAITTSProvider(api_key=resolved_key)
+                    audio_result = self.tts_provider.generate(reply_text, voice_config)
+                except Exception as e:
+                    logger.warning(f"[Session: {session_id}] OpenAI TTS failed ({e}), using Google TTS fallback")
+                    self.tts_provider = GoogleTTSProvider()
+                    audio_result = self.tts_provider.generate(reply_text, voice_config)
             else:
-                self.tts_provider = OpenAITTSProvider(api_key=resolved_key)
-            audio_result = self.tts_provider.generate(reply_text, voice_config)
+                self.tts_provider = GoogleTTSProvider()
+                audio_result = self.tts_provider.generate(reply_text, voice_config)
             
             logger.info(f"[Session: {session_id}][Corr: {correlation_id}] TTS completed.")
             LiveConsoleEventService.emit(session_id, "live.tts.completed", {"format": audio_result.format, "bytes": len(audio_result.audio_bytes)}, correlation_id)
@@ -489,9 +497,54 @@ class LiveOrchestrator:
             "audio_url": audio_asset_dict.get("signed_url")
         }
 
+    def generate_proactive_sales_pitch(self, product, session, context_data: dict) -> str:
+        """
+        Tự động tạo câu tư vấn sản phẩm bán hàng chuyên nghiệp khi livestream chưa có comment.
+        Xoay vòng đa dạng: Lời chào mừng, nêu bật tính năng & độ bền, báo giá flash sale, ưu đãi vận chuyển, kêu gọi chốt đơn.
+        """
+        pitch_index = context_data.get("proactive_pitch_index", 0)
+        prod_name = product.name if product else "sản phẩm nổi bật của bên em"
+        
+        price_val = None
+        try:
+            from live_sessions.models import LivePlatformProduct
+            platform_product = LivePlatformProduct.objects.filter(
+                company_id=session.company_id,
+                product_id=product.id,
+                platform=session.platform
+            ).first() if product else None
+            if platform_product and platform_product.live_price_override:
+                price_val = f"{int(platform_product.live_price_override):,} đồng"
+        except Exception:
+            pass
+            
+        if not price_val and product and product.price:
+            try:
+                price_val = f"{int(product.price):,} đồng"
+            except Exception:
+                price_val = f"{product.price} đồng"
+                
+        price_str = f"chỉ với mức giá {price_val}" if price_val else "với mức giá cực kỳ ưu đãi"
+        extra_note = f". Đặc biệt lưu ý: {session.session_prompt}" if getattr(session, 'session_prompt', None) else ""
+        
+        pitches = [
+            f"Dạ em xin chào mừng toàn thể mọi người đang theo dõi phiên livestream hôm nay ạ! Sản phẩm bên em đang ghim trực tiếp là {prod_name}, hôm nay trợ giá đặc biệt {price_str} thôi cả nhà ơi! Các bác nhanh tay bấm vào giỏ hàng bên dưới để săn deal ngay nhé{extra_note}!",
+            f"Dạ sản phẩm {prod_name} này bên em cam kết hàng chuẩn chính hãng một trăm phần trăm, độ bền vượt trội và bảo hành đầy đủ. Bác nào ưng ý thì bấm đặt ngay trong live để nhận mã miễn phí vận chuyển toàn quốc nha!",
+            f"Số lượng suất flash sale dành cho {prod_name} {price_str} trong phiên live hôm nay chỉ còn rất ít thôi cả nhà ơi! Anh chị em mình nhanh tay chốt đơn kẻo hết mã giảm giá nhé!",
+            f"Mọi người đang xem livestream nếu có bất kỳ thắc mắc nào về kích thước, chất liệu hay cách sử dụng của {prod_name} thì cứ thả bình luận xuống bên dưới, em sẽ tư vấn và giải đáp chi tiết cho từng người luôn ạ!",
+            f"Dạ các bác nhanh tay bấm vào giỏ hàng màu cam để nhận ngay voucher độc quyền cho {prod_name} nha. Mức giá ưu đãi {price_str} chỉ áp dụng trực tiếp trong lúc phiên live đang phát thôi ạ!"
+        ]
+        
+        chosen = pitches[pitch_index % len(pitches)]
+        from live_sessions.services import LiveContextService
+        LiveContextService.update_context(str(session.company_id), str(session.id), {
+            "proactive_pitch_index": pitch_index + 1
+        })
+        return chosen
+
     def process_proactive_speech(self, session_id: str, correlation_id: Optional[str] = None) -> Dict[str, Any]:
         """
-        Generates proactive speech when the session is idle (no comments).
+        Generates proactive speech when the session is idle (no comments) or starting up.
         """
         logger.info(f"[Session: {session_id}][Corr: {correlation_id}] Proactive speech started.")
 
@@ -507,44 +560,53 @@ class LiveOrchestrator:
             return {"status": "suppressed", "reason": "not_running"}
 
         agent = session.ai_agent
-        if not agent:
-            return {"status": "error", "reason": "missing_agent"}
-
-        # Use same product truth
         product = session.product
-        product_truth = f"THÔNG TIN SẢN PHẨM ĐANG LIVE (BẮT BUỘC SỬ DỤNG LÀM CHUẨN):\n- Tên: {product.name}\n- Mã (SKU): {product.sku}\n- Giá tiêu chuẩn: {product.price}\n- Mô tả cơ bản: {product.description}\n"
-        
-        try:
-            from live_sessions.models import LivePlatformProduct
-            platform_product = LivePlatformProduct.objects.filter(
-                company_id=session.company_id,
-                product_id=product.id,
-                platform=session.platform
-            ).first()
-            if platform_product and platform_product.live_price_override:
-                product_truth += f"- GIÁ ĐANG CHẠY FLASH SALE TRÊN LIVE: {platform_product.live_price_override} (Ưu tiên báo giá này cho khách livestream)\n"
-        except Exception:
-            pass
-
-        conversation_history = [
-            {"role": "system", "content": product_truth},
-            {"role": "system", "content": "BẮT BUỘC: Không có ai bình luận trong thời gian qua. Hãy chủ động nói một câu ngắn gọn (1-2 câu) để giới thiệu sản phẩm đang ghim, nêu bật điểm mạnh hoặc kêu gọi người xem chốt đơn. Định dạng trả về JSON với 'intent'='PROACTIVE', 'action'='RESPOND', và 'reply' chứa câu nói của bạn."}
-        ]
         
         from live_sessions.services import LiveContextService
         context_data = LiveContextService.get_context(str(session.company_id), str(session.id))
-        recent_history = context_data.get("recent_history", [])
-        if isinstance(recent_history, list):
-            for msg in recent_history:
-                conversation_history.append(msg)
-                
-        try:
-            ai_result = generate_ai_reply(agent, conversation_history, "Khách hàng Livestream")
-        except Exception as e:
-            logger.error(f"[Session: {session_id}] AI error in proactive speech: {e}")
-            return {"status": "error", "reason": "ai_failure"}
+        
+        reply_text = ""
+        # 1. Thử gọi LLM nếu có agent cấu hình
+        if agent:
+            product_truth = f"THÔNG TIN SẢN PHẨM ĐANG LIVE (BẮT BUỘC SỬ DỤNG LÀM CHUẨN):\n- Tên: {product.name if product else 'Sản phẩm hot'}\n"
+            if product:
+                product_truth += f"- Mã (SKU): {product.sku}\n- Giá tiêu chuẩn: {product.price}\n- Mô tả cơ bản: {product.description}\n"
+            
+            try:
+                from live_sessions.models import LivePlatformProduct
+                if product:
+                    platform_product = LivePlatformProduct.objects.filter(
+                        company_id=session.company_id,
+                        product_id=product.id,
+                        platform=session.platform
+                    ).first()
+                    if platform_product and platform_product.live_price_override:
+                        product_truth += f"- GIÁ ĐANG CHẠY FLASH SALE TRÊN LIVE: {platform_product.live_price_override} (Ưu tiên báo giá này cho khách livestream)\n"
+            except Exception:
+                pass
 
-        reply_text = ai_result.get("reply", "").strip()
+            conversation_history = [
+                {"role": "system", "content": product_truth},
+                {"role": "system", "content": "BẮT BUỘC: Không có ai bình luận trong thời gian qua. Hãy chủ động nói một câu ngắn gọn (1-2 câu) bằng tiếng Việt tự nhiên để chào người xem, giới thiệu sản phẩm đang ghim, nêu bật điểm mạnh hoặc kêu gọi chốt đơn trong giỏ hàng. Định dạng trả về JSON với 'intent'='PROACTIVE', 'action'='RESPOND', và 'reply' chứa câu nói của bạn."}
+            ]
+            
+            recent_history = context_data.get("recent_history", [])
+            if isinstance(recent_history, list):
+                for msg in recent_history:
+                    conversation_history.append(msg)
+                    
+            try:
+                ai_result = generate_ai_reply(agent, conversation_history, "Khách hàng Livestream")
+                candidate_reply = ai_result.get("reply", "").strip() if isinstance(ai_result, dict) else ""
+                if candidate_reply and candidate_reply != "[STOP]" and not candidate_reply.startswith("Hệ thống AI chưa được cấu hình"):
+                    reply_text = candidate_reply
+            except Exception as e:
+                logger.warning(f"[Session: {session_id}] AI error in proactive speech: {e}, falling back to sales pitch")
+
+        # 2. Nếu LLM không khả dụng hoặc lỗi hoặc chưa có API key -> Dùng kịch bản tư vấn thông minh
+        if not reply_text:
+            reply_text = self.generate_proactive_sales_pitch(product, session, context_data)
+
         if not reply_text or reply_text == "[STOP]":
             return {"status": "suppressed", "reason": "empty_reply"}
 
@@ -552,39 +614,52 @@ class LiveOrchestrator:
         import time
         LiveContextService.update_context(str(session.company_id), str(session.id), {"last_speech_time": time.time()})
 
-        # Generate TTS
+        # 3. Generate TTS (OpenAI nếu có Key, fallback Google TTS 100%)
         try:
-            voice_config = {"voice": getattr(agent, 'tts_voice', 'alloy'), "speed": getattr(agent, 'tts_speed', 1.0)}
+            voice_config = {"voice": getattr(agent, 'tts_voice', 'alloy') if agent else 'alloy', "speed": getattr(agent, 'tts_speed', 1.0) if agent else 1.0}
             from ai_agents.services import get_api_keys
-            tts_keys = get_api_keys(session.company, 'openai')
+            tts_keys = get_api_keys(session.company, 'openai') if session.company else []
             resolved_key = tts_keys[0] if tts_keys else None
-            if getattr(settings, 'DEBUG', False) and resolved_key == 'dummy':
-                self.tts_provider = DummyTTSProvider()
+            
+            if resolved_key and resolved_key != 'dummy':
+                try:
+                    self.tts_provider = OpenAITTSProvider(api_key=resolved_key)
+                    audio_result = self.tts_provider.generate(reply_text, voice_config)
+                except Exception as e:
+                    logger.warning(f"[Session: {session_id}] OpenAI TTS error ({e}), using Google TTS fallback")
+                    self.tts_provider = GoogleTTSProvider()
+                    audio_result = self.tts_provider.generate(reply_text, voice_config)
             else:
-                self.tts_provider = OpenAITTSProvider(api_key=resolved_key)
-            audio_result = self.tts_provider.generate(reply_text, voice_config)
+                self.tts_provider = GoogleTTSProvider()
+                audio_result = self.tts_provider.generate(reply_text, voice_config)
+                
+            logger.info(f"[Session: {session_id}][Corr: {correlation_id}] Proactive TTS completed: {len(audio_result.audio_bytes)} bytes")
         except Exception as e:
             logger.error(f"[Session: {session_id}] TTS error: {e}")
             return {"status": "error", "reason": "tts_failure"}
 
+        # 4. Lưu Audio Asset
         try:
             audio_asset_dict = self.audio_storage.store(audio_result, session.company_id, session.id)
         except Exception as e:
             logger.error(f"[Session: {session_id}] Storage error: {e}")
             return {"status": "error", "reason": "storage_failure"}
 
+        # 5. Build speech.speak command
         command_id = str(uuid.uuid4())
         message_id = str(uuid.uuid4())
         payload = {
             "command_id": command_id,
+            "correlation_id": correlation_id,
             "text": reply_text,
-            "audio_url": audio_asset_dict["url"],
-            "signature": audio_asset_dict["signature"],
-            "expires_at": audio_asset_dict["expires_at"]
+            "audio_asset": audio_asset_dict,
+            "interruptible": True,
+            "priority": "normal"
         }
         
         payload_serializer = SpeechSpeakPayloadSerializer(data=payload)
         if not payload_serializer.is_valid():
+            logger.error(f"[Session: {session_id}] Invalid payload schema: {payload_serializer.errors}")
             return {"status": "error", "reason": "invalid_payload_schema"}
             
         try:
@@ -605,6 +680,7 @@ class LiveOrchestrator:
         
         envelope_serializer = ProtocolEnvelopeSerializer(data=envelope)
         if not envelope_serializer.is_valid():
+            logger.error(f"[Session: {session_id}] Invalid envelope schema: {envelope_serializer.errors}")
             return {"status": "error", "reason": "invalid_envelope_schema"}
             
         session_group_name = f"live_session_{session.id}_device"
@@ -613,7 +689,20 @@ class LiveOrchestrator:
                 session_group_name,
                 {"type": "send.command", "envelope": json.loads(json.dumps(envelope_serializer.data, default=str))}
             )
+            logger.info(f"[Session: {session_id}] speech.speak sent successfully to {session_group_name}")
         except Exception as e:
+            logger.error(f"[Session: {session_id}] Channel layer send error: {e}")
             return {"status": "error", "reason": "channel_layer_failure"}
             
+        # Emit console event to studio UI
+        try:
+            LiveConsoleEventService.emit(session_id, "live.speech.started", {
+                "text": reply_text,
+                "audio_url": audio_asset_dict.get("signed_url"),
+                "command_id": command_id,
+                "type": "proactive"
+            }, correlation_id)
+        except Exception as e:
+            logger.debug(f"Console event emit error: {e}")
+
         return {"status": "success", "command_id": command_id}

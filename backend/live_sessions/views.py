@@ -545,12 +545,10 @@ from .audio.storage import LocalAudioStorageBackend
 
 @api_view(['GET'])
 @authentication_classes([DeviceTokenAuthentication])
-@permission_classes([IsAuthenticatedDevice])
+@permission_classes([permissions.AllowAny])
 def serve_audio_asset(request, token):
     """
-    Secure endpoint to download audio assets.
-    The token acts as a signed URL, but we also enforce that the requesting Device
-    belongs to the same company as the asset.
+    Secure endpoint to download audio assets using signed HMAC token.
     """
     storage = LocalAudioStorageBackend()
     payload = storage.verify_token(token)
@@ -558,8 +556,8 @@ def serve_audio_asset(request, token):
     if not payload:
         raise Http404("Audio token invalid or expired.")
         
-    device = request.auth
-    if str(device.company_id) != payload["company_id"]:
+    device = getattr(request, 'auth', None)
+    if device and hasattr(device, 'company_id') and str(device.company_id) != payload["company_id"]:
         return Response({'detail': 'Forbidden. Tenant mismatch.'}, status=403)
         
     file_path = storage.get_audio_path(payload)
