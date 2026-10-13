@@ -462,7 +462,6 @@ def process_ai_reply_zalo(lead_id, is_followup=False, trigger_msg_id=None):
                 if is_file:
                     file_token = None
                     try:
-                        from .services import get_image_bytes
                         import io
                         file_bytes, fname = get_image_bytes(img_url)
                         if file_bytes and fname:
@@ -810,17 +809,17 @@ def process_ai_reply_facebook(lead_id, is_followup=False, trigger_msg_id=None):
                 file_obj = None
                 try:
                     import io
-                    from .services import get_image_bytes
                     file_bytes, fname = get_image_bytes(img_url)
                     if file_bytes and fname:
                         file_obj = io.BytesIO(file_bytes)
                         file_obj.name = url_to_title.get(img_url) or fname
+                        import mimetypes
+                        mt, _ = mimetypes.guess_type(fname)
                         if is_file:
-                            import mimetypes
-                            mt, _ = mimetypes.guess_type(fname)
                             file_obj.content_type = mt or "application/octet-stream"
                         else:
-                            file_obj.content_type = "image/png" if fname.lower().endswith('.png') else "image/jpeg"
+                            # Dùng mimetypes để xử lý đúng webp, gif, heic... tránh lỗi #100 Facebook
+                            file_obj.content_type = mt if mt and mt.startswith('image/') else "image/jpeg"
                 except Exception as e:
                     logger.warning(f"[AI Facebook] Không lấy được ảnh/file {img_url}: {e}")
 
@@ -836,6 +835,7 @@ def process_ai_reply_facebook(lead_id, is_followup=False, trigger_msg_id=None):
                         sender_type='page',
                         text="[File đính kèm]" if is_file else "[Hình ảnh]",
                         attachment_url=img_url,
+                        attachment_type="file" if is_file else "image",
                         fb_message_id=resp.get("message_id", ""),
                         sender_role="ai",
                         sender_name="Trợ lý AI",
