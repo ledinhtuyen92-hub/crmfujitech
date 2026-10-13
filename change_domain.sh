@@ -26,9 +26,9 @@ if [ ! -f "docker-compose.yml" ] || [ ! -d "frontend" ] || [ ! -d "backend" ]; t
     exit 1
 fi
 
-# 3. Nhap ten mien moi
+# 3. Nhap ten mien moi va cu
 echo ""
-read -p "👉 Nhap ten mien moi cua ban (Vd: crm.fujitechgroup.com): " RAW_DOMAIN
+read -p "👉 Nhap ten mien MOI cua ban (Vd: crm.fujitechgroup.com): " RAW_DOMAIN
 
 # Lam sach ten mien (xoa https://, http://, dau gach cheo cuoi, khoang trang)
 DOMAIN=$(echo "$RAW_DOMAIN" | sed -e 's|^https\?://||' -e 's|/.*$||' -e 's|^[ \t]*||' -e 's|[ \t]*$||')
@@ -37,6 +37,11 @@ if [ -z "$DOMAIN" ]; then
     echo "❌ Ten mien khong duoc de trong!"
     exit 1
 fi
+
+# Hoi domain cu de thay the URL trong RAG (co the bo qua)
+echo ""
+read -p "👉 Nhap ten mien CU (de thay the URL trong RAG). Nhan Enter de bo qua: " RAW_OLD_DOMAIN
+OLD_DOMAIN=$(echo "$RAW_OLD_DOMAIN" | sed -e 's|^https\?://||' -e 's|/.*$||' -e 's|^[ \t]*||' -e 's|[ \t]*$||')
 
 # Xac dinh giao thuc (IP -> http, Domain -> https)
 if [[ "$DOMAIN" =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
@@ -151,7 +156,7 @@ fi
 
 # 8. Khoi dong lai Backend de ap dung ALLOWED_HOSTS & SITE_URL moi
 echo ""
-echo "🐳 [5/5] Khoi dong lai Docker Backend..."
+echo "🐳 [5/6] Khoi dong lai Docker Backend..."
 docker restart crm_web crm_celery crm_celery_beat 2>/dev/null || {
     echo "Container chua bat, dang khoi dong bang docker compose..."
     if command -v docker-compose &> /dev/null; then
@@ -160,6 +165,28 @@ docker restart crm_web crm_celery crm_celery_beat 2>/dev/null || {
         docker compose up -d
     fi
 }
+
+# 9. Thay the URL domain cu trong noi dung RAG (neu nguoi dung cung cap domain cu)
+if [ -n "$OLD_DOMAIN" ] && [ "$OLD_DOMAIN" != "$DOMAIN" ]; then
+    echo ""
+    echo "🔄 [6/6] Thay the URL domain cu ($OLD_DOMAIN) bang domain moi ($DOMAIN) trong RAG..."
+    # Doi container crm_web san sang
+    RETRIES=15
+    until docker exec crm_web echo "ready" > /dev/null 2>&1; do
+        RETRIES=$((RETRIES - 1))
+        [ "$RETRIES" -le 0 ] && break
+        sleep 2
+    done
+    if docker exec crm_web echo "ready" > /dev/null 2>&1; then
+        docker exec crm_web python manage.py replace_rag_domain --old "$OLD_DOMAIN" --new "$DOMAIN"
+        echo "✅ Da cap nhat URL anh trong RAG tu domain cu sang domain moi!"
+    else
+        echo "⚠️  Container crm_web chua san sang. Hay chay thu cong sau:"
+        echo "    docker exec crm_web python manage.py replace_rag_domain --old \"$OLD_DOMAIN\" --new \"$DOMAIN\""
+    fi
+else
+    echo "ℹ️  [6/6] Bo qua buoc thay the URL RAG (khong co domain cu)."
+fi
 
 systemctl reload nginx
 
