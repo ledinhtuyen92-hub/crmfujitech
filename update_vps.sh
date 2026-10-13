@@ -91,7 +91,8 @@ sed -i "s|^SITE_URL=.*|SITE_URL=$PROTOCOL://$DOMAIN|g" .env
 sed -i "s|^VITE_API_URL=.*|VITE_API_URL=$PROTOCOL://$DOMAIN|g" .env
 sed -i "s|^ALLOWED_HOSTS=.*|ALLOWED_HOSTS=$DOMAIN,localhost,127.0.0.1|g" .env
 sed -i "s|^DEBUG=.*|DEBUG=False|g" .env
-echo "✅ File .env da duoc cau hinh tu dong cho: $DOMAIN"
+echo "VITE_API_URL=$PROTOCOL://$DOMAIN/api/" > frontend/.env.production
+echo "✅ File .env va frontend/.env.production da duoc cau hinh tu dong cho: $DOMAIN"
 
 
 # 2.5 Khoi dong cac dich vu moi (neu co)
