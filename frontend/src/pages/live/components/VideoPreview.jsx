@@ -26,6 +26,7 @@ export default function VideoPreview({ session, streamEvent }) {
   const [isBuffering, setIsBuffering] = useState(false)
   const [isMuted, setIsMuted] = useState(true)
   const hasStartedPlaybackRef = useRef(false)
+  const hasJumpedToLiveEdgeRef = useRef(false)
 
   const toggleMute = () => {
     if (videoRef.current) {
@@ -175,6 +176,8 @@ export default function VideoPreview({ session, streamEvent }) {
         setHlsUrl(null)
         setHlsStatus('idle')
         setIsPlaybackReady(false)
+        hasStartedPlaybackRef.current = false
+        hasJumpedToLiveEdgeRef.current = false
         if (hlsRef.current) { hlsRef.current.destroy(); hlsRef.current = null }
       }
     }
@@ -191,6 +194,7 @@ export default function VideoPreview({ session, streamEvent }) {
       setHlsStatus('idle')
       setIsPlaybackReady(false)
       hasStartedPlaybackRef.current = false
+      hasJumpedToLiveEdgeRef.current = false
       setErrorMsg(null)
       return
     }
@@ -207,8 +211,6 @@ export default function VideoPreview({ session, streamEvent }) {
   }, [isSessionLive, session?.id, probeHls])
 
   // Stall watchdog: ONLY active during initial connection before playback has ever started.
-  // Once the stream is live, HLS.js manages error recovery internally and we NEVER destroy
-  // the playing instance on a timer!
   useEffect(() => {
     if (!hlsUrl || isPlaybackReady || hasStartedPlaybackRef.current) {
       if (watchdogTimerRef.current) clearTimeout(watchdogTimerRef.current)
@@ -217,28 +219,34 @@ export default function VideoPreview({ session, streamEvent }) {
     }
 
     watchdogTimerRef.current = setTimeout(() => {
-      if (!hasStartedPlaybackRef.current && videoRef.current && videoRef.current.readyState < 2 && hlsRef.current) {
-        console.warn('[VideoPreview Watchdog] Initial stream frames taking >10s. Resyncing live edge...')
+      if (!hasStartedPlaybackRef.current && videoRef.current && hlsRef.current) {
+        const v = videoRef.current
+        console.warn('[VideoPreview Watchdog] Waiting for frames after 8s. Nudging...')
         try {
-          hlsRef.current.stopLoad()
-          hlsRef.current.startLoad(-1)
+          if (v.buffered.length > 0) {
+            v.currentTime = v.buffered.start(0) + 0.1
+            v.play().catch(() => {})
+          } else {
+            hlsRef.current.startLoad()
+          }
         } catch (_) {}
       }
-    }, 10000)
+    }, 8000)
 
     hardResetTimerRef.current = setTimeout(() => {
       if (!hasStartedPlaybackRef.current && videoRef.current && videoRef.current.readyState < 2) {
-        console.warn('[VideoPreview Watchdog] Cold start timed out after 20s. Re-probing...')
+        console.warn('[VideoPreview Watchdog] Cold start timed out after 18s. Re-probing...')
         if (hlsRef.current) {
           hlsRef.current.destroy()
           hlsRef.current = null
         }
         setIsPlaybackReady(false)
+        hasJumpedToLiveEdgeRef.current = false
         setHlsUrl(null)
         setHlsStatus('waiting')
         probeHls()
       }
-    }, 20000)
+    }, 18000)
 
     return () => {
       if (watchdogTimerRef.current) clearTimeout(watchdogTimerRef.current)
@@ -269,6 +277,8 @@ export default function VideoPreview({ session, streamEvent }) {
     const token = localStorage.getItem('accessToken') || sessionStorage.getItem('accessToken') || ''
 
     setIsPlaybackReady(false)
+    hasStartedPlaybackRef.current = false
+    hasJumpedToLiveEdgeRef.current = false
 
     // Native HLS (Safari)
     if (video.canPlayType('application/vnd.apple.mpegurl')) {
@@ -291,13 +301,13 @@ export default function VideoPreview({ session, streamEvent }) {
       const hls = new Hls({
         enableWorker: true,
         lowLatencyMode: false,
-        backBufferLength: 30,
+        backBufferLength: 15,
         liveDurationInfinity: true,
-        liveSyncDurationCount: 3,
-        liveMaxLatencyDurationCount: 8,
+        liveSyncDurationCount: 2,
+        liveMaxLatencyDurationCount: 6,
         maxLiveSyncPlaybackRate: 1.1,
-        maxBufferLength: 10,
-        maxMaxBufferLength: 20,
+        maxBufferLength: 8,
+        maxMaxBufferLength: 16,
         manifestLoadingMaxRetry: 10,
         manifestLoadingRetryDelay: 1000,
         manifestLoadingMaxRetryTimeout: 15000,
@@ -318,38 +328,30 @@ export default function VideoPreview({ session, streamEvent }) {
       video.muted = true
       video.defaultMuted = true
 
-      const seekToLiveEdge = () => {
-        if (!video) return
+      // Jump over initial timestamp gap once on cold start
+      const jumpToLiveEdgeOnce = () => {
+        if (!video || hasJumpedToLiveEdgeRef.current) return
         try {
           if (video.buffered.length > 0) {
             const bufStart = video.buffered.start(0)
             const bufEnd = video.buffered.end(video.buffered.length - 1)
-            const target = (hls.liveSyncPosition && hls.liveSyncPosition > 0) 
-              ? hls.liveSyncPosition 
-              : Math.max(bufStart, bufEnd - 0.5)
             if (video.currentTime < bufStart || video.currentTime === 0) {
+              const target = (hls.liveSyncPosition && hls.liveSyncPosition >= bufStart && hls.liveSyncPosition <= bufEnd)
+                ? hls.liveSyncPosition
+                : bufStart + 0.1
               video.currentTime = target
+              hasJumpedToLiveEdgeRef.current = true
             }
-          }
-          if (video.paused) {
-            video.play().catch(() => {})
           }
         } catch (_) {}
       }
-
-      hls.on(Hls.Events.FRAG_BUFFERED, () => {
-        seekToLiveEdge()
-        hasStartedPlaybackRef.current = true
-        setIsPlaybackReady(true)
-        setIsBuffering(false)
-      })
 
       hls.on(Hls.Events.MANIFEST_PARSED, () => {
         video.muted = true
         video.play()
           .then(() => {
             setHlsStatus('live')
-            seekToLiveEdge()
+            jumpToLiveEdgeOnce()
           })
           .catch(() => {
             // Autoplay blocked by browser policy
@@ -357,10 +359,30 @@ export default function VideoPreview({ session, streamEvent }) {
           })
       })
 
+      hls.on(Hls.Events.LEVEL_LOADED, () => {
+        if (!hasJumpedToLiveEdgeRef.current) {
+          jumpToLiveEdgeOnce()
+        }
+      })
+
+      hls.on(Hls.Events.FRAG_BUFFERED, () => {
+        if (!hasJumpedToLiveEdgeRef.current) {
+          jumpToLiveEdgeOnce()
+        }
+        if (video.paused && !video.seeking) {
+          video.play().catch(() => {})
+        }
+      })
+
       hls.on(Hls.Events.ERROR, (_, data) => {
         console.warn('[HLS Event]', data.type, data.details, data.fatal)
         if (data.details === Hls.ErrorDetails.BUFFER_STALLED_ERROR || data.details === Hls.ErrorDetails.BUFFER_NUDGE_ON_STALL) {
-          seekToLiveEdge()
+          try {
+            if (video && video.buffered.length > 0 && video.currentTime < video.buffered.start(0)) {
+              video.currentTime = video.buffered.start(0) + 0.1
+              video.play().catch(() => {})
+            }
+          } catch (_) {}
           return
         }
         if (data.fatal) {
