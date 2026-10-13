@@ -13,6 +13,7 @@ import SortableColumnOption from '../components/SortableColumnOption';
 
 import QuotationPrintView from '../components/QuotationPrintView'
 import api from '../utils/api'
+import { getSafeMediaUrl } from '../utils/mediaUtils'
 import { useResponsive } from '../hooks/useResponsive'
 import CustomInfoInput from '../components/CustomInfoInput'
 import { DebouncedInput, DebouncedInputNumber, DebouncedTextArea } from '../components/DebouncedInput'
@@ -2198,7 +2199,7 @@ export default function QuotationList() {
           width: 260,
           render: (val, record, idx) => {
             const prodObj = products.find((p) => p.id === val)
-            const imgUrl = record.product_image || (prodObj ? (prodObj.image_url || prodObj.image) : null)
+            const imgUrl = getSafeMediaUrl(record.product_image || (prodObj ? (prodObj.image_url || prodObj.image) : null))
             const rowSpan = computeRowSpan(formItems, idx, 'product')
             return {
               children: (
@@ -2432,7 +2433,7 @@ export default function QuotationList() {
         width: 220,
         render: (val, record, idx) => {
           const prodObj = products.find((p) => p.id === val);
-          const imgUrl = record.product_image || (prodObj ? (prodObj.image_url || prodObj.image) : null);
+          const imgUrl = getSafeMediaUrl(record.product_image || (prodObj ? (prodObj.image_url || prodObj.image) : null));
           const rowSpan = computeRowSpan(formItems, idx, 'product');
           if (rowSpan === 0) return { children: null, props: { rowSpan: 0 } };
 
@@ -3042,7 +3043,7 @@ export default function QuotationList() {
                 <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'nowrap' }}>
                   {imgUrl && (
                     <div style={{ position: 'relative', flexShrink: 0, width: 32, height: 32 }}>
-                      <Image src={imgUrl} alt="uploaded" style={{ width: 32, height: 32, objectFit: 'cover', borderRadius: 4, border: '1px solid #cbd5e1' }} />
+                      <Image src={getSafeMediaUrl(imgUrl)} alt="uploaded" style={{ width: 32, height: 32, objectFit: 'cover', borderRadius: 4, border: '1px solid #cbd5e1' }} />
                       <CloseCircleOutlined 
                         style={{ position: 'absolute', top: -6, right: -6, color: '#ef4444', cursor: 'pointer', background: '#fff', borderRadius: '50%', fontSize: 12 }} 
                         onClick={(e) => {

@@ -2,6 +2,7 @@ import React from 'react';
 import { Typography, Row, Col, Divider } from 'antd';
 import { BLOCK_TYPES } from '../pages/admin/builder/constants';
 import { parseVariables } from '../utils/templateVariables';
+import { getSafeMediaUrl } from '../utils/mediaUtils';
 
 const ChuSo = ["không", "một", "hai", "ba", "bốn", "năm", "sáu", "bảy", "tám", "chín"];
 const Tien = ["", " nghìn", " triệu", " tỷ", " nghìn tỷ", " triệu tỷ"];
@@ -177,7 +178,7 @@ export default function QuotationRenderer({ layoutConfig, layoutStyle, data, ren
             <div style={{ textAlign: 'left', flexShrink: 0, maxWidth: '40%' }}>
               {finalLogoUrl ? (
                 <img
-                  src={finalLogoUrl}
+                  src={getSafeMediaUrl(finalLogoUrl)}
                   alt="Logo"
                   style={{ maxHeight: 75, maxWidth: '100%', objectFit: 'contain', borderRadius: 4 }}
                 />
@@ -245,7 +246,7 @@ export default function QuotationRenderer({ layoutConfig, layoutStyle, data, ren
 
         return imgUrl ? (
           <div style={{ textAlign: block.props.align }}>
-            <img src={imgUrl} alt="Image" style={{ width: block.props.width, maxWidth: '100%' }} />
+            <img src={getSafeMediaUrl(imgUrl)} alt="Image" style={{ width: block.props.width, maxWidth: '100%' }} />
           </div>
         ) : null;
         
@@ -454,13 +455,14 @@ export default function QuotationRenderer({ layoutConfig, layoutStyle, data, ren
                                 {enableProductImage && item.product_image && (
                                   <div style={{ flex: 1, position: 'relative', width: '100%', minHeight: 0, marginBottom: 4 }}>
                                     <img
-                                      src={item.product_image}
+                                      src={getSafeMediaUrl(item.product_image)}
                                       alt=""
                                       style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', borderRadius: 4, objectFit: 'contain' }}
                                       onError={(e) => {
                                         // Nếu ảnh snapshot bị lỗi (URL hết hạn/bị xóa), thử dùng ảnh catalog hiện tại
-                                        if (item.fallback_product_image && e.target.src !== item.fallback_product_image) {
-                                          e.target.src = item.fallback_product_image;
+                                        const fallback = getSafeMediaUrl(item.fallback_product_image);
+                                        if (fallback && e.target.src !== fallback) {
+                                          e.target.src = fallback;
                                         } else {
                                           // Ẩn luôn nếu cả fallback cũng lỗi
                                           e.target.style.display = 'none';
@@ -524,7 +526,7 @@ export default function QuotationRenderer({ layoutConfig, layoutStyle, data, ren
                                       <div key={field.id} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', borderRight: idx < dimensionFields.length - 1 ? '1px dashed #e2e8f0' : 'none', padding: '4px 6px', textAlign: 'center' }}>
                                         {childImgUrl && (
                                           <div style={{ marginBottom: 4, display: 'flex', justifyContent: 'center' }}>
-                                            <img src={childImgUrl} alt="" style={{ maxWidth: '100%', maxHeight: 60, objectFit: 'contain', borderRadius: 4, border: '1px solid #cbd5e1' }} />
+                                            <img src={getSafeMediaUrl(childImgUrl)} alt="" style={{ maxWidth: '100%', maxHeight: 60, objectFit: 'contain', borderRadius: 4, border: '1px solid #cbd5e1' }} />
                                           </div>
                                         )}
                                         <div>{val}</div>
@@ -540,7 +542,7 @@ export default function QuotationRenderer({ layoutConfig, layoutStyle, data, ren
                             <td key="note" style={{ ...tdStyle, textAlign: 'center', whiteSpace: 'pre-wrap' }}>
                               {enableNoteImage && item.custom_data?.note_image && (
                                 <div style={{ marginBottom: 4, display: 'flex', justifyContent: 'center' }}>
-                                  <img src={item.custom_data.note_image} alt="note" style={{ maxWidth: '100%', maxHeight: 60, objectFit: 'contain', borderRadius: 4, border: '1px solid #cbd5e1' }} />
+                                  <img src={getSafeMediaUrl(item.custom_data.note_image)} alt="note" style={{ maxWidth: '100%', maxHeight: 60, objectFit: 'contain', borderRadius: 4, border: '1px solid #cbd5e1' }} />
                                 </div>
                               )}
                               <span style={{color: '#475569', fontSize: 11}}>{item.note || item.custom_data?.note}</span>
@@ -575,7 +577,7 @@ export default function QuotationRenderer({ layoutConfig, layoutStyle, data, ren
                             const imgUrl = canShowImg ? item.custom_data?.[`img_${colId}`] : null;
                             return (
                               <td key={colId} style={{ ...tdStyle, textAlign: 'center' }}>
-                                {imgUrl && <div style={{ marginBottom: 4, display: 'flex', justifyContent: 'center' }}><img src={imgUrl} alt="" style={{ maxWidth: '100%', maxHeight: 60, objectFit: 'contain', borderRadius: 4, border: '1px solid #cbd5e1' }} /></div>}
+                                {imgUrl && <div style={{ marginBottom: 4, display: 'flex', justifyContent: 'center' }}><img src={getSafeMediaUrl(imgUrl)} alt="" style={{ maxWidth: '100%', maxHeight: 60, objectFit: 'contain', borderRadius: 4, border: '1px solid #cbd5e1' }} /></div>}
                                 <span style={{color: '#334155'}}>{item.custom_data?.[colId] || ''}</span>
                               </td>
                             );
@@ -591,7 +593,7 @@ export default function QuotationRenderer({ layoutConfig, layoutStyle, data, ren
                                     const childImgUrl = canShowChildImg ? item.custom_data?.[`img_${child.id}`] : null;
                                     return (
                                       <div key={child.id} style={{ flex: 1, borderRight: idx < children.length - 1 ? '1px dashed #e2e8f0' : 'none', padding: '4px 6px', textAlign: 'center' }}>
-                                        {childImgUrl && <div style={{ marginBottom: 4, display: 'flex', justifyContent: 'center' }}><img src={childImgUrl} alt="" style={{ maxWidth: '100%', maxHeight: 60, objectFit: 'contain', borderRadius: 4, border: '1px solid #cbd5e1' }} /></div>}
+                                        {childImgUrl && <div style={{ marginBottom: 4, display: 'flex', justifyContent: 'center' }}><img src={getSafeMediaUrl(childImgUrl)} alt="" style={{ maxWidth: '100%', maxHeight: 60, objectFit: 'contain', borderRadius: 4, border: '1px solid #cbd5e1' }} /></div>}
                                         <span style={{color: '#334155'}}>{item.custom_data?.[child.id] || ''}</span>
                                       </div>
                                     );

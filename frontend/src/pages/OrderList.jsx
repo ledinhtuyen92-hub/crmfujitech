@@ -40,6 +40,7 @@ import { useLocation, useNavigate } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
 import useDebounce from '../hooks/useDebounce'
 import api from '../utils/api'
+import { getSafeMediaUrl } from '../utils/mediaUtils'
 import QuotationPrintView from '../components/QuotationPrintView'
 import ReceiptPrintView from '../components/ReceiptPrintView'
 import ZnsSendModal from '../components/ZnsSendModal'
@@ -1314,7 +1315,7 @@ export default function OrderList() {
           width: 260,
           render: (val, record, idx) => {
             const prodObj = products.find((p) => p.id === val)
-            const imgUrl = record.product_image || (prodObj ? (prodObj.image_url || prodObj.image) : null)
+            const imgUrl = getSafeMediaUrl(record.product_image || (prodObj ? (prodObj.image_url || prodObj.image) : null))
             const rowSpan = computeRowSpan(formItems, idx, 'product')
             return {
               children: (
@@ -1491,7 +1492,7 @@ export default function OrderList() {
               <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
                 {enableNoteImage && record.custom_data?.note_image && (
                   <div style={{ position: 'relative', flexShrink: 0, width: 32, height: 32 }}>
-                    <Image src={record.custom_data.note_image} alt="note" style={{ width: 32, height: 32, objectFit: 'cover', borderRadius: 4, border: '1px solid #cbd5e1' }} />
+                    <Image src={getSafeMediaUrl(record.custom_data.note_image)} alt="note" style={{ width: 32, height: 32, objectFit: 'cover', borderRadius: 4, border: '1px solid #cbd5e1' }} />
                     <CloseCircleOutlined 
                       style={{ position: 'absolute', top: -6, right: -6, color: '#ef4444', cursor: 'pointer', background: '#fff', borderRadius: '50%', fontSize: 12 }} 
                       onClick={(e) => {
@@ -1615,7 +1616,7 @@ export default function OrderList() {
         width: 220,
         render: (val, record, idx) => {
           const prodObj = products.find((p) => p.id === val);
-          const imgUrl = record.product_image || (prodObj ? (prodObj.image_url || prodObj.image) : null);
+          const imgUrl = getSafeMediaUrl(record.product_image || (prodObj ? (prodObj.image_url || prodObj.image) : null));
           const rowSpan = computeRowSpan(formItems, idx, 'product');
           if (rowSpan === 0) return { children: null, props: { rowSpan: 0 } };
 
@@ -2206,7 +2207,7 @@ export default function OrderList() {
                 <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
                   {imgUrl && (
                     <div style={{ position: 'relative', flexShrink: 0, width: 32, height: 32 }}>
-                      <Image src={imgUrl} alt="uploaded" style={{ width: 32, height: 32, objectFit: 'cover', borderRadius: 4, border: '1px solid #cbd5e1' }} />
+                      <Image src={getSafeMediaUrl(imgUrl)} alt="uploaded" style={{ width: 32, height: 32, objectFit: 'cover', borderRadius: 4, border: '1px solid #cbd5e1' }} />
                       <CloseCircleOutlined 
                         style={{ position: 'absolute', top: -6, right: -6, color: '#ef4444', cursor: 'pointer', background: '#fff', borderRadius: '50%', fontSize: 12 }} 
                         onClick={(e) => {
