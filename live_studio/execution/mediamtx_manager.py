@@ -1,6 +1,7 @@
 import asyncio
 import logging
 import os
+import socket
 import sys
 from typing import Optional
 
@@ -73,6 +74,19 @@ paths:
         logger.info(f'[MediaMTX] Config written to {config_path}')
 
     async def start(self) -> bool:
+        # Check if an instance of MediaMTX is already listening on local port (e.g. Docker container)
+        try:
+            sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            sock.settimeout(0.5)
+            res = sock.connect_ex(('127.0.0.1', MEDIAMTX_LOCAL_HLS_PORT))
+            sock.close()
+            if res == 0:
+                logger.info(f'[MediaMTX] Existing MediaMTX server detected on port {MEDIAMTX_LOCAL_HLS_PORT}. Reusing instance.')
+                self.is_running = True
+                return True
+        except Exception as e:
+            logger.debug(f'[MediaMTX] Port probe check: {e}')
+
         binary = self._locate_binary()
         if not binary:
             logger.error('[MediaMTX] mediamtx.exe not found.')
@@ -115,7 +129,9 @@ paths:
 
     async def stop(self):
         self.is_running = False
-        if self.process and self.process.returncode is None:
+        if not self.process:
+            return
+        if self.process.returncode is None:
             self.process.terminate()
             try:
                 await asyncio.wait_for(self.process.wait(), timeout=5.0)

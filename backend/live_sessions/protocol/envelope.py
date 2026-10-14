@@ -41,10 +41,18 @@ class ProtocolEnvelopeSerializer(serializers.Serializer):
     name = serializers.CharField(required=True)
     message_id = serializers.UUIDField(required=True)
     timestamp = serializers.DateTimeField(required=True)
-    sequence_number = serializers.IntegerField(min_value=1, required=True)
+    sequence_number = serializers.IntegerField(min_value=0, required=True)
     session_id = serializers.UUIDField(required=True)
     reference_message_id = serializers.UUIDField(required=False, allow_null=True)
     payload = serializers.DictField(required=True)
+
+    def to_internal_value(self, data):
+        if isinstance(data, dict):
+            ref = data.get('reference_message_id')
+            if ref == '' or ref is False:
+                data = data.copy()
+                data['reference_message_id'] = None
+        return super().to_internal_value(data)
 
     def validate(self, data):
         type_str = data.get('type')

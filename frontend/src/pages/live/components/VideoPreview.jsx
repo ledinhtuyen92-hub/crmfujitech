@@ -224,7 +224,8 @@ export default function VideoPreview({ session, streamEvent }) {
         console.warn('[VideoPreview Watchdog] Waiting for frames after 8s. Nudging...')
         try {
           if (v.buffered.length > 0) {
-            v.currentTime = v.buffered.start(0) + 0.1
+            const bufEnd = v.buffered.end(v.buffered.length - 1)
+            v.currentTime = Math.max(v.buffered.start(0), bufEnd - 1.0)
             v.play().catch(() => {})
           } else {
             hlsRef.current.startLoad()
@@ -460,7 +461,6 @@ export default function VideoPreview({ session, streamEvent }) {
       <video
         ref={videoRef}
         autoPlay
-        loop
         muted={isMuted}
         playsInline
         style={{
@@ -486,20 +486,6 @@ export default function VideoPreview({ session, streamEvent }) {
         onCanPlay={markFrameReady}
         onWaiting={() => {
           if (isPlaybackReady) setIsBuffering(true)
-        }}
-        onEnded={() => {
-          if (videoRef.current) {
-            videoRef.current.play().catch(() => {})
-          }
-        }}
-        onPause={() => {
-          if (hlsStatus === 'live' && videoRef.current && !videoRef.current.seeking) {
-            setTimeout(() => {
-              if (videoRef.current && videoRef.current.paused && hlsStatus === 'live') {
-                videoRef.current.play().catch(() => {})
-              }
-            }, 300)
-          }
         }}
       />
 
@@ -552,7 +538,7 @@ export default function VideoPreview({ session, streamEvent }) {
       )}
 
       {/* ── Status overlays ── */}
-      {hlsStatus === 'idle' && (
+      {!isSessionLive && hlsStatus === 'idle' && (
         session?.background_asset_url || session?.avatar_asset_url || session?.overlay_asset_url ? (
           <div style={{ position: 'relative', width: '100%', height: '100%', overflow: 'hidden', display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
             <div style={{ position: 'relative', height: '100%', aspectRatio: '9/16', backgroundColor: '#000', overflow: 'hidden', boxShadow: '0 0 20px rgba(0,0,0,0.5)' }}>
@@ -630,10 +616,19 @@ export default function VideoPreview({ session, streamEvent }) {
         <Button
           size="small"
           onClick={() => {
+            if (hlsRef.current) {
+              hlsRef.current.destroy()
+              hlsRef.current = null
+            }
+            if (videoRef.current) {
+              videoRef.current.src = ''
+            }
             setHlsUrl(null)
             setIsPlaybackReady(false)
+            hasStartedPlaybackRef.current = false
+            hasJumpedToLiveEdgeRef.current = false
             setHlsStatus('waiting')
-            setTimeout(probeHls, 800)
+            setTimeout(probeHls, 600)
           }}
         >
           Thử lại

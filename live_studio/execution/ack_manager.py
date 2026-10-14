@@ -14,13 +14,15 @@ class AckManager:
         self.session_id = session_id
         self.sequence_counter = sequence_counter
 
-    def build_ack(self, command_id: str, status: str, reference_message_id: str, error_code: Optional[str] = None) -> Dict[str, Any]:
+    def build_ack(self, command_id: str, status: str, reference_message_id: Optional[str] = None, error_code: Optional[str] = None) -> Dict[str, Any]:
         """
         Builds the ACK envelope.
         """
+        ref_id = reference_message_id if reference_message_id else None
         payload = {
             "command_id": command_id,
-            "status": status
+            "status": status,
+            "reference_message_id": ref_id
         }
         if error_code:
             payload["error_code"] = error_code
@@ -36,7 +38,7 @@ class AckManager:
             "timestamp": datetime.datetime.now(datetime.timezone.utc).isoformat(),
             "sequence_number": seq_num,
             "session_id": self.session_id,
-            "reference_message_id": reference_message_id,
+            "reference_message_id": ref_id,
             "payload": payload
         }
         return envelope

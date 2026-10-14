@@ -2,6 +2,7 @@ import asyncio
 import time
 import logging
 import subprocess
+import sys
 
 logger = logging.getLogger(__name__)
 
@@ -133,12 +134,18 @@ class Mp3Decoder:
     @staticmethod
     def decode_to_pcm(filepath: str) -> bytes:
         ffmpeg_bin = get_ffmpeg_binary()
+        flags = 0x08000000 if sys.platform == 'win32' else 0
+        startupinfo = None
+        if sys.platform == 'win32':
+            startupinfo = subprocess.STARTUPINFO()
+            startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
+            startupinfo.wShowWindow = 0
         try:
             result = subprocess.run([
                 ffmpeg_bin, '-y', '-i', filepath,
                 '-f', 's16le', '-acodec', 'pcm_s16le',
                 '-ar', '44100', '-ac', '2', '-'
-            ], stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=True)
+            ], stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=True, creationflags=flags, startupinfo=startupinfo)
             return result.stdout
         except FileNotFoundError:
             logger.warning("FFmpeg not found. Cannot decode MP3 to PCM. Stream sink will receive empty chunks.")
