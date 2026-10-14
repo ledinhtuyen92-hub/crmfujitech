@@ -191,7 +191,8 @@ class LiveStudioApp:
                     if frame:
                         self.frame_queue.put(frame)
                         
-                await asyncio.sleep(1/30.0)
+                # Render at high responsiveness; frame pacer in stream_controller locks exact 30 FPS
+                await asyncio.sleep(0.01)
             except asyncio.CancelledError:
                 break
             except Exception as e:
@@ -234,7 +235,7 @@ class LiveStudioApp:
                 # If stream is STARTING, wait for it to reach LIVE so audio is not dropped into void!
                 if self.stream_controller and getattr(self.stream_controller.state, 'value', None) == "STARTING":
                     logger.info(f"Stream is STARTING. Waiting for LIVE state before playing {cmd_id}...")
-                    for _ in range(30):
+                    for _ in range(60):
                         await asyncio.sleep(0.5)
                         if getattr(self.stream_controller.state, 'value', None) != "STARTING":
                             break

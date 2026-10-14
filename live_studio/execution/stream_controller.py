@@ -1,5 +1,6 @@
 import logging
 import asyncio
+import time
 from enum import Enum
 from typing import Optional, Any
 from live_studio.execution.stream_encoder import StreamEncoder, StreamConfig, FfmpegLocator
@@ -65,17 +66,34 @@ class StreamController:
                 
     async def _frame_pump(self):
         try:
+            start_time = time.monotonic()
+            sent_frames = 0
+            fps = self._current_payload.fps if self._current_payload else 30
+            last_frame_data = None
+            
             while self.state == StreamState.LIVE:
+                # 1. Drain the frame queue to always fetch the most recent frame
                 if self.frame_queue:
-                    frame = self.frame_queue.get()
-                    if frame:
+                    while True:
+                        frame = self.frame_queue.get()
+                        if frame is not None:
+                            last_frame_data = frame.data
+                        else:
+                            break
+
+                # 2. Clock-driven pacing: send exact number of frames corresponding to elapsed wall-clock time
+                if last_frame_data and self.encoder:
+                    now = time.monotonic()
+                    target_frames = int((now - start_time) * fps)
+                    while sent_frames < target_frames and self.state == StreamState.LIVE:
                         try:
-                            if self.encoder:
-                                await self.encoder.write_video(frame.data)
+                            await self.encoder.write_video(last_frame_data)
+                            sent_frames += 1
                         except Exception as e:
-                            logger.error(f"Failed to write video frame to encoder.")
-                        continue
-                await asyncio.sleep(1/60.0) 
+                            logger.error(f"Failed to write video frame to encoder: {e}")
+                            break
+
+                await asyncio.sleep(0.005)
         except asyncio.CancelledError:
             pass
         except Exception as e:
@@ -93,6 +111,7 @@ class StreamController:
             self.state = StreamState.ERROR
             return False
             
+        self.state = StreamState.STARTING
         self._current_payload = payload
         self._current_target = target
         self.retry_count = 0

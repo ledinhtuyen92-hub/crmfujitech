@@ -156,6 +156,8 @@ class PygameAvatarRenderer(BaseAvatarRenderer):
         self._speech_start_time = 0.0
         self._idle_start_time = time.monotonic()
         self._is_speaking_state = False
+        self._active_speaking_time = 0.0
+        self._last_render_time = time.monotonic()
         
         try:
             import pygame
@@ -198,14 +200,18 @@ class PygameAvatarRenderer(BaseAvatarRenderer):
         self.idle_sequence = VideoFrameSequence(idle_path, self.width, self.height, ffmpeg_bin) if idle_path else None
         self.speaking_sequence = VideoFrameSequence(speaking_path, self.width, self.height, ffmpeg_bin) if speaking_path else None
         self._idle_start_time = time.monotonic()
+        self._active_speaking_time = 0.0
 
     def notify_speech_start(self):
         self._is_speaking_state = True
         self._speech_start_time = time.monotonic()
+        self._active_speaking_time = 0.0
+        self._last_render_time = time.monotonic()
 
     def notify_speech_stop(self):
         self._is_speaking_state = False
         self._idle_start_time = time.monotonic()
+        self._active_speaking_time = 0.0
 
     def render(self, is_speaking: bool, mouth_state: str, is_blinking: bool):
         if not self.available or not self.screen:
@@ -217,22 +223,32 @@ class PygameAvatarRenderer(BaseAvatarRenderer):
                 pass 
                 
         now = time.monotonic()
+        dt = max(0.0, min(0.1, now - getattr(self, '_last_render_time', now)))
+        self._last_render_time = now
+
         has_custom_avatar = (self.idle_sequence and len(self.idle_sequence) > 0) or (self.speaking_sequence and len(self.speaking_sequence) > 0)
         
-        # Dual-Loop Video Frame Rendering
+        # Dual-Loop Video Frame Rendering with Lip-Sync Gating
         if has_custom_avatar:
             surf = None
             if is_speaking:
-                if self.speaking_sequence and len(self.speaking_sequence) > 0:
-                    elapsed = max(0.0, now - self._speech_start_time)
-                    surf = self.speaking_sequence.get_frame(elapsed)
-                elif self.idle_sequence and len(self.idle_sequence) > 0:
-                    elapsed = max(0.0, now - self._idle_start_time)
-                    surf = self.idle_sequence.get_frame(elapsed)
+                # When audio is actively producing sound (mouth_state != CLOSED), advance the speaking loop
+                if mouth_state != MOUTH_STATE_CLOSED:
+                    self._active_speaking_time = getattr(self, '_active_speaking_time', 0.0) + dt
+                    if self.speaking_sequence and len(self.speaking_sequence) > 0:
+                        surf = self.speaking_sequence.get_frame(self._active_speaking_time)
+                    elif self.idle_sequence and len(self.idle_sequence) > 0:
+                        surf = self.idle_sequence.get_frame(now - self._idle_start_time)
+                else:
+                    # Speech pause / silence between words or sentences:
+                    # Return to closed-mouth idle pose, or freeze on frame 0 of speaking loop
+                    if self.idle_sequence and len(self.idle_sequence) > 0:
+                        surf = self.idle_sequence.get_frame(now - self._idle_start_time)
+                    elif self.speaking_sequence and len(self.speaking_sequence) > 0:
+                        surf = self.speaking_sequence.get_frame(0.0)
             else:
                 if self.idle_sequence and len(self.idle_sequence) > 0:
-                    elapsed = max(0.0, now - self._idle_start_time)
-                    surf = self.idle_sequence.get_frame(elapsed)
+                    surf = self.idle_sequence.get_frame(now - self._idle_start_time)
                 elif self.speaking_sequence and len(self.speaking_sequence) > 0:
                     # Freeze on first frame during idle if only speaking sequence is loaded
                     surf = self.speaking_sequence.get_frame(0.0)
