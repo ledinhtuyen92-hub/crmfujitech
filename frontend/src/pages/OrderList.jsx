@@ -2869,104 +2869,81 @@ export default function OrderList() {
           ...(templateSnapshot ? { template_snapshot: templateSnapshot } : {}),
         },
         payment_target: values.payment_target || null,
+        items: (() => {
+          const resolveParentProduct = (items, idx) => {
+            if (!items[idx]?.custom_data?.is_custom_size) return items[idx]?.product ?? null
+            for (let k = idx - 1; k >= 0; k--) {
+              if (!items[k]?.custom_data?.is_custom_size) return items[k]?.product ?? null
+            }
+            return items[idx]?.product ?? null
+          }
+
+          return [
+            ...validItems.map((it, idx) => {
+              const isCustomSize = it.custom_data?.is_custom_size === true
+              const effectiveProductId = isCustomSize ? resolveParentProduct(validItems, idx) : it.product
+              const prodObj = products.find((p) => p.id === effectiveProductId)
+              return {
+                product: effectiveProductId,
+                product_name: it.product_name || (prodObj ? prodObj.name : 'Sản phẩm'),
+                unit_price: Number(it.unit_price || 0),
+                width: Number(it.width || 0),
+                height: Number(it.height || 0),
+                length: Number(it.length || 0),
+                thickness: Number(it.thickness || 0),
+                area: Number(Number(it.area || 0).toFixed(2)),
+                spec: it.spec || (prodObj ? prodObj.description : '') || '',
+                warranty: it.warranty || '12 tháng',
+                product_image: it.product_image || (prodObj ? (prodObj.image_url || prodObj.image) : '') || '',
+                custom_data: {
+                  ...(it.custom_data || {}),
+                  unit: it.unit || (prodObj ? prodObj.unit : 'cái'),
+                  thickness: Math.round(Number(it.thickness || 0)),
+                  symbol: it.custom_data?.symbol || it.symbol || '',
+                },
+                quantity: Number(it.quantity || 1),
+                discount_percent: Number(it.discount_percent || 0),
+                note: it.note || '',
+              }
+            }),
+            ...validServiceItems.map((srv) => {
+              let prodId = null
+              if (typeof srv.product === 'number') {
+                prodId = srv.product
+              }
+              return {
+                product: prodId,
+                item_type: 'service',
+                product_name: srv.product_name,
+                unit_price: Number(srv.unit_price || 0),
+                width: 0,
+                height: 0,
+                length: 0,
+                thickness: 0,
+                area: 0,
+                spec: srv.spec || '',
+                warranty: srv.warranty || '',
+                product_image: srv.product_image || '',
+                custom_data: {
+                  ...(srv.custom_data || {}),
+                  unit: srv.unit || srv.custom_data?.unit || 'lần',
+                  symbol: srv.symbol || srv.custom_data?.symbol || '',
+                },
+                quantity: Number(srv.quantity || 1),
+                discount_percent: Number(srv.discount_percent || 0),
+                note: srv.note || '',
+              }
+            })
+          ]
+        })(),
       }
 
-      let orderId
       if (editingOrder) {
-        const res = await api.patch(`/orders/orders/${editingOrder.id}/`, payload)
-        orderId = res.data.id
+        await api.patch(`/orders/orders/${editingOrder.id}/`, payload)
         messageApi.success('Cập nhật đơn hàng thành công!')
       } else {
-        const res = await api.post('/orders/orders/', payload)
-        orderId = res.data.id
+        await api.post('/orders/orders/', payload)
         messageApi.success('Tạo đơn hàng mới thành công!')
-      }
-
-      if (editingOrder) {
-        // Fetch fresh items from server to avoid stale data causing duplicates
-        try {
-          const freshOrder = await api.get(`/orders/orders/${orderId}/`)
-          const freshItems = freshOrder.data.items || []
-          await Promise.all(
-            freshItems.map((it) => api.delete(`/orders/order-items/${it.id}/`).catch(() => {}))
-          )
-        } catch {
-          // fallback to editingOrder.items if fetch fails
-          if (editingOrder.items) {
-            await Promise.all(
-              editingOrder.items.map((it) => api.delete(`/orders/order-items/${it.id}/`).catch(() => {}))
-            )
-          }
-        }
-      }
-
-      // Build parent product map: for each custom_size item, use the nearest parent's product_id
-      const resolveParentProduct = (items, idx) => {
-        if (!items[idx]?.custom_data?.is_custom_size) return items[idx]?.product ?? null
-        for (let k = idx - 1; k >= 0; k--) {
-          if (!items[k]?.custom_data?.is_custom_size) return items[k]?.product ?? null
-        }
-        return items[idx]?.product ?? null
-      }
-
-      for (let idx = 0; idx < validItems.length; idx++) {
-        const it = validItems[idx]
-        const isCustomSize = it.custom_data?.is_custom_size === true
-        const effectiveProductId = isCustomSize ? resolveParentProduct(validItems, idx) : it.product
-        const prodObj = products.find((p) => p.id === effectiveProductId)
-        await api.post('/orders/order-items/', {
-          order: orderId,
-          product: effectiveProductId,
-          product_name: it.product_name || (prodObj ? prodObj.name : 'Sản phẩm'),
-          unit_price: Number(it.unit_price || 0),
-          width: Number(it.width || 0),
-          height: Number(it.height || 0),
-          length: Number(it.length || 0),
-          thickness: Number(it.thickness || 0),
-          area: Number(Number(it.area || 0).toFixed(2)),
-          spec: it.spec || (prodObj ? prodObj.description : '') || '',
-          warranty: it.warranty || '12 tháng',
-          product_image: it.product_image || (prodObj ? (prodObj.image_url || prodObj.image) : '') || '',
-          custom_data: {
-            ...(it.custom_data || {}),
-            unit: it.unit || (prodObj ? prodObj.unit : 'cái'),
-            thickness: Math.round(Number(it.thickness || 0)),
-            symbol: it.custom_data?.symbol || it.symbol || '',
-          },
-          quantity: Number(it.quantity || 1),
-          discount_percent: Number(it.discount_percent || 0),
-          note: it.note || '',
-        })
-      }
-
-      for (const srv of validServiceItems) {
-        let prodId = null
-        if (typeof srv.product === 'number') {
-          prodId = srv.product
-        }
-        await api.post('/orders/order-items/', {
-          order: orderId,
-          product: prodId,
-          item_type: 'service',
-          product_name: srv.product_name,
-          unit_price: Number(srv.unit_price || 0),
-          width: 0,
-          height: 0,
-          length: 0,
-          thickness: 0,
-          area: 0,
-          spec: srv.spec || '',
-          warranty: srv.warranty || '',
-          product_image: srv.product_image || '',
-          custom_data: {
-            ...(srv.custom_data || {}),
-            unit: srv.unit || srv.custom_data?.unit || 'lần',
-            symbol: srv.symbol || srv.custom_data?.symbol || '',
-          },
-          quantity: Number(srv.quantity || 1),
-          discount_percent: Number(srv.discount_percent || 0),
-          note: srv.note || '',
-        })
       }
 
       setModalVisible(false)
