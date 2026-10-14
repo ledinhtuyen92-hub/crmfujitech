@@ -10,5 +10,5 @@ class OrderPaymentMilestoneAdmin(admin.ModelAdmin):
 
 @admin.register(PaymentReceipt)
 class PaymentReceiptAdmin(admin.ModelAdmin):
-    list_display = ["receipt_code", "order", "milestone", "amount", "payment_method", "payment_date"]
-    list_filter = ["payment_method", "company"]
+    list_display = ["receipt_code", "order", "milestone", "amount", "is_over_payment", "over_payment_amount", "payment_method", "payment_date"]
+    list_filter = ["payment_method", "is_over_payment", "company"]

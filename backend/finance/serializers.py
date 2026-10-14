@@ -20,20 +20,56 @@ class PaymentReceiptSerializer(serializers.ModelSerializer):
             "payment_date",
             "reference_code",
             "note",
+            "is_over_payment",
+            "over_payment_amount",
+            "over_payment_reason",
             "created_by",
             "created_by_name",
             "attachments",
             "created_at",
         ]
-        read_only_fields = ["id", "company", "receipt_code", "created_by", "created_by_name", "created_at"]
+        read_only_fields = [
+            "id",
+            "company",
+            "receipt_code",
+            "is_over_payment",
+            "over_payment_amount",
+            "created_by",
+            "created_by_name",
+            "created_at",
+        ]
 
     def validate(self, attrs):
-        order = attrs.get('order')
-        amount = attrs.get('amount')
-        
+        order = attrs.get('order') or (self.instance.order if self.instance else None)
+        amount = attrs.get('amount') if 'amount' in attrs else (self.instance.amount if self.instance else None)
+        over_payment_reason = attrs.get('over_payment_reason') if 'over_payment_reason' in attrs else (self.instance.over_payment_reason if self.instance else '')
+        if over_payment_reason is None:
+            over_payment_reason = ''
+
         if not self.instance and order and amount:
-            if float(amount) > float(order.remaining_debt):
-                raise serializers.ValidationError({"amount": f"Số tiền thu ({amount:,.0f} đ) không được vượt quá số tiền còn nợ của đơn hàng ({order.remaining_debt:,.0f} đ)."})
+            remaining = float(order.remaining_debt)
+            amt = float(amount)
+            if amt > remaining:
+                diff = amt - remaining
+                attrs['is_over_payment'] = True
+                attrs['over_payment_amount'] = diff
+                if not str(over_payment_reason).strip():
+                    raise serializers.ValidationError({
+                        "over_payment_reason": f"Số tiền thu ({amt:,.0f} đ) vượt quá số tiền còn nợ của đơn hàng ({remaining:,.0f} đ) là {diff:,.0f} đ. Vui lòng nhập lý do / ghi chú thu vượt mức."
+                    })
+            else:
+                attrs['is_over_payment'] = False
+                attrs['over_payment_amount'] = 0
+        elif self.instance and order and (attrs.get('amount') is not None or attrs.get('over_payment_reason') is not None):
+            amt = float(attrs.get('amount', self.instance.amount))
+            remaining_without_this = float(order.remaining_debt) + float(self.instance.amount)
+            if amt > remaining_without_this:
+                diff = amt - remaining_without_this
+                attrs['is_over_payment'] = True
+                attrs['over_payment_amount'] = diff
+            else:
+                attrs['is_over_payment'] = False
+                attrs['over_payment_amount'] = 0
         return attrs
 
 
