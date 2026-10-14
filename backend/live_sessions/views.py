@@ -270,6 +270,10 @@ class LiveSessionViewSet(viewsets.ModelViewSet):
         
         orchestrator = LiveOrchestrator()
         result = orchestrator.dispatch_stream_stop(str(session.id), reason="manual_stop")
+        try:
+            orchestrator.dispatch_session_control(str(session.id), "stop")
+        except Exception:
+            pass
         
         return Response({
             'status': session.status,

@@ -105,12 +105,18 @@ class LiveStudioApp:
                 logger.info("High priority command arrived. Interrupting current playback.")
                 self._current_playing_interrupted = True
                 self.audio_player.stop()
+                if self.avatar_engine:
+                    self.avatar_engine.interrupt()
                 
-        elif msg_name == "session.control" and payload.get("action") in ["pause", "stop"]:
-            if self._current_playing_command_id:
-                logger.info("Human Takeover control arrived. Interrupting current playback.")
-                self._current_playing_interrupted = True
-                self.audio_player.stop()
+        elif msg_name == "stream.stop" or (msg_name == "session.control" and payload.get("action") in ["pause", "stop"]):
+            logger.info(f"Stream/Session stop or pause received ({msg_name}). Immediately halting audio and clearing speech queue.")
+            self._current_playing_interrupted = True
+            self.audio_player.stop()
+            if self.avatar_engine:
+                self.avatar_engine.stop()
+            flushed = self.queue_manager.flush()
+            if flushed:
+                logger.info(f"Flushed {len(flushed)} pending speech commands from queue.")
 
     async def _on_stream_state_change(self, state):
         import uuid
@@ -215,10 +221,12 @@ class LiveStudioApp:
                 item = await self.queue_manager.get_next()
                 cmd_id = item.payload.command_id
                 
-                # Check if we were paused while waiting
-                if self.state.is_paused():
-                    logger.info(f"Skipping {cmd_id} because state is PAUSED.")
-                    self._mark_failed(item, "CANCELLED_BY_HUMAN")
+                # Check if we were paused while waiting or stream was stopped
+                from live_studio.execution.stream_controller import StreamState
+                is_stream_stopped = self.stream_controller and self.stream_controller.state in [StreamState.STOPPED, StreamState.STOPPING]
+                if self.state.is_paused() or is_stream_stopped:
+                    logger.info(f"Skipping {cmd_id} because state is PAUSED or stream is stopped.")
+                    self._mark_failed(item, "CANCELLED_OR_STREAM_STOPPED")
                     continue
                 
                 # Audio download
@@ -235,10 +243,11 @@ class LiveStudioApp:
                     self._mark_failed(item, "AUDIO_DOWNLOAD_FAILED")
                     continue
 
-                # Check pause again before playing
-                if self.state.is_paused():
+                # Check pause or stream stop again before playing
+                is_stream_stopped = self.stream_controller and self.stream_controller.state in [StreamState.STOPPED, StreamState.STOPPING]
+                if self.state.is_paused() or is_stream_stopped:
                     self.audio_fetcher.cleanup(audio_path)
-                    self._mark_failed(item, "CANCELLED_BY_HUMAN")
+                    self._mark_failed(item, "CANCELLED_OR_STREAM_STOPPED")
                     continue
 
                 # Ensure stream encoder is ready before playing audio!

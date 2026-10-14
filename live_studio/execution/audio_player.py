@@ -151,7 +151,12 @@ class PygameAudioPlayer(BaseAudioPlayer):
 
                 return completed
 
-            # Offline Preview / Test mode: play out of local speakers via Pygame
+            elif self.stream_sink and not self.stream_sink.is_streaming:
+                # Stream is stopped or inactive! Do NOT leak audio out of PC speakers!
+                logger.info("[PygameAudioPlayer] Stream sink is inactive. Discarding audio playback.")
+                return False
+
+            # Offline Preview / Test mode (when stream_sink is None): play out of local speakers via Pygame
             pygame.mixer.music.load(filepath)
             pygame.mixer.music.set_volume(1.0)
             pygame.mixer.music.play()
@@ -182,13 +187,21 @@ class PygameAudioPlayer(BaseAudioPlayer):
                 pass
 
     def stop(self):
+        self._is_playing = False
+        if hasattr(self, 'stream_sink') and self.stream_sink:
+            try:
+                self.stream_sink.set_speaking(False)
+            except Exception:
+                pass
         if not self._available:
             return
             
         import pygame
-        if self._is_playing:
-            self._is_playing = False
-            pygame.mixer.music.stop()
+        try:
+            if pygame.mixer.get_init():
+                pygame.mixer.music.stop()
+        except Exception:
+            pass
 
     def get_position_ms(self) -> int:
         """
