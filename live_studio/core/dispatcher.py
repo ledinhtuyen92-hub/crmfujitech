@@ -61,9 +61,23 @@ class ProtocolDispatcher:
             logger.debug(f"Unknown or unhandled command: {msg_type}/{msg_name}")
 
     async def _handle_speech_speak(self, envelope: Dict[str, Any]):
-        if not self.state.is_accepting_speech():
-            logger.warning("Dropped speech.speak: device is not in a state to accept speech.")
+        from live_studio.execution.stream_controller import StreamState
+        from live_studio.protocol.constants import STATE_RUNNING
+
+        is_stream_active = (
+            self.stream_controller is not None and 
+            getattr(self.stream_controller, 'state', None) in [StreamState.STARTING, StreamState.LIVE]
+        )
+        if not (self.state.is_accepting_speech() or is_stream_active):
+            logger.warning(
+                f"Dropped speech.speak: device is not in a state to accept speech "
+                f"(state={self.state.state}, stream_state={getattr(self.stream_controller, 'state', None)})."
+            )
             return
+
+        if is_stream_active and not self.state.is_accepting_speech():
+            logger.info(f"Stream is active ({self.stream_controller.state}); auto-transitioning device state {self.state.state} -> RUNNING")
+            self.state.transition(STATE_RUNNING)
 
         payload_data = envelope.get("payload", {})
         cmd_id = payload_data.get("command_id")
@@ -177,6 +191,10 @@ class ProtocolDispatcher:
         ack_msg = self.ack_manager.build_ack(cmd_id, ACK_RECEIVED, msg_id)
         await self.send_ack(ack_msg)
         
+        # Transition state to RUNNING immediately so incoming speech is accepted while stream starts up
+        from live_studio.protocol.constants import STATE_RUNNING, STATE_ERROR, STATE_STOPPED
+        self.state.transition(STATE_RUNNING)
+        
         from live_studio.protocol.envelopes import StreamStartPayload
         payload = StreamStartPayload(
             command_id=cmd_id,
@@ -201,10 +219,12 @@ class ProtocolDispatcher:
         success = await self.stream_controller.handle_start(payload)
         
         if success:
+            self.state.transition(STATE_RUNNING)
             self.dedup_registry.update_status(cmd_id, ACK_COMPLETED)
             ack_comp = self.ack_manager.build_ack(cmd_id, ACK_COMPLETED, msg_id)
             await self.send_ack(ack_comp)
         else:
+            self.state.transition(STATE_ERROR)
             self.dedup_registry.update_status(cmd_id, ACK_FAILED)
             ack_fail = self.ack_manager.build_ack(cmd_id, ACK_FAILED, msg_id, "STARTUP_FAILED")
             await self.send_ack(ack_fail)
@@ -235,6 +255,10 @@ class ProtocolDispatcher:
         )
         
         success = await self.stream_controller.handle_stop(payload)
+        
+        from live_studio.protocol.constants import STATE_STOPPED
+        self.state.transition(STATE_STOPPED)
+        self.queue_manager.flush()
         
         if success:
             self.dedup_registry.update_status(cmd_id, ACK_COMPLETED)

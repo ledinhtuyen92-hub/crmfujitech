@@ -227,6 +227,10 @@ class LiveSessionViewSet(viewsets.ModelViewSet):
             orchestrator = LiveOrchestrator()
             test_mode = request.data.get('test_mode') is True or request.query_params.get('test_mode') == '1'
             result = orchestrator.dispatch_stream_start(str(session.id), test_mode=test_mode)
+            try:
+                orchestrator.dispatch_session_control(str(session.id), "resume")
+            except Exception:
+                pass
             
             # If dispatch failed synchronously (e.g. invalid stream URL)
             if result.get("status") in ["error", "failed"]:

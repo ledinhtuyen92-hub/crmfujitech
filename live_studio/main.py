@@ -99,8 +99,14 @@ class LiveStudioApp:
         msg_name = envelope.get("name")
         payload = envelope.get("payload", {})
         
+        if msg_name == "stream.start":
+            logger.info("stream.start received. Resetting interruption state and transitioning state to RUNNING.")
+            self._current_playing_interrupted = False
+            from live_studio.protocol.constants import STATE_RUNNING
+            self.state.transition(STATE_RUNNING)
+
         # Check if we need to interrupt current playback for high priority
-        if msg_name == "speech.speak" and payload.get("priority") == "high":
+        elif msg_name == "speech.speak" and payload.get("priority") == "high":
             if self._current_playing_command_id:
                 logger.info("High priority command arrived. Interrupting current playback.")
                 self._current_playing_interrupted = True
@@ -122,27 +128,34 @@ class LiveStudioApp:
         import uuid
         import datetime
         from live_studio.execution.stream_controller import StreamState
+        from live_studio.protocol.constants import STATE_RUNNING, STATE_STOPPED
         try:
             from live_studio.execution.mediamtx_manager import MEDIAMTX_LOCAL_HLS_URL
-            logger.info(f"[_on_stream_state_change] ENTERED. state={state}, type={type(state)}")
+            logger.info(f"[_on_stream_state_change] state={getattr(state, 'value', state)}")
             extra_payload = {"state": state.value}
             if state == StreamState.LIVE:
-                logger.info(f"[_on_stream_state_change] IS LIVE. URL={MEDIAMTX_LOCAL_HLS_URL}")
                 extra_payload["hls_url"] = MEDIAMTX_LOCAL_HLS_URL
+                if self.state.state in ["stopped", "paused", "disconnected", "connected"]:
+                    self.state.transition(STATE_RUNNING)
+            elif state == StreamState.STOPPED:
+                if self.state.state == "running":
+                    self.state.transition(STATE_STOPPED)
         except Exception as e:
-            logger.error(f"[_on_stream_state_change] CRASHED: {e}")
-            raise
-        payload = {
-            "protocol_version": "1.0",
-            "type": "event",
-            "name": "stream.status",
-            "message_id": str(uuid.uuid4()),
-            "timestamp": datetime.datetime.now(datetime.timezone.utc).isoformat(),
-            "sequence_number": self.device_sequence_counter.next(),
-            "session_id": self.ws_client.session_id,
-            "payload": extra_payload
-        }
-        await self.ws_client.send(payload)
+            logger.error(f"[_on_stream_state_change] Error: {e}")
+            extra_payload = {"state": getattr(state, 'value', str(state))}
+
+        if hasattr(self, 'ws_client') and self.ws_client:
+            payload = {
+                "protocol_version": "1.0",
+                "type": "event",
+                "name": "stream.status",
+                "message_id": str(uuid.uuid4()),
+                "timestamp": datetime.datetime.now(datetime.timezone.utc).isoformat(),
+                "sequence_number": self.device_sequence_counter.next(),
+                "session_id": self.ws_client.session_id,
+                "payload": extra_payload
+            }
+            await self.ws_client.send(payload)
 
     async def start(self):
         if self.avatar_engine:
@@ -172,26 +185,6 @@ class LiveStudioApp:
         if self.stream_controller:
             from live_studio.protocol.envelopes import StreamStopPayload
             await self.stream_controller.handle_stop(StreamStopPayload(command_id="shutdown"))
-            
-    async def _on_stream_state_change(self, state):
-        import uuid
-        import datetime
-        from live_studio.execution.mediamtx_manager import MEDIAMTX_LOCAL_HLS_URL
-        if hasattr(self, 'ws_client') and self.ws_client:
-            payload = {
-                "protocol_version": "1.0",
-                "type": "event",
-                "name": "stream.status",
-                "message_id": str(uuid.uuid4()),
-                "timestamp": datetime.datetime.now(datetime.timezone.utc).isoformat(),
-                "sequence_number": self.device_sequence_counter.next(),
-                "session_id": self.ws_client.session_id,
-                "payload": {
-                    "state": state.value,
-                    "hls_url": MEDIAMTX_LOCAL_HLS_URL if state.value == "LIVE" else ""
-                }
-            }
-            await self.ws_client.send(payload)
             
     async def _avatar_render_loop(self):
         """Continuous render loop for the Avatar Engine (running at ~30 FPS)."""
