@@ -1,3 +1,5 @@
+from decimal import Decimal
+from django.db import transaction
 from rest_framework import serializers
 
 from .models import Quotation, QuotationItem, QuotationTemplate, SavedTemplateBlock
@@ -261,6 +263,64 @@ class QuotationSerializer(serializers.ModelSerializer):
     def get_customer_city(self, obj):
         if getattr(obj, "customer_name_snapshot", ""): return obj.customer_city_snapshot
         return obj.customer.city if obj.customer else ""
+
+    @transaction.atomic
+    def create(self, validated_data):
+        items_data = self.initial_data.get('items')
+        instance = super().create(validated_data)
+        if items_data is not None and isinstance(items_data, list):
+            self._save_items(instance, items_data)
+        return instance
+
+    @transaction.atomic
+    def update(self, instance, validated_data):
+        items_data = self.initial_data.get('items')
+        instance = super().update(instance, validated_data)
+        if items_data is not None and isinstance(items_data, list):
+            instance.items.all().delete()
+            self._save_items(instance, items_data)
+        return instance
+
+    def _save_items(self, quotation, items_data):
+        items_to_create = []
+        for it in items_data:
+            prod_id = it.get('product')
+            if not isinstance(prod_id, int):
+                prod_id = None
+            
+            qty = int(it.get('quantity', 1) or 1)
+            u_price = Decimal(str(it.get('unit_price', 0) or 0))
+            disc = Decimal(str(it.get('discount_percent', 0) or 0))
+            area_val = Decimal(str(it.get('area', 0) or 0))
+            custom_d = it.get('custom_data', {}) or {}
+            unit_str = str(custom_d.get('unit', '') or it.get('unit', '')).lower()
+            if ('m2' in unit_str or 'm²' in unit_str) and area_val > 0:
+                calc_total = area_val * Decimal(qty) * u_price * (Decimal(1) - disc / Decimal(100))
+            else:
+                calc_total = Decimal(qty) * u_price * (Decimal(1) - disc / Decimal(100))
+
+            items_to_create.append(QuotationItem(
+                quotation=quotation,
+                product_id=prod_id,
+                item_type=it.get('item_type', QuotationItem.ITEM_TYPE_PRODUCT),
+                product_name=it.get('product_name', 'Sản phẩm'),
+                unit_price=u_price,
+                width=Decimal(str(it.get('width', 0) or 0)),
+                height=Decimal(str(it.get('height', 0) or 0)),
+                length=Decimal(str(it.get('length', 0) or 0)),
+                thickness=Decimal(str(it.get('thickness', 0) or 0)),
+                area=area_val,
+                quantity=qty,
+                discount_percent=disc,
+                line_total=Decimal(str(it.get('line_total', calc_total) or calc_total)),
+                spec=it.get('spec', '') or '',
+                warranty=it.get('warranty', '') or '',
+                product_image=it.get('product_image', '') or '',
+                note=it.get('note', '') or '',
+                custom_data=custom_d,
+            ))
+        if items_to_create:
+            QuotationItem.objects.bulk_create(items_to_create)
 
 class SavedTemplateBlockSerializer(serializers.ModelSerializer):
     class Meta:
