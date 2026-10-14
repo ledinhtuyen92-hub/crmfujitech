@@ -228,29 +228,31 @@ class PygameAvatarRenderer(BaseAvatarRenderer):
 
         has_custom_avatar = (self.idle_sequence and len(self.idle_sequence) > 0) or (self.speaking_sequence and len(self.speaking_sequence) > 0)
         
-        # Dual-Loop Video Frame Rendering with Lip-Sync Gating
+        # Dual-Loop Video Frame Rendering
         if has_custom_avatar:
             surf = None
             if is_speaking:
-                # When audio is actively producing sound (mouth_state != CLOSED), advance the speaking loop
-                if mouth_state != MOUTH_STATE_CLOSED:
-                    self._active_speaking_time = getattr(self, '_active_speaking_time', 0.0) + dt
-                    if self.speaking_sequence and len(self.speaking_sequence) > 0:
-                        surf = self.speaking_sequence.get_frame(self._active_speaking_time)
-                    elif self.idle_sequence and len(self.idle_sequence) > 0:
-                        surf = self.idle_sequence.get_frame(now - self._idle_start_time)
-                else:
-                    # Speech pause / silence between words or sentences:
-                    # Return to closed-mouth idle pose, or freeze on frame 0 of speaking loop
-                    if self.idle_sequence and len(self.idle_sequence) > 0:
-                        surf = self.idle_sequence.get_frame(now - self._idle_start_time)
-                    elif self.speaking_sequence and len(self.speaking_sequence) > 0:
+                # If speaking asset is a single static image (len == 1), gate mouth by audio energy
+                if self.speaking_sequence and len(self.speaking_sequence) == 1:
+                    if mouth_state != MOUTH_STATE_CLOSED:
                         surf = self.speaking_sequence.get_frame(0.0)
+                    elif self.idle_sequence and len(self.idle_sequence) > 0:
+                        surf = self.idle_sequence.get_frame(0.0)
+                    else:
+                        surf = self.speaking_sequence.get_frame(0.0)
+                # If speaking asset is a video sequence (len > 1), play smoothly and continuously during speech!
+                elif self.speaking_sequence and len(self.speaking_sequence) > 1:
+                    elapsed = max(0.0, now - self._speech_start_time)
+                    surf = self.speaking_sequence.get_frame(elapsed)
+                elif self.idle_sequence and len(self.idle_sequence) > 0:
+                    elapsed = max(0.0, now - self._idle_start_time)
+                    surf = self.idle_sequence.get_frame(elapsed)
             else:
+                # Idle state: smoothly loop idle sequence; if unavailable, freeze on neutral frame 0
                 if self.idle_sequence and len(self.idle_sequence) > 0:
-                    surf = self.idle_sequence.get_frame(now - self._idle_start_time)
+                    elapsed = max(0.0, now - self._idle_start_time)
+                    surf = self.idle_sequence.get_frame(elapsed)
                 elif self.speaking_sequence and len(self.speaking_sequence) > 0:
-                    # Freeze on first frame during idle if only speaking sequence is loaded
                     surf = self.speaking_sequence.get_frame(0.0)
                     
             if surf:
