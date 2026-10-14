@@ -39,12 +39,14 @@ class FfmpegLocator:
         candidates.append(bundled)
         candidates.append("ffmpeg")
         
+        flags = 0x08000000 if sys.platform == 'win32' else 0
         for candidate in candidates:
             try:
                 proc = await asyncio.create_subprocess_exec(
                     candidate, "-version",
                     stdout=asyncio.subprocess.PIPE,
-                    stderr=asyncio.subprocess.PIPE
+                    stderr=asyncio.subprocess.PIPE,
+                    creationflags=flags
                 )
                 await proc.communicate()
                 if proc.returncode == 0:
@@ -68,11 +70,13 @@ class HardwareEncoderProbe:
         Returns: (preferred_encoder, [list of available encoders])
         """
         available = []
+        flags = 0x08000000 if sys.platform == 'win32' else 0
         try:
             proc = await asyncio.create_subprocess_exec(
                 self.ffmpeg_path, "-encoders",
                 stdout=asyncio.subprocess.PIPE,
-                stderr=asyncio.subprocess.PIPE
+                stderr=asyncio.subprocess.PIPE,
+                creationflags=flags
             )
             stdout, _ = await proc.communicate()
             if proc.returncode == 0:

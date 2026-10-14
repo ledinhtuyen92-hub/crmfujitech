@@ -143,8 +143,8 @@ def trigger_proactive_speech(self, session_id: str):
         
         context = LiveContextService.get_context(str(session.company_id), str(session.id))
         stream_state = context.get("stream_state")
-        if stream_state == "STARTING":
-            logger.info(f"[Session {session_id}] Stream is still STARTING. Postponing proactive speech by 4s.")
+        if stream_state in ("STARTING", None, ""):
+            logger.info(f"[Session {session_id}] Stream is not yet confirmed LIVE (state={stream_state}). Postponing proactive speech by 4s.")
             trigger_proactive_speech.apply_async(kwargs={"session_id": session_id}, countdown=4)
             return
 

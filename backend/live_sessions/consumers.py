@@ -164,7 +164,7 @@ class DeviceAgentConsumer(AsyncWebsocketConsumer):
                 payload=safe_payload,
                 correlation_id=envelope['message_id']
             )
-        elif msg_type == 'event' and msg_name in ('stream.status', 'live.stream.status'):
+        elif msg_type == 'event' and msg_name in ('stream.status', 'live.stream.status', 'stream.state'):
             state = payload.get('state')
             hls_url = payload.get('hls_url', '')
             updates = {

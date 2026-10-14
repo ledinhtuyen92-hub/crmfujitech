@@ -262,6 +262,7 @@ export default function VideoPreview({ session, streamEvent }) {
         hlsRef.current.startLoad()
       }
       videoRef.current.muted = true
+      videoRef.current.defaultMuted = true
       videoRef.current.play()
         .then(() => {
           setHlsStatus('live')
@@ -270,8 +271,10 @@ export default function VideoPreview({ session, streamEvent }) {
         })
         .catch((e) => {
           console.warn('Manual play pending buffer:', e)
-          if (e.name === 'NotAllowedError') {
+          if (hasStartedPlaybackRef.current && e.name === 'NotAllowedError') {
             setHlsStatus('paused')
+          } else {
+            setHlsStatus('loading')
           }
         })
     }
@@ -357,6 +360,7 @@ export default function VideoPreview({ session, streamEvent }) {
       const tryPlay = () => {
         if (!video) return
         video.muted = true
+        video.defaultMuted = true
         video.playsInline = true
         const p = video.play()
         if (p && typeof p.then === 'function') {
@@ -364,8 +368,10 @@ export default function VideoPreview({ session, streamEvent }) {
             setHlsStatus('live')
             jumpToLiveEdgeOnce()
           }).catch((err) => {
-            // Only fall into paused if strictly blocked by browser user-interaction policy
-            if (err && err.name === 'NotAllowedError') {
+            // Keep status as loading during initial stream connection
+            if (!hasStartedPlaybackRef.current) {
+              setHlsStatus('loading')
+            } else if (err && err.name === 'NotAllowedError') {
               setHlsStatus('paused')
             }
           })
@@ -474,7 +480,7 @@ export default function VideoPreview({ session, streamEvent }) {
       <video
         ref={videoRef}
         autoPlay
-        muted={isMuted}
+        muted
         playsInline
         style={{
           width: '100%',
@@ -538,15 +544,15 @@ export default function VideoPreview({ session, streamEvent }) {
       )}
 
       {/* Synchronizing overlay: shown during stream connect and until first frame appears */}
-      {(hlsStatus === 'loading' || (hlsStatus === 'live' && !isPlaybackReady)) && (
+      {(hlsStatus === 'waiting' || hlsStatus === 'loading' || (hlsStatus === 'live' && !isPlaybackReady) || (hlsStatus === 'paused' && !isPlaybackReady)) && isSessionLive && (
         <div style={{
           position: 'absolute', top: 0, left: 0, width: '100%', height: '100%',
           display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
           backgroundColor: '#141414', zIndex: 5, gap: 12, padding: 24,
         }}>
           <LoadingOutlined spin style={{ fontSize: 52, color: '#1890ff' }} />
-          <Title level={4} style={{ color: '#1890ff', margin: 0 }}>ĐANG ĐỒNG BỘ LUỒNG VIDEO</Title>
-          <Text style={{ color: '#8c8c8c', fontSize: 13 }}>Đang tải và hiển thị khung hình đầu tiên...</Text>
+          <Title level={4} style={{ color: '#1890ff', margin: 0 }}>ĐANG KẾT NỐI LUỒNG VIDEO</Title>
+          <Text style={{ color: '#8c8c8c', fontSize: 13 }}>Đang kết nối tín hiệu và đồng bộ luồng phát...</Text>
         </div>
       )}
 
@@ -597,15 +603,15 @@ export default function VideoPreview({ session, streamEvent }) {
         )
       )}
 
-      {hlsStatus === 'waiting' && renderOverlay(
+      {hlsStatus === 'waiting' && !isSessionLive && renderOverlay(
         <LoadingOutlined spin />,
         'ĐANG KẾT NỐI LUỒNG VIDEO',
         'Đang đồng bộ tín hiệu từ thiết bị... Tự động kết nối ngay khi sẵn sàng',
         '#faad14'
       )}
 
-      {/* Autoplay blocked — show play button */}
-      {hlsStatus === 'paused' && renderOverlay(
+      {/* Autoplay blocked — ONLY shown when video frame is ready but browser explicitly stopped playback */}
+      {hlsStatus === 'paused' && isPlaybackReady && renderOverlay(
         <PlayCircleOutlined style={{ cursor: 'pointer', color: '#52c41a', fontSize: 72 }} />,
         'NHẤN ĐỂ XEM',
         'Trình duyệt yêu cầu tương tác để phát video',

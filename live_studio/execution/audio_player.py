@@ -100,82 +100,74 @@ class PygameAudioPlayer(BaseAudioPlayer):
             
         import pygame
         try:
-            # Phase 1E-1: Decode to PCM for the stream sink
-            pcm_data = b""
+            # When broadcasting live, stream directly to stream_sink via PCM.
+            # PC speakers remain completely silent so unbuffered audio never leaks out!
             if self.stream_sink and self.stream_sink.is_streaming:
+                pcm_data = b""
                 try:
                     from live_studio.execution.media_pipeline import Mp3Decoder
                     pcm_data = await asyncio.to_thread(Mp3Decoder.decode_to_pcm, filepath)
                     self.stream_sink.set_speaking(True)
                 except Exception as e:
                     logger.error(f"Stream sink preparation failed: {e}")
-                
-            pygame.mixer.music.load(filepath)
-            # When streaming, stream_sink carries the audio into the broadcast.
-            # Mute local speaker output so it doesn't leak unbuffered audio ahead of the video!
-            if self.stream_sink and self.stream_sink.is_streaming:
-                try:
-                    pygame.mixer.music.set_volume(0.0)
-                except Exception:
-                    pass
-            else:
-                try:
-                    pygame.mixer.music.set_volume(1.0)
-                except Exception:
-                    pass
-            pygame.mixer.music.play()
-            self._is_playing = True
-            
-            # Record start time for monotonic execution clock fallback
-            # pygame.mixer.music.get_pos() is unreliable when paused/stopped
-            self._start_time = time.monotonic()
-            self._last_position_ms = 0
-            
-            pcm_offset = 0
 
-            
-            # Poll playback state
-            while pygame.mixer.music.get_busy() and self._is_playing:
-                self._last_position_ms = pygame.mixer.music.get_pos()
-                if self._last_position_ms < 0:
-                    # Fallback if pygame returns -1
-                    self._last_position_ms = int((time.monotonic() - self._start_time) * 1000)
-                    
-                # Push PCM to sink based on playback progress
-                if self.stream_sink and self.stream_sink.is_streaming and pcm_data:
-                    try:
-                        bytes_per_ms = self.stream_sink.bytes_per_sec / 1000.0
+                bytes_per_sec = getattr(self.stream_sink, 'bytes_per_sec', 176400)
+                duration_ms = (len(pcm_data) / bytes_per_sec * 1000.0) if pcm_data else 0.0
+
+                self._is_playing = True
+                self._start_time = time.monotonic()
+                self._last_position_ms = 0
+                pcm_offset = 0
+
+                while self._is_playing:
+                    elapsed_ms = (time.monotonic() - self._start_time) * 1000.0
+                    self._last_position_ms = int(elapsed_ms)
+                    if elapsed_ms >= duration_ms:
+                        break
+
+                    if pcm_data:
+                        bytes_per_ms = bytes_per_sec / 1000.0
                         target_offset = int(self._last_position_ms * bytes_per_ms)
-                        # Align to frame boundary (4 bytes for s16le stereo)
                         target_offset -= target_offset % 4
-                        
                         if target_offset > pcm_offset:
                             chunk = pcm_data[pcm_offset:target_offset]
                             self.stream_sink.write_pcm(chunk)
                             pcm_offset = target_offset
+
+                    await asyncio.sleep(0.01)
+
+                if self._is_playing and pcm_data and pcm_offset < len(pcm_data):
+                    try:
+                        self.stream_sink.write_pcm(pcm_data[pcm_offset:])
                     except Exception as e:
-                        logger.error(f"Stream sink write failed: {e}")
+                        logger.error(f"Stream sink flush failed: {e}")
 
-                await asyncio.sleep(0.01) # Faster poll for tighter sync
-                
-            # If playback completed naturally, flush any remaining PCM chunk
-            if self._is_playing and self.stream_sink and self.stream_sink.is_streaming and pcm_data and pcm_offset < len(pcm_data):
-                try:
-                    remaining_chunk = pcm_data[pcm_offset:]
-                    self.stream_sink.write_pcm(remaining_chunk)
-                except Exception as e:
-                    logger.error(f"Stream sink flush failed: {e}")
-
-            # If stopped via stop(), get_busy() becomes False
-            completed = self._is_playing
-            self._is_playing = False
-            
-            if self.stream_sink:
+                completed = self._is_playing
+                self._is_playing = False
                 try:
                     self.stream_sink.set_speaking(False)
                 except Exception as e:
                     logger.error(f"Stream sink set_speaking failed: {e}")
+
+                return completed
+
+            # Offline Preview / Test mode: play out of local speakers via Pygame
+            pygame.mixer.music.load(filepath)
+            pygame.mixer.music.set_volume(1.0)
+            pygame.mixer.music.play()
+            self._is_playing = True
+            
+            self._start_time = time.monotonic()
+            self._last_position_ms = 0
+            
+            while pygame.mixer.music.get_busy() and self._is_playing:
+                self._last_position_ms = pygame.mixer.music.get_pos()
+                if self._last_position_ms < 0:
+                    self._last_position_ms = int((time.monotonic() - self._start_time) * 1000)
+                await asyncio.sleep(0.01)
                 
+            completed = self._is_playing
+            self._is_playing = False
             return completed
         except Exception as e:
             logger.error(f"Pygame playback error: {e}")
