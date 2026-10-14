@@ -77,18 +77,36 @@ const CreateSessionModal = ({ visible, onClose, onSuccess }) => {
     <Modal title="Tạo Phiên Livestream Mới" open={visible} onCancel={onClose} onOk={handleCreate} confirmLoading={loading}>
       <Form form={form} layout="vertical">
         <Form.Item name="device" label="Thiết bị" rules={[{ required: true }]}>
-          <Select placeholder="Chọn thiết bị">
-            {deps.devices.map(d => <Select.Option key={d.id} value={d.id}>{d.name}</Select.Option>)}
+          <Select placeholder="Chọn thiết bị" showSearch optionFilterProp="label" allowClear>
+            {deps.devices.map(d => <Select.Option key={d.id} value={d.id} label={d.name}>{d.name}</Select.Option>)}
           </Select>
         </Form.Item>
         <Form.Item name="product" label="Sản phẩm" rules={[{ required: true }]}>
-          <Select placeholder="Chọn sản phẩm">
-            {deps.products.map(p => <Select.Option key={p.id} value={p.id}>{p.code} - {p.name}</Select.Option>)}
+          <Select 
+            placeholder="Nhập mã hoặc tên sản phẩm để tìm kiếm..." 
+            showSearch 
+            optionFilterProp="label"
+            filterOption={(input, option) =>
+              (option?.label ?? '').toLowerCase().includes(input.toLowerCase().trim())
+            }
+            allowClear
+          >
+            {deps.products.map(p => {
+              const labelText = p.code ? `[${p.code}] ${p.name}` : p.name
+              return (
+                <Select.Option key={p.id} value={p.id} label={labelText}>
+                  <Space>
+                    {p.code ? <span style={{ fontWeight: 600, color: '#1649c9' }}>[{p.code}]</span> : null}
+                    <span>{p.name}</span>
+                  </Space>
+                </Select.Option>
+              )
+            })}
           </Select>
         </Form.Item>
         <Form.Item name="ai_agent" label="AI Agent" rules={[{ required: true }]}>
-          <Select placeholder="Chọn AI Agent">
-            {deps.agents.map(a => <Select.Option key={a.id} value={a.id}>{a.name}</Select.Option>)}
+          <Select placeholder="Chọn AI Agent" showSearch optionFilterProp="label" allowClear>
+            {deps.agents.map(a => <Select.Option key={a.id} value={a.id} label={a.name}>{a.name}</Select.Option>)}
           </Select>
         </Form.Item>
         <Form.Item name="platform" label="Nền tảng" rules={[{ required: true }]}>

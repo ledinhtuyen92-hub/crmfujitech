@@ -225,9 +225,9 @@ export default function LiveSessionsList() {
         <Form form={form} layout="vertical">
           <Card size="small" title="Cấu hình Nội dung" style={{ marginBottom: 24, borderRadius: 8 }}>
             <Form.Item name="device" label="Máy chủ phát sóng (Live Studio Device)" rules={[{ required: true }]}>
-              <Select placeholder="Chọn máy chủ Windows">
+              <Select placeholder="Chọn máy chủ Windows" showSearch optionFilterProp="label" allowClear>
                 {deps.devices.map(d => (
-                  <Select.Option key={d.id} value={d.id}>
+                  <Select.Option key={d.id} value={d.id} label={`${d.name} ${d.is_online ? '(Đang bật)' : '(Đang tắt)'}`}>
                     <Space>
                       <div style={{ width: 8, height: 8, borderRadius: '50%', backgroundColor: d.is_online ? '#52c41a' : '#f5222d' }} />
                       {d.name} {d.is_online ? '(Đang bật)' : '(Đang tắt)'}
@@ -245,8 +245,27 @@ export default function LiveSessionsList() {
 
             {productSource === 'internal' ? (
               <Form.Item name="product" label="Sản phẩm trung tâm" rules={[{ required: true, message: 'Vui lòng chọn sản phẩm' }]}>
-                <Select placeholder="Chọn sản phẩm trong kho">
-                  {deps.products.map(p => <Select.Option key={p.id} value={p.id}>{p.code} - {p.name}</Select.Option>)}
+                <Select 
+                  showSearch
+                  placeholder="Nhập mã hoặc tên sản phẩm để tìm kiếm..."
+                  optionFilterProp="label"
+                  filterOption={(input, option) =>
+                    (option?.label ?? '').toLowerCase().includes(input.toLowerCase().trim())
+                  }
+                  allowClear
+                >
+                  {deps.products.map(p => {
+                    const labelText = p.code ? `[${p.code}] ${p.name}` : p.name
+                    return (
+                      <Select.Option key={p.id} value={p.id} label={labelText}>
+                        <Space>
+                          {p.code ? <span style={{ fontWeight: 600, color: '#1649c9' }}>[{p.code}]</span> : null}
+                          <span>{p.name}</span>
+                          {p.price ? <span style={{ color: '#8c8c8c', fontSize: 12 }}>({Number(p.price).toLocaleString()}đ)</span> : null}
+                        </Space>
+                      </Select.Option>
+                    )
+                  })}
                 </Select>
               </Form.Item>
             ) : (
@@ -255,8 +274,8 @@ export default function LiveSessionsList() {
               </Form.Item>
             )}
             <Form.Item name="ai_agent" label="AI Agent (Bộ não cố định)" rules={[{ required: true }]}>
-              <Select placeholder="Chọn AI Agent">
-                {deps.agents.map(a => <Select.Option key={a.id} value={a.id}>{a.name}</Select.Option>)}
+              <Select placeholder="Chọn AI Agent" showSearch optionFilterProp="label" allowClear>
+                {deps.agents.map(a => <Select.Option key={a.id} value={a.id} label={a.name}>{a.name}</Select.Option>)}
               </Select>
             </Form.Item>
 
