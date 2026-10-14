@@ -72,6 +72,11 @@ const ReceiptPrintView = React.forwardRef(({ receipt, company, order }, ref) => 
         </div>
         <div style={{ marginBottom: 8 }}>
           Lý do nộp: {receipt.note || `Thanh toán cho đơn hàng ${order?.order_number || ''}`}
+          {receipt.is_over_payment && receipt.over_payment_reason && (
+            <span style={{ fontStyle: 'italic', color: '#b45309' }}>
+              {` (Lý do thu vượt công nợ: ${receipt.over_payment_reason})`}
+            </span>
+          )}
         </div>
         <div style={{ marginBottom: 8 }}>
           Số tiền: <Text strong style={{ fontSize: 18 }}>{Number(receipt.amount).toLocaleString('vi-VN')} VNĐ</Text>

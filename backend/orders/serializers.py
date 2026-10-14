@@ -3,7 +3,7 @@ from django.db import transaction
 from rest_framework import serializers
 
 from .models import Order, OrderItem
-from finance.serializers import OrderPaymentMilestoneSerializer
+from finance.serializers import OrderPaymentMilestoneSerializer, PaymentReceiptSerializer
 
 
 class OrderItemSerializer(serializers.ModelSerializer):
@@ -70,6 +70,7 @@ class OrderSerializer(serializers.ModelSerializer):
     customer_info = serializers.SerializerMethodField()
     has_pending_credit_request = serializers.SerializerMethodField()
     payment_milestones = OrderPaymentMilestoneSerializer(many=True, read_only=True)
+    payment_receipts = PaymentReceiptSerializer(many=True, read_only=True)
     needs_export_request = serializers.SerializerMethodField()
     has_production_order = serializers.SerializerMethodField()
     has_pending_export = serializers.SerializerMethodField()
@@ -129,6 +130,7 @@ class OrderSerializer(serializers.ModelSerializer):
             "has_pending_credit_request",
             "needs_export_request",
             "payment_milestones",
+            "payment_receipts",
             "has_production_order",
             "has_pending_export",
             "requires_inventory_export",
@@ -142,6 +144,7 @@ class OrderSerializer(serializers.ModelSerializer):
             "items", "created_at", "updated_at", "company_info", "customer_info", "quotation_detail",
             "has_pending_credit_request",
             "payment_milestones",
+            "payment_receipts",
             "needs_export_request",
             "has_production_order",
             "has_pending_export",

@@ -1,5 +1,6 @@
-import { AlertOutlined, CheckCircleOutlined, ClockCircleOutlined, CloseCircleOutlined, DeleteOutlined, EditOutlined, FileDoneOutlined, FileTextOutlined, MessageOutlined, MinusCircleOutlined, PlusOutlined, PrinterOutlined, SearchOutlined, UploadOutlined, PictureOutlined, CameraOutlined, TableOutlined, ToolOutlined, EnvironmentOutlined , SettingOutlined } from '@ant-design/icons'
+import { AlertOutlined, CheckCircleOutlined, ClockCircleOutlined, CloseCircleOutlined, DeleteOutlined, EditOutlined, FileDoneOutlined, FileTextOutlined, MessageOutlined, MinusCircleOutlined, PlusOutlined, PrinterOutlined, SearchOutlined, UploadOutlined, PictureOutlined, CameraOutlined, TableOutlined, ToolOutlined, EnvironmentOutlined , SettingOutlined, ExclamationCircleOutlined, InfoCircleOutlined } from '@ant-design/icons'
 import {
+  Alert,
   AutoComplete,
   Badge,
   Button,
@@ -425,6 +426,7 @@ export default function OrderList() {
   const [receiptModalVisible, setReceiptModalVisible] = useState(false)
   const [receiptSubmitting, setReceiptSubmitting] = useState(false)
   const [receiptForm] = Form.useForm()
+  const watchReceiptAmount = Form.useWatch('amount', receiptForm)
   const [receiptFileList, setReceiptFileList] = useState([])
   const [receiptUploading, setReceiptUploading] = useState(false)
 
@@ -519,6 +521,7 @@ export default function OrderList() {
       amount: defaultAmount,
       payment_method: 'transfer',
       note: note,
+      over_payment_reason: '',
       payment_target: selectedOrder?.payment_target || undefined,
     })
     setReceiptModalVisible(true)
@@ -595,7 +598,7 @@ export default function OrderList() {
     }
   }
 
-  const handleCreateReceipt = async (values) => {
+  const doSubmitReceipt = async (values) => {
     setReceiptSubmitting(true)
     messageApi.loading({ content: 'Đang xử lý và tải ảnh...', key: 'uploading' })
     try {
@@ -620,6 +623,7 @@ export default function OrderList() {
         amount: values.amount,
         payment_method: values.payment_method,
         note: values.note,
+        over_payment_reason: values.over_payment_reason || '',
         attachments: finalUrls
       })
       messageApi.success({ content: 'Lập phiếu thu thành công! Hệ thống đã tự động cập nhật.', key: 'uploading', duration: 2 })
@@ -631,6 +635,7 @@ export default function OrderList() {
       let msg = 'Lỗi khi lập phiếu thu!'
       if (err.response?.data) {
         if (typeof err.response.data === 'string') msg = err.response.data
+        else if (err.response.data.over_payment_reason) msg = err.response.data.over_payment_reason[0]
         else if (err.response.data.amount) msg = err.response.data.amount[0]
         else if (err.response.data.milestone) msg = err.response.data.milestone[0]
         else if (err.response.data.detail) msg = err.response.data.detail
@@ -647,6 +652,40 @@ export default function OrderList() {
       messageApi.error(msg)
     } finally {
       setReceiptSubmitting(false)
+    }
+  }
+
+  const handleCreateReceipt = async (values) => {
+    const remaining = Number(selectedOrder?.remaining_debt || 0)
+    const amt = Number(values.amount || 0)
+    if (amt > remaining) {
+      const over = amt - remaining
+      Modal.confirm({
+        title: 'Xác nhận thu tiền vượt công nợ?',
+        icon: <ExclamationCircleOutlined style={{ color: '#d97706', fontSize: 22 }} />,
+        content: (
+          <div style={{ fontSize: 13, lineHeight: 1.6, marginTop: 8 }}>
+            <div>Số tiền thu <b>{amt.toLocaleString('vi-VN')} đ</b> đang vượt quá công nợ còn lại (<b>{remaining.toLocaleString('vi-VN')} đ</b>).</div>
+            <div style={{ color: '#b45309', fontWeight: 700, margin: '6px 0' }}>
+              Mức thu vượt: +{over.toLocaleString('vi-VN')} đ
+            </div>
+            {values.over_payment_reason && (
+              <div style={{ marginTop: 6, padding: '8px 12px', background: '#fffbeb', borderRadius: 6, border: '1px solid #fde68a' }}>
+                <span style={{ color: '#b45309', fontWeight: 600 }}>Lý do thu vượt:</span> {values.over_payment_reason}
+              </div>
+            )}
+            <div style={{ marginTop: 10, color: '#475569' }}>
+              Bạn có chắc chắn muốn lập phiếu thu này không?
+            </div>
+          </div>
+        ),
+        okText: 'Xác nhận lập phiếu',
+        cancelText: 'Kiểm tra lại',
+        okButtonProps: { style: { background: '#10b981', borderColor: '#10b981' } },
+        onOk: () => doSubmitReceipt(values)
+      })
+    } else {
+      await doSubmitReceipt(values)
     }
   }
 
@@ -4226,10 +4265,15 @@ export default function OrderList() {
                     <Text strong style={{ color: selectedOrder.remaining_debt > 0 ? '#b91c1c' : '#15803d', fontSize: 18, textShadow: '0 1px 2px rgba(185, 28, 28, 0.1)' }}>
                       {Number(selectedOrder.remaining_debt || 0).toLocaleString('vi-VN')} <span style={{fontSize: 14, fontWeight: 500}}>đ</span>
                     </Text>
+                    {Math.max(0, Number(selectedOrder.paid_amount || 0) - Number(selectedOrder.total_amount || 0)) > 0 && (
+                      <Tag color="warning" style={{ fontSize: 11, marginTop: 2 }}>
+                        Thu vượt: +{Math.max(0, Number(selectedOrder.paid_amount || 0) - Number(selectedOrder.total_amount || 0)).toLocaleString('vi-VN')} đ
+                      </Tag>
+                    )}
                   </Space>
                 </Col>
                 <Col xs={24} md={4} style={{ textAlign: 'right' }}>
-                  {hasPermission('finance.create_receipt') && selectedOrder.remaining_debt > 0 && (
+                  {hasPermission('finance.create_receipt') && (
                     <Button
                       type="primary"
                       icon={<PlusOutlined />}
@@ -4352,87 +4396,167 @@ export default function OrderList() {
             )}
 
             {/* LỊCH SỬ THU TIỀN */}
-            {(selectedOrder.payment_milestones?.flatMap(m => m.receipts || []) || []).length > 0 && (
-              <div style={{ marginTop: 16, marginBottom: 16 }}>
-                <Text strong style={{ fontSize: 14, textTransform: 'uppercase', color: '#475569', marginBottom: 8, display: 'block' }}>
-                  Lịch sử thu tiền
-                </Text>
-                <div style={{ background: '#fff', border: '1px solid #e2e8f0', borderRadius: '8px', overflow: 'hidden' }}>
-                  <Table scroll={{ x: 'max-content' }}
-                    dataSource={selectedOrder.payment_milestones?.flatMap(m => m.receipts || []) || []}
-                    rowKey="id"
-                    pagination={false}
-                    size="small"
-                    columns={[
-                      { title: 'Ngày thu', dataIndex: 'payment_date', key: 'payment_date', render: d => dayjs(d).format('DD/MM/YYYY') },
-                      { title: 'Số phiếu', dataIndex: 'receipt_code', key: 'receipt_code', render: c => <Text strong>{c}</Text> },
-                      { title: 'Số tiền', dataIndex: 'amount', key: 'amount', render: a => <Text strong style={{color: '#15803d'}}>{Number(a).toLocaleString('vi-VN')} đ</Text> },
-                      { title: 'Hình thức', dataIndex: 'payment_method_display', key: 'payment_method' },
-                      {
-                        title: '',
-                        key: 'action',
-                        render: (_, record) => (
-                          <Space>
-                            {hasPermission('finance.print_receipt') && (
-                              <Button type="link" size="small" icon={<PrinterOutlined />} onClick={() => handlePrintReceipt(record)}>
-                                In phiếu
-                              </Button>
-                            )}
-                            {record.attachments && record.attachments.length > 0 && (
-                              <Button
-                                type="link"
-                                size="small"
-                                icon={<PictureOutlined />}
-                                onClick={() => {
-                                  setPreviewAttachments(record.attachments)
-                                  setPreviewVisible(true)
-                                }}
-                              >
-                                Xem chứng từ ({record.attachments.length})
-                              </Button>
-                            )}
-                            {hasPermission('finance.create_receipt') && (
-                              <Button
-                                type="link"
-                                size="small"
-                                icon={<UploadOutlined />}
-                                onClick={() => {
-                                  setUpdatingReceipt(record)
-                                  const initialList = (record.attachments || []).map((url, idx) => ({
-                                    uid: `existing_${idx}`,
-                                    name: `Chung_tu_${idx + 1}`,
-                                    status: 'done',
-                                    url: getSafeMediaUrl(url)
-                                  }))
-                                  setUpdateReceiptFileList(initialList)
-                                  setUpdateAttachmentModalVisible(true)
-                                }}
-                              >
-                                Bổ sung chứng từ
-                              </Button>
-                            )}
-                            {hasPermission('finance.delete') && (
-                              <Popconfirm
-                                title="Xác nhận xóa phiếu thu này?"
-                                description="Thao tác này sẽ cập nhật lại công nợ của đơn hàng. Bạn có chắc chắn?"
-                                onConfirm={() => handleDeleteReceipt(record.id)}
-                                okText="Xóa"
-                                cancelText="Hủy"
-                                okButtonProps={{ danger: true }}
-                              >
-                                <Button type="link" size="small" danger icon={<DeleteOutlined />}>
-                                  Xóa
-                                </Button>
-                              </Popconfirm>
-                            )}
-                          </Space>
-                        )
+            {(() => {
+              const allReceipts = selectedOrder.payment_receipts?.length > 0
+                ? selectedOrder.payment_receipts
+                : (selectedOrder.payment_milestones?.flatMap(m => m.receipts || []) || []);
+              if (allReceipts.length === 0) return null;
+              const hasOver = allReceipts.some(r => r.is_over_payment || Number(r.over_payment_amount) > 0);
+              return (
+                <div style={{ marginTop: 16, marginBottom: 16 }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+                    <Text strong style={{ fontSize: 14, textTransform: 'uppercase', color: '#475569' }}>
+                      Lịch sử thu tiền ({allReceipts.length} phiếu)
+                    </Text>
+                    {hasOver && (
+                      <Tag color="warning" icon={<ExclamationCircleOutlined />}>
+                        Có phiếu thu vượt công nợ
+                      </Tag>
+                    )}
+                  </div>
+                  {hasOver && (
+                    <Alert
+                      type="warning"
+                      showIcon
+                      icon={<ExclamationCircleOutlined style={{ color: '#d97706' }} />}
+                      style={{ marginBottom: 10, borderRadius: 8, background: '#fffbeb', border: '1px solid #fde68a' }}
+                      message={
+                        <Text strong style={{ color: '#b45309', fontSize: 13 }}>
+                          Đơn hàng có khoản thu vượt mức công nợ (phát sinh cước vận chuyển, phụ phí...)
+                        </Text>
                       }
-                    ]}
-                  />
+                      description={
+                        <Text style={{ fontSize: 12, color: '#92400e' }}>
+                          Kế toán có thể xem số tiền thu vượt và ghi chú lý do phát sinh tại cột <b>Số tiền</b> và <b>Ghi chú / Lý do</b> trong bảng dưới đây.
+                        </Text>
+                      }
+                    />
+                  )}
+                  <div style={{ background: '#fff', border: '1px solid #e2e8f0', borderRadius: '8px', overflow: 'hidden' }}>
+                    <Table scroll={{ x: 'max-content' }}
+                      dataSource={allReceipts}
+                      rowKey="id"
+                      pagination={false}
+                      size="small"
+                      columns={[
+                        { title: 'Ngày thu', dataIndex: 'payment_date', key: 'payment_date', render: d => dayjs(d).format('DD/MM/YYYY') },
+                        { title: 'Số phiếu', dataIndex: 'receipt_code', key: 'receipt_code', render: c => <Text strong>{c}</Text> },
+                        {
+                          title: 'Số tiền',
+                          dataIndex: 'amount',
+                          key: 'amount',
+                          render: (a, record) => (
+                            <Space direction="vertical" size={2}>
+                              <Text strong style={{color: '#15803d', fontSize: 14}}>
+                                {Number(a).toLocaleString('vi-VN')} đ
+                              </Text>
+                              {(record.is_over_payment || Number(record.over_payment_amount) > 0) && (
+                                <Tag color="warning" icon={<ExclamationCircleOutlined />} style={{ fontSize: 11, margin: 0, padding: '0 6px' }}>
+                                  Vượt nợ: +{Number(record.over_payment_amount || 0).toLocaleString('vi-VN')} đ
+                                </Tag>
+                              )}
+                            </Space>
+                          )
+                        },
+                        { title: 'Hình thức', dataIndex: 'payment_method_display', key: 'payment_method' },
+                        {
+                          title: 'Ghi chú / Lý do',
+                          key: 'notes_and_reason',
+                          render: (_, record) => (
+                            <div style={{ maxWidth: 280 }}>
+                              {record.note && (
+                                <div style={{ fontSize: 13, color: '#334155' }}>
+                                  {record.note}
+                                </div>
+                              )}
+                              {(record.is_over_payment || Number(record.over_payment_amount) > 0) && record.over_payment_reason && (
+                                <div style={{
+                                  marginTop: record.note ? 4 : 0,
+                                  padding: '4px 8px',
+                                  background: '#fffbeb',
+                                  border: '1px solid #fde68a',
+                                  borderRadius: 6,
+                                  fontSize: 12,
+                                  color: '#92400e',
+                                  lineHeight: 1.4
+                                }}>
+                                  <Space size={4} align="start">
+                                    <ExclamationCircleOutlined style={{ color: '#d97706', marginTop: 2, flexShrink: 0 }} />
+                                    <div>
+                                      <strong style={{ color: '#b45309' }}>Lý do thu vượt:</strong> {record.over_payment_reason}
+                                    </div>
+                                  </Space>
+                                </div>
+                              )}
+                            </div>
+                          )
+                        },
+                        {
+                          title: '',
+                          key: 'action',
+                          render: (_, record) => (
+                            <Space>
+                              {hasPermission('finance.print_receipt') && (
+                                <Button type="link" size="small" icon={<PrinterOutlined />} onClick={() => handlePrintReceipt(record)}>
+                                  In phiếu
+                                </Button>
+                              )}
+                              {record.attachments && record.attachments.length > 0 && (
+                                <Button
+                                  type="link"
+                                  size="small"
+                                  icon={<PictureOutlined />}
+                                  onClick={() => {
+                                    setPreviewAttachments(record.attachments)
+                                    setPreviewVisible(true)
+                                  }}
+                                >
+                                  Xem chứng từ ({record.attachments.length})
+                                </Button>
+                              )}
+                              {hasPermission('finance.create_receipt') && (
+                                <Button
+                                  type="link"
+                                  size="small"
+                                  icon={<UploadOutlined />}
+                                  onClick={() => {
+                                    setUpdatingReceipt(record)
+                                    const initialList = (record.attachments || []).map((url, idx) => ({
+                                      uid: `existing_${idx}`,
+                                      name: `Chung_tu_${idx + 1}`,
+                                      status: 'done',
+                                      url: getSafeMediaUrl(url)
+                                    }))
+                                    setUpdateReceiptFileList(initialList)
+                                    setUpdateAttachmentModalVisible(true)
+                                  }}
+                                >
+                                  Bổ sung chứng từ
+                                </Button>
+                              )}
+                              {hasPermission('finance.delete') && (
+                                <Popconfirm
+                                  title="Xác nhận xóa phiếu thu này?"
+                                  description="Thao tác này sẽ cập nhật lại công nợ của đơn hàng. Bạn có chắc chắn?"
+                                  onConfirm={() => handleDeleteReceipt(record.id)}
+                                  okText="Xóa"
+                                  cancelText="Hủy"
+                                  okButtonProps={{ danger: true }}
+                                >
+                                  <Button type="link" size="small" danger icon={<DeleteOutlined />}>
+                                    Xóa
+                                  </Button>
+                                </Popconfirm>
+                              )}
+                            </Space>
+                          )
+                        }
+                      ]}
+                    />
+                  </div>
                 </div>
-              </div>
-            )}
+              );
+            })()}
 
             {selectedOrder.notes && (
               <div style={{ padding: '16px', background: 'linear-gradient(135deg, #fefce8 0%, #fef9c3 100%)', borderRadius: '12px', border: '1px solid #fde047', boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.05)' }}>
@@ -4471,14 +4595,21 @@ export default function OrderList() {
       >
         <Form form={receiptForm} layout="vertical" onFinish={handleCreateReceipt}>
           {selectedOrder?.payment_milestones?.length > 0 && (
-            <Form.Item name="milestone" label="Kỳ thanh toán" rules={[{ required: true, message: 'Vui lòng chọn kỳ thanh toán' }]}>
-              <Select placeholder="Chọn kỳ thanh toán" onChange={handleMilestoneChange} allowClear>
-                {getAdjustedMilestones(selectedOrder.payment_milestones)
-                  .filter(m => m.status !== 'paid' && m.adjusted_needed > 0)
-                  .map(m => (
-                    <Option key={m.id} value={m.id}>
-                      {m.title} - Cần thu: {Number(m.adjusted_needed).toLocaleString('vi-VN')} đ
-                    </Option>
+            <Form.Item
+              name="milestone"
+              label="Kỳ thanh toán"
+              rules={[
+                {
+                  required: selectedOrder.payment_milestones.some(m => Number(m.paid_amount || 0) < Number(m.amount || 0)),
+                  message: 'Vui lòng chọn kỳ thanh toán'
+                }
+              ]}
+            >
+              <Select placeholder="Chọn kỳ thanh toán (hoặc để trống nếu thu ngoài kỳ)" onChange={handleMilestoneChange} allowClear>
+                {getAdjustedMilestones(selectedOrder.payment_milestones).map(m => (
+                  <Option key={m.id} value={m.id}>
+                    {m.title} - Cần thu: {Number(m.adjusted_needed).toLocaleString('vi-VN')} đ {m.adjusted_needed <= 0 ? '(Đã đủ)' : ''}
+                  </Option>
                 ))}
               </Select>
             </Form.Item>
@@ -4495,6 +4626,63 @@ export default function OrderList() {
               parser={(value) => value.replace(/\$\s?|(,*)/g, '')}
             />
           </Form.Item>
+
+          {/* CẢNH BÁO VÀ GHI CHÚ THU VƯỢT MỨC */}
+          {(() => {
+            const currentRemaining = Number(selectedOrder?.remaining_debt || 0);
+            const isOver = Number(watchReceiptAmount || 0) > currentRemaining;
+            const diff = isOver ? Number(watchReceiptAmount || 0) - currentRemaining : 0;
+            if (!isOver) return null;
+            return (
+              <>
+                <Alert
+                  type="warning"
+                  showIcon
+                  icon={<ExclamationCircleOutlined style={{ color: '#d97706', fontSize: 18 }} />}
+                  style={{
+                    marginBottom: 16,
+                    borderRadius: 8,
+                    border: '1px solid #fde68a',
+                    background: '#fffbeb'
+                  }}
+                  message={
+                    <Text strong style={{ color: '#b45309' }}>
+                      Số tiền thu đang vượt quá công nợ còn lại
+                    </Text>
+                  }
+                  description={
+                    <div style={{ color: '#92400e', fontSize: 13, marginTop: 4 }}>
+                      <div>• Công nợ còn lại của đơn hàng: <b>{currentRemaining.toLocaleString('vi-VN')} đ</b></div>
+                      <div>• Số tiền dự kiến thu: <b>{Number(watchReceiptAmount || 0).toLocaleString('vi-VN')} đ</b></div>
+                      <div style={{ marginTop: 4, fontWeight: 700, color: '#b45309' }}>
+                        👉 Mức thu vượt công nợ: +{diff.toLocaleString('vi-VN')} đ
+                      </div>
+                      <div style={{ marginTop: 4, fontSize: 12, fontStyle: 'italic', color: '#78350f' }}>
+                        (Áp dụng khi thu thêm cước vận chuyển ngoài hợp đồng, phụ phí phát sinh... Vui lòng điền ghi chú thu vượt mức bên dưới để kế toán tiện theo dõi).
+                      </div>
+                    </div>
+                  }
+                />
+                <Form.Item
+                  name="over_payment_reason"
+                  label={
+                    <Space>
+                      <Text strong style={{ color: '#b45309' }}>Ghi chú / Lý do thu vượt mức</Text>
+                      <Tag color="warning">Bắt buộc khi thu vượt</Tag>
+                    </Space>
+                  }
+                  rules={[
+                    { required: true, message: 'Vui lòng nhập lý do/ghi chú cho khoản tiền thu vượt mức (VD: Thu thêm cước vận chuyển...)' }
+                  ]}
+                >
+                  <TextArea
+                    rows={2}
+                    placeholder="Ví dụ: Thu thêm cước vận chuyển giao hàng tận nơi theo thỏa thuận với khách..."
+                  />
+                </Form.Item>
+              </>
+            );
+          })()}
           <Form.Item
             name="payment_method"
             label="Hình thức thanh toán"
