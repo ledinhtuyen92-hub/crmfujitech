@@ -18,7 +18,7 @@ class StreamState(Enum):
     RECONNECTING = "RECONNECTING"
 
 class StreamController:
-    def __init__(self, frame_queue=None, audio_sink=None, on_state_change=None, asset_fetcher=None):
+    def __init__(self, frame_queue=None, audio_sink=None, on_state_change=None, asset_fetcher=None, avatar_engine=None):
         self._state = StreamState.IDLE
         self.encoder: Optional[StreamEncoder] = None
         self.locator = FfmpegLocator()
@@ -27,6 +27,7 @@ class StreamController:
         self.audio_sink = audio_sink
         self.on_state_change = on_state_change
         self.asset_fetcher = asset_fetcher
+        self.avatar_engine = avatar_engine
         
         self._frame_pump_task = None
         self._monitor_task = None
@@ -110,6 +111,11 @@ class StreamController:
             else:
                 downloads.append(asyncio.sleep(0))
                 
+            if payload.avatar_speaking_asset_url:
+                downloads.append(self.asset_fetcher.fetch(payload.avatar_speaking_asset_url, 'avatar_speaking'))
+            else:
+                downloads.append(asyncio.sleep(0))
+                
             if payload.background_asset_url:
                 downloads.append(self.asset_fetcher.fetch(payload.background_asset_url, 'background'))
             else:
@@ -128,11 +134,26 @@ class StreamController:
             results = await asyncio.gather(*downloads, return_exceptions=True)
             self.cached_assets = {
                 'avatar': results[0] if isinstance(results[0], str) else None,
-                'background': results[1] if isinstance(results[1], str) else None,
-                'overlay': results[2] if isinstance(results[2], str) else None,
-                'audio': results[3] if isinstance(results[3], str) else None,
+                'avatar_speaking': results[1] if isinstance(results[1], str) else None,
+                'background': results[2] if isinstance(results[2], str) else None,
+                'overlay': results[3] if isinstance(results[3], str) else None,
+                'audio': results[4] if isinstance(results[4], str) else None,
             }
             logger.info(f"Asset cache paths: {self.cached_assets}")
+
+            if self.avatar_engine and (self.cached_assets.get('avatar') or self.cached_assets.get('avatar_speaking')):
+                ffmpeg_path = await self.locator.locate()
+                logger.info("Preloading avatar sequences into avatar_engine...")
+                try:
+                    await asyncio.to_thread(
+                        self.avatar_engine.load_avatar_assets,
+                        self.cached_assets.get('avatar'),
+                        self.cached_assets.get('avatar_speaking'),
+                        ffmpeg_path
+                    )
+                    logger.info("Avatar sequences loaded successfully.")
+                except Exception as e:
+                    logger.error(f"Error loading avatar sequences: {e}")
 
         return await self._start_internal()
 

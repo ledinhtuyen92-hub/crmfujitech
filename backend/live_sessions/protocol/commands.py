@@ -39,6 +39,7 @@ class StreamStartPayloadSerializer(serializers.Serializer):
     ai_agent_id = serializers.IntegerField(required=False, allow_null=True)
     session_prompt = serializers.CharField(required=False, allow_null=True, allow_blank=True)
     avatar_asset_url = serializers.CharField(required=False, allow_null=True, allow_blank=True)
+    avatar_speaking_asset_url = serializers.CharField(required=False, allow_null=True, allow_blank=True)
     background_asset_url = serializers.CharField(required=False, allow_null=True, allow_blank=True)
     overlay_asset_url = serializers.CharField(required=False, allow_null=True, allow_blank=True)
     audio_asset_url = serializers.CharField(required=False, allow_null=True, allow_blank=True)

@@ -192,6 +192,7 @@ class ProtocolDispatcher:
             ai_agent_id=payload_data.get("ai_agent_id"),
             session_prompt=payload_data.get("session_prompt"),
             avatar_asset_url=payload_data.get("avatar_asset_url"),
+            avatar_speaking_asset_url=payload_data.get("avatar_speaking_asset_url"),
             background_asset_url=payload_data.get("background_asset_url"),
             overlay_asset_url=payload_data.get("overlay_asset_url"),
             audio_asset_url=payload_data.get("audio_asset_url")

@@ -558,13 +558,13 @@ export default function VideoPreview({ session, streamEvent }) {
 
       {/* ── Status overlays ── */}
       {!isSessionLive && hlsStatus === 'idle' && (
-        session?.background_asset_url || session?.avatar_asset_url || session?.overlay_asset_url ? (
+        session?.background_asset_url || session?.avatar_asset_url || session?.avatar_speaking_asset_url || session?.overlay_asset_url ? (
           <div style={{ position: 'relative', width: '100%', height: '100%', overflow: 'hidden', display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
             <div style={{ position: 'relative', height: '100%', aspectRatio: '9/16', backgroundColor: '#000', overflow: 'hidden', boxShadow: '0 0 20px rgba(0,0,0,0.5)' }}>
               {(() => {
                 const resolveUrl = (url) => url?.startsWith('/') ? `http://localhost:8000${url}` : url;
                 const bgUrl = resolveUrl(session.background_asset_url);
-                const avatarUrl = resolveUrl(session.avatar_asset_url);
+                const avatarUrl = resolveUrl(session.avatar_asset_url || session.avatar_speaking_asset_url);
                 const overlayUrl = resolveUrl(session.overlay_asset_url);
                 return (
                   <>

@@ -46,6 +46,7 @@ class StreamStartPayload:
     ai_agent_id: Optional[int] = None
     session_prompt: Optional[str] = None
     avatar_asset_url: Optional[str] = None
+    avatar_speaking_asset_url: Optional[str] = None
     background_asset_url: Optional[str] = None
     overlay_asset_url: Optional[str] = None
     audio_asset_url: Optional[str] = None

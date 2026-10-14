@@ -48,7 +48,8 @@ class LiveStudioApp:
             frame_queue=self.frame_queue,
             audio_sink=audio_sink,
             on_state_change=self._on_stream_state_change,
-            asset_fetcher=self.asset_fetcher
+            asset_fetcher=self.asset_fetcher,
+            avatar_engine=self.avatar_engine
         )
         
         self.ws_client = WebSocketClient(

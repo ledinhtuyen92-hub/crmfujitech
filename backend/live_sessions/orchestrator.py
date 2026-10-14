@@ -82,6 +82,7 @@ class LiveOrchestrator:
             "ai_agent_id": session.ai_agent_id if session.ai_agent else None,
             "session_prompt": session.session_prompt,
             "avatar_asset_url": session.avatar_asset.file.url if session.avatar_asset and session.avatar_asset.file else None,
+            "avatar_speaking_asset_url": session.avatar_speaking_asset.file.url if session.avatar_speaking_asset and session.avatar_speaking_asset.file else None,
             "background_asset_url": session.background_asset.file.url if session.background_asset and session.background_asset.file else None,
             "overlay_asset_url": session.overlay_asset.file.url if session.overlay_asset and session.overlay_asset.file else None,
             "audio_asset_url": session.audio_asset.file.url if session.audio_asset and session.audio_asset.file else None,

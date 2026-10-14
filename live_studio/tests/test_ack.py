@@ -10,7 +10,7 @@ class TestAckManager(unittest.TestCase):
         
         ack = manager.build_ack("cmd1", ACK_RECEIVED, "msg1")
         self.assertEqual(ack["type"], "ack")
-        self.assertEqual(ack["name"], "ack")
+        self.assertEqual(ack["name"], "command.ack")
         self.assertEqual(ack["session_id"], "sess1")
         self.assertEqual(ack["sequence_number"], 1)
         self.assertEqual(ack["reference_message_id"], "msg1")

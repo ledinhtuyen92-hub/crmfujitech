@@ -1,4 +1,9 @@
+import os
+import time
 import logging
+import tempfile
+import subprocess
+from typing import Optional, List
 from .lip_sync import MOUTH_STATE_CLOSED
 
 logger = logging.getLogger(__name__)
@@ -24,9 +29,21 @@ class DummyAvatarRenderer(BaseAvatarRenderer):
     def __init__(self):
         self.last_state = None
         self.is_initialized = False
+        self.idle_path = None
+        self.speaking_path = None
 
     def initialize(self):
         self.is_initialized = True
+
+    def load_avatar_assets(self, idle_path: str = None, speaking_path: str = None, ffmpeg_bin: str = None):
+        self.idle_path = idle_path
+        self.speaking_path = speaking_path
+
+    def notify_speech_start(self):
+        pass
+
+    def notify_speech_stop(self):
+        pass
 
     def render(self, is_speaking: bool, mouth_state: str, is_blinking: bool):
         self.last_state = {
@@ -39,16 +56,106 @@ class DummyAvatarRenderer(BaseAvatarRenderer):
         self.is_initialized = False
 
 
+class VideoFrameSequence:
+    """
+    Loads and manages a sequence of frames for Idle or Speaking video loops.
+    Supports both image files (.png, .jpg, etc.) and video files (.mp4, .webm, etc.).
+    Uses bundled FFmpeg for ultra-fast frame extraction.
+    """
+    def __init__(self, file_path: Optional[str], target_width: int = 720, target_height: int = 1280, ffmpeg_bin: Optional[str] = None, fps: int = 25):
+        self.frames = []
+        self.fps = fps
+        self.target_width = target_width
+        self.target_height = target_height
+        
+        if not file_path or not os.path.exists(file_path):
+            return
+
+        import pygame
+        ext = os.path.splitext(file_path)[1].lower()
+        
+        # 1. Image Asset (Static)
+        if ext in ['.png', '.jpg', '.jpeg', '.webp', '.bmp']:
+            try:
+                surf = pygame.image.load(file_path)
+                if surf.get_size() != (target_width, target_height):
+                    surf = pygame.transform.smoothscale(surf, (target_width, target_height))
+                self.frames.append(surf)
+                logger.info(f"[VideoFrameSequence] Loaded static image: {file_path}")
+            except Exception as e:
+                logger.error(f"[VideoFrameSequence] Failed to load image {file_path}: {e}")
+
+        # 2. Video Asset (Dynamic Sequence)
+        elif ext in ['.mp4', '.mov', '.webm', '.mkv', '.avi']:
+            ffmpeg_exe = ffmpeg_bin or "ffmpeg"
+            temp_dir = tempfile.mkdtemp(prefix="avatar_frames_")
+            try:
+                cmd = [
+                    ffmpeg_exe,
+                    "-y",
+                    "-i", file_path,
+                    "-t", "10",  # Max 10s loop
+                    "-r", str(fps),
+                    "-vf", f"scale={target_width}:{target_height}",
+                    "-q:v", "2",
+                    os.path.join(temp_dir, "frame_%04d.jpg")
+                ]
+                flags = 0x08000000 if os.name == 'nt' else 0
+                res = subprocess.run(cmd, capture_output=True, creationflags=flags)
+                if res.returncode == 0:
+                    frame_files = sorted([os.path.join(temp_dir, f) for f in os.listdir(temp_dir) if f.endswith('.jpg')])
+                    for f in frame_files:
+                        surf = pygame.image.load(f)
+                        self.frames.append(surf)
+                    logger.info(f"[VideoFrameSequence] Extracted & loaded {len(self.frames)} frames from video: {file_path}")
+                else:
+                    logger.error(f"[VideoFrameSequence] FFmpeg extraction failed: {res.stderr.decode('utf-8', errors='ignore')[-300:]}")
+            except Exception as e:
+                logger.error(f"[VideoFrameSequence] Exception extracting video {file_path}: {e}")
+            finally:
+                # Cleanup temporary disk files
+                for f in os.listdir(temp_dir):
+                    try:
+                        os.remove(os.path.join(temp_dir, f))
+                    except Exception:
+                        pass
+                try:
+                    os.rmdir(temp_dir)
+                except Exception:
+                    pass
+
+    def get_frame(self, elapsed_seconds: float):
+        if not self.frames:
+            return None
+        if len(self.frames) == 1:
+            return self.frames[0]
+        idx = int(elapsed_seconds * self.fps) % len(self.frames)
+        return self.frames[idx]
+
+    def __len__(self):
+        return len(self.frames)
+
+    def cleanup(self):
+        self.frames.clear()
+
+
 class PygameAvatarRenderer(BaseAvatarRenderer):
     """
-    2D Scene Composition Renderer using Pygame.
-    Outputs a 9:16 (720x1280) frame with Product Area, CTA, and Avatar.
+    Dual-Loop Video & 2D Scene Composition Renderer using Pygame.
+    Outputs a 9:16 (720x1280) frame.
+    Supports real-time switching between Idle and Speaking video loops.
     """
     def __init__(self):
         self.screen = None
         self.clock = None
         self.width = 720
         self.height = 1280
+        
+        self.idle_sequence: Optional[VideoFrameSequence] = None
+        self.speaking_sequence: Optional[VideoFrameSequence] = None
+        self._speech_start_time = 0.0
+        self._idle_start_time = time.monotonic()
+        self._is_speaking_state = False
         
         try:
             import pygame
@@ -77,7 +184,29 @@ class PygameAvatarRenderer(BaseAvatarRenderer):
         # Use an off-screen surface for internal frame extraction (rendering without a window)
         self.screen = self.pygame.Surface((self.width, self.height))
         self.clock = self.pygame.time.Clock()
-        
+
+    def load_avatar_assets(self, idle_path: Optional[str] = None, speaking_path: Optional[str] = None, ffmpeg_bin: Optional[str] = None):
+        if not self.available:
+            return
+            
+        logger.info(f"[PygameAvatarRenderer] Loading assets idle={idle_path}, speaking={speaking_path}")
+        if self.idle_sequence:
+            self.idle_sequence.cleanup()
+        if self.speaking_sequence:
+            self.speaking_sequence.cleanup()
+            
+        self.idle_sequence = VideoFrameSequence(idle_path, self.width, self.height, ffmpeg_bin) if idle_path else None
+        self.speaking_sequence = VideoFrameSequence(speaking_path, self.width, self.height, ffmpeg_bin) if speaking_path else None
+        self._idle_start_time = time.monotonic()
+
+    def notify_speech_start(self):
+        self._is_speaking_state = True
+        self._speech_start_time = time.monotonic()
+
+    def notify_speech_stop(self):
+        self._is_speaking_state = False
+        self._idle_start_time = time.monotonic()
+
     def render(self, is_speaking: bool, mouth_state: str, is_blinking: bool):
         if not self.available or not self.screen:
             return
@@ -87,6 +216,32 @@ class PygameAvatarRenderer(BaseAvatarRenderer):
             if event.type == self.pygame.QUIT:
                 pass 
                 
+        now = time.monotonic()
+        has_custom_avatar = (self.idle_sequence and len(self.idle_sequence) > 0) or (self.speaking_sequence and len(self.speaking_sequence) > 0)
+        
+        # Dual-Loop Video Frame Rendering
+        if has_custom_avatar:
+            surf = None
+            if is_speaking:
+                if self.speaking_sequence and len(self.speaking_sequence) > 0:
+                    elapsed = max(0.0, now - self._speech_start_time)
+                    surf = self.speaking_sequence.get_frame(elapsed)
+                elif self.idle_sequence and len(self.idle_sequence) > 0:
+                    elapsed = max(0.0, now - self._idle_start_time)
+                    surf = self.idle_sequence.get_frame(elapsed)
+            else:
+                if self.idle_sequence and len(self.idle_sequence) > 0:
+                    elapsed = max(0.0, now - self._idle_start_time)
+                    surf = self.idle_sequence.get_frame(elapsed)
+                elif self.speaking_sequence and len(self.speaking_sequence) > 0:
+                    # Freeze on first frame during idle if only speaking sequence is loaded
+                    surf = self.speaking_sequence.get_frame(0.0)
+                    
+            if surf:
+                self.screen.blit(surf, (0, 0))
+                return
+
+        # Fallback 2D Cartoon Scene (used for tests or when no video asset is selected)
         # 1. Background (Warm pastel)
         self.screen.fill((250, 240, 245))
         
@@ -145,8 +300,12 @@ class PygameAvatarRenderer(BaseAvatarRenderer):
             cta_rect = cta_surf.get_rect(center=(360, cta_y + 50))
             self.screen.blit(cta_surf, cta_rect)
 
-        # self.pygame.display.flip() # Not needed for off-screen surface
-
     def shutdown(self):
-        if self.available:
+        if self.idle_sequence:
+            self.idle_sequence.cleanup()
+            self.idle_sequence = None
+        if self.speaking_sequence:
+            self.speaking_sequence.cleanup()
+            self.speaking_sequence = None
+        if self.available and self.pygame:
             self.pygame.quit()

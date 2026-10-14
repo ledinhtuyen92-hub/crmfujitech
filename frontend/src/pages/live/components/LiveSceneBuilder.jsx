@@ -18,6 +18,7 @@ export default function LiveSceneBuilder({ visible, onClose, session, onUpdateSu
       if (session) {
         form.setFieldsValue({
           avatar_asset: session.avatar_asset || undefined,
+          avatar_speaking_asset: session.avatar_speaking_asset || undefined,
           background_asset: session.background_asset || undefined,
           overlay_asset: session.overlay_asset || undefined,
           audio_asset: session.audio_asset || undefined,
@@ -45,6 +46,7 @@ export default function LiveSceneBuilder({ visible, onClose, session, onUpdateSu
       // Explicitly convert undefined/falsy to null so DRF clears ForeignKey fields
       const payload = {
         avatar_asset: values.avatar_asset || null,
+        avatar_speaking_asset: values.avatar_speaking_asset || null,
         background_asset: values.background_asset || null,
         overlay_asset: values.overlay_asset || null,
         audio_asset: values.audio_asset || null,
@@ -98,12 +100,17 @@ export default function LiveSceneBuilder({ visible, onClose, session, onUpdateSu
         </div>
       ) : (
         <Form form={form} layout="vertical">
-          <Card size="small" title={<Space><VideoCameraOutlined /> Avatar (Tùy chọn)</Space>} style={{ marginBottom: 16 }}>
+          <Card size="small" title={<Space><VideoCameraOutlined /> Người mẫu AI / Avatar (Tùy chọn)</Space>} style={{ marginBottom: 16 }}>
             <Text type="secondary" style={{ display: 'block', marginBottom: 12 }}>
-              Nếu bỏ trống, AI sẽ phát dưới dạng "Giấu mặt" (Faceless Livestream).
+              Chọn video/ảnh người mẫu phông xanh. Kết hợp Video lúc nghỉ và Video lúc nói giúp người mẫu chuyển động và nhép miệng hoàn toàn tự nhiên!
             </Text>
-            <Form.Item name="avatar_asset">
-              <Select placeholder="Chọn Video Phông Xanh" allowClear showSearch optionFilterProp="label">
+            <Form.Item label="Video / Ảnh Lúc Nghỉ (Idle - Đứng cười, chớp mắt)" name="avatar_asset" style={{ marginBottom: 12 }}>
+              <Select placeholder="Chọn Video Lúc Nghỉ (Phông Xanh)" allowClear showSearch optionFilterProp="label">
+                {renderOptions('avatar')}
+              </Select>
+            </Form.Item>
+            <Form.Item label="Video / Ảnh Lúc Nói (Speaking - Cử động miệng, thuyết trình)" name="avatar_speaking_asset" style={{ marginBottom: 0 }}>
+              <Select placeholder="Chọn Video Lúc Nói (Phông Xanh)" allowClear showSearch optionFilterProp="label">
                 {renderOptions('avatar')}
               </Select>
             </Form.Item>

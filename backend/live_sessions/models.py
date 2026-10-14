@@ -264,6 +264,14 @@ class LiveSession(models.Model):
         related_name="avatar_sessions",
         verbose_name="Avatar (Tùy chọn)"
     )
+    avatar_speaking_asset = models.ForeignKey(
+        "LiveMediaAsset",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="avatar_speaking_sessions",
+        verbose_name="Avatar khi nói (Tùy chọn)"
+    )
     background_asset = models.ForeignKey(
         "LiveMediaAsset",
         on_delete=models.SET_NULL,

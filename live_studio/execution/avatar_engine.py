@@ -13,6 +13,12 @@ class BaseAvatarEngine:
         """
         raise NotImplementedError
 
+    def load_avatar_assets(self, idle_path: str = None, speaking_path: str = None, ffmpeg_bin: str = None):
+        """
+        Loads idle and speaking video/image assets for rendering.
+        """
+        pass
+
     def start_speech(self, audio_filepath: str, text: str):
         """
         Prepares the avatar for speech playback.
@@ -59,6 +65,10 @@ class DummyAvatarEngine(BaseAvatarEngine):
         self.events.append(("initialize", None))
         logger.info("[DummyAvatar] Initialized")
 
+    def load_avatar_assets(self, idle_path: str = None, speaking_path: str = None, ffmpeg_bin: str = None):
+        self.events.append(("load_avatar_assets", {"idle": idle_path, "speaking": speaking_path}))
+        logger.info(f"[DummyAvatar] Loaded assets idle={idle_path}, speaking={speaking_path}")
+
     def start_speech(self, audio_filepath: str, text: str):
         self.is_speaking = True
         self.events.append(("start_speech", {"filepath": audio_filepath, "text": text}))
@@ -88,7 +98,7 @@ class DummyAvatarEngine(BaseAvatarEngine):
 class Local2DAvatarEngine(BaseAvatarEngine):
     """
     Local 2D Avatar Engine running directly in the Studio application.
-    Drives lip-sync and blinking, and outputs via the provided Renderer.
+    Drives lip-sync, blinking, and dual-loop video avatar frame switching.
     """
     def __init__(self, renderer, lip_sync_analyzer):
         self.renderer = renderer
@@ -103,8 +113,14 @@ class Local2DAvatarEngine(BaseAvatarEngine):
         self.is_initialized = True
         logger.info("[Local2DAvatarEngine] Initialized")
 
+    def load_avatar_assets(self, idle_path: str = None, speaking_path: str = None, ffmpeg_bin: str = None):
+        if hasattr(self.renderer, 'load_avatar_assets'):
+            self.renderer.load_avatar_assets(idle_path, speaking_path, ffmpeg_bin)
+
     def start_speech(self, audio_filepath: str, text: str):
         self.is_speaking = True
+        if hasattr(self.renderer, 'notify_speech_start'):
+            self.renderer.notify_speech_start()
         self.lip_sync.prepare(audio_filepath, text)
         # Force a render update immediately
         self.update(0)
@@ -136,12 +152,16 @@ class Local2DAvatarEngine(BaseAvatarEngine):
     def interrupt(self):
         if self.is_speaking:
             self.is_speaking = False
+            if hasattr(self.renderer, 'notify_speech_stop'):
+                self.renderer.notify_speech_stop()
             self.lip_sync.stop()
             self.update(0) # Re-render as idle
             logger.info("[Local2DAvatarEngine] Interrupted")
 
     def stop(self):
         self.is_speaking = False
+        if hasattr(self.renderer, 'notify_speech_stop'):
+            self.renderer.notify_speech_stop()
         self.lip_sync.stop()
         self.update(0) # Re-render as idle
         logger.info("[Local2DAvatarEngine] Stopped")

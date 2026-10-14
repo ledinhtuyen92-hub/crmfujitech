@@ -192,7 +192,15 @@ class StreamEncoder:
         
         inputs = []
         # Input 0: Video
-        if self.cached_assets.get('avatar'):
+        if self.cached_assets.get('avatar_speaking'):
+            inputs.extend([
+                "-f", "rawvideo",
+                "-pixel_format", self.config.video_pixel_format,
+                "-video_size", f"{self.config.width}x{self.config.height}",
+                "-framerate", str(self.config.fps),
+                "-i", f"tcp://127.0.0.1:{self.video_transport.port}"
+            ])
+        elif self.cached_assets.get('avatar'):
             inputs.extend(["-stream_loop", "-1", "-i", self.cached_assets['avatar']])
         else:
             inputs.extend([
