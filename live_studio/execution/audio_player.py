@@ -111,6 +111,18 @@ class PygameAudioPlayer(BaseAudioPlayer):
                     logger.error(f"Stream sink preparation failed: {e}")
                 
             pygame.mixer.music.load(filepath)
+            # When streaming, stream_sink carries the audio into the broadcast.
+            # Mute local speaker output so it doesn't leak unbuffered audio ahead of the video!
+            if self.stream_sink and self.stream_sink.is_streaming:
+                try:
+                    pygame.mixer.music.set_volume(0.0)
+                except Exception:
+                    pass
+            else:
+                try:
+                    pygame.mixer.music.set_volume(1.0)
+                except Exception:
+                    pass
             pygame.mixer.music.play()
             self._is_playing = True
             

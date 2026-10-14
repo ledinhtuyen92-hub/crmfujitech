@@ -229,6 +229,17 @@ class LiveStudioApp:
                     self._mark_failed(item, "CANCELLED_BY_HUMAN")
                     continue
 
+                # Ensure stream encoder is ready before playing audio!
+                # If stream is STARTING, wait for it to reach LIVE so audio is not dropped into void!
+                if self.stream_controller and getattr(self.stream_controller.state, 'value', None) == "STARTING":
+                    logger.info(f"Stream is STARTING. Waiting for LIVE state before playing {cmd_id}...")
+                    for _ in range(30):
+                        await asyncio.sleep(0.5)
+                        if getattr(self.stream_controller.state, 'value', None) != "STARTING":
+                            break
+                    if getattr(self.stream_controller.state, 'value', None) == "LIVE":
+                        await asyncio.sleep(1.0)
+
                 # Playback
                 self.dedup_registry.update_status(cmd_id, "playing")
                 self._current_playing_command_id = cmd_id

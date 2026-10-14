@@ -258,14 +258,21 @@ export default function VideoPreview({ session, streamEvent }) {
   // Manual play (bypass browser autoplay block)
   const handleManualPlay = () => {
     if (videoRef.current) {
-      videoRef.current.muted = false
-      setIsMuted(false)
+      if (hlsRef.current) {
+        hlsRef.current.startLoad()
+      }
+      videoRef.current.muted = true
       videoRef.current.play()
-        .then(() => setHlsStatus('live'))
+        .then(() => {
+          setHlsStatus('live')
+          videoRef.current.muted = false
+          setIsMuted(false)
+        })
         .catch((e) => {
-          console.error('Manual play failed:', e)
-          setErrorMsg(`Không thể phát: ${e.message}`)
-          setHlsStatus('error')
+          console.warn('Manual play pending buffer:', e)
+          if (e.name === 'NotAllowedError') {
+            setHlsStatus('paused')
+          }
         })
     }
   }
@@ -347,31 +354,37 @@ export default function VideoPreview({ session, streamEvent }) {
         } catch (_) {}
       }
 
-      hls.on(Hls.Events.MANIFEST_PARSED, () => {
+      const tryPlay = () => {
+        if (!video) return
         video.muted = true
-        video.play()
-          .then(() => {
+        video.playsInline = true
+        const p = video.play()
+        if (p && typeof p.then === 'function') {
+          p.then(() => {
             setHlsStatus('live')
             jumpToLiveEdgeOnce()
+          }).catch((err) => {
+            // Only fall into paused if strictly blocked by browser user-interaction policy
+            if (err && err.name === 'NotAllowedError') {
+              setHlsStatus('paused')
+            }
           })
-          .catch(() => {
-            // Autoplay blocked by browser policy
-            setHlsStatus('paused')
-          })
+        }
+      }
+
+      hls.on(Hls.Events.MANIFEST_PARSED, () => {
+        jumpToLiveEdgeOnce()
+        tryPlay()
       })
 
       hls.on(Hls.Events.LEVEL_LOADED, () => {
-        if (!hasJumpedToLiveEdgeRef.current) {
-          jumpToLiveEdgeOnce()
-        }
+        jumpToLiveEdgeOnce()
       })
 
       hls.on(Hls.Events.FRAG_BUFFERED, () => {
-        if (!hasJumpedToLiveEdgeRef.current) {
-          jumpToLiveEdgeOnce()
-        }
+        jumpToLiveEdgeOnce()
         if (video.paused && !video.seeking) {
-          video.play().catch(() => {})
+          tryPlay()
         }
       })
 

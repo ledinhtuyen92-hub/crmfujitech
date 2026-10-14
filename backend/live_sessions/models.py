@@ -402,7 +402,7 @@ class LiveSession(models.Model):
                     from .services import LiveContextService
                     from .tasks import trigger_proactive_speech
                     LiveContextService.update_context(str(self.company_id), str(self.id), {"last_speech_time": 0})
-                    trigger_proactive_speech.apply_async(kwargs={"session_id": str(self.id)}, countdown=3)
+                    trigger_proactive_speech.apply_async(kwargs={"session_id": str(self.id)}, countdown=10)
                 except Exception as e:
                     import logging
                     logger = logging.getLogger(__name__)
