@@ -950,91 +950,68 @@ export default function QuotationList() {
           ...(editingQuotation?.custom_data || {}),
           ...(templateSnapshot ? { template_snapshot: templateSnapshot } : {}),
         },
+        items: [
+          ...validItems.map((it) => {
+            const prodObj = products.find((p) => p.id === it.product)
+            return {
+              product: it.product,
+              product_name: it.product_name || (prodObj ? prodObj.name : 'Sản phẩm'),
+              unit_price: Number(it.unit_price || 0),
+              width: Math.round(Number(it.width || 0)),
+              height: Math.round(Number(it.height || 0)),
+              length: Math.round(Number(it.length || 0)),
+              thickness: Math.round(Number(it.thickness || 0)),
+              area: Number(Number(it.area || 0).toFixed(2)),
+              spec: it.spec || (prodObj ? prodObj.description : '') || '',
+              warranty: it.warranty || '12 tháng',
+              product_image: it.product_image || (prodObj ? (prodObj.image_url || prodObj.image) : '') || '',
+              custom_data: {
+                ...(it.custom_data || {}),
+                unit: it.unit || (prodObj ? prodObj.unit : 'cái'),
+                thickness: Math.round(Number(it.thickness || 0)),
+                symbol: it.custom_data?.symbol || it.symbol || '',
+              },
+              quantity: Number(it.quantity || 1),
+              discount_percent: Number(it.discount_percent || 0),
+              note: it.note || '',
+            }
+          }),
+          ...validServiceItems.map((srv) => {
+            let prodId = null
+            if (typeof srv.product === 'number') {
+              prodId = srv.product
+            }
+            return {
+              product: prodId,
+              item_type: 'service',
+              product_name: srv.product_name,
+              unit_price: Number(srv.unit_price || 0),
+              width: 0,
+              height: 0,
+              length: 0,
+              thickness: 0,
+              area: 0,
+              spec: srv.spec || '',
+              note: srv.note || '',
+              product_image: srv.product_image || '',
+              custom_data: {
+                ...(srv.custom_data || {}),
+                unit: srv.unit || srv.custom_data?.unit || 'lần',
+                symbol: srv.symbol || srv.custom_data?.symbol || '',
+              },
+              quantity: Number(srv.quantity || 1),
+              discount_percent: Number(srv.discount_percent || 0),
+            }
+          })
+        ]
       }
 
-      let quotationId
       if (editingQuotation) {
-        const res = await api.patch(`/sales/quotations/${editingQuotation.id}/`, payload)
-        quotationId = res.data.id
+        await api.patch(`/sales/quotations/${editingQuotation.id}/`, payload)
         messageApi.success('Cập nhật báo giá thành công!')
       } else {
-        const res = await api.post('/sales/quotations/', payload)
-        quotationId = res.data.id
+        await api.post('/sales/quotations/', payload)
         messageApi.success('Tạo báo giá mới thành công!')
-      }
-
-      // Add / replace items
-      if (editingQuotation) {
-        // Fetch fresh items from server to avoid stale data causing duplicates
-        try {
-          const freshQuotation = await api.get(`/sales/quotations/${quotationId}/`)
-          const freshItems = freshQuotation.data.items || []
-          await Promise.all(
-            freshItems.map((it) => api.delete(`/sales/quotation-items/${it.id}/`).catch(() => {}))
-          )
-        } catch {
-          if (editingQuotation.items) {
-            await Promise.all(
-              editingQuotation.items.map((it) => api.delete(`/sales/quotation-items/${it.id}/`).catch(() => {}))
-            )
-          }
-        }
-      }
-
-      for (const it of validItems) {
-        const prodObj = products.find((p) => p.id === it.product)
-        await api.post('/sales/quotation-items/', {
-          quotation: quotationId,
-          product: it.product,
-          product_name: it.product_name || (prodObj ? prodObj.name : 'Sản phẩm'),
-          unit_price: Number(it.unit_price || 0),
-          width: Math.round(Number(it.width || 0)),
-          height: Math.round(Number(it.height || 0)),
-          length: Math.round(Number(it.length || 0)),
-          thickness: Math.round(Number(it.thickness || 0)),
-          area: Number(Number(it.area || 0).toFixed(2)),
-          spec: it.spec || (prodObj ? prodObj.description : '') || '',
-          warranty: it.warranty || '12 tháng',
-          product_image: it.product_image || (prodObj ? (prodObj.image_url || prodObj.image) : '') || '',
-          custom_data: {
-            ...(it.custom_data || {}),
-            unit: it.unit || (prodObj ? prodObj.unit : 'cái'),
-            thickness: Math.round(Number(it.thickness || 0)),
-            symbol: it.custom_data?.symbol || it.symbol || '',
-          },
-          quantity: Number(it.quantity || 1),
-          discount_percent: Number(it.discount_percent || 0),
-          note: it.note || '',
-        })
-      }
-
-      for (const srv of validServiceItems) {
-        let prodId = null
-        if (typeof srv.product === 'number') {
-          prodId = srv.product
-        }
-        await api.post('/sales/quotation-items/', {
-          quotation: quotationId,
-          product: prodId,
-          item_type: 'service',
-          product_name: srv.product_name,
-          unit_price: Number(srv.unit_price || 0),
-          width: 0,
-          height: 0,
-          length: 0,
-          thickness: 0,
-          area: 0,
-          spec: srv.spec || '',
-          note: srv.note || '',
-          product_image: srv.product_image || '',
-          custom_data: {
-            ...(srv.custom_data || {}),
-            unit: srv.unit || srv.custom_data?.unit || 'lần',
-            symbol: srv.symbol || srv.custom_data?.symbol || '',
-          },
-          quantity: Number(srv.quantity || 1),
-          discount_percent: Number(srv.discount_percent || 0),
-        })
       }
 
       setModalVisible(false)
