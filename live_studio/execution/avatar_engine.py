@@ -13,11 +13,17 @@ class BaseAvatarEngine:
         """
         raise NotImplementedError
 
-    def load_avatar_assets(self, idle_path: str = None, speaking_path: str = None, ffmpeg_bin: str = None):
+    def load_avatar_assets(self, idle_path: str = None, speaking_path: str = None, ffmpeg_bin: str = None, actions_map: dict = None):
         """
-        Loads idle and speaking video/image assets for rendering.
+        Loads idle, speaking, and specialized action video/image assets for rendering.
         """
         pass
+
+    def trigger_action(self, action_id: str) -> bool:
+        """
+        Triggers a specialized action gesture (e.g. point_cart, welcome).
+        """
+        return False
 
     def start_speech(self, audio_filepath: str, text: str):
         """
@@ -65,9 +71,13 @@ class DummyAvatarEngine(BaseAvatarEngine):
         self.events.append(("initialize", None))
         logger.info("[DummyAvatar] Initialized")
 
-    def load_avatar_assets(self, idle_path: str = None, speaking_path: str = None, ffmpeg_bin: str = None):
-        self.events.append(("load_avatar_assets", {"idle": idle_path, "speaking": speaking_path}))
-        logger.info(f"[DummyAvatar] Loaded assets idle={idle_path}, speaking={speaking_path}")
+    def load_avatar_assets(self, idle_path: str = None, speaking_path: str = None, ffmpeg_bin: str = None, actions_map: dict = None):
+        self.events.append(("load_avatar_assets", {"idle": idle_path, "speaking": speaking_path, "actions": actions_map}))
+        logger.info(f"[DummyAvatar] Loaded assets idle={idle_path}, speaking={speaking_path}, actions={actions_map}")
+
+    def trigger_action(self, action_id: str) -> bool:
+        self.events.append(("trigger_action", action_id))
+        return True
 
     def start_speech(self, audio_filepath: str, text: str):
         self.is_speaking = True
@@ -113,9 +123,14 @@ class Local2DAvatarEngine(BaseAvatarEngine):
         self.is_initialized = True
         logger.info("[Local2DAvatarEngine] Initialized")
 
-    def load_avatar_assets(self, idle_path: str = None, speaking_path: str = None, ffmpeg_bin: str = None):
+    def load_avatar_assets(self, idle_path: str = None, speaking_path: str = None, ffmpeg_bin: str = None, actions_map: dict = None):
         if hasattr(self.renderer, 'load_avatar_assets'):
-            self.renderer.load_avatar_assets(idle_path, speaking_path, ffmpeg_bin)
+            self.renderer.load_avatar_assets(idle_path, speaking_path, ffmpeg_bin, actions_map)
+
+    def trigger_action(self, action_id: str) -> bool:
+        if hasattr(self.renderer, 'play_action'):
+            return self.renderer.play_action(action_id)
+        return False
 
     def start_speech(self, audio_filepath: str, text: str):
         self.is_speaking = True

@@ -12,6 +12,7 @@ class SpeechSpeakPayloadSerializer(serializers.Serializer):
     audio_asset = AudioAssetSerializer(required=False, allow_null=True)
     interruptible = serializers.BooleanField(default=True)
     priority = serializers.ChoiceField(choices=['high', 'normal'], default='normal')
+    action = serializers.CharField(required=False, allow_null=True, allow_blank=True)
 
 class AvatarActionPayloadSerializer(serializers.Serializer):
     command_id = serializers.UUIDField(required=True)
@@ -43,6 +44,7 @@ class StreamStartPayloadSerializer(serializers.Serializer):
     background_asset_url = serializers.CharField(required=False, allow_null=True, allow_blank=True)
     overlay_asset_url = serializers.CharField(required=False, allow_null=True, allow_blank=True)
     audio_asset_url = serializers.CharField(required=False, allow_null=True, allow_blank=True)
+    avatar_actions = serializers.ListField(child=serializers.DictField(), required=False, default=list)
 
 class StreamStopPayloadSerializer(serializers.Serializer):
     command_id = serializers.UUIDField(required=True)

@@ -86,7 +86,31 @@ class LiveOrchestrator:
             "background_asset_url": session.background_asset.file.url if session.background_asset and session.background_asset.file else None,
             "overlay_asset_url": session.overlay_asset.file.url if session.overlay_asset and session.overlay_asset.file else None,
             "audio_asset_url": session.audio_asset.file.url if session.audio_asset and session.audio_asset.file else None,
+            "avatar_actions": [],
         }
+        
+        # Resolve avatar_actions with full accessible URLs
+        if session.avatar_actions and isinstance(session.avatar_actions, list):
+            from .models import LiveMediaAsset
+            resolved_actions = []
+            for act in session.avatar_actions:
+                act_url = act.get('asset_url')
+                asset_id = act.get('asset_id')
+                if not act_url and asset_id:
+                    try:
+                        asset = LiveMediaAsset.objects.get(id=asset_id)
+                        if asset.file:
+                            act_url = asset.file.url
+                    except Exception:
+                        pass
+                if act_url:
+                    resolved_actions.append({
+                        "id": str(act.get("id") or act.get("action_id") or uuid.uuid4())[:16],
+                        "name": act.get("name", "Action"),
+                        "url": act_url,
+                        "keywords": act.get("keywords", "")
+                    })
+            payload["avatar_actions"] = resolved_actions
         
         payload_serializer = StreamStartPayloadSerializer(data=payload)
         if not payload_serializer.is_valid():
@@ -435,13 +459,27 @@ class LiveOrchestrator:
         command_id = str(uuid.uuid4())
         message_id = str(uuid.uuid4())
 
+        # Check action keywords in reply_text
+        triggered_action = None
+        if session.avatar_actions and isinstance(session.avatar_actions, list):
+            lower_text = reply_text.lower()
+            for act in session.avatar_actions:
+                kw_str = act.get("keywords", "")
+                if kw_str:
+                    keywords = [k.strip().lower() for k in kw_str.split(",") if k.strip()]
+                    if any(kw in lower_text for kw in keywords):
+                        triggered_action = str(act.get("id") or act.get("action_id"))[:16]
+                        logger.info(f"[Session: {session_id}] Matched action '{act.get('name')}' ({triggered_action}) in speech text")
+                        break
+
         payload = {
             "command_id": command_id,
             "correlation_id": correlation_id,
             "text": reply_text,
             "audio_asset": audio_asset_dict,
             "interruptible": True,
-            "priority": "normal"
+            "priority": "normal",
+            "action": triggered_action
         }
         
         payload_serializer = SpeechSpeakPayloadSerializer(data=payload)
@@ -649,13 +687,26 @@ class LiveOrchestrator:
         # 5. Build speech.speak command
         command_id = str(uuid.uuid4())
         message_id = str(uuid.uuid4())
+
+        triggered_action = None
+        if session.avatar_actions and isinstance(session.avatar_actions, list):
+            lower_text = reply_text.lower()
+            for act in session.avatar_actions:
+                kw_str = act.get("keywords", "")
+                if kw_str:
+                    keywords = [k.strip().lower() for k in kw_str.split(",") if k.strip()]
+                    if any(kw in lower_text for kw in keywords):
+                        triggered_action = str(act.get("id") or act.get("action_id"))[:16]
+                        break
+
         payload = {
             "command_id": command_id,
             "correlation_id": correlation_id,
             "text": reply_text,
             "audio_asset": audio_asset_dict,
             "interruptible": True,
-            "priority": "normal"
+            "priority": "normal",
+            "action": triggered_action
         }
         
         payload_serializer = SpeechSpeakPayloadSerializer(data=payload)

@@ -35,9 +35,14 @@ class DummyAvatarRenderer(BaseAvatarRenderer):
     def initialize(self):
         self.is_initialized = True
 
-    def load_avatar_assets(self, idle_path: str = None, speaking_path: str = None, ffmpeg_bin: str = None):
+    def load_avatar_assets(self, idle_path: str = None, speaking_path: str = None, ffmpeg_bin: str = None, actions_map: dict = None):
         self.idle_path = idle_path
         self.speaking_path = speaking_path
+        self.actions_map = actions_map
+
+    def play_action(self, action_id: str) -> bool:
+        self.last_action = action_id
+        return True
 
     def notify_speech_start(self):
         pass
@@ -58,20 +63,26 @@ class DummyAvatarRenderer(BaseAvatarRenderer):
 
 class VideoFrameSequence:
     """
-    Loads and manages a sequence of frames for Idle or Speaking video loops.
+    Loads and manages a sequence of frames for Idle, Speaking, or Action video loops.
     Supports both image files (.png, .jpg, etc.) and video files (.mp4, .webm, etc.).
-    Uses bundled FFmpeg for ultra-fast frame extraction.
+    Uses JPEG byte buffer in memory with dynamic single-surface cache for ultra-low RAM footprint (~35MB for 60s).
     """
-    def __init__(self, file_path: Optional[str], target_width: int = 720, target_height: int = 1280, ffmpeg_bin: Optional[str] = None, fps: int = 25):
-        self.frames = []
+    def __init__(self, file_path: Optional[str], target_width: int = 720, target_height: int = 1280, ffmpeg_bin: Optional[str] = None, fps: int = 25, max_duration: int = 120):
+        self.static_surf = None
+        self.frame_bytes = []
         self.fps = fps
         self.target_width = target_width
         self.target_height = target_height
+        self._cached_idx = -1
+        self._cached_surf = None
         
         if not file_path or not os.path.exists(file_path):
             return
 
         import pygame
+        import io
+        self.pygame = pygame
+        self.io = io
         ext = os.path.splitext(file_path)[1].lower()
         
         # 1. Image Asset (Static)
@@ -80,7 +91,7 @@ class VideoFrameSequence:
                 surf = pygame.image.load(file_path)
                 if surf.get_size() != (target_width, target_height):
                     surf = pygame.transform.smoothscale(surf, (target_width, target_height))
-                self.frames.append(surf)
+                self.static_surf = surf
                 logger.info(f"[VideoFrameSequence] Loaded static image: {file_path}")
             except Exception as e:
                 logger.error(f"[VideoFrameSequence] Failed to load image {file_path}: {e}")
@@ -94,10 +105,10 @@ class VideoFrameSequence:
                     ffmpeg_exe,
                     "-y",
                     "-i", file_path,
-                    "-t", "10",  # Max 10s loop
+                    "-t", str(max_duration),
                     "-r", str(fps),
                     "-vf", f"scale={target_width}:{target_height}",
-                    "-q:v", "2",
+                    "-q:v", "3",
                     os.path.join(temp_dir, "frame_%04d.jpg")
                 ]
                 flags = 0x08000000 if os.name == 'nt' else 0
@@ -105,9 +116,9 @@ class VideoFrameSequence:
                 if res.returncode == 0:
                     frame_files = sorted([os.path.join(temp_dir, f) for f in os.listdir(temp_dir) if f.endswith('.jpg')])
                     for f in frame_files:
-                        surf = pygame.image.load(f)
-                        self.frames.append(surf)
-                    logger.info(f"[VideoFrameSequence] Extracted & loaded {len(self.frames)} frames from video: {file_path}")
+                        with open(f, "rb") as fp:
+                            self.frame_bytes.append(fp.read())
+                    logger.info(f"[VideoFrameSequence] Loaded {len(self.frame_bytes)} frames (~{self.duration:.1f}s) into compressed memory cache from: {file_path}")
                 else:
                     logger.error(f"[VideoFrameSequence] FFmpeg extraction failed: {res.stderr.decode('utf-8', errors='ignore')[-300:]}")
             except Exception as e:
@@ -124,26 +135,47 @@ class VideoFrameSequence:
                 except Exception:
                     pass
 
+    @property
+    def duration(self) -> float:
+        if self.static_surf:
+            return 1.0
+        if not self.frame_bytes:
+            return 0.0
+        return len(self.frame_bytes) / float(self.fps)
+
     def get_frame(self, elapsed_seconds: float):
-        if not self.frames:
+        if self.static_surf:
+            return self.static_surf
+        if not self.frame_bytes:
             return None
-        if len(self.frames) == 1:
-            return self.frames[0]
-        idx = int(elapsed_seconds * self.fps) % len(self.frames)
-        return self.frames[idx]
+        idx = int(elapsed_seconds * self.fps) % len(self.frame_bytes)
+        if idx == self._cached_idx and self._cached_surf:
+            return self._cached_surf
+        try:
+            surf = self.pygame.image.load(self.io.BytesIO(self.frame_bytes[idx]))
+            self._cached_idx = idx
+            self._cached_surf = surf
+            return surf
+        except Exception as e:
+            logger.error(f"Failed to decode frame {idx}: {e}")
+            return self._cached_surf
 
     def __len__(self):
-        return len(self.frames)
+        return 1 if self.static_surf else len(self.frame_bytes)
 
     def cleanup(self):
-        self.frames.clear()
+        self.frame_bytes.clear()
+        self.static_surf = None
+        self._cached_surf = None
+        self._cached_idx = -1
 
 
 class PygameAvatarRenderer(BaseAvatarRenderer):
     """
     Dual-Loop Video & 2D Scene Composition Renderer using Pygame.
     Outputs a 9:16 (720x1280) frame.
-    Supports real-time switching between Idle and Speaking video loops.
+    Supports real-time switching between Idle, Speaking, and specialized Action gesture loops.
+    Implements Resume Playback: idle and speaking positions resume from where they paused.
     """
     def __init__(self):
         self.screen = None
@@ -153,10 +185,18 @@ class PygameAvatarRenderer(BaseAvatarRenderer):
         
         self.idle_sequence: Optional[VideoFrameSequence] = None
         self.speaking_sequence: Optional[VideoFrameSequence] = None
-        self._speech_start_time = 0.0
-        self._idle_start_time = time.monotonic()
+        self.action_sequences: dict = {}
+        
+        # Resume Playback time accumulators
+        self._idle_playback_time = 0.0
+        self._speaking_playback_time = 0.0
+        
+        # Action gesture state
+        self._current_action_id: Optional[str] = None
+        self._current_action_seq: Optional[VideoFrameSequence] = None
+        self._current_action_time = 0.0
+        
         self._is_speaking_state = False
-        self._active_speaking_time = 0.0
         self._last_render_time = time.monotonic()
         
         try:
@@ -187,31 +227,56 @@ class PygameAvatarRenderer(BaseAvatarRenderer):
         self.screen = self.pygame.Surface((self.width, self.height))
         self.clock = self.pygame.time.Clock()
 
-    def load_avatar_assets(self, idle_path: Optional[str] = None, speaking_path: Optional[str] = None, ffmpeg_bin: Optional[str] = None):
+    def load_avatar_assets(self, idle_path: Optional[str] = None, speaking_path: Optional[str] = None, ffmpeg_bin: Optional[str] = None, actions_map: Optional[dict] = None):
         if not self.available:
             return
             
-        logger.info(f"[PygameAvatarRenderer] Loading assets idle={idle_path}, speaking={speaking_path}")
+        logger.info(f"[PygameAvatarRenderer] Loading assets idle={idle_path}, speaking={speaking_path}, actions_count={len(actions_map or {})}")
         if self.idle_sequence:
             self.idle_sequence.cleanup()
         if self.speaking_sequence:
             self.speaking_sequence.cleanup()
+        for seq in self.action_sequences.values():
+            seq.cleanup()
+        self.action_sequences.clear()
             
-        self.idle_sequence = VideoFrameSequence(idle_path, self.width, self.height, ffmpeg_bin) if idle_path else None
-        self.speaking_sequence = VideoFrameSequence(speaking_path, self.width, self.height, ffmpeg_bin) if speaking_path else None
-        self._idle_start_time = time.monotonic()
-        self._active_speaking_time = 0.0
+        self.idle_sequence = VideoFrameSequence(idle_path, self.width, self.height, ffmpeg_bin, fps=25, max_duration=120) if idle_path else None
+        self.speaking_sequence = VideoFrameSequence(speaking_path, self.width, self.height, ffmpeg_bin, fps=25, max_duration=120) if speaking_path else None
+        
+        # Load action library
+        if actions_map and isinstance(actions_map, dict):
+            for act_id, act_info in actions_map.items():
+                act_path = act_info.get('path') if isinstance(act_info, dict) else act_info
+                if act_path and os.path.exists(act_path):
+                    self.action_sequences[act_id] = VideoFrameSequence(act_path, self.width, self.height, ffmpeg_bin, fps=25, max_duration=30)
+                    logger.info(f"[PygameAvatarRenderer] Loaded action gesture '{act_id}' from {act_path}")
+
+        self._idle_playback_time = 0.0
+        self._speaking_playback_time = 0.0
+        self._current_action_seq = None
+        self._current_action_id = None
+        self._current_action_time = 0.0
+
+    def play_action(self, action_id: str) -> bool:
+        """Triggers a specialized action gesture (e.g. point_cart, welcome)."""
+        if not action_id or action_id not in self.action_sequences:
+            logger.info(f"Action '{action_id}' not found in action library.")
+            return False
+        self._current_action_id = action_id
+        self._current_action_seq = self.action_sequences[action_id]
+        self._current_action_time = 0.0
+        logger.info(f"[PygameAvatarRenderer] Started action '{action_id}' (duration={self._current_action_seq.duration:.1f}s)")
+        return True
 
     def notify_speech_start(self):
         self._is_speaking_state = True
-        self._speech_start_time = time.monotonic()
-        self._active_speaking_time = 0.0
         self._last_render_time = time.monotonic()
+        # Resume Playback: We do NOT reset _idle_playback_time or _speaking_playback_time
 
     def notify_speech_stop(self):
         self._is_speaking_state = False
-        self._idle_start_time = time.monotonic()
-        self._active_speaking_time = 0.0
+        self._last_render_time = time.monotonic()
+        # Resume Playback: We do NOT reset _idle_playback_time
 
     def render(self, is_speaking: bool, mouth_state: str, is_blinking: bool):
         if not self.available or not self.screen:
@@ -226,32 +291,49 @@ class PygameAvatarRenderer(BaseAvatarRenderer):
         dt = max(0.0, min(0.1, now - getattr(self, '_last_render_time', now)))
         self._last_render_time = now
 
-        has_custom_avatar = (self.idle_sequence and len(self.idle_sequence) > 0) or (self.speaking_sequence and len(self.speaking_sequence) > 0)
+        has_custom_avatar = (
+            (self.idle_sequence and len(self.idle_sequence) > 0) or 
+            (self.speaking_sequence and len(self.speaking_sequence) > 0) or
+            bool(self._current_action_seq)
+        )
         
-        # Dual-Loop Video Frame Rendering
+        # Avatar Rendering with Action Support & Resume Playback
         if has_custom_avatar:
             surf = None
-            if is_speaking:
+            
+            # 1. Action Gesture (Highest visual priority: plays to completion)
+            if self._current_action_seq and len(self._current_action_seq) > 0:
+                surf = self._current_action_seq.get_frame(self._current_action_time)
+                self._current_action_time += dt
+                if self._current_action_time >= self._current_action_seq.duration:
+                    logger.info(f"Action '{self._current_action_id}' finished. Returning to baseline sequence.")
+                    self._current_action_seq = None
+                    self._current_action_id = None
+                    self._current_action_time = 0.0
+                    
+            # 2. Speaking State
+            elif is_speaking:
                 # If speaking asset is a single static image (len == 1), gate mouth by audio energy
                 if self.speaking_sequence and len(self.speaking_sequence) == 1:
                     if mouth_state != MOUTH_STATE_CLOSED:
                         surf = self.speaking_sequence.get_frame(0.0)
                     elif self.idle_sequence and len(self.idle_sequence) > 0:
-                        surf = self.idle_sequence.get_frame(0.0)
+                        surf = self.idle_sequence.get_frame(self._idle_playback_time)
                     else:
                         surf = self.speaking_sequence.get_frame(0.0)
                 # If speaking asset is a video sequence (len > 1), play smoothly and continuously during speech!
                 elif self.speaking_sequence and len(self.speaking_sequence) > 1:
-                    elapsed = max(0.0, now - self._speech_start_time)
-                    surf = self.speaking_sequence.get_frame(elapsed)
+                    surf = self.speaking_sequence.get_frame(self._speaking_playback_time)
+                    self._speaking_playback_time += dt
                 elif self.idle_sequence and len(self.idle_sequence) > 0:
-                    elapsed = max(0.0, now - self._idle_start_time)
-                    surf = self.idle_sequence.get_frame(elapsed)
+                    surf = self.idle_sequence.get_frame(self._idle_playback_time)
+                    self._idle_playback_time += dt
+                    
+            # 3. Idle State (RESUME PLAYBACK: continues smoothly from paused position)
             else:
-                # Idle state: smoothly loop idle sequence; if unavailable, freeze on neutral frame 0
                 if self.idle_sequence and len(self.idle_sequence) > 0:
-                    elapsed = max(0.0, now - self._idle_start_time)
-                    surf = self.idle_sequence.get_frame(elapsed)
+                    surf = self.idle_sequence.get_frame(self._idle_playback_time)
+                    self._idle_playback_time += dt
                 elif self.speaking_sequence and len(self.speaking_sequence) > 0:
                     surf = self.speaking_sequence.get_frame(0.0)
                     

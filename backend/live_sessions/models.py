@@ -296,6 +296,12 @@ class LiveSession(models.Model):
         related_name="audio_sessions",
         verbose_name="Âm thanh nền (Tùy chọn)"
     )
+    avatar_actions = models.JSONField(
+        default=list,
+        blank=True,
+        verbose_name="Thư viện cử động Avatar",
+        help_text="Danh sách cử động mở rộng: [{ id, name, asset_id, asset_url, keywords }]"
+    )
     status = models.CharField(
         max_length=20,
         choices=STATUS_CHOICES,
@@ -426,6 +432,7 @@ class LiveMediaAsset(models.Model):
     """
     ASSET_TYPE_CHOICES = (
         ('avatar', 'Avatar (Video Phông Xanh)'),
+        ('avatar_action', 'Cử động Avatar (Action Clip)'),
         ('background', 'Phông nền (Background)'),
         ('overlay', 'Lớp phủ (Overlay/Logo/Frame)'),
         ('audio', 'Âm thanh (BGM/SFX)'),

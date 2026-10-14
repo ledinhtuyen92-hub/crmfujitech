@@ -160,7 +160,30 @@ class StreamController:
             }
             logger.info(f"Asset cache paths: {self.cached_assets}")
 
-            if self.avatar_engine and (self.cached_assets.get('avatar') or self.cached_assets.get('avatar_speaking')):
+            # Download avatar_actions
+            actions_map = {}
+            if payload.avatar_actions and isinstance(payload.avatar_actions, list):
+                action_downloads = []
+                action_items = []
+                for act in payload.avatar_actions:
+                    act_url = act.get('url')
+                    act_id = act.get('id')
+                    if act_url and act_id:
+                        action_items.append(act)
+                        action_downloads.append(self.asset_fetcher.fetch(act_url, f"action_{act_id}"))
+                if action_downloads:
+                    act_results = await asyncio.gather(*action_downloads, return_exceptions=True)
+                    for meta, res in zip(action_items, act_results):
+                        if isinstance(res, str) and res:
+                            actions_map[meta['id']] = {
+                                'path': res,
+                                'name': meta.get('name'),
+                                'keywords': meta.get('keywords', '')
+                            }
+                logger.info(f"Loaded {len(actions_map)} action gesture files into actions_map.")
+            self.actions_map = actions_map
+
+            if self.avatar_engine and (self.cached_assets.get('avatar') or self.cached_assets.get('avatar_speaking') or actions_map):
                 ffmpeg_path = await self.locator.locate()
                 logger.info("Preloading avatar sequences into avatar_engine...")
                 try:
@@ -168,7 +191,8 @@ class StreamController:
                         self.avatar_engine.load_avatar_assets,
                         self.cached_assets.get('avatar'),
                         self.cached_assets.get('avatar_speaking'),
-                        ffmpeg_path
+                        ffmpeg_path,
+                        actions_map
                     )
                     logger.info("Avatar sequences loaded successfully.")
                 except Exception as e:

@@ -85,6 +85,28 @@ class LiveSessionSerializer(serializers.ModelSerializer):
         model = LiveSession
         fields = '__all__'
         read_only_fields = ['id', 'company', 'started_at', 'ended_at', 'created_at', 'updated_at', 'status']
+
+    def to_representation(self, instance):
+        data = super().to_representation(instance)
+        actions = data.get('avatar_actions') or []
+        if isinstance(actions, list):
+            enriched = []
+            for act in actions:
+                item = dict(act)
+                asset_id = item.get('asset_id')
+                if asset_id:
+                    try:
+                        from .models import LiveMediaAsset
+                        asset = LiveMediaAsset.objects.get(id=asset_id)
+                        if asset.file:
+                            item['asset_url'] = asset.file.url
+                            if not item.get('name') and asset.name:
+                                item['name'] = asset.name
+                    except Exception:
+                        pass
+                enriched.append(item)
+            data['avatar_actions'] = enriched
+        return data
     
     def validate(self, attrs):
         request = self.context.get('request')

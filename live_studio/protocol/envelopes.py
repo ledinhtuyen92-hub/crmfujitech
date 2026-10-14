@@ -19,6 +19,7 @@ class SpeechSpeakPayload:
     audio_asset: Optional[Dict[str, Any]] = None
     interruptible: bool = True
     priority: str = "normal"
+    action: Optional[str] = None
 
 @dataclass
 class SessionControlPayload:
@@ -50,6 +51,7 @@ class StreamStartPayload:
     background_asset_url: Optional[str] = None
     overlay_asset_url: Optional[str] = None
     audio_asset_url: Optional[str] = None
+    avatar_actions: Optional[list] = None
 
 @dataclass
 class StreamStopPayload:

@@ -108,7 +108,8 @@ class ProtocolDispatcher:
             correlation_id=payload_data.get("correlation_id"),
             audio_asset=payload_data.get("audio_asset"),
             interruptible=payload_data.get("interruptible", True),
-            priority=payload_data.get("priority", "normal")
+            priority=payload_data.get("priority", "normal"),
+            action=payload_data.get("action")
         )
         
         # Enqueue
@@ -213,7 +214,8 @@ class ProtocolDispatcher:
             avatar_speaking_asset_url=payload_data.get("avatar_speaking_asset_url"),
             background_asset_url=payload_data.get("background_asset_url"),
             overlay_asset_url=payload_data.get("overlay_asset_url"),
-            audio_asset_url=payload_data.get("audio_asset_url")
+            audio_asset_url=payload_data.get("audio_asset_url"),
+            avatar_actions=payload_data.get("avatar_actions", [])
         )
         
         success = await self.stream_controller.handle_start(payload)

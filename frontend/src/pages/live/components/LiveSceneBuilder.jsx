@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react'
-import { Drawer, Form, Button, Select, Space, message, Typography, Card, Spin } from 'antd'
-import { CheckCircleOutlined, PictureOutlined, VideoCameraOutlined, BlockOutlined, AudioOutlined } from '@ant-design/icons'
+import { Drawer, Form, Button, Select, Space, message, Typography, Card, Spin, Input, Tag, Popconfirm } from 'antd'
+import { CheckCircleOutlined, PictureOutlined, VideoCameraOutlined, BlockOutlined, AudioOutlined, PlusOutlined, DeleteOutlined, SmileOutlined } from '@ant-design/icons'
 import api from '../../../utils/api'
 
 const { Text, Title } = Typography
@@ -9,6 +9,7 @@ const { Option } = Select
 export default function LiveSceneBuilder({ visible, onClose, session, onUpdateSuccess }) {
   const [form] = Form.useForm()
   const [assets, setAssets] = useState([])
+  const [actions, setActions] = useState([])
   const [loading, setLoading] = useState(false)
   const [saving, setSaving] = useState(false)
 
@@ -23,6 +24,7 @@ export default function LiveSceneBuilder({ visible, onClose, session, onUpdateSu
           overlay_asset: session.overlay_asset || undefined,
           audio_asset: session.audio_asset || undefined,
         })
+        setActions(Array.isArray(session.avatar_actions) ? session.avatar_actions : [])
       }
     }
   }, [visible, session, form])
@@ -39,6 +41,26 @@ export default function LiveSceneBuilder({ visible, onClose, session, onUpdateSu
     }
   }
 
+  const handleAddAction = () => {
+    const newAction = {
+      id: `act_${Date.now().toString(36)}`,
+      name: `Cử động ${actions.length + 1}`,
+      asset_id: undefined,
+      keywords: '',
+    }
+    setActions([...actions, newAction])
+  }
+
+  const handleRemoveAction = (index) => {
+    setActions(actions.filter((_, i) => i !== index))
+  }
+
+  const handleActionChange = (index, field, value) => {
+    const updated = [...actions]
+    updated[index] = { ...updated[index], [field]: value }
+    setActions(updated)
+  }
+
   const handleSave = async () => {
     try {
       setSaving(true)
@@ -50,9 +72,10 @@ export default function LiveSceneBuilder({ visible, onClose, session, onUpdateSu
         background_asset: values.background_asset || null,
         overlay_asset: values.overlay_asset || null,
         audio_asset: values.audio_asset || null,
+        avatar_actions: actions,
       }
       const res = await api.patch(`/live_sessions/sessions/${session.id}/`, payload)
-      message.success('Đã lưu cấu hình Cảnh (Scene)')
+      message.success('Đã lưu cấu hình Cảnh & Thư viện cử động')
       if (onUpdateSuccess) {
         onUpdateSuccess(res.data)
       }
@@ -67,6 +90,17 @@ export default function LiveSceneBuilder({ visible, onClose, session, onUpdateSu
 
   const renderOptions = (type) => {
     return assets.filter(a => a.asset_type === type).map(asset => (
+      <Option key={asset.id} value={asset.id} label={asset.name}>
+        <Space>
+          {asset.is_system ? <Text type="secondary">[Hệ thống]</Text> : null}
+          {asset.name}
+        </Space>
+      </Option>
+    ))
+  }
+
+  const renderAvatarOptions = () => {
+    return assets.filter(a => a.asset_type === 'avatar' || a.asset_type === 'avatar_action').map(asset => (
       <Option key={asset.id} value={asset.id} label={asset.name}>
         <Space>
           {asset.is_system ? <Text type="secondary">[Hệ thống]</Text> : null}
@@ -114,6 +148,72 @@ export default function LiveSceneBuilder({ visible, onClose, session, onUpdateSu
                 {renderOptions('avatar')}
               </Select>
             </Form.Item>
+          </Card>
+
+          <Card 
+            size="small" 
+            title={
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <Space><SmileOutlined /> Thư viện cử động (Avatar Actions)</Space>
+                <Button type="dashed" size="small" icon={<PlusOutlined />} onClick={handleAddAction}>
+                  Thêm cử động
+                </Button>
+              </div>
+            } 
+            style={{ marginBottom: 16 }}
+          >
+            <Text type="secondary" style={{ display: 'block', marginBottom: 12 }}>
+              Cài đặt các clip cử động ngắn (3-6s như chỉ giỏ hàng, vẫy chào). Hệ thống sẽ tự động kích hoạt khi lời nói AI chứa từ khóa tương ứng!
+            </Text>
+            {actions.length === 0 ? (
+              <div style={{ textAlign: 'center', padding: '16px 0', color: '#999', border: '1px dashed #d9d9d9', borderRadius: 6 }}>
+                Chưa có cử động nào. Bấm "Thêm cử động" để bổ sung các hành động như chỉ giỏ hàng, chào hỏi...
+              </div>
+            ) : (
+              <Space direction="vertical" style={{ width: '100%' }} size={12}>
+                {actions.map((act, index) => (
+                  <Card key={act.id || index} size="small" type="inner" style={{ background: '#fafafa' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+                      <Input 
+                        placeholder="Tên cử động (VD: Chỉ giỏ hàng)" 
+                        value={act.name} 
+                        onChange={(e) => handleActionChange(index, 'name', e.target.value)}
+                        style={{ width: '70%', fontWeight: 500 }}
+                        size="small"
+                      />
+                      <Popconfirm title="Xóa cử động này?" onConfirm={() => handleRemoveAction(index)} okText="Xóa" cancelText="Hủy">
+                        <Button type="text" danger size="small" icon={<DeleteOutlined />} />
+                      </Popconfirm>
+                    </div>
+                    <div style={{ marginBottom: 8 }}>
+                      <Text style={{ fontSize: 12, color: '#666' }}>Video cử động (3 - 6 giây):</Text>
+                      <Select 
+                        placeholder="Chọn Video cử động" 
+                        value={act.asset_id} 
+                        onChange={(val) => handleActionChange(index, 'asset_id', val)}
+                        style={{ width: '100%', marginTop: 4 }}
+                        size="small"
+                        allowClear
+                        showSearch
+                        optionFilterProp="label"
+                      >
+                        {renderAvatarOptions()}
+                      </Select>
+                    </div>
+                    <div>
+                      <Text style={{ fontSize: 12, color: '#666' }}>Từ khóa kích hoạt (ngăn cách bởi dấu phẩy):</Text>
+                      <Input 
+                        placeholder="VD: giỏ hàng, bấm mua, đặt hàng, ưu đãi" 
+                        value={act.keywords} 
+                        onChange={(e) => handleActionChange(index, 'keywords', e.target.value)}
+                        style={{ width: '100%', marginTop: 4 }}
+                        size="small"
+                      />
+                    </div>
+                  </Card>
+                ))}
+              </Space>
+            )}
           </Card>
 
           <Card size="small" title={<Space><PictureOutlined /> Phông nền Background</Space>} style={{ marginBottom: 16 }}>

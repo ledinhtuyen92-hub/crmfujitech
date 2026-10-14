@@ -124,6 +124,12 @@ class LiveStudioApp:
             if flushed:
                 logger.info(f"Flushed {len(flushed)} pending speech commands from queue.")
 
+        elif msg_name == "avatar.action":
+            action_name = payload.get("action")
+            if action_name and self.avatar_engine:
+                logger.info(f"Direct avatar.action received: {action_name}")
+                self.avatar_engine.trigger_action(action_name)
+
     async def _on_stream_state_change(self, state):
         import uuid
         import datetime
@@ -262,10 +268,23 @@ class LiveStudioApp:
                 
                 logger.info(f"Starting playback for {cmd_id}")
                 
-                # Start Avatar Speech
+                # Start Avatar Speech & Trigger Associated Action Gesture
                 if self.avatar_engine:
-                    # Provide empty text as we only have audio url here. text might be in avatar_action.
                     text = getattr(item.payload, 'text', "")
+                    action_to_trigger = getattr(item.payload, 'action', None)
+                    if not action_to_trigger and self.stream_controller and hasattr(self.stream_controller, 'actions_map'):
+                        lower_text = text.lower()
+                        for act_id, act_info in self.stream_controller.actions_map.items():
+                            kw_str = act_info.get('keywords', '')
+                            if kw_str:
+                                keywords = [k.strip().lower() for k in kw_str.split(',') if k.strip()]
+                                if any(kw in lower_text for kw in keywords):
+                                    action_to_trigger = act_id
+                                    break
+                    if action_to_trigger:
+                        logger.info(f"Triggering action gesture '{action_to_trigger}' for speech {cmd_id}")
+                        self.avatar_engine.trigger_action(action_to_trigger)
+                        
                     self.avatar_engine.start_speech(audio_path, text)
                     
                 completed = await self.audio_player.play(audio_path)
