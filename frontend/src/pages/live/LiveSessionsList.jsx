@@ -184,9 +184,9 @@ export default function LiveSessionsList() {
             <Empty description="Chưa có phiên livestream nào" />
           </Card>
         ) : (
-          <Row gutter={[24, 24]}>
+          <Row gutter={[20, 20]}>
             {sessions.map(session => (
-              <Col xs={24} sm={12} lg={8} xl={6} key={session.id}>
+              <Col xs={24} sm={24} md={12} lg={12} xl={8} xxl={6} key={session.id}>
                 <StreamCard 
                   session={session} 
                   onStart={(id) => handleAction(id, 'start')}

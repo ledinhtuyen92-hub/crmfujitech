@@ -63,8 +63,9 @@ SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
 # When running on VPS, MediaMTX should run on the VPS itself.
 # Set MEDIAMTX_SERVER_URL in .env to the VPS's MediaMTX base URL.
 # Example (VPS): MEDIAMTX_SERVER_URL=http://your-vps-ip:8888
-# Example (local dev): leave empty or set to http://127.0.0.1:8888
-MEDIAMTX_SERVER_URL = env.str('MEDIAMTX_SERVER_URL', default='http://127.0.0.1:8888')
+_is_docker = os.path.exists('/.dockerenv') or bool(os.environ.get('IN_DOCKER'))
+_default_mediamtx_hls = 'http://mediamtx:8888' if _is_docker else 'http://127.0.0.1:8888'
+MEDIAMTX_SERVER_URL = env.str('MEDIAMTX_SERVER_URL', default=_default_mediamtx_hls)
 MEDIAMTX_RTMP_URL = env.str('MEDIAMTX_RTMP_URL', default='rtmp://127.0.0.1:1935/live')
 
 

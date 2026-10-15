@@ -195,6 +195,7 @@ class LiveSessionViewSet(viewsets.ModelViewSet):
         
         allowed_states = [
             LiveSession.STATUS_DRAFT,
+            LiveSession.STATUS_READY,
             LiveSession.STATUS_STOPPED,
             LiveSession.STATUS_ERROR
         ]
@@ -364,7 +365,15 @@ class LiveSessionViewSet(viewsets.ModelViewSet):
             import time
             max_retries = 3 if hls_path.endswith('.m3u8') else 1
             for attempt in range(max_retries):
-                resp = http_client.get(upstream_url, params=upstream_params, timeout=10, stream=True)
+                try:
+                    resp = http_client.get(upstream_url, params=upstream_params, timeout=10, stream=True)
+                except http_client.ConnectionError:
+                    # Docker container network fallback: if 127.0.0.1 failed, try 'mediamtx'
+                    if '127.0.0.1' in upstream_url or 'localhost' in upstream_url:
+                        fallback_url = upstream_url.replace('127.0.0.1', 'mediamtx').replace('localhost', 'mediamtx')
+                        resp = http_client.get(fallback_url, params=upstream_params, timeout=10, stream=True)
+                    else:
+                        raise
                 if resp.status_code == 404 and attempt < max_retries - 1:
                     time.sleep(0.4)
                     continue

@@ -17,6 +17,7 @@ hiddenimports = [
     'live_studio.core',
     'live_studio.core.dispatcher',
     'live_studio.core.state',
+    'live_studio.core.telemetry',
     'live_studio.core.ws_client',
     'live_studio.execution',
     'live_studio.execution.ack_manager',

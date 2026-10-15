@@ -6,6 +6,7 @@ import datetime
 import os
 import websockets
 from typing import Callable, Optional
+from live_studio.core.telemetry import telemetry
 
 logger = logging.getLogger(__name__)
 
@@ -22,11 +23,20 @@ class WebSocketClient:
 
     async def connect(self, sequence_getter: Callable[[], int], device_sequence_counter):
         self._running = True
+        telemetry.session_id = self.session_id
         extra_headers = {"Authorization": f"Device {self.token}"}
+        
+        # Support both websockets modern (additional_headers) and legacy (extra_headers)
+        ws_kwargs = {}
+        import inspect
+        if 'additional_headers' in inspect.signature(websockets.connect).parameters:
+            ws_kwargs['additional_headers'] = extra_headers
+        else:
+            ws_kwargs['extra_headers'] = extra_headers
         
         while self._running:
             try:
-                async with websockets.connect(self.ws_url, additional_headers=extra_headers) as ws:
+                async with websockets.connect(self.ws_url, **ws_kwargs) as ws:
                     self.ws = ws
                     logger.info(f"Connected to {self.ws_url}")
                     self._reconnect_delay = 1.0
@@ -106,7 +116,8 @@ class WebSocketClient:
                             "audio": {
                                 "tts_mode": "remote"
                             }
-                        }
+                        },
+                        "metrics": telemetry.get_metrics_snapshot()
                     }
                 }
                 

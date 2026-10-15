@@ -93,7 +93,7 @@ class StreamController:
                             logger.error(f"Failed to write video frame to encoder: {e}")
                             break
 
-                await asyncio.sleep(0.005)
+                await asyncio.sleep(0.015)
         except asyncio.CancelledError:
             pass
         except Exception as e:

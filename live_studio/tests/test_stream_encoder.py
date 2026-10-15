@@ -37,7 +37,7 @@ class TestStreamEncoderFoundation(unittest.IsolatedAsyncioTestCase):
     async def test_hardware_encoder_probe(self, mock_exec):
         mock_proc = AsyncMock()
         mock_proc.returncode = 0
-        mock_proc.communicate.return_value = (b" V..... h264_nvenc \n V..... libx264 \n", b"")
+        mock_proc.wait = AsyncMock(return_value=0)
         mock_exec.return_value = mock_proc
         
         probe = HardwareEncoderProbe("dummy_ffmpeg")

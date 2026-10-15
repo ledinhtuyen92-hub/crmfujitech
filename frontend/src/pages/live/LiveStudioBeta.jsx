@@ -149,11 +149,8 @@ export default function LiveStudioBeta() {
   // ── Control bar — derived strictly from backend state ─────────────────────
   // Only show controls for transitions the backend will accept.
   const renderControls = () => {
-
     return (
-      <Space wrap>
-        <LiveStatusBadge status={status} />
-        <Divider orientation="vertical" />
+      <>
 
         {/* draft, ready, stopped, error → Bắt đầu LIVE */}
         {['draft', 'ready', 'stopped', 'error'].includes(status) && (
@@ -273,7 +270,7 @@ export default function LiveStudioBeta() {
             </Button>
           </Popconfirm>
         )}
-      </Space>
+      </>
     )
   }
 
@@ -321,12 +318,26 @@ export default function LiveStudioBeta() {
     <div style={{ padding: 24, width: '100%', boxSizing: 'border-box' }}>
 
       {/* ── Page Header ───────────────────────────────────────────────────── */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
-        <div>
-          <Title level={4} style={{ margin: 0, color: '#1f1f1f' }}>Live Studio Workspace</Title>
-          <Text type="secondary">Session: {session.id}</Text>
+      <div style={{ 
+        display: 'flex', 
+        justifyContent: 'space-between', 
+        alignItems: 'center', 
+        flexWrap: 'wrap',
+        gap: '12px 16px',
+        marginBottom: 24 
+      }}>
+        <div style={{ minWidth: 220 }}>
+          <Title level={4} style={{ margin: 0, color: '#1f1f1f', whiteSpace: 'nowrap' }}>Live Studio Workspace</Title>
+          <Text type="secondary" style={{ fontSize: 13, wordBreak: 'break-all' }}>Session: {session.id}</Text>
         </div>
-        <Space>
+        <div style={{ 
+          display: 'flex', 
+          flexWrap: 'wrap', 
+          justifyContent: 'flex-end', 
+          alignItems: 'center', 
+          gap: '8px 10px',
+          marginLeft: 'auto'
+        }}>
           <Button 
             type="dashed" 
             icon={<PictureOutlined />} 
@@ -334,8 +345,11 @@ export default function LiveStudioBeta() {
           >
             Thiết kế Cảnh (Scene)
           </Button>
+          <Divider type="vertical" style={{ height: 20, margin: '0 2px' }} />
+          <LiveStatusBadge status={status} />
+          <Divider type="vertical" style={{ height: 20, margin: '0 2px' }} />
           {renderControls()}
-        </Space>
+        </div>
       </div>
 
       {/* ── Status Banners ─────────────────────────────────────────────────── */}

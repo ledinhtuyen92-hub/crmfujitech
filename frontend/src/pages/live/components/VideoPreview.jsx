@@ -22,6 +22,7 @@ export default function VideoPreview({ session, streamEvent }) {
   const [hlsStatus, setHlsStatus] = useState('idle')
   const [hlsUrl, setHlsUrl] = useState(null)
   const [errorMsg, setErrorMsg] = useState(null)
+  const [deviceTelemetry, setDeviceTelemetry] = useState(null)
   const [isPlaybackReady, setIsPlaybackReady] = useState(false)
   const [isBuffering, setIsBuffering] = useState(false)
   const [isMuted, setIsMuted] = useState(true)
@@ -179,6 +180,10 @@ export default function VideoPreview({ session, streamEvent }) {
         hasStartedPlaybackRef.current = false
         hasJumpedToLiveEdgeRef.current = false
         if (hlsRef.current) { hlsRef.current.destroy(); hlsRef.current = null }
+      }
+    } else if (streamEvent.event_type === 'live.device.heartbeat') {
+      if (streamEvent.payload?.metrics) {
+        setDeviceTelemetry(streamEvent.payload.metrics)
       }
     }
   }, [streamEvent, probeHls])
@@ -553,6 +558,52 @@ export default function VideoPreview({ session, streamEvent }) {
           <LoadingOutlined spin style={{ fontSize: 52, color: '#1890ff' }} />
           <Title level={4} style={{ color: '#1890ff', margin: 0 }}>ĐANG KẾT NỐI LUỒNG VIDEO</Title>
           <Text style={{ color: '#8c8c8c', fontSize: 13 }}>Đang kết nối tín hiệu và đồng bộ luồng phát...</Text>
+          
+          {deviceTelemetry && (
+            <div style={{
+              marginTop: 10,
+              padding: '10px 18px',
+              backgroundColor: 'rgba(255, 255, 255, 0.05)',
+              borderRadius: 8,
+              border: '1px solid rgba(255, 255, 255, 0.1)',
+              textAlign: 'center',
+              maxWidth: 380,
+              backdropFilter: 'blur(4px)'
+            }}>
+              <div style={{ color: '#52c41a', fontSize: 12, fontWeight: 600, marginBottom: 4 }}>
+                {deviceTelemetry.encoder_label || deviceTelemetry.encoder}
+              </div>
+              <div style={{ color: '#bfbfbf', fontSize: 11 }}>
+                GPU: {deviceTelemetry.gpu_model?.length > 32 ? deviceTelemetry.gpu_model.substring(0, 32) + '...' : deviceTelemetry.gpu_model} • CPU: {deviceTelemetry.cpu_percent}% • RAM: {deviceTelemetry.ram_used_gb || 0}GB
+              </div>
+              {deviceTelemetry.last_error && (
+                <div style={{ 
+                  color: '#ff4d4f', 
+                  fontSize: 11, 
+                  marginTop: 6, 
+                  padding: '4px 8px', 
+                  backgroundColor: 'rgba(255, 77, 79, 0.15)', 
+                  borderRadius: 4,
+                  border: '1px solid rgba(255, 77, 79, 0.3)' 
+                }}>
+                  ⚠️ Sự cố: {deviceTelemetry.last_error}
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Floating Hardware Badge during live playback */}
+      {isPlaybackReady && deviceTelemetry && (
+        <div style={{
+          position: 'absolute', top: 16, right: 16,
+          display: 'flex', alignItems: 'center', gap: 6,
+          backgroundColor: 'rgba(0,0,0,0.65)', padding: '4px 10px', borderRadius: 14,
+          zIndex: 10, backdropFilter: 'blur(4px)', border: '1px solid rgba(255,255,255,0.1)'
+        }}>
+          <span style={{ color: '#52c41a', fontSize: 11 }}>● {deviceTelemetry.encoder}</span>
+          <span style={{ color: '#8c8c8c', fontSize: 11 }}>| CPU {deviceTelemetry.cpu_percent}%</span>
         </div>
       )}
 

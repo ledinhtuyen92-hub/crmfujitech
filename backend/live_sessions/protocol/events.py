@@ -9,6 +9,7 @@ class HeartbeatPayloadSerializer(serializers.Serializer):
     )
     capabilities_version = serializers.CharField(max_length=50, required=True)
     capabilities = CapabilitiesSerializer(required=True)
+    metrics = serializers.DictField(required=False, allow_null=True)
 
 class CommentPayloadSerializer(serializers.Serializer):
     platform = serializers.CharField(max_length=50, required=True)

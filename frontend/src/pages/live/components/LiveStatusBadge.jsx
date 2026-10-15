@@ -8,7 +8,7 @@ export const STATUS_COLORS = {
   live: '#52c41a',
   ready: '#1890ff', // Blue
   online: '#1890ff',
-  draft: '#d9d9d9', // Grey
+  draft: 'default', // Clear grey
   offline: '#d9d9d9',
   stopped: '#ff4d4f', // Red
   error: '#ff4d4f',
@@ -58,7 +58,7 @@ export default function LiveStatusBadge({ status, type = 'tag' }) {
   }
 
   return (
-    <Tag color={color} icon={icon} style={{ borderRadius: 12, padding: '2px 8px' }}>
+    <Tag color={color} icon={icon} style={{ borderRadius: 12, padding: '2px 8px', margin: 0, whiteSpace: 'nowrap', display: 'inline-flex', alignItems: 'center' }}>
       {text}
     </Tag>
   )

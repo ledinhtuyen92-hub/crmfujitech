@@ -1,4 +1,6 @@
-﻿pygame==2.6.1
-websockets>=14.0
+pygame==2.6.1
+websockets>=12.0
 requests
 psutil==7.2.2
+customtkinter>=5.2.0
+Pillow>=10.0.0

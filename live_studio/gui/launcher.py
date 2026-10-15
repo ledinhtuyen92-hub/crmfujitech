@@ -12,6 +12,7 @@ import platform
 import subprocess
 import sys
 from PIL import Image
+from live_studio.core.telemetry import telemetry
 
 # Setup file logging
 log_path = os.path.join(os.path.expanduser("~"), "fujitech_live_studio.log")
@@ -28,7 +29,7 @@ class StudioLauncher(ctk.CTk):
         self.on_connect_callback = on_connect_callback
         
         self.title("Autotech Live Studio")
-        self.geometry("500x600")
+        self.geometry("520x680")
         self.resizable(False, False)
         
         self.config_path = os.path.join(os.path.expanduser("~"), ".fujitech_live_studio.json")
@@ -128,17 +129,59 @@ class StudioLauncher(ctk.CTk):
         # Dashboard Form (Hidden initially)
         self.dashboard_frame = ctk.CTkFrame(self.frame, fg_color="transparent")
         
-        self.dashboard_title = ctk.CTkLabel(self.dashboard_frame, text="Trạm Live Đang Chạy", font=ctk.CTkFont(size=20, weight="bold"), text_color="#0066ff")
-        self.dashboard_title.pack(pady=(10, 5))
+        self.dashboard_title = ctk.CTkLabel(self.dashboard_frame, text="Trạm Live Đang Hoạt Động", font=ctk.CTkFont(size=20, weight="bold"), text_color="#0066ff")
+        self.dashboard_title.pack(pady=(5, 3))
         
-        self.dashboard_status = ctk.CTkLabel(self.dashboard_frame, text="Hệ thống xử lý Video đang hoạt động ngầm.\nVui lòng không tắt cửa sổ này.", text_color="#cccccc")
-        self.dashboard_status.pack(pady=10)
+        self.dashboard_status = ctk.CTkLabel(self.dashboard_frame, text="Hệ thống đang chạy ngầm. Vui lòng không tắt cửa sổ.", text_color="#aaaaaa", font=ctk.CTkFont(size=12))
+        self.dashboard_status.pack(pady=(0, 8))
         
-        self.dashboard_spinner = ctk.CTkProgressBar(self.dashboard_frame, mode="indeterminate", width=200)
-        self.dashboard_spinner.pack(pady=20)
+        # Health & Hardware Card
+        self.health_card = ctk.CTkFrame(self.dashboard_frame, fg_color="#181822", corner_radius=10, border_width=1, border_color="#33334d")
+        self.health_card.pack(fill="x", padx=10, pady=5)
         
-        self.dashboard_hide_btn = ctk.CTkButton(self.dashboard_frame, text="Thu nhỏ (Minimize)", command=self.iconify, fg_color="#333", hover_color="#222")
-        self.dashboard_hide_btn.pack(pady=10)
+        self.lbl_stream_status = ctk.CTkLabel(self.health_card, text="● Trạng thái: Đang kết nối...", font=ctk.CTkFont(size=13, weight="bold"), text_color="#17a2b8", anchor="w")
+        self.lbl_stream_status.pack(fill="x", padx=12, pady=(8, 2))
+        
+        self.lbl_encoder = ctk.CTkLabel(self.health_card, text="⚡ Bộ mã hóa: Chờ khởi chạy...", font=ctk.CTkFont(size=12), text_color="#e0e0e0", anchor="w")
+        self.lbl_encoder.pack(fill="x", padx=12, pady=2)
+        
+        self.lbl_gpu = ctk.CTkLabel(self.health_card, text="🖥️ GPU: Đang kiểm tra...", font=ctk.CTkFont(size=12), text_color="#bbbbbb", anchor="w")
+        self.lbl_gpu.pack(fill="x", padx=12, pady=2)
+        
+        self.lbl_resources = ctk.CTkLabel(self.health_card, text="📊 Tải: CPU 0% | RAM 0 GB", font=ctk.CTkFont(size=12), text_color="#bbbbbb", anchor="w")
+        self.lbl_resources.pack(fill="x", padx=12, pady=(2, 8))
+        
+        self.dashboard_spinner = ctk.CTkProgressBar(self.dashboard_frame, mode="indeterminate", width=220)
+        self.dashboard_spinner.pack(pady=10)
+        
+        # Action Buttons
+        self.btn_copy_diag = ctk.CTkButton(
+            self.dashboard_frame, 
+            text="📋 Sao Chép Chẩn Đoán (Gửi Hỗ Trợ)", 
+            command=self.copy_diagnostic, 
+            fg_color="#0d6efd", 
+            hover_color="#0b5ed7",
+            height=36,
+            font=ctk.CTkFont(size=13, weight="bold")
+        )
+        self.btn_copy_diag.pack(pady=(4, 4), padx=10, fill="x")
+        
+        self.btn_open_log = ctk.CTkButton(
+            self.dashboard_frame, 
+            text="📁 Mở Thư Mục Chứa Nhật Ký (Log)", 
+            command=self.open_log_file, 
+            fg_color="#2b2d42", 
+            hover_color="#1f202f",
+            height=32,
+            font=ctk.CTkFont(size=12)
+        )
+        self.btn_open_log.pack(pady=4, padx=10, fill="x")
+        
+        self.lbl_diag_status = ctk.CTkLabel(self.dashboard_frame, text="", font=ctk.CTkFont(size=11), text_color="#28a745")
+        self.lbl_diag_status.pack(pady=2)
+        
+        self.dashboard_hide_btn = ctk.CTkButton(self.dashboard_frame, text="Thu nhỏ cửa sổ (Minimize)", command=self.iconify, fg_color="#333333", hover_color="#222222", height=32)
+        self.dashboard_hide_btn.pack(pady=(5, 5), padx=10, fill="x")
         
         # Bind Enter key to a smart handler
         self.bind('<Return>', self.on_enter_pressed)
@@ -397,6 +440,14 @@ class StudioLauncher(ctk.CTk):
         self.dashboard_frame.pack(fill="both", expand=True, padx=20, pady=10)
         self.dashboard_spinner.start()
         
+        telemetry.server_url = self.server_url
+        telemetry.session_id = config.get("session_id")
+        telemetry.device_id = getattr(self, 'local_device_id', None)
+        telemetry.stream_state = "starting"
+        
+        # Start periodic dashboard updater
+        self.after(500, self._schedule_dashboard_updates)
+        
         # Start async engine
         def run_async():
             import traceback
@@ -405,10 +456,70 @@ class StudioLauncher(ctk.CTk):
             except Exception as e:
                 err_msg = traceback.format_exc()
                 logger.error(f"Engine crashed: {err_msg}")
+                telemetry.record_error(f"Engine crashed: {str(e)}")
                 # Show error on GUI thread
                 self.after(0, lambda: self._on_engine_crashed(err_msg))
 
         threading.Thread(target=run_async, daemon=True).start()
+
+    def _schedule_dashboard_updates(self):
+        try:
+            if self.dashboard_frame.winfo_viewable():
+                snap = telemetry.get_metrics_snapshot()
+                if snap['stream_state'] == 'running':
+                    state_text = "● Trạng thái: 🟢 Đang phát luồng video"
+                    state_color = "#28a745"
+                elif snap['stream_state'] == 'starting':
+                    state_text = "● Trạng thái: 🟡 Đang kết nối luồng phát..."
+                    state_color = "#ffc107"
+                elif snap['stream_state'] == 'error':
+                    err_hint = snap['last_error'] or "Lỗi phát sóng"
+                    if len(err_hint) > 36:
+                        err_hint = err_hint[:36] + "..."
+                    state_text = f"● Trạng thái: 🔴 Sự cố ({err_hint})"
+                    state_color = "#dc3545"
+                else:
+                    state_text = "● Trạng thái: ⚪ Chờ tín hiệu"
+                    state_color = "#17a2b8"
+                    
+                self.lbl_stream_status.configure(text=state_text, text_color=state_color)
+                self.lbl_encoder.configure(text=f"⚡ {snap['encoder_label']}")
+                
+                gpu_name = snap['gpu_model']
+                if len(gpu_name) > 34:
+                    gpu_name = gpu_name[:34] + "..."
+                self.lbl_gpu.configure(text=f"🖥️ GPU: {gpu_name}")
+                self.lbl_resources.configure(text=f"📊 Tải: CPU {snap['cpu_percent']}% | RAM {snap['ram_used_gb']}/{snap['total_ram_gb']}GB ({snap['ram_percent']}%)")
+        except Exception as e:
+            logger.debug(f"Dashboard update error: {e}")
+            
+        self.after(2000, self._schedule_dashboard_updates)
+
+    def copy_diagnostic(self):
+        try:
+            report = telemetry.generate_diagnostic_report()
+            self.clipboard_clear()
+            self.clipboard_append(report)
+            self.update() # Flush clipboard to Windows OS
+            self.lbl_diag_status.configure(text="✅ Đã sao chép! Hãy dán (Ctrl+V) gửi cho hỗ trợ qua Zalo.", text_color="#28a745")
+            self.after(6000, lambda: self.lbl_diag_status.configure(text=""))
+        except Exception as e:
+            self.lbl_diag_status.configure(text=f"Lỗi sao chép: {e}", text_color="#dc3545")
+
+    def open_log_file(self):
+        try:
+            log_dir = os.path.expanduser("~")
+            log_file = os.path.join(log_dir, "fujitech_live_studio.log")
+            if os.path.exists(log_file):
+                if sys.platform == 'win32':
+                    os.system(f'explorer.exe /select,"{log_file}"')
+                else:
+                    os.system(f'open "{log_dir}"')
+                self.lbl_diag_status.configure(text="Đã mở thư mục chứa file log.", text_color="#17a2b8")
+            else:
+                self.lbl_diag_status.configure(text="Chưa có file log phát sinh.", text_color="#ffc107")
+        except Exception as e:
+            self.lbl_diag_status.configure(text=f"Lỗi: {e}", text_color="#dc3545")
 
     def _on_engine_crashed(self, err_msg):
         self.dashboard_frame.pack_forget()

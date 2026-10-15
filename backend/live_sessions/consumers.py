@@ -144,10 +144,14 @@ class DeviceAgentConsumer(AsyncWebsocketConsumer):
                 correlation_id=envelope['message_id']
             )
         elif msg_type == 'event' and msg_name == 'device.heartbeat':
+            metrics = payload.get('metrics', {})
             updates = {
                 'uptime_seconds': payload['uptime_seconds'],
                 'execution_state': payload['execution_state']
             }
+            if metrics:
+                updates['metrics'] = metrics
+                
             await database_sync_to_async(LiveContextService.update_context)(
                 self.session.company_id, self.session_id, updates
             )
@@ -156,7 +160,8 @@ class DeviceAgentConsumer(AsyncWebsocketConsumer):
             safe_payload = {
                 'uptime_seconds': payload.get('uptime_seconds'),
                 'execution_state': payload.get('execution_state'),
-                'capabilities_version': payload.get('capabilities_version')
+                'capabilities_version': payload.get('capabilities_version'),
+                'metrics': metrics
             }
             await LiveConsoleEventService.aemit(
                 session_id=self.session_id,
@@ -213,6 +218,19 @@ class DeviceAgentConsumer(AsyncWebsocketConsumer):
                 }
             }
             await self.send(text_data=json.dumps(sync_response))
+            
+            # If session is actively running, auto re-dispatch stream.start so device starts encoder
+            try:
+                session_obj = await database_sync_to_async(LiveSession.objects.get)(id=self.session_id)
+                if session_obj.status in (LiveSession.STATUS_RUNNING, LiveSession.STATUS_HUMAN_TAKEOVER):
+                    logger.info(f"Auto-resuming stream for reconnected device on running session {self.session_id}")
+                    from .orchestrator import LiveOrchestrator
+                    is_test_mode = not bool(session_obj.stream_url)
+                    await database_sync_to_async(LiveOrchestrator().dispatch_stream_start)(
+                        str(session_obj.id), test_mode=is_test_mode
+                    )
+            except Exception as e:
+                logger.error(f"Error auto-resuming stream on session.sync: {e}")
             
         elif msg_type == 'ack':
             logger.info(f"Received ACK for command {payload.get('command_id')}: {payload.get('status')}")

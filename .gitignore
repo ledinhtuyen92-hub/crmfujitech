@@ -40,11 +40,13 @@ crop*.ps1
 live_studio/bin/*.exe
 
 # Live Studio builds and configs
+build/
+dist/
 live_studio/build/
 live_studio/dist/
 live_studio/config.json
 live_studio/server_config.txt
-mediamtx.log
+*.log
 mediamtx.err
 mediamtx.yml
 test_config.yml

@@ -38,6 +38,8 @@ class AudioStreamSink:
         self.is_streaming = False
         self._is_speaking = False
         self._pump_task = None
+        self._worker_task = None
+        self._audio_queue = None
         self._stream_start_time = 0.0
         self.bytes_per_sec = clock.sample_rate * clock.channels * clock.sample_width
 
@@ -46,7 +48,9 @@ class AudioStreamSink:
         self.is_streaming = True
         self.clock.total_samples_written = 0
         self._stream_start_time = time.monotonic()
+        self._audio_queue = asyncio.Queue(maxsize=300)
         self._pump_task = asyncio.create_task(self._silence_pump())
+        self._worker_task = asyncio.create_task(self._audio_worker())
         logger.info("AudioStreamSink started")
 
     def stop(self):
@@ -54,6 +58,10 @@ class AudioStreamSink:
         if self._pump_task:
             self._pump_task.cancel()
             self._pump_task = None
+        if self._worker_task:
+            self._worker_task.cancel()
+            self._worker_task = None
+        self._audio_queue = None
         logger.info("AudioStreamSink stopped")
 
     def set_speaking(self, speaking: bool):
@@ -64,12 +72,33 @@ class AudioStreamSink:
             return
         # Advance the clock
         self.clock.add_bytes(len(pcm_bytes))
-        if self.write_callback:
+        if self._audio_queue:
             try:
-                # Dispatch audio data to encoder asynchronously without blocking PygameAudioPlayer
+                self._audio_queue.put_nowait(pcm_bytes)
+            except asyncio.QueueFull:
+                try:
+                    self._audio_queue.get_nowait()
+                    self._audio_queue.put_nowait(pcm_bytes)
+                except Exception:
+                    pass
+        elif self.write_callback:
+            try:
                 asyncio.create_task(self.write_callback(pcm_bytes))
             except Exception as e:
                 logger.error(f"Failed to dispatch audio chunk: {e}")
+
+    async def _audio_worker(self):
+        while self.is_streaming:
+            try:
+                if not self._audio_queue:
+                    break
+                chunk = await self._audio_queue.get()
+                if self.write_callback:
+                    await self.write_callback(chunk)
+            except asyncio.CancelledError:
+                break
+            except Exception as e:
+                logger.error(f"Audio worker error: {e}")
 
     def write_silence(self, duration_ms: int):
         if not self.is_streaming or duration_ms <= 0:

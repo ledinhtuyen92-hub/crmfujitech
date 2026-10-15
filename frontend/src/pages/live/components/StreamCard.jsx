@@ -22,7 +22,8 @@ export default function StreamCard({ session, onStart, onStop, onDelete, onEdit,
 
   const isRunning = status === 'running' || status === 'human_takeover'
   const isReady = ['ready', 'draft', 'stopped', 'error'].includes(status)
-  const isDeletable = ['draft', 'stopped', 'error'].includes(status)
+  // Cho phép chỉnh sửa và xóa khi phiên không đang chạy
+  const isDeletable = !isRunning
 
   const handleDeleteClick = (e) => {
     if (e.domEvent) e.domEvent.stopPropagation()
@@ -49,7 +50,7 @@ export default function StreamCard({ session, onStart, onStop, onDelete, onEdit,
       key: 'edit',
       label: 'Chỉnh sửa',
       icon: <ApiOutlined />,
-      disabled: !isDeletable, // Only allow edit when stopped/draft/error
+      disabled: !isDeletable, // Allow edit whenever session is not running
       onClick: (e) => {
         if (e.domEvent) e.domEvent.stopPropagation()
         if (onEdit) onEdit(session)
@@ -70,9 +71,9 @@ export default function StreamCard({ session, onStart, onStop, onDelete, onEdit,
 
   // Determine platform identity
   const getPlatformLabel = () => {
-    if (platform === 'shopee') return <Text strong style={{ color: '#ee4d2d' }}>Shopee</Text>
-    if (platform === 'tiktok') return <Text strong style={{ color: '#000000' }}>TikTok</Text>
-    return <Text strong>Custom</Text>
+    if (platform === 'shopee') return <Text strong style={{ color: '#ee4d2d', whiteSpace: 'nowrap', flexShrink: 0 }}>Shopee</Text>
+    if (platform === 'tiktok') return <Text strong style={{ color: '#000000', whiteSpace: 'nowrap', flexShrink: 0 }}>TikTok</Text>
+    return <Text strong style={{ whiteSpace: 'nowrap', flexShrink: 0 }}>Custom</Text>
   }
 
   return (
@@ -89,13 +90,22 @@ export default function StreamCard({ session, onStart, onStop, onDelete, onEdit,
       styles={{ body: { padding: 0 } }}
     >
       {/* Header */}
-      <div style={{ padding: '16px 20px', background: isRunning ? '#f6ffed' : '#fafafa', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <Space>
+      <div style={{ 
+        padding: '12px 16px', 
+        background: isRunning ? '#f6ffed' : '#fafafa', 
+        display: 'flex', 
+        justifyContent: 'space-between', 
+        alignItems: 'center',
+        gap: 8,
+        minWidth: 0,
+        overflow: 'hidden'
+      }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6, minWidth: 0, flexShrink: 1, overflow: 'hidden' }}>
           {getPlatformLabel()}
-          <Divider orientation="vertical" />
+          <Divider type="vertical" style={{ margin: '0 2px', height: 14 }} />
           <LiveStatusBadge status={status} />
-        </Space>
-        <Space>
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 4, flexShrink: 0 }}>
           {shopee_connection_mode && (
             <Tooltip title={shopee_connection_mode === 'api' ? 'API Mode' : 'Manual RTMP'}>
               <ApiOutlined style={{ color: '#8c8c8c' }} />
@@ -104,7 +114,7 @@ export default function StreamCard({ session, onStart, onStop, onDelete, onEdit,
           <Dropdown menu={{ items: menuItems }} trigger={['click']}>
             <Button type="text" icon={<MoreOutlined />} size="small" onClick={(e) => e.stopPropagation()} loading={isDeleting} />
           </Dropdown>
-        </Space>
+        </div>
       </div>
 
       {/* Body */}

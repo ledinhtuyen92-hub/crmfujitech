@@ -5,6 +5,7 @@ import logging
 import time
 from typing import Optional, Tuple, List
 from dataclasses import dataclass
+from live_studio.core.telemetry import telemetry
 
 logger = logging.getLogger(__name__)
 
@@ -64,39 +65,39 @@ class HardwareEncoderProbe:
     def __init__(self, ffmpeg_path: str):
         self.ffmpeg_path = ffmpeg_path
         
-    async def probe(self) -> Tuple[str, List[str]]:
-        """
-        Probes for available hardware encoders.
-        Returns: (preferred_encoder, [list of available encoders])
-        """
-        available = []
+    async def _test_encoder(self, encoder: str) -> bool:
         flags = 0x08000000 if sys.platform == 'win32' else 0
         try:
             proc = await asyncio.create_subprocess_exec(
-                self.ffmpeg_path, "-encoders",
-                stdout=asyncio.subprocess.PIPE,
-                stderr=asyncio.subprocess.PIPE,
+                self.ffmpeg_path,
+                "-nostats", "-loglevel", "quiet",
+                "-f", "lavfi", "-i", "nullsrc",
+                "-c:v", encoder,
+                "-frames:v", "1",
+                "-f", "null", "-",
+                stdout=asyncio.subprocess.DEVNULL,
+                stderr=asyncio.subprocess.DEVNULL,
                 creationflags=flags
             )
-            stdout, _ = await proc.communicate()
-            if proc.returncode == 0:
-                output = stdout.decode('utf-8', errors='ignore')
-                for enc in ["h264_nvenc", "h264_qsv", "h264_amf", "libx264"]:
-                    if f" {enc} " in output:
-                        available.append(enc)
-        except Exception as e:
-            logger.error(f"Failed to probe encoders: {e}")
-            
-        if not available:
-            available = ["libx264"]
-            
-        preferences = ["h264_nvenc", "h264_qsv", "h264_amf", "libx264"]
-        preferred = "libx264"
-        for pref in preferences:
-            if pref in available:
-                preferred = pref
-                break
+            await asyncio.wait_for(proc.wait(), timeout=1.5)
+            return proc.returncode == 0
+        except Exception:
+            return False
+
+    async def probe(self) -> Tuple[str, List[str]]:
+        """
+        Probes for available hardware encoders by actually running a 1-frame test.
+        Returns: (preferred_encoder, [list of available encoders])
+        """
+        candidates = ["h264_nvenc", "h264_qsv", "h264_mf", "h264_amf"]
+        available = []
+        for enc in candidates:
+            if await self._test_encoder(enc):
+                available.append(enc)
                 
+        available.append("libx264")
+        preferred = available[0]
+        telemetry.set_encoder(preferred, available)
         return preferred, available
 
 
@@ -113,6 +114,7 @@ class LocalTcpTransport:
         self.client_writer = None
         self.connected_event = asyncio.Event()
         self.close_event = asyncio.Event()
+        self._write_lock = asyncio.Lock()
 
     async def start(self):
         self.server = await asyncio.start_server(self.handle_client, self.host, 0)
@@ -125,13 +127,14 @@ class LocalTcpTransport:
         await self.close_event.wait()
         
     async def write(self, data: bytes):
-        if not self.client_writer:
+        if not self.client_writer or self.client_writer.is_closing():
             return
-        try:
-            self.client_writer.write(data)
-            await self.client_writer.drain()
-        except (ConnectionResetError, BrokenPipeError):
-            pass
+        async with self._write_lock:
+            try:
+                self.client_writer.write(data)
+                await self.client_writer.drain()
+            except (ConnectionResetError, BrokenPipeError, ConnectionAbortedError, OSError, asyncio.CancelledError):
+                pass
         
     async def close(self):
         self.close_event.set()
@@ -249,11 +252,28 @@ class StreamEncoder:
             map_a = audio_out.strip("[]") if ":" in audio_out else audio_out
             cmd.extend(["-map", map_v, "-map", map_a])
             
-        # Output params
+        # Output params - auto-detect hardware encoder if available
+        codec = self.config.video_codec
+        if codec == "libx264":
+            try:
+                probe = HardwareEncoderProbe(self.ffmpeg_path)
+                pref, _ = await probe.probe()
+                if pref != "libx264":
+                    codec = pref
+                    logger.info(f"Hardware acceleration enabled: using '{codec}' instead of CPU libx264")
+            except Exception as e:
+                logger.debug(f"Hardware probe check: {e}")
+
+        encoder_args = ["-c:v", codec, "-b:v", self.config.bitrate]
+        if codec == "libx264":
+            encoder_args.extend(["-preset", "ultrafast", "-tune", "zerolatency"])
+        elif codec == "h264_nvenc":
+            encoder_args.extend(["-preset", "p1", "-tune", "ull"])
+        elif codec == "h264_qsv":
+            encoder_args.extend(["-preset", "veryfast"])
+
+        cmd.extend(encoder_args)
         cmd.extend([
-            "-c:v", self.config.video_codec,
-            "-b:v", self.config.bitrate,
-            "-preset", "veryfast",
             "-pix_fmt", "yuv420p",
             "-g", "60",
             "-keyint_min", "60",
@@ -273,6 +293,8 @@ class StreamEncoder:
             creationflags=flags
         )
         self.is_running = True
+        telemetry.stream_state = "running"
+        telemetry.clear_error()
         
         asyncio.create_task(self._monitor_process())
 
@@ -286,15 +308,19 @@ class StreamEncoder:
                 if not line:
                     break
                 line_str = line.decode('utf-8', errors='ignore').strip()
-                if "error" in line_str.lower():
+                if "error" in line_str.lower() or "refused" in line_str.lower() or "failed" in line_str.lower():
                     logger.error(f"[FFmpeg] {line_str}")
+                    telemetry.record_error(line_str)
                 else:
                     logger.debug(f"[FFmpeg] {line_str}")
         except Exception as e:
             logger.error(f"FFmpeg monitor error: {e}")
+            telemetry.record_error(f"Lỗi theo dõi FFmpeg: {e}")
             
         await self.process.wait()
         logger.info(f"FFmpeg process exited with code {self.process.returncode}")
+        if self.process.returncode not in (0, None, -15):
+            telemetry.record_error(f"FFmpeg dừng bất ngờ với mã lỗi {self.process.returncode}")
         self.is_running = False
         await self.stop()
 
@@ -303,8 +329,7 @@ class StreamEncoder:
             try:
                 await self.video_transport.write(frame_data)
             except Exception as e:
-                logger.error(f"Video transport write failed (broken pipe?): {e}")
-                await self.stop()
+                logger.debug(f"Video transport write failed: {e}")
                 
     async def write_audio(self, audio_data: bytes):
         if self.is_running and self.audio_transport.client_writer:
@@ -314,11 +339,11 @@ class StreamEncoder:
                 samples = len(audio_data) // bytes_per_sample
                 self.timeline.advance_audio(samples)
             except Exception as e:
-                logger.error(f"Audio transport write failed (broken pipe?): {e}")
-                await self.stop()
+                logger.debug(f"Audio transport write failed: {e}")
 
     async def stop(self):
         self.is_running = False
+        telemetry.stream_state = "stopped"
         if self.process and self.process.returncode is None:
             self.process.terminate()
             try:
