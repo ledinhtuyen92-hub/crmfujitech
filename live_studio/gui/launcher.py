@@ -28,7 +28,7 @@ class StudioLauncher(ctk.CTk):
         self.on_connect_callback = on_connect_callback
         
         self.title("Autotech Live Studio")
-        self.geometry("500x640")
+        self.geometry("500x600")
         self.resizable(False, False)
         
         self.config_path = os.path.join(os.path.expanduser("~"), ".fujitech_live_studio.json")
@@ -71,7 +71,7 @@ class StudioLauncher(ctk.CTk):
         bg_path = os.path.join(base_dir, "assets", "bg.jpg")
         master_widget = self
         if os.path.exists(bg_path):
-            self.bg_image = ctk.CTkImage(Image.open(bg_path), size=(500, 640))
+            self.bg_image = ctk.CTkImage(Image.open(bg_path), size=(500, 600))
             self.bg_label = ctk.CTkLabel(self, text="", image=self.bg_image)
             self.bg_label.place(x=0, y=0, relwidth=1, relheight=1)
             
@@ -105,14 +105,7 @@ class StudioLauncher(ctk.CTk):
         self.remember_checkbox.pack(pady=(5, 5), padx=30, anchor="w")
         
         self.login_btn = ctk.CTkButton(self.frame, text="ĐĂNG NHẬP", command=self.do_login, height=45, font=ctk.CTkFont(size=14, weight="bold"), corner_radius=8, fg_color="#0066ff", hover_color="#0055cc")
-        self.login_btn.pack(pady=(15, 8), padx=30, fill="x")
-        
-        self.sandbox_btn = ctk.CTkButton(
-            self.frame, text="🧪 Phòng Thí Nghiệm Lip-Sync (Audio-Driven)", command=self.open_sandbox,
-            height=36, font=ctk.CTkFont(size=12, weight="bold"), corner_radius=8,
-            fg_color="#2b2038", hover_color="#3d2d50", border_width=1, border_color="#8855bb"
-        )
-        self.sandbox_btn.pack(pady=(0, 10), padx=30, fill="x")
+        self.login_btn.pack(pady=(20, 10), padx=30, fill="x")
         
         self.status_label = ctk.CTkLabel(self.frame, text="", text_color="red")
         self.status_label.pack(pady=5)
@@ -130,14 +123,7 @@ class StudioLauncher(ctk.CTk):
         self.refresh_btn.pack(pady=(5, 10), fill="x")
         
         self.connect_btn = ctk.CTkButton(self.selection_frame, text="Kết Nối & Bắt Đầu", command=self.do_connect, fg_color="#28a745", hover_color="#218838")
-        self.connect_btn.pack(pady=10, fill="x")
-
-        self.selection_sandbox_btn = ctk.CTkButton(
-            self.selection_frame, text="🧪 Thử Nghiệm Lip-Sync (Sandbox)", command=self.open_sandbox,
-            height=32, font=ctk.CTkFont(size=11, weight="bold"), corner_radius=8,
-            fg_color="#2b2038", hover_color="#3d2d50", border_width=1, border_color="#8855bb"
-        )
-        self.selection_sandbox_btn.pack(pady=(5, 10), fill="x")
+        self.connect_btn.pack(pady=20, fill="x")
         
         # Dashboard Form (Hidden initially)
         self.dashboard_frame = ctk.CTkFrame(self.frame, fg_color="transparent")
@@ -227,7 +213,6 @@ class StudioLauncher(ctk.CTk):
         self.password_entry.pack_forget()
         self.remember_checkbox.pack_forget()
         self.login_btn.pack_forget()
-        self.sandbox_btn.pack_forget()
         
         self.selection_frame.pack(fill="both", expand=True, padx=20, pady=10)
         
@@ -432,30 +417,3 @@ class StudioLauncher(ctk.CTk):
         short = err_msg[-400:] if len(err_msg) > 400 else err_msg
         self.show_error(f"Lỗi khởi động engine:\n{short}")
         self.connect_btn.configure(state="normal", text="Kết Nối & Bắt Đầu")
-
-    def open_sandbox(self):
-        """Launches the Lip-Sync Sandbox testing suite."""
-        try:
-            if getattr(sys, 'frozen', False):
-                base_dir = os.path.dirname(sys.executable)
-            else:
-                base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-                
-            sandbox_script = os.path.join(base_dir, "sandbox_lip_sync.py")
-            if os.path.exists(sandbox_script):
-                flags = 0x08000000 if os.name == 'nt' else 0
-                subprocess.Popen([sys.executable, sandbox_script], creationflags=flags)
-                logger.info(f"Launched Sandbox process: {sandbox_script}")
-            else:
-                threading.Thread(target=self._run_sandbox_in_thread, daemon=True).start()
-        except Exception as e:
-            logger.error(f"Failed to launch sandbox via subprocess: {e}")
-            threading.Thread(target=self._run_sandbox_in_thread, daemon=True).start()
-
-    def _run_sandbox_in_thread(self):
-        try:
-            from live_studio.sandbox_lip_sync import LipSyncSandboxApp
-            app = LipSyncSandboxApp()
-            app.mainloop()
-        except Exception as e:
-            logger.error(f"Failed to run sandbox in thread: {e}")

@@ -11,11 +11,9 @@ spec_parent = os.path.dirname(SPECPATH)   # fujitech/
 
 hiddenimports = [
     'pygame', 'websockets', 'requests', 'customtkinter',
-    'PIL', 'PIL._tkinter_finder', 'psutil', 'numpy',
+    'PIL', 'PIL._tkinter_finder', 'psutil',
     # live_studio submodules – must be listed explicitly for PyInstaller
     'live_studio',
-    'live_studio.sandbox_lip_sync',
-    'sandbox_lip_sync',
     'live_studio.core',
     'live_studio.core.dispatcher',
     'live_studio.core.state',
@@ -26,7 +24,6 @@ hiddenimports = [
     'live_studio.execution.audio_player',
     'live_studio.execution.avatar_engine',
     'live_studio.execution.avatar_renderer',
-    'live_studio.execution.experimental_lip_sync_renderer',
     'live_studio.execution.dedup_registry',
     'live_studio.execution.device_sequence',
     'live_studio.execution.frame_source',
