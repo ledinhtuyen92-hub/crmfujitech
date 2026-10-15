@@ -35,13 +35,14 @@ class ExperimentalLipSyncRenderer:
 
         self.surface = pygame.Surface((self.width, self.height))
         
-        # Mode A: Human Model Assets & Parameters
+        # Mode A: Human Model Assets & Parameters (Calibrated to female model face center)
         self.human_idle_surf: Optional[pygame.Surface] = None
         self.human_speak_surf: Optional[pygame.Surface] = None
-        self.mouth_center_x = 375
-        self.mouth_center_y = 470
-        self.mouth_radius = 70
+        self.mouth_center_x = 385
+        self.mouth_center_y = 505
+        self.mouth_radius = 80
         self.mouth_scale = 1.0
+        self.show_mouth_guide = False
         
         # Mode B: Mascot & 2D Parameters
         self.mascot_bounce_intensity = 8.0
@@ -83,46 +84,51 @@ class ExperimentalLipSyncRenderer:
         """
         Renders photorealistic human model by soft-morphing between idle and speak poses
         concentrated around the mouth & jaw region based on audio amplitude.
+        Uses 32-bit RGBA radial feathering to eliminate any black box or corner artifacts.
         """
         # Base background: Idle surface
         self.surface.blit(self.human_idle_surf, (0, 0))
         
-        if not self.human_speak_surf or amplitude <= 0.02:
-            return
-
-        # Blend factor based on amplitude
-        blend_alpha = int(min(255, max(0, amplitude * 255 * self.mouth_scale)))
-        if blend_alpha <= 0:
-            return
-
         cx = self.mouth_center_x
         cy = self.mouth_center_y
         r = int(self.mouth_radius * self.mouth_scale)
-        
-        # Define region of interest (ROI) around mouth
-        x0 = max(0, cx - r)
-        y0 = max(0, cy - r)
-        w = min(self.width - x0, 2 * r)
-        h = min(self.height - y0, 2 * r)
-        
-        # Extract patch from speaking image
-        speak_patch = self.human_speak_surf.subsurface((x0, y0, w, h)).copy()
-        
-        # Create circular feather mask
-        mask = pygame.Surface((w, h), pygame.SRCALPHA)
-        # Draw radial gradient into mask
-        for i in range(r, 0, -3):
-            # Alpha smoothly fades out toward edges (cosine falloff)
-            dist_ratio = i / float(r)
-            falloff = 0.5 * (1.0 + math.cos(math.pi * dist_ratio))
-            ring_alpha = int(blend_alpha * falloff)
-            pygame.draw.circle(mask, (255, 255, 255, ring_alpha), (w // 2, h // 2), i)
+
+        if self.human_speak_surf and amplitude > 0.01:
+            blend_alpha = int(min(255, max(0, amplitude * 255 * self.mouth_scale)))
             
-        # Blit mask with BLEND_RGBA_MULT
-        speak_patch.blit(mask, (0, 0), special_flags=pygame.BLEND_RGBA_MULT)
-        
-        # Overlay mouth onto base surface
-        self.surface.blit(speak_patch, (x0, y0))
+            # Define region of interest (ROI) around mouth
+            x0 = max(0, cx - r)
+            y0 = max(0, cy - r)
+            w = min(self.width - x0, 2 * r)
+            h = min(self.height - y0, 2 * r)
+            
+            if w > 0 and h > 0 and blend_alpha > 0:
+                # 1. Create a true 32-bit RGBA surface for the patch
+                patch = pygame.Surface((w, h), pygame.SRCALPHA)
+                patch.blit(self.human_speak_surf, (0, 0), (x0, y0, w, h))
+                
+                # 2. Create the radial alpha mask with transparent background
+                mask = pygame.Surface((w, h), pygame.SRCALPHA)
+                mask.fill((0, 0, 0, 0))
+                for i in range(r, 0, -2):
+                    dist_ratio = i / float(r)
+                    falloff = 0.5 * (1.0 + math.cos(math.pi * dist_ratio))
+                    ring_alpha = int(blend_alpha * falloff)
+                    pygame.draw.circle(mask, (255, 255, 255, ring_alpha), (w // 2, h // 2), i)
+                    
+                # 3. Multiply mask into patch (corners remain alpha=0, center gets blend_alpha)
+                patch.blit(mask, (0, 0), special_flags=pygame.BLEND_RGBA_MULT)
+                
+                # 4. Seamlessly blend onto base surface with zero black border
+                self.surface.blit(patch, (x0, y0))
+
+        # Optional: Render subtle alignment guide if enabled
+        if self.show_mouth_guide:
+            guide = pygame.Surface((self.width, self.height), pygame.SRCALPHA)
+            pygame.draw.circle(guide, (0, 210, 255, 120), (cx, cy), r, width=2)
+            pygame.draw.line(guide, (0, 210, 255, 160), (cx - 10, cy), (cx + 10, cy), width=1)
+            pygame.draw.line(guide, (0, 210, 255, 160), (cx, cy - 10), (cx, cy + 10), width=1)
+            self.surface.blit(guide, (0, 0))
 
     def _render_human_single_warp(self, amplitude: float):
         """

@@ -45,10 +45,12 @@ class LipSyncAnalyzer:
         self._last_state_idx = 0
         try:
             self._pcm_data = Mp3Decoder.decode_to_pcm(audio_filepath)
-            logger.info(f"LipSyncAnalyzer prepared, decoded {len(self._pcm_data)} bytes of PCM for: {audio_filepath}")
+            self.duration_ms = int((len(self._pcm_data) / self._bytes_per_sec) * 1000)
+            logger.info(f"LipSyncAnalyzer prepared, decoded {len(self._pcm_data)} bytes ({self.duration_ms}ms) of PCM for: {audio_filepath}")
         except Exception as e:
             logger.error(f"Failed to decode audio for lip sync: {e}")
             self._pcm_data = b""
+            self.duration_ms = 0
 
     def stop(self):
         self._is_speaking = False
@@ -93,9 +95,19 @@ class LipSyncAnalyzer:
                 # Normal speech RMS is around 0.03 - 0.12. Map to 0.0 - 1.0
                 raw_amp = min(1.0, (rms / 0.12) * self.sensitivity)
 
-            # EMA Smoothing: smooth_amp = alpha * raw + (1 - alpha) * last
-            # If closing (raw < last), snap closed faster to prevent trailing mouth
-            alpha = self.smoothing if raw_amp >= self._smoothed_amp else min(0.6, self.smoothing * 1.8)
+            # Dynamic Attack / Release Envelope:
+            # - Attack (sound gets louder): Must be near-instant (10-20ms) so mouth opens immediately when speaking starts!
+            # - Release (sound drops): Snaps shut quickly on pauses so pauses between words are crisp.
+            if raw_amp >= self._smoothed_amp:
+                # Fast attack: alpha ranges from 0.70 (smooth) to 0.95 (instant)
+                alpha = max(0.70, 0.98 - self.smoothing * 0.35)
+            else:
+                # Controlled release: closes naturally without lingering
+                if raw_amp == 0.0:
+                    alpha = max(0.45, 0.80 - self.smoothing * 0.45)
+                else:
+                    alpha = max(0.35, 0.70 - self.smoothing * 0.45)
+
             self._smoothed_amp = alpha * raw_amp + (1.0 - alpha) * self._smoothed_amp
             return max(0.0, min(1.0, self._smoothed_amp))
 

@@ -38,8 +38,8 @@ class LipSyncSandboxApp(ctk.CTk):
         self.demo_idle_path = os.path.join(base_assets, "demo_model.jpg")
         self.demo_speak_path = os.path.join(base_assets, "demo_model_speak.jpg")
         
-        # Audio & Renderer engines
-        self.audio_analyzer = LipSyncAnalyzer(sensitivity=1.5, smoothing=0.3, noise_gate=0.015)
+        # Audio & Renderer engines (Low latency, snappy attack)
+        self.audio_analyzer = LipSyncAnalyzer(sensitivity=1.2, smoothing=0.15, noise_gate=0.010)
         self.renderer = ExperimentalLipSyncRenderer()
         
         # Pre-load demo assets if available
@@ -59,8 +59,11 @@ class LipSyncSandboxApp(ctk.CTk):
         self.audio_duration_ms = 0
         self._preview_ctk_image = None
         
-        # Pygame mixer init
-        pygame.mixer.init(frequency=44100, size=-16, channels=2, buffer=1024)
+        # Pygame mixer init with small 512 buffer for low latency (<12ms)
+        try:
+            pygame.mixer.init(frequency=44100, size=-16, channels=2, buffer=512)
+        except Exception:
+            pass
         
         self._build_ui()
         
@@ -105,6 +108,7 @@ class LipSyncSandboxApp(ctk.CTk):
         # Preview Canvas / Label (360x640)
         self.preview_label = ctk.CTkLabel(self.left_frame, text="", fg_color="#000000", corner_radius=8)
         self.preview_label.pack(padx=10, pady=5)
+        self.preview_label.bind("<Button-1>", self._on_preview_clicked)
         
         # Preview Overlay Bar (Bottom of preview)
         overlay_box = ctk.CTkFrame(self.left_frame, fg_color="#22222d", corner_radius=8)
@@ -240,33 +244,33 @@ class LipSyncSandboxApp(ctk.CTk):
         s1_frame = ctk.CTkFrame(tuning_frame, fg_color="transparent")
         s1_frame.pack(fill="x", padx=15, pady=4)
         ctk.CTkLabel(s1_frame, text="Độ nhạy âm thanh (Sensitivity):", font=ctk.CTkFont(size=12)).pack(side="left")
-        self.lbl_sens_val = ctk.CTkLabel(s1_frame, text="1.5x", font=ctk.CTkFont(size=12, weight="bold"), text_color="#00d2ff")
+        self.lbl_sens_val = ctk.CTkLabel(s1_frame, text="1.2x", font=ctk.CTkFont(size=12, weight="bold"), text_color="#00d2ff")
         self.lbl_sens_val.pack(side="right")
         
-        self.slider_sens = ctk.CTkSlider(tuning_frame, from_=0.5, to=3.0, number_of_steps=50, command=self._on_param_changed)
-        self.slider_sens.set(1.5)
+        self.slider_sens = ctk.CTkSlider(tuning_frame, from_=0.5, to=2.5, number_of_steps=40, command=self._on_param_changed)
+        self.slider_sens.set(1.2)
         self.slider_sens.pack(fill="x", padx=15, pady=(0, 6))
 
         # Slider 2: EMA Smoothing
         s2_frame = ctk.CTkFrame(tuning_frame, fg_color="transparent")
         s2_frame.pack(fill="x", padx=15, pady=4)
-        ctk.CTkLabel(s2_frame, text="Độ mượt chống giật (EMA Smoothing):", font=ctk.CTkFont(size=12)).pack(side="left")
-        self.lbl_smooth_val = ctk.CTkLabel(s2_frame, text="0.30", font=ctk.CTkFont(size=12, weight="bold"), text_color="#00d2ff")
+        ctk.CTkLabel(s2_frame, text="Độ mượt phản hồi (Smoothing - Thấp là khớp nhanh):", font=ctk.CTkFont(size=12)).pack(side="left")
+        self.lbl_smooth_val = ctk.CTkLabel(s2_frame, text="0.15 (Khớp tức thì)", font=ctk.CTkFont(size=12, weight="bold"), text_color="#00d2ff")
         self.lbl_smooth_val.pack(side="right")
         
-        self.slider_smooth = ctk.CTkSlider(tuning_frame, from_=0.05, to=0.80, number_of_steps=75, command=self._on_param_changed)
-        self.slider_smooth.set(0.30)
+        self.slider_smooth = ctk.CTkSlider(tuning_frame, from_=0.05, to=0.50, number_of_steps=45, command=self._on_param_changed)
+        self.slider_smooth.set(0.15)
         self.slider_smooth.pack(fill="x", padx=15, pady=(0, 6))
 
         # Slider 3: Noise Gate
         s3_frame = ctk.CTkFrame(tuning_frame, fg_color="transparent")
         s3_frame.pack(fill="x", padx=15, pady=4)
         ctk.CTkLabel(s3_frame, text="Lọc nhiễu / Hơi thở (Noise Gate):", font=ctk.CTkFont(size=12)).pack(side="left")
-        self.lbl_gate_val = ctk.CTkLabel(s3_frame, text="0.015", font=ctk.CTkFont(size=12, weight="bold"), text_color="#00d2ff")
+        self.lbl_gate_val = ctk.CTkLabel(s3_frame, text="0.010", font=ctk.CTkFont(size=12, weight="bold"), text_color="#00d2ff")
         self.lbl_gate_val.pack(side="right")
         
-        self.slider_gate = ctk.CTkSlider(tuning_frame, from_=0.005, to=0.060, number_of_steps=55, command=self._on_param_changed)
-        self.slider_gate.set(0.015)
+        self.slider_gate = ctk.CTkSlider(tuning_frame, from_=0.005, to=0.040, number_of_steps=35, command=self._on_param_changed)
+        self.slider_gate.set(0.010)
         self.slider_gate.pack(fill="x", padx=15, pady=(0, 10))
 
         # 4. MODE SPECIFIC SETTINGS
@@ -303,6 +307,15 @@ class LipSyncSandboxApp(ctk.CTk):
             )
             btn_speak.pack(side="left")
 
+            # Guide Checkbox
+            self.guide_check_var = ctk.BooleanVar(value=self.renderer.show_mouth_guide)
+            self.guide_check = ctk.CTkCheckBox(
+                self.mode_specific_frame, text="🎯 Hiện vòng căn chỉnh (Hoặc click trực tiếp lên môi trên ảnh)",
+                variable=self.guide_check_var, command=self._on_guide_toggle,
+                font=ctk.CTkFont(size=12)
+            )
+            self.guide_check.pack(padx=15, pady=(6, 6), anchor="w")
+
             # Center Y Slider
             cy_frame = ctk.CTkFrame(self.mode_specific_frame, fg_color="transparent")
             cy_frame.pack(fill="x", padx=15, pady=4)
@@ -311,7 +324,7 @@ class LipSyncSandboxApp(ctk.CTk):
             self.lbl_cy_val.pack(side="right")
             
             self.slider_cy = ctk.CTkSlider(
-                self.mode_specific_frame, from_=300, to=650, number_of_steps=70,
+                self.mode_specific_frame, from_=350, to=650, number_of_steps=60,
                 command=self._on_human_param_changed
             )
             self.slider_cy.set(self.renderer.mouth_center_y)
@@ -399,6 +412,22 @@ class LipSyncSandboxApp(ctk.CTk):
         self.lbl_r_val.configure(text=f"{r} px")
         self.renderer.set_mouth_coordinates(self.renderer.mouth_center_x, cy, r)
 
+    def _on_guide_toggle(self):
+        self.renderer.show_mouth_guide = self.guide_check_var.get()
+
+    def _on_preview_clicked(self, event):
+        """Click anywhere on preview image to center mouth region."""
+        if self.current_mode == MODE_HUMAN:
+            # Scale from 360x640 preview coordinates to 720x1280 render coordinates
+            cx = max(50, min(self.renderer.width - 50, int(event.x * 2.0)))
+            cy = max(50, min(self.renderer.height - 50, int(event.y * 2.0)))
+            self.renderer.mouth_center_x = cx
+            self.renderer.mouth_center_y = cy
+            if hasattr(self, 'slider_cy'):
+                self.slider_cy.set(cy)
+                self.lbl_cy_val.configure(text=f"{cy} px")
+            logger.info(f"Mouth center set to ({cx}, {cy})")
+
     def _on_mascot_param_changed(self, _=None):
         bounce = round(self.slider_bounce.get(), 1)
         self.lbl_bounce_val.configure(text=f"{bounce:.0f} px")
@@ -427,9 +456,12 @@ class LipSyncSandboxApp(ctk.CTk):
         # Load into pygame mixer
         try:
             pygame.mixer.music.load(filepath)
-            # Get approximate duration
-            sound = pygame.mixer.Sound(filepath)
-            self.audio_duration_ms = int(sound.get_length() * 1000)
+            # Use exact PCM duration from analyzer to prevent loop drift
+            if hasattr(self.audio_analyzer, 'duration_ms') and self.audio_analyzer.duration_ms > 0:
+                self.audio_duration_ms = self.audio_analyzer.duration_ms
+            else:
+                sound = pygame.mixer.Sound(filepath)
+                self.audio_duration_ms = int(sound.get_length() * 1000)
         except Exception as e:
             logger.error(f"Failed to load audio into pygame: {e}")
             self.audio_duration_ms = 10000
