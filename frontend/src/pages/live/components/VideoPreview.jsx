@@ -114,7 +114,7 @@ export default function VideoPreview({ session, streamEvent }) {
 
       if (!masterResp.ok && masterResp.status !== 200) {
         setHlsStatus('waiting')
-        retryTimerRef.current = setTimeout(probeHls, 400)
+        retryTimerRef.current = setTimeout(probeHls, 200)
         return
       }
 
@@ -133,7 +133,7 @@ export default function VideoPreview({ session, streamEvent }) {
         const variantUrl = extractVariantUrl(masterText, proxyUrl)
         if (!variantUrl) {
           setHlsStatus('waiting')
-          retryTimerRef.current = setTimeout(probeHls, 400)
+          retryTimerRef.current = setTimeout(probeHls, 200)
           return
         }
 
@@ -156,16 +156,16 @@ export default function VideoPreview({ session, streamEvent }) {
 
         // Stream connected but waiting for first segment to be muxed
         setHlsStatus('waiting')
-        retryTimerRef.current = setTimeout(probeHls, 400)
+        retryTimerRef.current = setTimeout(probeHls, 200)
         return
       }
 
       // Other playlist status, retry shortly
       setHlsStatus('waiting')
-      retryTimerRef.current = setTimeout(probeHls, 400)
+      retryTimerRef.current = setTimeout(probeHls, 200)
     } catch {
       setHlsStatus('waiting')
-      retryTimerRef.current = setTimeout(probeHls, 400)
+      retryTimerRef.current = setTimeout(probeHls, 200)
     }
   }, [isSessionLive, session?.id]) // eslint-disable-line
 
@@ -231,22 +231,23 @@ export default function VideoPreview({ session, streamEvent }) {
     watchdogTimerRef.current = setTimeout(() => {
       if (!hasStartedPlaybackRef.current && videoRef.current && hlsRef.current) {
         const v = videoRef.current
-        console.warn('[VideoPreview Watchdog] Waiting for frames after 4s. Nudging...')
+        console.warn('[VideoPreview Watchdog] Waiting for frames after 2s. Nudging...')
         try {
           if (v.buffered.length > 0) {
+            const bufStart = v.buffered.start(0)
             const bufEnd = v.buffered.end(v.buffered.length - 1)
-            v.currentTime = Math.max(v.buffered.start(0), bufEnd - 0.5)
+            v.currentTime = bufEnd < 5.0 ? bufStart + 0.05 : Math.max(bufStart, bufEnd - 1.0)
             v.play().catch(() => {})
           } else {
             hlsRef.current.startLoad()
           }
         } catch (_) {}
       }
-    }, 4000)
+    }, 2000)
 
     hardResetTimerRef.current = setTimeout(() => {
       if (!hasStartedPlaybackRef.current && videoRef.current && videoRef.current.readyState < 2) {
-        console.warn('[VideoPreview Watchdog] Cold start timed out after 10s. Re-probing...')
+        console.warn('[VideoPreview Watchdog] Cold start timed out after 6s. Re-probing...')
         if (hlsRef.current) {
           hlsRef.current.destroy()
           hlsRef.current = null
@@ -257,7 +258,7 @@ export default function VideoPreview({ session, streamEvent }) {
         setHlsStatus('waiting')
         probeHls()
       }
-    }, 10000)
+    }, 6000)
 
     return () => {
       if (watchdogTimerRef.current) clearTimeout(watchdogTimerRef.current)
@@ -367,20 +368,21 @@ export default function VideoPreview({ session, streamEvent }) {
       const hls = new Hls({
         enableWorker: true,
         lowLatencyMode: true,
-        backBufferLength: 8,
+        backBufferLength: 6,
         liveDurationInfinity: true,
-        liveSyncDurationCount: 3,
-        liveMaxLatencyDurationCount: 6,
+        initialLiveManifestSize: 1,
+        liveSyncDurationCount: 2,
+        liveMaxLatencyDurationCount: 4,
         maxLiveSyncPlaybackRate: 1.0,
-        maxBufferLength: 8,
-        maxMaxBufferLength: 15,
+        maxBufferLength: 6,
+        maxMaxBufferLength: 10,
         manifestLoadingMaxRetry: 10,
-        manifestLoadingRetryDelay: 500,
-        manifestLoadingMaxRetryTimeout: 10000,
+        manifestLoadingRetryDelay: 200,
+        manifestLoadingMaxRetryTimeout: 8000,
         levelLoadingMaxRetry: 10,
-        levelLoadingRetryDelay: 500,
+        levelLoadingRetryDelay: 200,
         fragLoadingMaxRetry: 10,
-        fragLoadingRetryDelay: 500,
+        fragLoadingRetryDelay: 200,
         startFragPrefetch: true,
         xhrSetup: (xhr) => {
           if (token) xhr.setRequestHeader('Authorization', `Bearer ${token}`)
@@ -401,10 +403,19 @@ export default function VideoPreview({ session, streamEvent }) {
           if (video.buffered.length > 0) {
             const bufStart = video.buffered.start(0)
             const bufEnd = video.buffered.end(video.buffered.length - 1)
-            if (video.currentTime < bufStart || video.currentTime === 0) {
-              const target = (hls.liveSyncPosition && hls.liveSyncPosition >= bufStart && hls.liveSyncPosition <= bufEnd - 0.5)
-                ? hls.liveSyncPosition
-                : Math.max(bufStart, bufEnd - 2.0)
+            
+            // If cold start (stream is fresh, duration under 5s):
+            // Start immediately from the very first frame to achieve instant playback (<1s)
+            let target
+            if (bufEnd < 5.0) {
+              target = bufStart + 0.05
+            } else {
+              // Ongoing stream (e.g. F5 refresh):
+              // Jump to live edge with a ~1.5s cushion to prevent stall
+              target = Math.max(bufStart + 0.1, bufEnd - 1.5)
+            }
+
+            if (video.currentTime < bufStart || video.currentTime === 0 || Math.abs(video.currentTime - target) > 3.0) {
               video.currentTime = target
               hasJumpedToLiveEdgeRef.current = true
             }
@@ -563,7 +574,18 @@ export default function VideoPreview({ session, streamEvent }) {
           markFrameReady()
           setIsBuffering(false)
         }}
-        onCanPlay={markFrameReady}
+        onCanPlay={() => {
+          markFrameReady()
+          if (videoRef.current && videoRef.current.paused) {
+            videoRef.current.play().catch(() => {})
+          }
+        }}
+        onSeeked={() => {
+          markFrameReady()
+          if (videoRef.current && videoRef.current.paused) {
+            videoRef.current.play().catch(() => {})
+          }
+        }}
         onWaiting={() => {
           if (isPlaybackReady) setIsBuffering(true)
         }}
