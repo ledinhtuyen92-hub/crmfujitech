@@ -25,7 +25,13 @@ export default function VideoPreview({ session, streamEvent }) {
   const [deviceTelemetry, setDeviceTelemetry] = useState(null)
   const [isPlaybackReady, setIsPlaybackReady] = useState(false)
   const [isBuffering, setIsBuffering] = useState(false)
-  const [isMuted, setIsMuted] = useState(true)
+  const [isMuted, setIsMuted] = useState(() => {
+    try {
+      return localStorage.getItem('fujitech_live_muted') !== 'false'
+    } catch {
+      return true
+    }
+  })
   const [isMockupAvatarLoaded, setIsMockupAvatarLoaded] = useState(false)
   const hasStartedPlaybackRef = useRef(false)
   const hasJumpedToLiveEdgeRef = useRef(false)
@@ -39,6 +45,9 @@ export default function VideoPreview({ session, streamEvent }) {
       const nextMuted = !videoRef.current.muted
       videoRef.current.muted = nextMuted
       setIsMuted(nextMuted)
+      try {
+        localStorage.setItem('fujitech_live_muted', nextMuted ? 'true' : 'false')
+      } catch (_) {}
     }
   }
 
@@ -287,14 +296,19 @@ export default function VideoPreview({ session, streamEvent }) {
       const curTime = v.currentTime
       if (Math.abs(curTime - lastTime) < 0.05 && v.readyState >= 2) {
         frozenCount += 1
-        if (frozenCount >= 3) {
-          console.warn(`[VideoPreview Runtime Watchdog] Video frozen at ${curTime.toFixed(2)}s. Auto-recovering...`)
+        if (frozenCount >= 4) {
+          console.warn(`[VideoPreview Runtime Watchdog] Video frozen at ${curTime.toFixed(2)}s. Nudging...`)
           try {
             if (v.buffered.length > 0) {
               const bufStart = v.buffered.start(0)
               const bufEnd = v.buffered.end(v.buffered.length - 1)
-              const safeTarget = Math.max(bufStart, bufEnd - 1.5)
-              v.currentTime = safeTarget
+              if (v.currentTime < bufStart) {
+                // Playhead fell behind sliding window: jump forward to live buffer
+                v.currentTime = Math.max(bufStart + 0.1, bufEnd - 2.0)
+              } else if (v.currentTime < bufEnd - 0.5) {
+                // Stuck inside valid buffer on timestamp gap: nudge forward by 0.1s
+                v.currentTime += 0.1
+              }
               v.play().catch(() => {})
             } else if (hlsRef.current) {
               hlsRef.current.startLoad()
@@ -324,6 +338,9 @@ export default function VideoPreview({ session, streamEvent }) {
           setHlsStatus('live')
           videoRef.current.muted = false
           setIsMuted(false)
+          try {
+            localStorage.setItem('fujitech_live_muted', 'false')
+          } catch (_) {}
         })
         .catch((e) => {
           console.warn('Manual play pending buffer:', e)
@@ -367,22 +384,22 @@ export default function VideoPreview({ session, streamEvent }) {
 
       const hls = new Hls({
         enableWorker: true,
-        lowLatencyMode: true,
-        backBufferLength: 6,
+        lowLatencyMode: false,
+        backBufferLength: 10,
         liveDurationInfinity: true,
         initialLiveManifestSize: 1,
-        liveSyncDurationCount: 2,
-        liveMaxLatencyDurationCount: 4,
-        maxLiveSyncPlaybackRate: 1.0,
-        maxBufferLength: 6,
-        maxMaxBufferLength: 10,
+        liveSyncDurationCount: 3,
+        liveMaxLatencyDurationCount: 6,
+        maxLiveSyncPlaybackRate: 1.1,
+        maxBufferLength: 10,
+        maxMaxBufferLength: 20,
         manifestLoadingMaxRetry: 10,
-        manifestLoadingRetryDelay: 200,
+        manifestLoadingRetryDelay: 300,
         manifestLoadingMaxRetryTimeout: 8000,
         levelLoadingMaxRetry: 10,
-        levelLoadingRetryDelay: 200,
+        levelLoadingRetryDelay: 300,
         fragLoadingMaxRetry: 10,
-        fragLoadingRetryDelay: 200,
+        fragLoadingRetryDelay: 300,
         startFragPrefetch: true,
         xhrSetup: (xhr) => {
           if (token) xhr.setRequestHeader('Authorization', `Bearer ${token}`)
@@ -393,8 +410,9 @@ export default function VideoPreview({ session, streamEvent }) {
       hls.loadSource(absoluteUrl)
       hls.attachMedia(video)
 
-      video.muted = true
-      video.defaultMuted = true
+      const wantsUnmuted = localStorage.getItem('fujitech_live_muted') === 'false'
+      video.muted = !wantsUnmuted
+      video.defaultMuted = !wantsUnmuted
 
       // Jump over initial timestamp gap once on cold start or browser refresh (F5)
       const jumpToLiveEdgeOnce = () => {
@@ -404,18 +422,17 @@ export default function VideoPreview({ session, streamEvent }) {
             const bufStart = video.buffered.start(0)
             const bufEnd = video.buffered.end(video.buffered.length - 1)
             
-            // If cold start (stream is fresh, duration under 5s):
-            // Start immediately from the very first frame to achieve instant playback (<1s)
-            let target
-            if (bufEnd < 5.0) {
-              target = bufStart + 0.05
-            } else {
-              // Ongoing stream (e.g. F5 refresh):
-              // Jump to live edge with a ~1.5s cushion to prevent stall
-              target = Math.max(bufStart + 0.1, bufEnd - 1.5)
-            }
-
-            if (video.currentTime < bufStart || video.currentTime === 0 || Math.abs(video.currentTime - target) > 3.0) {
+            // Only jump if playhead is uninitialized (0) or behind buffer start
+            if (video.currentTime < bufStart || video.currentTime === 0) {
+              const livePos = hls.liveSyncPosition
+              let target
+              if (livePos && livePos >= bufStart && livePos <= bufEnd - 0.5) {
+                target = livePos
+              } else if (bufEnd < 5.0) {
+                target = bufStart + 0.05
+              } else {
+                target = Math.max(bufStart + 0.1, bufEnd - 2.5)
+              }
               video.currentTime = target
               hasJumpedToLiveEdgeRef.current = true
             }
@@ -425,15 +442,30 @@ export default function VideoPreview({ session, streamEvent }) {
 
       const tryPlay = () => {
         if (!video) return
-        video.muted = true
-        video.defaultMuted = true
+        const preferSound = localStorage.getItem('fujitech_live_muted') === 'false'
+        video.muted = !preferSound
+        video.defaultMuted = !preferSound
         video.playsInline = true
         const p = video.play()
         if (p && typeof p.then === 'function') {
           p.then(() => {
             setHlsStatus('live')
             jumpToLiveEdgeOnce()
+            if (preferSound) {
+              setIsMuted(false)
+            }
           }).catch((err) => {
+            if (preferSound && (err.name === 'NotAllowedError' || err.name === 'SecurityError')) {
+              console.warn('[VideoPreview] Autoplay with audio blocked by browser policy. Falling back to muted playback...')
+              video.muted = true
+              video.defaultMuted = true
+              setIsMuted(true)
+              video.play().then(() => {
+                setHlsStatus('live')
+                jumpToLiveEdgeOnce()
+              }).catch(() => {})
+              return
+            }
             // Keep status as loading during initial stream connection
             if (!hasStartedPlaybackRef.current) {
               setHlsStatus('loading')
@@ -466,11 +498,9 @@ export default function VideoPreview({ session, streamEvent }) {
           try {
             if (video && video.buffered.length > 0) {
               const bufStart = video.buffered.start(0)
-              const bufEnd = video.buffered.end(video.buffered.length - 1)
-              if (video.currentTime < bufStart || video.currentTime >= bufEnd - 0.25) {
-                const safeTarget = Math.max(bufStart, bufEnd - 1.5)
-                console.warn(`[VideoPreview] Auto-recovering live stall at ${video.currentTime.toFixed(2)}s -> seeking to ${safeTarget.toFixed(2)}s`)
-                video.currentTime = safeTarget
+              // Only seek forward if playhead has fallen behind sliding window buffer
+              if (video.currentTime < bufStart - 0.5) {
+                video.currentTime = bufStart + 0.1
               }
               video.play().catch(() => {})
             }

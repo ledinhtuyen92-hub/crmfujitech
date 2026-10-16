@@ -6,6 +6,7 @@ from typing import Optional, Any
 from live_studio.execution.stream_encoder import StreamEncoder, StreamConfig, FfmpegLocator
 from live_studio.protocol.envelopes import StreamStartPayload, StreamStopPayload
 from live_studio.execution.rtmp_target import RtmpStreamTarget
+from live_studio.core.telemetry import telemetry
 
 logger = logging.getLogger(__name__)
 
@@ -66,7 +67,7 @@ class StreamController:
                 
     async def _frame_pump(self):
         try:
-            start_time = time.monotonic()
+            start_time = None
             sent_frames = 0
             fps = self._current_payload.fps if self._current_payload else 30
             last_frame_data = None
@@ -84,10 +85,11 @@ class StreamController:
                 # 2. Clock-driven pacing: send exact number of frames corresponding to elapsed wall-clock time
                 if last_frame_data and self.encoder:
                     now = time.monotonic()
+                    if start_time is None:
+                        start_time = now
+                        sent_frames = 0
+
                     target_frames = int((now - start_time) * fps)
-                    # Safety clamp: if thread or OS was delayed for > 1 second, drop backlog to maintain real-time pacing
-                    if target_frames - sent_frames > fps:
-                        sent_frames = target_frames - 2
                     while sent_frames < target_frames and self.state == StreamState.LIVE:
                         try:
                             await self.encoder.write_video(last_frame_data)
