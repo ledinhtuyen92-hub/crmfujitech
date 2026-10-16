@@ -190,6 +190,8 @@ class PygameAvatarRenderer(BaseAvatarRenderer):
         # Resume Playback time accumulators
         self._idle_playback_time = 0.0
         self._speaking_playback_time = 0.0
+        # Synchronized Master Clock for Pose-Matched Twin Loops
+        self._master_timeline = 0.0
         
         # Action gesture state
         self._current_action_id: Optional[str] = None
@@ -301,6 +303,13 @@ class PygameAvatarRenderer(BaseAvatarRenderer):
         if has_custom_avatar:
             surf = None
             
+            # Determine if idle and speaking are twin-loop matched (within 3s duration)
+            is_twin_loop = bool(
+                self.idle_sequence and self.speaking_sequence and
+                len(self.idle_sequence) > 1 and len(self.speaking_sequence) > 1 and
+                abs(self.idle_sequence.duration - self.speaking_sequence.duration) < 3.0
+            )
+
             # 1. Action Gesture (Highest visual priority: plays to completion)
             if self._current_action_seq and len(self._current_action_seq) > 0:
                 surf = self._current_action_seq.get_frame(self._current_action_time)
@@ -313,15 +322,19 @@ class PygameAvatarRenderer(BaseAvatarRenderer):
                     
             # 2. Speaking State
             elif is_speaking:
+                if is_twin_loop:
+                    # Synchronized Twin Loop: Samples frame at exact same timeline as idle!
+                    surf = self.speaking_sequence.get_frame(self._master_timeline)
+                    self._master_timeline += dt
                 # If speaking asset is a single static image (len == 1), gate mouth by audio energy
-                if self.speaking_sequence and len(self.speaking_sequence) == 1:
+                elif self.speaking_sequence and len(self.speaking_sequence) == 1:
                     if mouth_state != MOUTH_STATE_CLOSED:
                         surf = self.speaking_sequence.get_frame(0.0)
                     elif self.idle_sequence and len(self.idle_sequence) > 0:
                         surf = self.idle_sequence.get_frame(self._idle_playback_time)
                     else:
                         surf = self.speaking_sequence.get_frame(0.0)
-                # If speaking asset is a video sequence (len > 1), play smoothly and continuously during speech!
+                # If speaking asset is an independent video sequence (len > 1), resume playback
                 elif self.speaking_sequence and len(self.speaking_sequence) > 1:
                     surf = self.speaking_sequence.get_frame(self._speaking_playback_time)
                     self._speaking_playback_time += dt
@@ -329,9 +342,13 @@ class PygameAvatarRenderer(BaseAvatarRenderer):
                     surf = self.idle_sequence.get_frame(self._idle_playback_time)
                     self._idle_playback_time += dt
                     
-            # 3. Idle State (RESUME PLAYBACK: continues smoothly from paused position)
+            # 3. Idle State
             else:
-                if self.idle_sequence and len(self.idle_sequence) > 0:
+                if is_twin_loop:
+                    # Synchronized Twin Loop: Samples frame at exact same timeline as speaking!
+                    surf = self.idle_sequence.get_frame(self._master_timeline)
+                    self._master_timeline += dt
+                elif self.idle_sequence and len(self.idle_sequence) > 0:
                     surf = self.idle_sequence.get_frame(self._idle_playback_time)
                     self._idle_playback_time += dt
                 elif self.speaking_sequence and len(self.speaking_sequence) > 0:
