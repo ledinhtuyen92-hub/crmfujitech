@@ -1,4 +1,5 @@
 import os
+import io
 import time
 import logging
 import tempfile
@@ -192,6 +193,7 @@ class PygameAvatarRenderer(BaseAvatarRenderer):
         self._speaking_playback_time = 0.0
         # Synchronized Master Clock for Pose-Matched Twin Loops
         self._master_timeline = 0.0
+        self._speech_blend_weight = 0.0  # 0.0 = Idle, 1.0 = Speaking (for smooth cross-fade)
         
         # Action gesture state
         self._current_action_id: Optional[str] = None
@@ -255,6 +257,8 @@ class PygameAvatarRenderer(BaseAvatarRenderer):
 
         self._idle_playback_time = 0.0
         self._speaking_playback_time = 0.0
+        self._master_timeline = 0.0
+        self._speech_blend_weight = 0.0
         self._current_action_seq = None
         self._current_action_id = None
         self._current_action_time = 0.0
@@ -319,36 +323,67 @@ class PygameAvatarRenderer(BaseAvatarRenderer):
                     self._current_action_seq = None
                     self._current_action_id = None
                     self._current_action_time = 0.0
-                    
-            # 2. Speaking State
+
+            # 2. Synchronized Twin-Loop Video Avatar (Idle & Speaking share exact same timeline with smooth cross-fade)
+            elif self.idle_sequence and len(self.idle_sequence) > 1 and self.speaking_sequence and len(self.speaking_sequence) > 1:
+                # Reference duration is the shared loop length (prevents phase drift over time)
+                base_duration = min(self.idle_sequence.duration, self.speaking_sequence.duration)
+                if base_duration <= 0.0:
+                    base_duration = 1.0
+
+                # Advance the unified master timeline
+                loop_time = self._master_timeline % base_duration
+                self._master_timeline += dt
+
+                # Smooth cross-fade transition (~160ms = ~4 frames at 25fps for natural facial morphing)
+                TRANSITION_DURATION = 0.16
+                target_weight = 1.0 if is_speaking else 0.0
+                if self._speech_blend_weight < target_weight:
+                    self._speech_blend_weight = min(target_weight, self._speech_blend_weight + (dt / TRANSITION_DURATION))
+                elif self._speech_blend_weight > target_weight:
+                    self._speech_blend_weight = max(target_weight, self._speech_blend_weight - (dt / TRANSITION_DURATION))
+
+                if self._speech_blend_weight <= 0.001:
+                    # 100% Idle frame at exact current second
+                    surf = self.idle_sequence.get_frame(loop_time)
+                elif self._speech_blend_weight >= 0.999:
+                    # 100% Speaking frame at exact current second
+                    surf = self.speaking_sequence.get_frame(loop_time)
+                else:
+                    # Cross-fade blending window: both frames sampled at the EXACT same timeline position!
+                    surf_idle = self.idle_sequence.get_frame(loop_time)
+                    surf_speaking = self.speaking_sequence.get_frame(loop_time)
+                    if surf_idle and surf_speaking:
+                        self.screen.blit(surf_idle, (0, 0))
+                        alpha_255 = int(self._speech_blend_weight * 255)
+                        surf_speaking.set_alpha(alpha_255)
+                        self.screen.blit(surf_speaking, (0, 0))
+                        surf_speaking.set_alpha(255)  # Restore surface alpha to full opacity for cache integrity
+                        return
+                    else:
+                        surf = surf_speaking if is_speaking else surf_idle
+
+            # 3. Fallback: Speaking State (Single image or single video)
             elif is_speaking:
-                if is_twin_loop:
-                    # Synchronized Twin Loop: Samples frame at exact same timeline as idle!
-                    surf = self.speaking_sequence.get_frame(self._master_timeline)
-                    self._master_timeline += dt
                 # If speaking asset is a single static image (len == 1), gate mouth by audio energy
-                elif self.speaking_sequence and len(self.speaking_sequence) == 1:
+                if self.speaking_sequence and len(self.speaking_sequence) == 1:
                     if mouth_state != MOUTH_STATE_CLOSED:
                         surf = self.speaking_sequence.get_frame(0.0)
                     elif self.idle_sequence and len(self.idle_sequence) > 0:
                         surf = self.idle_sequence.get_frame(self._idle_playback_time)
                     else:
                         surf = self.speaking_sequence.get_frame(0.0)
-                # If speaking asset is an independent video sequence (len > 1), resume playback
+                # If speaking asset is an independent video sequence, resume playback
                 elif self.speaking_sequence and len(self.speaking_sequence) > 1:
                     surf = self.speaking_sequence.get_frame(self._speaking_playback_time)
                     self._speaking_playback_time += dt
                 elif self.idle_sequence and len(self.idle_sequence) > 0:
                     surf = self.idle_sequence.get_frame(self._idle_playback_time)
                     self._idle_playback_time += dt
-                    
-            # 3. Idle State
+
+            # 4. Fallback: Idle State (Single image or single video)
             else:
-                if is_twin_loop:
-                    # Synchronized Twin Loop: Samples frame at exact same timeline as speaking!
-                    surf = self.idle_sequence.get_frame(self._master_timeline)
-                    self._master_timeline += dt
-                elif self.idle_sequence and len(self.idle_sequence) > 0:
+                if self.idle_sequence and len(self.idle_sequence) > 0:
                     surf = self.idle_sequence.get_frame(self._idle_playback_time)
                     self._idle_playback_time += dt
                 elif self.speaking_sequence and len(self.speaking_sequence) > 0:
