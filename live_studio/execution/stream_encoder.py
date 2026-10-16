@@ -266,19 +266,28 @@ class StreamEncoder:
 
         encoder_args = ["-c:v", codec, "-b:v", self.config.bitrate]
         if codec == "libx264":
-            encoder_args.extend(["-preset", "ultrafast", "-tune", "zerolatency"])
+            encoder_args.extend(["-preset", "ultrafast", "-tune", "zerolatency", "-bf", "0"])
         elif codec == "h264_nvenc":
-            encoder_args.extend(["-preset", "p1", "-tune", "ull"])
+            encoder_args.extend(["-preset", "p1", "-tune", "ull", "-zerolatency", "1", "-bf", "0"])
         elif codec == "h264_qsv":
-            encoder_args.extend(["-preset", "veryfast"])
+            encoder_args.extend(["-preset", "veryfast", "-bf", "0"])
 
         cmd.extend(encoder_args)
+        
+        # Ultra-low latency GOP: emit keyframe every 1 second (e.g. 30 frames at 30fps)
+        # Slicing short HLS segments requires keyframes at least every 1s.
+        gop_size = str(max(15, self.config.fps))
         cmd.extend([
             "-pix_fmt", "yuv420p",
-            "-g", "60",
-            "-keyint_min", "60",
+            "-g", gop_size,
+            "-keyint_min", gop_size,
+            "-sc_threshold", "0",
+            "-flags", "+global_header",
+            "-fflags", "+nobuffer+flush_packets",
+            "-flush_packets", "1",
             "-c:a", "aac",
             "-b:a", "128k",
+            "-ar", str(self.config.audio_sample_rate),
             "-flvflags", "no_duration_filesize",
             "-f", "flv" if self.output_url.startswith("rtmp") else "null",
             self.output_url

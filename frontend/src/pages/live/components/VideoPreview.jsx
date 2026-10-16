@@ -109,7 +109,7 @@ export default function VideoPreview({ session, streamEvent }) {
 
       if (!masterResp.ok && masterResp.status !== 200) {
         setHlsStatus('waiting')
-        retryTimerRef.current = setTimeout(probeHls, 1500)
+        retryTimerRef.current = setTimeout(probeHls, 400)
         return
       }
 
@@ -128,7 +128,7 @@ export default function VideoPreview({ session, streamEvent }) {
         const variantUrl = extractVariantUrl(masterText, proxyUrl)
         if (!variantUrl) {
           setHlsStatus('waiting')
-          retryTimerRef.current = setTimeout(probeHls, 1500)
+          retryTimerRef.current = setTimeout(probeHls, 400)
           return
         }
 
@@ -151,16 +151,16 @@ export default function VideoPreview({ session, streamEvent }) {
 
         // Stream connected but waiting for first segment to be muxed
         setHlsStatus('waiting')
-        retryTimerRef.current = setTimeout(probeHls, 1500)
+        retryTimerRef.current = setTimeout(probeHls, 400)
         return
       }
 
       // Other playlist status, retry shortly
       setHlsStatus('waiting')
-      retryTimerRef.current = setTimeout(probeHls, 1500)
+      retryTimerRef.current = setTimeout(probeHls, 400)
     } catch {
       setHlsStatus('waiting')
-      retryTimerRef.current = setTimeout(probeHls, 1500)
+      retryTimerRef.current = setTimeout(probeHls, 400)
     }
   }, [isSessionLive, session?.id]) // eslint-disable-line
 
@@ -226,22 +226,22 @@ export default function VideoPreview({ session, streamEvent }) {
     watchdogTimerRef.current = setTimeout(() => {
       if (!hasStartedPlaybackRef.current && videoRef.current && hlsRef.current) {
         const v = videoRef.current
-        console.warn('[VideoPreview Watchdog] Waiting for frames after 8s. Nudging...')
+        console.warn('[VideoPreview Watchdog] Waiting for frames after 4s. Nudging...')
         try {
           if (v.buffered.length > 0) {
             const bufEnd = v.buffered.end(v.buffered.length - 1)
-            v.currentTime = Math.max(v.buffered.start(0), bufEnd - 1.0)
+            v.currentTime = Math.max(v.buffered.start(0), bufEnd - 0.5)
             v.play().catch(() => {})
           } else {
             hlsRef.current.startLoad()
           }
         } catch (_) {}
       }
-    }, 8000)
+    }, 4000)
 
     hardResetTimerRef.current = setTimeout(() => {
       if (!hasStartedPlaybackRef.current && videoRef.current && videoRef.current.readyState < 2) {
-        console.warn('[VideoPreview Watchdog] Cold start timed out after 18s. Re-probing...')
+        console.warn('[VideoPreview Watchdog] Cold start timed out after 10s. Re-probing...')
         if (hlsRef.current) {
           hlsRef.current.destroy()
           hlsRef.current = null
@@ -252,7 +252,7 @@ export default function VideoPreview({ session, streamEvent }) {
         setHlsStatus('waiting')
         probeHls()
       }
-    }, 18000)
+    }, 10000)
 
     return () => {
       if (watchdogTimerRef.current) clearTimeout(watchdogTimerRef.current)
@@ -316,21 +316,21 @@ export default function VideoPreview({ session, streamEvent }) {
 
       const hls = new Hls({
         enableWorker: true,
-        lowLatencyMode: false,
-        backBufferLength: 15,
+        lowLatencyMode: true,
+        backBufferLength: 6,
         liveDurationInfinity: true,
-        liveSyncDurationCount: 2,
-        liveMaxLatencyDurationCount: 6,
-        maxLiveSyncPlaybackRate: 1.1,
-        maxBufferLength: 8,
-        maxMaxBufferLength: 16,
+        liveSyncDurationCount: 1,
+        liveMaxLatencyDurationCount: 3,
+        maxLiveSyncPlaybackRate: 1.25,
+        maxBufferLength: 4,
+        maxMaxBufferLength: 8,
         manifestLoadingMaxRetry: 10,
-        manifestLoadingRetryDelay: 1000,
-        manifestLoadingMaxRetryTimeout: 15000,
+        manifestLoadingRetryDelay: 400,
+        manifestLoadingMaxRetryTimeout: 10000,
         levelLoadingMaxRetry: 10,
-        levelLoadingRetryDelay: 1000,
+        levelLoadingRetryDelay: 400,
         fragLoadingMaxRetry: 10,
-        fragLoadingRetryDelay: 1000,
+        fragLoadingRetryDelay: 400,
         startFragPrefetch: true,
         xhrSetup: (xhr) => {
           if (token) xhr.setRequestHeader('Authorization', `Bearer ${token}`)
