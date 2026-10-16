@@ -26,8 +26,13 @@ export default function VideoPreview({ session, streamEvent }) {
   const [isPlaybackReady, setIsPlaybackReady] = useState(false)
   const [isBuffering, setIsBuffering] = useState(false)
   const [isMuted, setIsMuted] = useState(true)
+  const [isMockupAvatarLoaded, setIsMockupAvatarLoaded] = useState(false)
   const hasStartedPlaybackRef = useRef(false)
   const hasJumpedToLiveEdgeRef = useRef(false)
+
+  useEffect(() => {
+    setIsMockupAvatarLoaded(false)
+  }, [session?.avatar_asset_url, session?.avatar_speaking_asset_url])
 
   const toggleMute = () => {
     if (videoRef.current) {
@@ -613,28 +618,82 @@ export default function VideoPreview({ session, streamEvent }) {
           <div style={{ position: 'relative', width: '100%', height: '100%', overflow: 'hidden', display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
             <div style={{ position: 'relative', height: '100%', aspectRatio: '9/16', backgroundColor: '#000', overflow: 'hidden', boxShadow: '0 0 20px rgba(0,0,0,0.5)' }}>
               {(() => {
-                const resolveUrl = (url) => url?.startsWith('/') ? `http://localhost:8000${url}` : url;
+                const resolveUrl = (url) => {
+                  if (!url) return null;
+                  if (url.startsWith('http://') || url.startsWith('https://')) return url;
+                  let base = (import.meta.env.VITE_API_URL || '').replace(/\/api\/?$/, '');
+                  if (!base) {
+                    base = `${window.location.protocol}//${window.location.hostname}:8000`;
+                  }
+                  return `${base}${url.startsWith('/') ? '' : '/'}${url}`;
+                };
                 const bgUrl = resolveUrl(session.background_asset_url);
                 const avatarUrl = resolveUrl(session.avatar_asset_url || session.avatar_speaking_asset_url);
+                const avatarPosterUrl = resolveUrl(session.avatar_asset_thumbnail_url);
                 const overlayUrl = resolveUrl(session.overlay_asset_url);
                 return (
                   <>
                     {bgUrl && (
                       bgUrl.match(/\.(mp4|webm)$/i) ? (
-                        <video src={bgUrl} autoPlay loop muted playsInline style={{ width: '100%', height: '100%', objectFit: 'cover', position: 'absolute', top: 0, left: 0 }} />
+                        <video src={bgUrl} autoPlay loop muted playsInline preload="auto" style={{ width: '100%', height: '100%', objectFit: 'cover', position: 'absolute', top: 0, left: 0 }} />
                       ) : (
                         <img src={bgUrl} alt="Background" style={{ width: '100%', height: '100%', objectFit: 'cover', position: 'absolute', top: 0, left: 0 }} />
                       )
                     )}
                     {avatarUrl && (
                       avatarUrl.match(/\.(mp4|webm)$/i) ? (
-                        <video src={avatarUrl} autoPlay loop muted playsInline style={{ width: '100%', height: '100%', objectFit: 'contain', position: 'absolute', top: 0, left: 0 }} />
+                        <>
+                          <video
+                            src={avatarUrl}
+                            poster={avatarPosterUrl || undefined}
+                            autoPlay
+                            loop
+                            muted
+                            playsInline
+                            preload="auto"
+                            onLoadedData={() => setIsMockupAvatarLoaded(true)}
+                            onCanPlay={() => setIsMockupAvatarLoaded(true)}
+                            style={{
+                              width: '100%',
+                              height: '100%',
+                              objectFit: 'contain',
+                              position: 'absolute',
+                              top: 0,
+                              left: 0,
+                              opacity: isMockupAvatarLoaded || avatarPosterUrl ? 1 : 0,
+                              transition: 'opacity 0.25s ease-in-out',
+                              zIndex: 1
+                            }}
+                          />
+                          {!isMockupAvatarLoaded && !avatarPosterUrl && (
+                            <div style={{
+                              position: 'absolute',
+                              top: '45%',
+                              left: '50%',
+                              transform: 'translate(-50%, -50%)',
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: 8,
+                              backgroundColor: 'rgba(0,0,0,0.65)',
+                              padding: '8px 16px',
+                              borderRadius: 20,
+                              backdropFilter: 'blur(6px)',
+                              border: '1px solid rgba(255,255,255,0.15)',
+                              color: '#fff',
+                              zIndex: 2,
+                              pointerEvents: 'none'
+                            }}>
+                              <LoadingOutlined spin style={{ fontSize: 16, color: '#1890ff' }} />
+                              <span style={{ fontSize: 12, fontWeight: 500 }}>Đang nạp người mẫu...</span>
+                            </div>
+                          )}
+                        </>
                       ) : (
                         <img src={avatarUrl} alt="Avatar" style={{ width: '100%', height: '100%', objectFit: 'contain', position: 'absolute', top: 0, left: 0 }} />
                       )
                     )}
                     {overlayUrl && (
-                      <img src={overlayUrl} alt="Overlay" style={{ width: '100%', height: '100%', objectFit: 'cover', position: 'absolute', top: 0, left: 0, pointerEvents: 'none' }} />
+                      <img src={overlayUrl} alt="Overlay" style={{ width: '100%', height: '100%', objectFit: 'cover', position: 'absolute', top: 0, left: 0, pointerEvents: 'none', zIndex: 3 }} />
                     )}
                   </>
                 );

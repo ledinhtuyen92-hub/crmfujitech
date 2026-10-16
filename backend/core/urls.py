@@ -40,9 +40,11 @@ urlpatterns = [
     path('api/live_sessions/', include('live_sessions.urls')),
 ]
 
-# Explicitly serve media files even in DEBUG=False (since Nginx might not be configured for it yet)
+from .media_view import serve_media_with_ranges
+
+# Explicitly serve media files even in DEBUG=False (with HTTP 206 Range support for instant video playback)
 urlpatterns += [
-    re_path(r'^media/(?P<path>.*)$', serve, {
+    re_path(r'^media/(?P<path>.*)$', serve_media_with_ranges, {
         'document_root': settings.MEDIA_ROOT,
     }),
 ]

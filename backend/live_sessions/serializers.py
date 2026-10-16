@@ -51,6 +51,7 @@ class LiveSessionSerializer(serializers.ModelSerializer):
     product_name = serializers.CharField(source='product.name', read_only=True)
     
     avatar_asset_url = serializers.SerializerMethodField()
+    avatar_asset_thumbnail_url = serializers.SerializerMethodField()
     avatar_speaking_asset_url = serializers.SerializerMethodField()
     background_asset_url = serializers.SerializerMethodField()
     overlay_asset_url = serializers.SerializerMethodField()
@@ -59,6 +60,11 @@ class LiveSessionSerializer(serializers.ModelSerializer):
     def get_avatar_asset_url(self, obj):
         if obj.avatar_asset and obj.avatar_asset.file:
             return obj.avatar_asset.file.url
+        return None
+
+    def get_avatar_asset_thumbnail_url(self, obj):
+        if obj.avatar_asset and obj.avatar_asset.thumbnail:
+            return obj.avatar_asset.thumbnail.url
         return None
 
     def get_avatar_speaking_asset_url(self, obj):
