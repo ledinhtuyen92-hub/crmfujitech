@@ -22,6 +22,7 @@ class MediaMTXManager:
         self.process: Optional[asyncio.subprocess.Process] = None
         self._config_path: Optional[str] = None
         self.is_running = False
+        self._stopping = False
 
     def _locate_binary(self) -> Optional[str]:
         if getattr(sys, 'frozen', False):
@@ -59,7 +60,7 @@ hls: yes
 hlsAddress: :{MEDIAMTX_LOCAL_HLS_PORT}
 hlsAlwaysRemux: yes
 hlsVariant: lowLatency
-hlsSegmentCount: 7
+hlsSegmentCount: 10
 hlsSegmentDuration: 1s
 hlsPartDuration: 200ms
 
@@ -74,6 +75,7 @@ paths:
         logger.info(f'[MediaMTX] Config written to {config_path}')
 
     async def start(self) -> bool:
+        self._stopping = False
         # Check if an instance of MediaMTX is already listening on local port (e.g. Docker container)
         try:
             sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -124,10 +126,17 @@ paths:
         except Exception:
             pass
         await self.process.wait()
+        returncode = self.process.returncode
         self.is_running = False
-        logger.warning(f'[MediaMTX] Process exited with code {self.process.returncode}')
+        logger.warning(f'[MediaMTX] Process exited with code {returncode}')
+        if not self._stopping:
+            logger.error('[MediaMTX] Process died unexpectedly. Auto-restarting in 2s...')
+            await asyncio.sleep(2.0)
+            if not self._stopping:
+                await self.start()
 
     async def stop(self):
+        self._stopping = True
         self.is_running = False
         if not self.process:
             return

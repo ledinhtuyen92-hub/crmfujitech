@@ -85,6 +85,9 @@ class StreamController:
                 if last_frame_data and self.encoder:
                     now = time.monotonic()
                     target_frames = int((now - start_time) * fps)
+                    # Safety clamp: if thread or OS was delayed for > 1 second, drop backlog to maintain real-time pacing
+                    if target_frames - sent_frames > fps:
+                        sent_frames = target_frames - 2
                     while sent_frames < target_frames and self.state == StreamState.LIVE:
                         try:
                             await self.encoder.write_video(last_frame_data)

@@ -3,7 +3,10 @@ import sys
 import time
 import platform
 import subprocess
-import psutil
+try:
+    import psutil
+except ImportError:
+    psutil = None
 import datetime
 from typing import Optional, Dict, Any
 
@@ -24,7 +27,10 @@ class DeviceTelemetry:
         self.os_info = f"{platform.system()} {platform.release()} (Build {platform.version()})"
         self.cpu_model = platform.processor() or "Unknown CPU"
         self.gpu_model = self._detect_gpu()
-        self.total_ram_gb = round(psutil.virtual_memory().total / (1024**3), 1)
+        try:
+            self.total_ram_gb = round(psutil.virtual_memory().total / (1024**3), 1) if psutil else 0.0
+        except Exception:
+            self.total_ram_gb = 0.0
         
         self.encoder_name = "Chưa phát hiện"
         self.encoder_label = "Chờ khởi chạy..."

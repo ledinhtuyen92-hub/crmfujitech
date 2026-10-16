@@ -265,6 +265,51 @@ export default function VideoPreview({ session, streamEvent }) {
     }
   }, [hlsUrl, isPlaybackReady, probeHls])
 
+  // Continuous Live Runtime Watchdog: monitors active playback, auto-recovers freezes/stalls
+  useEffect(() => {
+    if (!isSessionLive || !hlsUrl || hlsStatus !== 'live' || !isPlaybackReady) return
+
+    let lastTime = videoRef.current ? videoRef.current.currentTime : 0
+    let frozenCount = 0
+
+    const interval = setInterval(() => {
+      const v = videoRef.current
+      if (!v) return
+
+      // If video paused unexpectedly during live session
+      if (v.paused && !v.seeking) {
+        v.play().catch(() => {})
+        return
+      }
+
+      // Check if time is advancing
+      const curTime = v.currentTime
+      if (Math.abs(curTime - lastTime) < 0.05 && v.readyState >= 2) {
+        frozenCount += 1
+        if (frozenCount >= 3) {
+          console.warn(`[VideoPreview Runtime Watchdog] Video frozen at ${curTime.toFixed(2)}s. Auto-recovering...`)
+          try {
+            if (v.buffered.length > 0) {
+              const bufStart = v.buffered.start(0)
+              const bufEnd = v.buffered.end(v.buffered.length - 1)
+              const safeTarget = Math.max(bufStart, bufEnd - 1.5)
+              v.currentTime = safeTarget
+              v.play().catch(() => {})
+            } else if (hlsRef.current) {
+              hlsRef.current.startLoad()
+            }
+          } catch (_) {}
+          frozenCount = 0
+        }
+      } else {
+        frozenCount = 0
+        lastTime = curTime
+      }
+    }, 1000)
+
+    return () => clearInterval(interval)
+  }, [isSessionLive, hlsUrl, hlsStatus, isPlaybackReady])
+
   // Manual play (bypass browser autoplay block)
   const handleManualPlay = () => {
     if (videoRef.current) {
@@ -322,20 +367,20 @@ export default function VideoPreview({ session, streamEvent }) {
       const hls = new Hls({
         enableWorker: true,
         lowLatencyMode: true,
-        backBufferLength: 6,
+        backBufferLength: 8,
         liveDurationInfinity: true,
-        liveSyncDurationCount: 1,
-        liveMaxLatencyDurationCount: 3,
-        maxLiveSyncPlaybackRate: 1.25,
-        maxBufferLength: 4,
-        maxMaxBufferLength: 8,
+        liveSyncDurationCount: 3,
+        liveMaxLatencyDurationCount: 6,
+        maxLiveSyncPlaybackRate: 1.0,
+        maxBufferLength: 8,
+        maxMaxBufferLength: 15,
         manifestLoadingMaxRetry: 10,
-        manifestLoadingRetryDelay: 400,
+        manifestLoadingRetryDelay: 500,
         manifestLoadingMaxRetryTimeout: 10000,
         levelLoadingMaxRetry: 10,
-        levelLoadingRetryDelay: 400,
+        levelLoadingRetryDelay: 500,
         fragLoadingMaxRetry: 10,
-        fragLoadingRetryDelay: 400,
+        fragLoadingRetryDelay: 500,
         startFragPrefetch: true,
         xhrSetup: (xhr) => {
           if (token) xhr.setRequestHeader('Authorization', `Bearer ${token}`)
@@ -349,7 +394,7 @@ export default function VideoPreview({ session, streamEvent }) {
       video.muted = true
       video.defaultMuted = true
 
-      // Jump over initial timestamp gap once on cold start
+      // Jump over initial timestamp gap once on cold start or browser refresh (F5)
       const jumpToLiveEdgeOnce = () => {
         if (!video || hasJumpedToLiveEdgeRef.current) return
         try {
@@ -357,9 +402,9 @@ export default function VideoPreview({ session, streamEvent }) {
             const bufStart = video.buffered.start(0)
             const bufEnd = video.buffered.end(video.buffered.length - 1)
             if (video.currentTime < bufStart || video.currentTime === 0) {
-              const target = (hls.liveSyncPosition && hls.liveSyncPosition >= bufStart && hls.liveSyncPosition <= bufEnd)
+              const target = (hls.liveSyncPosition && hls.liveSyncPosition >= bufStart && hls.liveSyncPosition <= bufEnd - 0.5)
                 ? hls.liveSyncPosition
-                : bufStart + 0.1
+                : Math.max(bufStart, bufEnd - 2.0)
               video.currentTime = target
               hasJumpedToLiveEdgeRef.current = true
             }
@@ -408,8 +453,14 @@ export default function VideoPreview({ session, streamEvent }) {
         console.warn('[HLS Event]', data.type, data.details, data.fatal)
         if (data.details === Hls.ErrorDetails.BUFFER_STALLED_ERROR || data.details === Hls.ErrorDetails.BUFFER_NUDGE_ON_STALL) {
           try {
-            if (video && video.buffered.length > 0 && video.currentTime < video.buffered.start(0)) {
-              video.currentTime = video.buffered.start(0) + 0.1
+            if (video && video.buffered.length > 0) {
+              const bufStart = video.buffered.start(0)
+              const bufEnd = video.buffered.end(video.buffered.length - 1)
+              if (video.currentTime < bufStart || video.currentTime >= bufEnd - 0.25) {
+                const safeTarget = Math.max(bufStart, bufEnd - 1.5)
+                console.warn(`[VideoPreview] Auto-recovering live stall at ${video.currentTime.toFixed(2)}s -> seeking to ${safeTarget.toFixed(2)}s`)
+                video.currentTime = safeTarget
+              }
               video.play().catch(() => {})
             }
           } catch (_) {}
