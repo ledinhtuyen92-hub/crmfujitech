@@ -11,7 +11,7 @@ spec_parent = os.path.dirname(SPECPATH)   # fujitech/
 
 hiddenimports = [
     'pygame', 'websockets', 'requests', 'customtkinter',
-    'PIL', 'PIL._tkinter_finder', 'psutil',
+    'PIL', 'PIL._tkinter_finder', 'psutil', 'logging.handlers',
     # live_studio submodules – must be listed explicitly for PyInstaller
     'live_studio',
     'live_studio.core',

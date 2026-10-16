@@ -14,13 +14,25 @@ import sys
 from PIL import Image
 from live_studio.core.telemetry import telemetry
 
-# Setup file logging
+# Setup auto-rotating file logging (Safe for client machines)
+# Limits log size to 5MB, keeps at most 3 historical backups.
+# Maximum total disk usage on customer PC is strictly capped at ~15MB.
+from logging.handlers import RotatingFileHandler
 log_path = os.path.join(os.path.expanduser("~"), "fujitech_live_studio.log")
-logging.basicConfig(
-    filename=log_path,
-    level=logging.DEBUG,
-    format='%(asctime)s - %(levelname)s - %(message)s'
-)
+
+root_logger = logging.getLogger()
+root_logger.setLevel(logging.INFO)
+
+if not any(isinstance(h, RotatingFileHandler) for h in root_logger.handlers):
+    rotating_handler = RotatingFileHandler(
+        log_path,
+        maxBytes=5 * 1024 * 1024,  # 5 MB max per file
+        backupCount=3,             # Keep 3 backups (.1, .2, .3), auto-purges older
+        encoding="utf-8"
+    )
+    rotating_handler.setFormatter(logging.Formatter('%(asctime)s - %(levelname)s - %(message)s'))
+    root_logger.addHandler(rotating_handler)
+
 logger = logging.getLogger(__name__)
 
 class StudioLauncher(ctk.CTk):
