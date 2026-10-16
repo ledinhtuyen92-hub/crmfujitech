@@ -99,7 +99,8 @@ class VideoFrameSequence:
 
         # 2. Video Asset (Dynamic Sequence)
         elif ext in ['.mp4', '.mov', '.webm', '.mkv', '.avi']:
-            ffmpeg_exe = ffmpeg_bin or "ffmpeg"
+            from live_studio.execution.media_pipeline import get_ffmpeg_binary
+            ffmpeg_exe = ffmpeg_bin or get_ffmpeg_binary()
             temp_dir = tempfile.mkdtemp(prefix="avatar_frames_")
             try:
                 cmd = [

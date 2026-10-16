@@ -209,6 +209,7 @@ class StreamController:
         ffmpeg_path = await self.locator.locate()
         if not ffmpeg_path:
             logger.error("FFmpeg not found. Cannot start stream.")
+            telemetry.record_error("Không tìm thấy FFmpeg trên máy tính (thiếu bin/ffmpeg.exe)")
             self.state = StreamState.ERROR
             return False
             

@@ -36,9 +36,15 @@ class FfmpegLocator:
             base_dir = os.path.dirname(sys.executable)
         else:
             base_dir = os.path.dirname(os.path.dirname(__file__))
-        bundled = os.path.join(base_dir, "bin", "ffmpeg.exe")
-        candidates.append(bundled)
-        candidates.append("ffmpeg")
+        candidates.extend([
+            os.path.join(base_dir, "bin", "ffmpeg.exe"),
+            os.path.join(base_dir, "bin", "ffmpeg", "ffmpeg.exe"),
+            os.path.join(base_dir, "..", "..", "bin", "ffmpeg.exe"),
+            os.path.join(base_dir, "..", "..", "bin", "ffmpeg", "ffmpeg.exe"),
+            os.path.join(os.path.dirname(os.path.dirname(__file__)), "bin", "ffmpeg.exe"),
+            os.path.join(os.path.dirname(os.path.dirname(__file__)), "bin", "ffmpeg", "ffmpeg.exe"),
+            "ffmpeg"
+        ])
         
         flags = 0x08000000 if sys.platform == 'win32' else 0
         for candidate in candidates:

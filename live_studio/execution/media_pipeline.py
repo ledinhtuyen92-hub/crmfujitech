@@ -145,6 +145,8 @@ def get_ffmpeg_binary() -> str:
     candidates = [
         os.path.join(base_dir, "bin", "ffmpeg.exe"),
         os.path.join(base_dir, "bin", "ffmpeg", "ffmpeg.exe"),
+        os.path.join(base_dir, "..", "..", "bin", "ffmpeg.exe"),
+        os.path.join(base_dir, "..", "..", "bin", "ffmpeg", "ffmpeg.exe"),
         os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "bin", "ffmpeg.exe"),
         os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "bin", "ffmpeg", "ffmpeg.exe"),
         "ffmpeg"
