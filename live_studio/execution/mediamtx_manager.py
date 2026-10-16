@@ -59,7 +59,7 @@ hls: yes
 hlsAddress: :{MEDIAMTX_LOCAL_HLS_PORT}
 hlsAlwaysRemux: yes
 hlsVariant: lowLatency
-hlsSegmentCount: 5
+hlsSegmentCount: 7
 hlsSegmentDuration: 1s
 hlsPartDuration: 200ms
 

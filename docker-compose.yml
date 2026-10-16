@@ -152,7 +152,7 @@ services:
       - MTX_HLSVARIANT=lowLatency
       - MTX_HLSSEGMENTDURATION=1s
       - MTX_HLSPARTDURATION=200ms
-      - MTX_HLSSEGMENTCOUNT=5
+      - MTX_HLSSEGMENTCOUNT=7
     ports:
       - "1935:1935" # RTMP push (public)
       - "8888:8888" # HLS proxy pull (can also be internal)
