@@ -90,6 +90,13 @@ class StreamController:
                         sent_frames = 0
 
                     target_frames = int((now - start_time) * fps)
+                    # Safety clamp: if event loop was blocked >1 second (OS scheduling jitter, GIL contention),
+                    # cap the debt to 2 frames. Without this, a single 2s freeze creates a backlog of 60 frames
+                    # that floods the TCP transport and causes MediaMTX to report timestamp discontinuities.
+                    if target_frames - sent_frames > fps:
+                        logger.debug(f"[FramePump] Clamping frame debt from {target_frames - sent_frames} to 2 frames")
+                        sent_frames = target_frames - 2
+
                     while sent_frames < target_frames and self.state == StreamState.LIVE:
                         try:
                             await self.encoder.write_video(last_frame_data)

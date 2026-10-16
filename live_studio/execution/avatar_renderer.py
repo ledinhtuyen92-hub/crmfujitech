@@ -387,6 +387,9 @@ class PygameAvatarRenderer(BaseAvatarRenderer):
                 if self.idle_sequence and len(self.idle_sequence) > 0:
                     surf = self.idle_sequence.get_frame(self._idle_playback_time)
                     self._idle_playback_time += dt
+                    # Wrap to prevent unbounded float growth after hours of streaming
+                    if self.idle_sequence.duration > 0 and self._idle_playback_time > self.idle_sequence.duration * 100:
+                        self._idle_playback_time = self._idle_playback_time % self.idle_sequence.duration
                 elif self.speaking_sequence and len(self.speaking_sequence) > 0:
                     surf = self.speaking_sequence.get_frame(0.0)
                     

@@ -17,6 +17,7 @@ export default function VideoPreview({ session, streamEvent }) {
   const retryTimerRef = useRef(null)
   const watchdogTimerRef = useRef(null)
   const hardResetTimerRef = useRef(null)
+  const liveEdgeResyncRef = useRef(null)
 
   // idle | waiting | loading | paused | live | error
   const [hlsStatus, setHlsStatus] = useState('idle')
@@ -276,11 +277,14 @@ export default function VideoPreview({ session, streamEvent }) {
   }, [hlsUrl, isPlaybackReady, probeHls])
 
   // Continuous Live Runtime Watchdog: monitors active playback, auto-recovers freezes/stalls
+  const frozenCountRef = useRef(0)
+  const watchdogLastTimeRef = useRef(0)
   useEffect(() => {
     if (!isSessionLive || !hlsUrl || hlsStatus !== 'live' || !isPlaybackReady) return
 
-    let lastTime = videoRef.current ? videoRef.current.currentTime : 0
-    let frozenCount = 0
+    // Reset counters when watchdog (re)activates
+    frozenCountRef.current = 0
+    watchdogLastTimeRef.current = videoRef.current ? videoRef.current.currentTime : 0
 
     const interval = setInterval(() => {
       const v = videoRef.current
@@ -294,9 +298,9 @@ export default function VideoPreview({ session, streamEvent }) {
 
       // Check if time is advancing
       const curTime = v.currentTime
-      if (Math.abs(curTime - lastTime) < 0.05 && v.readyState >= 2) {
-        frozenCount += 1
-        if (frozenCount >= 4) {
+      if (Math.abs(curTime - watchdogLastTimeRef.current) < 0.05 && v.readyState >= 2) {
+        frozenCountRef.current += 1
+        if (frozenCountRef.current >= 4) {
           console.warn(`[VideoPreview Runtime Watchdog] Video frozen at ${curTime.toFixed(2)}s. Nudging...`)
           try {
             if (v.buffered.length > 0) {
@@ -314,11 +318,11 @@ export default function VideoPreview({ session, streamEvent }) {
               hlsRef.current.startLoad()
             }
           } catch (_) {}
-          frozenCount = 0
+          frozenCountRef.current = 0
         }
       } else {
-        frozenCount = 0
-        lastTime = curTime
+        frozenCountRef.current = 0
+        watchdogLastTimeRef.current = curTime
       }
     }, 1000)
 
@@ -385,14 +389,18 @@ export default function VideoPreview({ session, streamEvent }) {
       const hls = new Hls({
         enableWorker: true,
         lowLatencyMode: false,
-        backBufferLength: 10,
+        // Buffer limits: keep tight to let Hls.js GC old segments aggressively.
+        // maxBufferSize (bytes) is the primary GC trigger — keep it small to evict
+        // old segments before MSE buffers grow unboundedly over hours of live streaming.
+        backBufferLength: 8,
+        maxBufferLength: 8,
+        maxMaxBufferLength: 12,
+        maxBufferSize: 24 * 1024 * 1024, // 24 MB hard cap — aggressive GC
         liveDurationInfinity: true,
         initialLiveManifestSize: 1,
         liveSyncDurationCount: 3,
         liveMaxLatencyDurationCount: 6,
         maxLiveSyncPlaybackRate: 1.1,
-        maxBufferLength: 10,
-        maxMaxBufferLength: 20,
         manifestLoadingMaxRetry: 10,
         manifestLoadingRetryDelay: 300,
         manifestLoadingMaxRetryTimeout: 8000,
@@ -492,6 +500,21 @@ export default function VideoPreview({ session, streamEvent }) {
         }
       })
 
+      // Periodic live-edge resync: every 30s, check if playhead has drifted too far
+      // behind the live edge. Over long sessions (30min+), cumulative latency can grow
+      // from network jitter or brief tab backgrounding. Snap back gently to live edge.
+      if (liveEdgeResyncRef.current) clearInterval(liveEdgeResyncRef.current)
+      liveEdgeResyncRef.current = setInterval(() => {
+        if (!video || video.paused || !hls) return
+        try {
+          const liveEdge = hls.liveSyncPosition
+          if (liveEdge && video.currentTime < liveEdge - 4.0) {
+            console.info(`[VideoPreview] Live edge resync: currentTime=${video.currentTime.toFixed(1)}s liveEdge=${liveEdge.toFixed(1)}s. Snapping forward.`)
+            video.currentTime = Math.max(video.currentTime, liveEdge - 1.0)
+          }
+        } catch (_) {}
+      }, 30000)
+
       hls.on(Hls.Events.ERROR, (_, data) => {
         console.warn('[HLS Event]', data.type, data.details, data.fatal)
         if (data.details === Hls.ErrorDetails.BUFFER_STALLED_ERROR || data.details === Hls.ErrorDetails.BUFFER_NUDGE_ON_STALL) {
@@ -530,6 +553,10 @@ export default function VideoPreview({ session, streamEvent }) {
     })
 
     return () => {
+      if (liveEdgeResyncRef.current) {
+        clearInterval(liveEdgeResyncRef.current)
+        liveEdgeResyncRef.current = null
+      }
       if (hlsRef.current) {
         hlsRef.current.destroy()
         hlsRef.current = null

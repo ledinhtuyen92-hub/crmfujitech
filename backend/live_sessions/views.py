@@ -423,8 +423,15 @@ class LiveSessionViewSet(viewsets.ModelViewSet):
                 response['Cache-Control'] = 'no-cache'
                 return response
             else:
-                # Binary content (TS segments)
-                response = HttpResponse(resp.content, content_type=content_type)
+                # Binary content (TS segments) — stream directly without buffering in memory.
+                # Previously resp.content buffered the full 200-400KB segment before sending,
+                # adding 50-200ms latency per segment. Streaming reduces that to near-zero.
+                from django.http import StreamingHttpResponse
+                def _iter_content():
+                    for chunk in resp.iter_content(chunk_size=8192):
+                        if chunk:
+                            yield chunk
+                response = StreamingHttpResponse(_iter_content(), content_type=content_type)
                 response['Access-Control-Allow-Origin'] = '*'
                 response['Cache-Control'] = 'no-cache'
                 return response

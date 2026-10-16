@@ -138,7 +138,12 @@ class LocalTcpTransport:
         async with self._write_lock:
             try:
                 self.client_writer.write(data)
-                await self.client_writer.drain()
+                # Timeout drain: if FFmpeg reads too slowly (CPU spike, encoding pressure),
+                # drain() would block indefinitely, stalling the entire audio_worker task.
+                # Dropping one chunk is much better than freezing all audio for seconds.
+                await asyncio.wait_for(self.client_writer.drain(), timeout=0.5)
+            except asyncio.TimeoutError:
+                logger.warning(f"[LocalTcpTransport:{self.port}] drain() timed out (500ms). Dropping chunk to prevent audio stall.")
             except (ConnectionResetError, BrokenPipeError, ConnectionAbortedError, OSError, asyncio.CancelledError):
                 pass
         

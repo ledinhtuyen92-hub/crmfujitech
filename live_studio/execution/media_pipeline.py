@@ -114,7 +114,26 @@ class AudioStreamSink:
         """
         Pumps silence if the stream is active but no speech is happening.
         Uses explicit timing to avoid tight CPU loops.
+        
+        Critical: caps silence injection to 200ms per tick to prevent audio timeline
+        explosion when asyncio was blocked (GIL, avatar render, OS jitter).
+        Without this cap, a 2s loop delay injects 2s of silence in one call,
+        flooding the audio TCP pipe and causing HLS timeline drift / stutter.
+
+        Also: waits for write_callback to be connected before starting.
+        FFmpeg TCP transport takes 200-500ms after process spawn to connect.
+        If silence is injected before connection, it pre-fills the queue and dumps
+        all at once on connect — causing a timestamp burst that MediaMTX stutters on.
         """
+        MAX_SILENCE_MS = 200  # Never inject more than 200ms silence per 100ms tick
+        # Wait for write_callback (FFmpeg TCP) to be ready, up to 3s
+        wait_elapsed = 0.0
+        while self.is_streaming and not self.write_callback and wait_elapsed < 3.0:
+            await asyncio.sleep(0.05)
+            wait_elapsed += 0.05
+        # Sync start time to NOW (after connection) to avoid injecting backlogged silence
+        if self.is_streaming:
+            self._stream_start_time = time.monotonic() - self.clock.get_audio_pts()
         try:
             while self.is_streaming:
                 await asyncio.sleep(0.1) # Check every 100ms
@@ -130,7 +149,10 @@ class AudioStreamSink:
                 
                 lag_sec = elapsed_sec - current_pts
                 if lag_sec > 0:
-                    self.write_silence(int(lag_sec * 1000))
+                    # Clamp to MAX_SILENCE_MS: if loop was blocked for multiple seconds,
+                    # injecting the full backlog at once would burst the audio pipe
+                    silence_ms = min(int(lag_sec * 1000), MAX_SILENCE_MS)
+                    self.write_silence(silence_ms)
         except asyncio.CancelledError:
             pass
 
