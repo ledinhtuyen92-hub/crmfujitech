@@ -13,6 +13,9 @@ Those are handled by the runtime or setup script.
 #>
 
 $ErrorActionPreference = "Stop"
+[Console]::OutputEncoding = [System.Text.Encoding]::UTF8
+$env:PYTHONIOENCODING = "utf-8"
+$env:PYTHONUTF8 = "1"
 
 $ProjectRoot = Resolve-Path "..\."
 $LiveStudioDir = "$ProjectRoot\live_studio"
