@@ -204,10 +204,25 @@ class ElevenLabsTTSProvider(BaseTTSProvider):
 
 class GoogleStudioTTSProvider(BaseTTSProvider):
     """
-    Google AI Studio (Gemini 2.0 Audio) Provider.
-    Supports natural prompt-based voice customization.
-    Uses Google Gemini API key.
+    Google AI Studio (Gemini TTS) Provider.
+    Uses the dedicated gemini-2.5-flash-preview-tts model with speech_config.
+    Supports prompt-based voice style customization.
+    Output: raw PCM 24kHz 16-bit mono → converted to WAV in-memory.
     """
+    # Prebuilt voices available in Gemini TTS
+    # Female: Aoede, Kore, Zephyr   Male: Charon, Fenrir, Puck
+    VOICE_MAP = {
+        "female": "Aoede",
+        "male": "Charon",
+        # explicit choices by name
+        "aoede": "Aoede",
+        "kore": "Kore",
+        "zephyr": "Zephyr",
+        "charon": "Charon",
+        "fenrir": "Fenrir",
+        "puck": "Puck",
+    }
+
     def __init__(self, api_key: str):
         if not api_key:
             raise TTSProviderException("Google Gemini API key is missing.")
@@ -223,43 +238,65 @@ class GoogleStudioTTSProvider(BaseTTSProvider):
 
         config = voice_config or {}
         style_prompt = config.get("style_prompt") or "Đọc với ngữ điệu tự nhiên, vui vẻ, rõ ràng cho buổi livestream bán hàng."
+        # Resolve voice name: user may pass "Aoede", "female", "charon", etc.
+        raw_voice = (config.get("voice") or "female").lower().strip()
+        voice_name = self.VOICE_MAP.get(raw_voice, "Aoede")
 
-        logger.info(f"[GoogleStudioTTS] Generating audio via Gemini Audio: {clean_text[:60]}...")
+        # Build the prompt — style instruction is embedded inside contents
+        prompt = f"{style_prompt}: {clean_text}"
+
+        logger.info(f"[GoogleStudioTTS] Generating via gemini-2.5-flash-preview-tts | voice={voice_name}: {clean_text[:60]}...")
         try:
             from google import genai
             from google.genai import types
+            import wave
 
             client = genai.Client(api_key=self.api_key)
-            # Gemini 2.0 Flash supports audio modality response
-            prompt_content = f"Chỉ đọc chính xác văn bản sau đây thành giọng nói, không thêm bớt từ ngữ nào: \"{clean_text}\""
-            
+
             response = client.models.generate_content(
-                model="gemini-2.0-flash",
-                contents=prompt_content,
+                model="gemini-2.5-flash-preview-tts",
+                contents=prompt,
                 config=types.GenerateContentConfig(
-                    response_mime_type="audio/mp3",
-                    system_instruction=f"Bạn là bộ đọc văn bản AI (TTS). Phong cách: {style_prompt}"
+                    response_modalities=["AUDIO"],
+                    speech_config=types.SpeechConfig(
+                        voice_config=types.VoiceConfig(
+                            prebuilt_voice_config=types.PrebuiltVoiceConfig(
+                                voice_name=voice_name
+                            )
+                        )
+                    )
                 )
             )
 
-            # Check if inline audio data was returned
-            audio_bytes = None
-            if hasattr(response, "candidates") and response.candidates:
+            # Extract raw PCM bytes from inline_data
+            pcm_bytes = None
+            if response.candidates and response.candidates[0].content.parts:
                 for part in response.candidates[0].content.parts:
-                    if hasattr(part, "inline_data") and part.inline_data:
-                        audio_bytes = part.inline_data.data
+                    if part.inline_data and part.inline_data.data:
+                        pcm_bytes = part.inline_data.data
                         break
 
-            if not audio_bytes:
-                raise TTSProviderException("Gemini did not return inline audio data.")
+            if not pcm_bytes:
+                raise TTSProviderException("Gemini TTS did not return any audio data.")
+
+            # Convert raw PCM (24kHz, 16-bit, mono) → WAV in-memory
+            wav_buffer = io.BytesIO()
+            with wave.open(wav_buffer, "wb") as wf:
+                wf.setnchannels(1)
+                wf.setsampwidth(2)   # 16-bit = 2 bytes
+                wf.setframerate(24000)
+                wf.writeframes(pcm_bytes)
+            wav_bytes = wav_buffer.getvalue()
 
             return AudioResult(
-                audio_bytes=audio_bytes,
-                mime_type="audio/mp3",
-                format="mp3",
+                audio_bytes=wav_bytes,
+                mime_type="audio/wav",
+                format="wav",
                 sample_rate=24000,
                 channels=1
             )
+        except TTSProviderException:
+            raise
         except Exception as e:
             logger.error(f"[GoogleStudioTTS] Gemini Audio generation failed: {e}")
             raise TTSProviderException(f"Google Studio Gemini Audio failed: {e}")

@@ -1067,7 +1067,7 @@ export default function AiAgentSettings() {
                       if (val === 'microsoft') form.setFieldsValue({ tts_voice: 'vi-VN-HoaiMyNeural' });
                       else if (val === 'openai') form.setFieldsValue({ tts_voice: 'nova' });
                       else if (val === 'elevenlabs') form.setFieldsValue({ tts_voice: '21m00Tcm4TlvDq8ikWAM' });
-                      else if (val === 'google_studio') form.setFieldsValue({ tts_voice: 'default' });
+                      else if (val === 'google_studio') form.setFieldsValue({ tts_voice: 'Aoede' });
                       else if (val === 'google_free') form.setFieldsValue({ tts_voice: 'vi' });
                     }}
                   >
@@ -1122,9 +1122,14 @@ export default function AiAgentSettings() {
                     }
                     if (provider === 'google_studio') {
                       return (
-                        <Form.Item name='tts_voice' label={<Text strong>Mô hình Audio</Text>}>
-                          <Select size="large" disabled defaultValue="gemini-2.0-flash">
-                            <Select.Option value="gemini-2.0-flash">Gemini 2.0 Flash Audio (Tự sinh giọng qua Prompt)</Select.Option>
+                        <Form.Item name='tts_voice' label={<Text strong>Giọng đọc (Gemini TTS)</Text>} rules={[{required: true}]}>
+                          <Select size="large">
+                            <Select.Option value="Aoede">👩 Aoede (Nữ - Ấm áp, biểu cảm, sinh động)</Select.Option>
+                            <Select.Option value="Kore">👩 Kore (Nữ - Trẻ trung, rõ ràng, năng lượng)</Select.Option>
+                            <Select.Option value="Zephyr">👩 Zephyr (Nữ - Nhẹ nhàng, ngọt ngào, dịu dàng)</Select.Option>
+                            <Select.Option value="Charon">👨 Charon (Nam - Trầm ấm, uy tín, dõng dạc)</Select.Option>
+                            <Select.Option value="Fenrir">👨 Fenrir (Nam - Mạnh mẽ, dứt khoát, tự tin)</Select.Option>
+                            <Select.Option value="Puck">👨 Puck (Nam - Vui vẻ, hài hước, thân thiện)</Select.Option>
                           </Select>
                         </Form.Item>
                       );
