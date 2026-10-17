@@ -155,13 +155,19 @@ class Local2DAvatarEngine(BaseAvatarEngine):
             self._last_blink_time = now
             
         mouth_state = "CLOSED"
+        audio_energy = 0.0
         if self.is_speaking:
             mouth_state = self.lip_sync.get_mouth_state(position_ms)
+            if hasattr(self.lip_sync, 'get_audio_energy'):
+                audio_energy = self.lip_sync.get_audio_energy(position_ms)
+            else:
+                audio_energy = 0.0 if mouth_state == "CLOSED" else 1.0
             
         self.renderer.render(
             is_speaking=self.is_speaking,
             mouth_state=mouth_state,
-            is_blinking=self._is_blinking
+            is_blinking=self._is_blinking,
+            audio_energy=audio_energy
         )
 
     def interrupt(self):

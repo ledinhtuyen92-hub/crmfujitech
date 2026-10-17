@@ -16,7 +16,7 @@ class BaseAvatarRenderer:
     def initialize(self):
         raise NotImplementedError
 
-    def render(self, is_speaking: bool, mouth_state: str, is_blinking: bool):
+    def render(self, is_speaking: bool, mouth_state: str, is_blinking: bool, audio_energy: float = 0.0):
         raise NotImplementedError
 
     def shutdown(self):
@@ -51,11 +51,12 @@ class DummyAvatarRenderer(BaseAvatarRenderer):
     def notify_speech_stop(self):
         pass
 
-    def render(self, is_speaking: bool, mouth_state: str, is_blinking: bool):
+    def render(self, is_speaking: bool, mouth_state: str, is_blinking: bool, audio_energy: float = 0.0):
         self.last_state = {
             "speaking": is_speaking,
             "mouth": mouth_state,
-            "blinking": is_blinking
+            "blinking": is_blinking,
+            "audio_energy": audio_energy
         }
 
     def shutdown(self):
@@ -282,10 +283,11 @@ class PygameAvatarRenderer(BaseAvatarRenderer):
 
     def notify_speech_stop(self):
         self._is_speaking_state = False
+        self._voice_active_hold_timer = 0.0
         self._last_render_time = time.monotonic()
         # Resume Playback: We do NOT reset _idle_playback_time
 
-    def render(self, is_speaking: bool, mouth_state: str, is_blinking: bool):
+    def render(self, is_speaking: bool, mouth_state: str, is_blinking: bool, audio_energy: float = 0.0):
         if not self.available or not self.screen:
             return
             
@@ -297,6 +299,24 @@ class PygameAvatarRenderer(BaseAvatarRenderer):
         now = time.monotonic()
         dt = max(0.0, min(0.1, now - getattr(self, '_last_render_time', now)))
         self._last_render_time = now
+
+        # Determine real-time voice activity via Audio Energy Gating & Hold Buffer
+        # - When audio amplitude exceeds threshold: voice is active -> open/animate mouth
+        # - When audio drops (pause, comma, breathing): hold buffer bridges minor consonant gaps (120ms)
+        #   before cleanly cross-fading back to closed-mouth idle pose!
+        VOICE_ENERGY_THRESHOLD = 0.05
+        VOICE_HOLD_SEC = 0.12
+
+        if is_speaking:
+            if audio_energy >= VOICE_ENERGY_THRESHOLD or mouth_state != MOUTH_STATE_CLOSED:
+                self._voice_active_hold_timer = VOICE_HOLD_SEC
+                is_actively_voicing = True
+            else:
+                self._voice_active_hold_timer = max(0.0, getattr(self, '_voice_active_hold_timer', 0.0) - dt)
+                is_actively_voicing = (self._voice_active_hold_timer > 0.0)
+        else:
+            self._voice_active_hold_timer = 0.0
+            is_actively_voicing = False
 
         has_custom_avatar = (
             (self.idle_sequence and len(self.idle_sequence) > 0) or 
@@ -336,19 +356,19 @@ class PygameAvatarRenderer(BaseAvatarRenderer):
                 loop_time = self._master_timeline % base_duration
                 self._master_timeline += dt
 
-                # Smooth cross-fade transition (~160ms = ~4 frames at 25fps for natural facial morphing)
-                TRANSITION_DURATION = 0.16
-                target_weight = 1.0 if is_speaking else 0.0
+                # Smooth cross-fade transition (~120ms = ~3 frames at 25fps for natural facial morphing)
+                TRANSITION_DURATION = 0.12
+                target_weight = 1.0 if is_actively_voicing else 0.0
                 if self._speech_blend_weight < target_weight:
                     self._speech_blend_weight = min(target_weight, self._speech_blend_weight + (dt / TRANSITION_DURATION))
                 elif self._speech_blend_weight > target_weight:
                     self._speech_blend_weight = max(target_weight, self._speech_blend_weight - (dt / TRANSITION_DURATION))
 
                 if self._speech_blend_weight <= 0.001:
-                    # 100% Idle frame at exact current second
+                    # 100% Idle frame at exact current second (closed mouth / resting)
                     surf = self.idle_sequence.get_frame(loop_time)
                 elif self._speech_blend_weight >= 0.999:
-                    # 100% Speaking frame at exact current second
+                    # 100% Speaking frame at exact current second (active lip movement)
                     surf = self.speaking_sequence.get_frame(loop_time)
                 else:
                     # Cross-fade blending window: both frames sampled at the EXACT same timeline position!
@@ -362,13 +382,13 @@ class PygameAvatarRenderer(BaseAvatarRenderer):
                         surf_speaking.set_alpha(255)  # Restore surface alpha to full opacity for cache integrity
                         return
                     else:
-                        surf = surf_speaking if is_speaking else surf_idle
+                        surf = surf_speaking if is_actively_voicing else surf_idle
 
             # 3. Fallback: Speaking State (Single image or single video)
             elif is_speaking:
                 # If speaking asset is a single static image (len == 1), gate mouth by audio energy
                 if self.speaking_sequence and len(self.speaking_sequence) == 1:
-                    if mouth_state != MOUTH_STATE_CLOSED:
+                    if is_actively_voicing and mouth_state != MOUTH_STATE_CLOSED:
                         surf = self.speaking_sequence.get_frame(0.0)
                     elif self.idle_sequence and len(self.idle_sequence) > 0:
                         surf = self.idle_sequence.get_frame(self._idle_playback_time)
@@ -376,8 +396,15 @@ class PygameAvatarRenderer(BaseAvatarRenderer):
                         surf = self.speaking_sequence.get_frame(0.0)
                 # If speaking asset is an independent video sequence, resume playback
                 elif self.speaking_sequence and len(self.speaking_sequence) > 1:
-                    surf = self.speaking_sequence.get_frame(self._speaking_playback_time)
-                    self._speaking_playback_time += dt
+                    if is_actively_voicing:
+                        surf = self.speaking_sequence.get_frame(self._speaking_playback_time)
+                        self._speaking_playback_time += dt
+                    elif self.idle_sequence and len(self.idle_sequence) > 0:
+                        # In pause/silence between phrases: show resting idle pose!
+                        surf = self.idle_sequence.get_frame(self._idle_playback_time)
+                        self._idle_playback_time += dt
+                    else:
+                        surf = self.speaking_sequence.get_frame(self._speaking_playback_time)
                 elif self.idle_sequence and len(self.idle_sequence) > 0:
                     surf = self.idle_sequence.get_frame(self._idle_playback_time)
                     self._idle_playback_time += dt

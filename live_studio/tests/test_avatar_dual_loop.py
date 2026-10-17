@@ -88,5 +88,44 @@ class TestDualLoopAvatar(unittest.TestCase):
             if os.path.exists(spk_path):
                 os.remove(spk_path)
 
+    def test_audio_energy_gating_micro_pauses(self):
+        renderer = PygameAvatarRenderer()
+        renderer.initialize()
+
+        surf_idle = pygame.Surface((720, 1280))
+        surf_idle.fill((0, 255, 0)) # Green: Idle
+        idle_path = "test_idle_energy.png"
+        pygame.image.save(surf_idle, idle_path)
+
+        surf_spk = pygame.Surface((720, 1280))
+        surf_spk.fill((255, 0, 0)) # Red: Speaking
+        spk_path = "test_speaking_energy.png"
+        pygame.image.save(surf_spk, spk_path)
+
+        try:
+            renderer.load_avatar_assets(idle_path=idle_path, speaking_path=spk_path)
+
+            # 1. Speech active with high audio energy -> Red speaking frame
+            renderer.notify_speech_start()
+            renderer.render(is_speaking=True, mouth_state="OPEN", is_blinking=False, audio_energy=0.5)
+            color = renderer.screen.get_at((360, 640))[:3]
+            self.assertEqual(color, (255, 0, 0), "High energy speaking should be red")
+
+            # 2. Audio falls into micro-pause (silence / taking breath between clauses)
+            # Even though is_speaking is True, energy drops to 0 and hold buffer expires -> Green idle frame
+            import time
+            renderer._voice_active_hold_timer = 0.0 # Force hold buffer expiry to simulate >120ms pause
+            renderer._speech_blend_weight = 0.0 # Blended back to idle
+            renderer.render(is_speaking=True, mouth_state="CLOSED", is_blinking=False, audio_energy=0.0)
+            color = renderer.screen.get_at((360, 640))[:3]
+            self.assertEqual(color, (0, 255, 0), "Micro-pause during speech should render closed mouth idle frame")
+
+        finally:
+            renderer.shutdown()
+            if os.path.exists(idle_path):
+                os.remove(idle_path)
+            if os.path.exists(spk_path):
+                os.remove(spk_path)
+
 if __name__ == '__main__':
     unittest.main()

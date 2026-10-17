@@ -73,6 +73,7 @@ class LipSyncAnalyzer:
             
             # Normalize amplitude to 0.0 - 1.0 (16-bit max is 32768)
             norm_amp = max_amp / 32768.0
+            self._current_energy = norm_amp
             
             # Map amplitude to target state index
             if norm_amp < 0.05:  # Noise floor threshold
@@ -98,4 +99,22 @@ class LipSyncAnalyzer:
         except Exception as e:
             logger.error(f"Error analyzing audio chunk: {e}")
             self._last_state_idx = 0
+            self._current_energy = 0.0
             return MOUTH_STATE_CLOSED
+
+    def get_audio_energy(self, position_ms: int = None) -> float:
+        """
+        Returns normalized audio amplitude (0.0 to 1.0).
+        If position_ms is provided, updates analysis if needed.
+        """
+        if not self._is_speaking or not self._pcm_data:
+            return 0.0
+        if position_ms is not None:
+            self.get_mouth_state(position_ms)
+        return getattr(self, '_current_energy', 0.0)
+
+    def is_voice_active(self, position_ms: int = None, threshold: float = 0.05) -> bool:
+        """
+        Determines whether the voice is actively making sound (not in pause/silence).
+        """
+        return self.get_audio_energy(position_ms) >= threshold
