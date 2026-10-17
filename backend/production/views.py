@@ -40,7 +40,7 @@ class ProductionOrderViewSet(TenantQuerySetMixin, viewsets.ModelViewSet):
     module_code = "production"
 
     queryset = ProductionOrder.objects.select_related(
-        "company", "order__customer"
+        "company", "order__customer", "factory"
     ).prefetch_related("steps").order_by("-created_at")
     serializer_class = ProductionOrderSerializer
     pagination_class = StandardPagination
@@ -130,6 +130,14 @@ class ProductionOrderViewSet(TenantQuerySetMixin, viewsets.ModelViewSet):
                 qs = qs.filter(status="completed", order__delivery_order__isnull=True)
             else:
                 qs = qs.filter(status=prod_status)
+
+        # Filter theo nhà máy sản xuất
+        factory_param = self.request.query_params.get("factory") or self.request.query_params.get("factory_id")
+        if factory_param:
+            if factory_param == "unassigned":
+                qs = qs.filter(factory__isnull=True)
+            else:
+                qs = qs.filter(factory_id=factory_param)
                 
         # Tìm kiếm
         search = self.request.query_params.get("search")

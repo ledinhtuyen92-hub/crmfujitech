@@ -202,6 +202,7 @@ export default function ProductionList() {
   // Filters
   const [searchInput, searchQuery, handleSearchChange] = useDebounce('', 400)
   const [statusFilter, setStatusFilter] = useState('')
+  const [factoryFilter, setFactoryFilter] = useState('')
 
   // Modal Add / Edit Production Order
   const [modalVisible, setModalVisible] = useState(false)
@@ -309,6 +310,7 @@ export default function ProductionList() {
         page_size: pageSize
       }
       if (statusFilter) params.status = statusFilter
+      if (factoryFilter) params.factory = factoryFilter
       if (searchQuery) params.search = searchQuery
       
       const res = await api.get('/production/orders/', { params })
@@ -322,17 +324,29 @@ export default function ProductionList() {
     } finally {
       setLoading(false)
     }
-  }, [statusFilter, searchQuery, pageSize, messageApi])
+  }, [statusFilter, factoryFilter, searchQuery, pageSize, messageApi])
+
+  const fetchFactories = useCallback(async () => {
+    try {
+      const res = await api.get('/production/factories/', { params: { page_size: 1000 } })
+      const data = Array.isArray(res.data) ? res.data : (res.data?.results ?? [])
+      if (data && data.length > 0) {
+        setFactories(data)
+      }
+    } catch {
+      // ignore
+    }
+  }, [])
 
   const fetchOrdersAndUsers = useCallback(async () => {
     await Promise.resolve()
     try {
       const [ordRes, usrRes, tmplRes, compTmplRes, facRes] = await Promise.all([
-        api.get('/orders/orders/', { params: { status: 'approved' } }),
+        api.get('/orders/orders/', { params: { status: 'approved' } }).catch(() => ({ data: [] })),
         api.get('/users/users/').catch(() => ({ data: [] })),
         api.get('/sales/quotation-templates/active/').catch(() => ({ data: [] })),
         api.get('/sales/quotation-templates/my-company-template/').catch(() => ({ data: null })),
-        api.get('/production/factories/').catch(() => ({ data: [] })),
+        api.get('/production/factories/', { params: { page_size: 1000 } }).catch(() => ({ data: [] })),
       ])
       const ordData = Array.isArray(ordRes.data) ? ordRes.data : ordRes.data?.results ?? []
       const usrData = Array.isArray(usrRes.data) ? usrRes.data : usrRes.data?.results ?? []
@@ -342,7 +356,9 @@ export default function ProductionList() {
       setUsers(usrData)
       setTemplates(tmplData)
       setCompanyTemplate(compTmplRes.data || null)
-      setFactories(facData)
+      if (facData && facData.length > 0) {
+        setFactories(facData)
+      }
     } catch {
       // ignore
     }
@@ -540,16 +556,12 @@ export default function ProductionList() {
   }, [fetchProductionOrders])
 
   useEffect(() => {
+    fetchFactories()
     fetchOrdersAndUsers()
-  }, [fetchOrdersAndUsers])
+  }, [fetchFactories, fetchOrdersAndUsers])
 
-  // ── Filtered list ─────────────────────────────────────────────────────
-  const filteredPOs = productionOrders.filter((item) => {
-    if (!searchQuery) return true
-    const oNum = (item.order_number || '').toLowerCase()
-    const query = searchQuery.toLowerCase()
-    return oNum.includes(query)
-  })
+  // ── Filtered list (Dữ liệu đã được lọc hoàn toàn ở server-side) ─────
+  const filteredPOs = productionOrders
 
   // ── Open Modal (PO) ───────────────────────────────────────────────────
   const openModal = (po = null) => {
@@ -1027,7 +1039,7 @@ export default function ProductionList() {
         <Row gutter={[16, 16]} align="middle">
           <Col xs={24} sm={12} md={8}>
             <Input
-              placeholder="Tìm theo mã đơn hàng liên kết..."
+              placeholder="Tìm theo mã lệnh SX, mã đơn hàng, khách hàng..."
               prefix={<SearchOutlined style={{ color: '#94a3b8' }} />}
               value={searchInput}
               onChange={handleSearchChange}
@@ -1035,7 +1047,7 @@ export default function ProductionList() {
               style={{ borderRadius: 8 }}
             />
           </Col>
-          <Col xs={24} sm={12} md={6}>
+          <Col xs={24} sm={12} md={5}>
             <Select
               placeholder="Lọc theo trạng thái"
               value={statusFilter || undefined}
@@ -1048,6 +1060,24 @@ export default function ProductionList() {
               <Option value="completed">Hoàn thành</Option>
               <Option value="undelivered">Hàng chưa được giao</Option>
               <Option value="cancelled">Đã hủy</Option>
+            </Select>
+          </Col>
+          <Col xs={24} sm={12} md={5}>
+            <Select
+              placeholder="Lọc theo Nhà máy"
+              value={factoryFilter || undefined}
+              onChange={(val) => setFactoryFilter(val || '')}
+              allowClear
+              showSearch
+              optionFilterProp="children"
+              style={{ width: '100%' }}
+            >
+              {factories.map((f) => (
+                <Option key={f.id} value={f.id}>
+                  {f.name}
+                </Option>
+              ))}
+              <Option value="unassigned">Chưa gán nhà máy</Option>
             </Select>
           </Col>
         </Row>
