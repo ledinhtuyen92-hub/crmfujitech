@@ -11,7 +11,7 @@ from rest_framework.test import APIClient
 
 from users.models import Company
 from live_sessions.models import LiveDevice
-from live_sessions.audio.tts import AudioResult, OpenAITTSProvider
+from live_sessions.audio.tts import AudioResult, OpenAITTSProvider, MicrosoftEdgeTTSProvider, generate_tts_with_failover
 from live_sessions.audio.exceptions import TTSProviderException
 from live_sessions.audio.storage import LocalAudioStorageBackend
 
@@ -145,3 +145,56 @@ class AudioLayerTests(TestCase):
         # Should be forbidden
         self.assertEqual(response.status_code, 403)
         self.assertEqual(response.json()['detail'], 'Forbidden. Tenant mismatch.')
+
+    @patch('edge_tts.Communicate')
+    def test_edge_tts_provider_success(self, mock_communicate):
+        # Mock communicate.stream() async generator
+        async def fake_stream():
+            yield {"type": "audio", "data": b"edge_audio"}
+        
+        mock_comm_instance = MagicMock()
+        mock_comm_instance.stream.return_value = fake_stream()
+        mock_communicate.return_value = mock_comm_instance
+
+        provider = MicrosoftEdgeTTSProvider()
+        result = provider.generate("Chào bạn", {"voice": "vi-VN-HoaiMyNeural", "speed": 1.2, "pitch": "+0Hz"})
+        self.assertEqual(result.audio_bytes, b"edge_audio")
+        self.assertEqual(result.format, "mp3")
+
+    @patch('live_sessions.audio.tts.MicrosoftEdgeTTSProvider.generate')
+    @patch('live_sessions.audio.tts.OpenAITTSProvider.generate')
+    def test_failover_openai_to_edge_inherits_speed(self, mock_openai, mock_edge):
+        # OpenAI throws 429 quota exception
+        mock_openai.side_effect = TTSProviderException("429 insufficient_quota")
+        mock_edge.return_value = AudioResult(
+            audio_bytes=b"fallback_edge_bytes",
+            mime_type="audio/mp3",
+            format="mp3"
+        )
+
+        agent_mock = MagicMock()
+        agent_mock.tts_provider = "openai"
+        agent_mock.tts_voice = "alloy"  # Female OpenAI voice
+        agent_mock.tts_speed = 1.3
+        agent_mock.tts_pitch = "+2Hz"
+        agent_mock.tts_style_prompt = ""
+        agent_mock.tts_stability = 0.5
+        agent_mock.tts_similarity = 0.75
+
+        result, provider_name, is_fallback, reason = generate_tts_with_failover(
+            text="Test failover",
+            agent=agent_mock,
+            company=self.company
+        )
+
+        self.assertTrue(is_fallback)
+        self.assertEqual(provider_name, "microsoft")
+        self.assertEqual(result.audio_bytes, b"fallback_edge_bytes")
+
+        # Verify edge was called with inherited speed (1.3) and female voice (vi-VN-HoaiMyNeural)
+        mock_edge.assert_called_once()
+        call_args = mock_edge.call_args
+        edge_options = call_args[0][1]
+        self.assertEqual(edge_options["speed"], 1.3)
+        self.assertEqual(edge_options["voice"], "vi-VN-HoaiMyNeural")
+

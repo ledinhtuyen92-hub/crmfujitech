@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Card, Table, Button, Modal, Form, Input, InputNumber, Select, Switch, message, Space, Typography, Tag, Collapse, Row, Col, Divider, Alert, Slider, Tooltip, Segmented, Radio, List } from 'antd';
-import { PlusOutlined, EditOutlined, RobotOutlined, SettingOutlined, KeyOutlined, SyncOutlined, InfoCircleOutlined, ThunderboltOutlined, DeleteOutlined, BookOutlined } from '@ant-design/icons';
+import { PlusOutlined, EditOutlined, RobotOutlined, SettingOutlined, KeyOutlined, SyncOutlined, InfoCircleOutlined, ThunderboltOutlined, DeleteOutlined, BookOutlined, SoundOutlined, PlayCircleOutlined } from '@ant-design/icons';
 import api from '../../utils/api';
 import { useAuth } from '../../contexts/AuthContext';
 import { useResponsive } from '../../hooks/useResponsive';
@@ -28,6 +28,50 @@ export default function AiAgentSettings() {
     }).catch(() => {});
   }, []);
   
+  // TTS Audio Preview
+  const [previewLoading, setPreviewLoading] = useState(false);
+  const [previewAudio, setPreviewAudio] = useState(null);
+  const [previewStatus, setPreviewStatus] = useState(null);
+
+  const handlePreviewTts = async () => {
+    const values = form.getFieldsValue();
+    setPreviewLoading(true);
+    setPreviewStatus(null);
+    if (previewAudio) {
+      try { previewAudio.pause(); } catch (_) {}
+    }
+    try {
+      const res = await api.post('/ai_agents/agents/tts-preview/', {
+        text: values.tts_preview_text || "Dạ xin chào mọi người đang xem live! Cảm ơn mọi người đã theo dõi buổi livestream hôm nay ạ.",
+        tts_provider: values.tts_provider || 'microsoft',
+        tts_voice: values.tts_voice || 'vi-VN-HoaiMyNeural',
+        tts_speed: values.tts_speed !== undefined ? values.tts_speed : 1.0,
+        tts_pitch: values.tts_pitch || '+0Hz',
+        tts_style_prompt: values.tts_style_prompt || '',
+        tts_stability: values.tts_stability !== undefined ? values.tts_stability : 0.5,
+        tts_similarity: values.tts_similarity !== undefined ? values.tts_similarity : 0.75,
+      });
+
+      const audioSrc = `data:${res.data.mime_type};base64,${res.data.audio_base64}`;
+      const audio = new Audio(audioSrc);
+      audio.play().catch(e => console.warn('Audio play error:', e));
+      setPreviewAudio(audio);
+
+      if (res.data.is_fallback) {
+        message.warning(`Đã tự động chuyển qua giọng dự phòng [${res.data.provider.toUpperCase()}] do: ${res.data.fallback_reason}`);
+        setPreviewStatus({ isFallback: true, provider: res.data.provider, reason: res.data.fallback_reason });
+      } else {
+        message.success(`Đang phát thử giọng qua [${res.data.provider.toUpperCase()}] tốc độ ${res.data.speed}x!`);
+        setPreviewStatus({ isFallback: false, provider: res.data.provider, speed: res.data.speed });
+      }
+    } catch (err) {
+      const errMsg = err.response?.data?.error || 'Lỗi khi tạo âm thanh thử.';
+      message.error(errMsg);
+    } finally {
+      setPreviewLoading(false);
+    }
+  };
+
   // Company API Settings
   const [companySettings, setCompanySettings] = useState(null);
   const [settingsLoading, setSettingsLoading] = useState(false);
@@ -302,11 +346,24 @@ export default function AiAgentSettings() {
       setDefaultCoreSystemRules(currentSystemRules);
     } catch (e) {}
 
+    setPreviewStatus(null);
+    if (previewAudio) {
+      try { previewAudio.pause(); } catch (_) {}
+    }
+
     if (agent) {
       form.setFieldsValue({
         ...agent,
         core_prompt_template: agent.core_prompt_template || currentTemplate,
-        core_system_rules: agent.core_system_rules || currentSystemRules
+        core_system_rules: agent.core_system_rules || currentSystemRules,
+        tts_provider: agent.tts_provider || 'microsoft',
+        tts_voice: agent.tts_voice || 'vi-VN-HoaiMyNeural',
+        tts_speed: agent.tts_speed !== undefined ? agent.tts_speed : 1.0,
+        tts_pitch: agent.tts_pitch || '+0Hz',
+        tts_style_prompt: agent.tts_style_prompt || '',
+        tts_stability: agent.tts_stability !== undefined ? agent.tts_stability : 0.5,
+        tts_similarity: agent.tts_similarity !== undefined ? agent.tts_similarity : 0.75,
+        tts_preview_text: 'Dạ xin chào mọi người đang xem live! Cảm ơn mọi người đã theo dõi buổi livestream hôm nay ạ.'
       });
     } else {
       form.resetFields();
@@ -330,7 +387,15 @@ export default function AiAgentSettings() {
         drip_followup_hours: 24,
         debounce_delay: 4,
         core_prompt_template: currentTemplate,
-        core_system_rules: currentSystemRules
+        core_system_rules: currentSystemRules,
+        tts_provider: 'microsoft',
+        tts_voice: 'vi-VN-HoaiMyNeural',
+        tts_speed: 1.0,
+        tts_pitch: '+0Hz',
+        tts_style_prompt: '',
+        tts_stability: 0.5,
+        tts_similarity: 0.75,
+        tts_preview_text: 'Dạ xin chào mọi người đang xem live! Cảm ơn mọi người đã theo dõi buổi livestream hôm nay ạ.'
       });
     }
     setModalVisible(true);
@@ -367,6 +432,15 @@ export default function AiAgentSettings() {
     { title: 'Tên Trợ lý AI', dataIndex: 'name', key: 'name', render: (t) => <Text strong><RobotOutlined /> {t}</Text> },
     { title: 'Nền tảng', dataIndex: 'provider', key: 'provider', render: (t) => <Tag color='purple'>{t?.toUpperCase()}</Tag> },
     { title: 'Mô hình', dataIndex: 'model_name', key: 'model_name', render: (t) => <Tag color='blue'>{t}</Tag> },
+    { title: 'Giọng đọc (TTS)', key: 'tts', render: (_, r) => (
+      <Space direction="vertical" size={2}>
+        <Space size={4}>
+          <Tag color="cyan">{r.tts_provider ? r.tts_provider.toUpperCase() : 'MICROSOFT'}</Tag>
+          <Text style={{ fontSize: 13 }}>{r.tts_voice || 'Hoài My'}</Text>
+        </Space>
+        <Text type="secondary" style={{ fontSize: 11 }}>Tốc độ: {r.tts_speed || 1.0}x</Text>
+      </Space>
+    )},
     { title: 'Trạng thái', dataIndex: 'is_active', key: 'is_active', render: (isActive) => isActive ? <Tag color='green'>Đang hoạt động</Tag> : <Tag color='red'>Đã tắt</Tag> },
     { title: 'Thao tác', key: 'actions', render: (_, record) => (
       <Space>
@@ -455,9 +529,14 @@ export default function AiAgentSettings() {
                   <Text type="secondary" style={{ fontSize: 13 }}>Nền tảng: </Text>
                   <Tag color='purple'>{item.provider?.toUpperCase()}</Tag>
                 </div>
-                <div style={{ marginBottom: 12 }}>
+                <div style={{ marginBottom: 4 }}>
                   <Text type="secondary" style={{ fontSize: 13 }}>Mô hình: </Text>
                   <Tag color='blue'>{item.model_name}</Tag>
+                </div>
+                <div style={{ marginBottom: 12 }}>
+                  <Text type="secondary" style={{ fontSize: 13 }}>Giọng đọc: </Text>
+                  <Tag color='cyan'>{item.tts_provider ? item.tts_provider.toUpperCase() : 'MICROSOFT'}</Tag>
+                  <Text style={{ fontSize: 12 }}>{item.tts_voice || 'Hoài My'} ({item.tts_speed || 1.0}x)</Text>
                 </div>
                 <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
                   <Button
@@ -968,6 +1047,243 @@ export default function AiAgentSettings() {
           </Collapse>
 
 
+
+          {/* Cấu hình Giọng nói AI (TTS & Livestream) */}
+          <div style={{ background: '#f8fafc', border: '1px solid #cbd5e1', borderRadius: 12, padding: '18px 20px', marginTop: 12, marginBottom: 16 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+              <Space>
+                <SoundOutlined style={{ fontSize: 20, color: '#0284c7' }} />
+                <Text strong style={{ fontSize: 16, color: '#0f172a' }}>Cấu hình Giọng nói AI (TTS & Livestream)</Text>
+              </Space>
+              <Tag color="cyan" style={{ borderRadius: 6, fontWeight: 500 }}>🛡️ Tự động xoay vòng dự phòng</Tag>
+            </div>
+
+            <Row gutter={16}>
+              <Col xs={24} md={12}>
+                <Form.Item name='tts_provider' label={<Text strong>Nền tảng Giọng đọc</Text>} rules={[{required: true}]}>
+                  <Select
+                    size="large"
+                    onChange={(val) => {
+                      if (val === 'microsoft') form.setFieldsValue({ tts_voice: 'vi-VN-HoaiMyNeural' });
+                      else if (val === 'openai') form.setFieldsValue({ tts_voice: 'nova' });
+                      else if (val === 'elevenlabs') form.setFieldsValue({ tts_voice: '21m00Tcm4TlvDq8ikWAM' });
+                      else if (val === 'google_studio') form.setFieldsValue({ tts_voice: 'default' });
+                      else if (val === 'google_free') form.setFieldsValue({ tts_voice: 'vi' });
+                    }}
+                  >
+                    <Select.Option value='microsoft'>🟢 Microsoft Edge TTS (Miễn phí 100% - Khuyên dùng)</Select.Option>
+                    <Select.Option value='google_studio'>🟣 Google AI Studio (Gemini Voice Prompt)</Select.Option>
+                    <Select.Option value='elevenlabs'>🟠 ElevenLabs (Voice Clone / Chuyên nghiệp)</Select.Option>
+                    <Select.Option value='openai'>🔵 OpenAI TTS (Alloy, Nova, Shimmer...)</Select.Option>
+                    <Select.Option value='google_free'>🟡 Google Translate (Dự phòng cơ bản)</Select.Option>
+                  </Select>
+                </Form.Item>
+              </Col>
+
+              <Col xs={24} md={12}>
+                <Form.Item noStyle shouldUpdate={(prev, curr) => prev.tts_provider !== curr.tts_provider}>
+                  {({ getFieldValue }) => {
+                    const provider = getFieldValue('tts_provider') || 'microsoft';
+                    if (provider === 'microsoft') {
+                      return (
+                        <Form.Item name='tts_voice' label={<Text strong>Giọng đọc (Microsoft Neural)</Text>} rules={[{required: true}]}>
+                          <Select size="large">
+                            <Select.Option value='vi-VN-HoaiMyNeural'>👩 Hoài My (Nữ - Truyền cảm, chuẩn MC bán hàng)</Select.Option>
+                            <Select.Option value='vi-VN-NamMinhNeural'>👨 Nam Minh (Nam - Trầm ấm, dõng dạc, uy tín)</Select.Option>
+                          </Select>
+                        </Form.Item>
+                      );
+                    }
+                    if (provider === 'openai') {
+                      return (
+                        <Form.Item name='tts_voice' label={<Text strong>Giọng đọc (OpenAI)</Text>} rules={[{required: true}]}>
+                          <Select size="large">
+                            <Select.Option value='nova'>👩 Nova (Nữ - Trẻ trung, năng lượng bán hàng)</Select.Option>
+                            <Select.Option value='shimmer'>👩 Shimmer (Nữ - Ngọt ngào, dịu dàng)</Select.Option>
+                            <Select.Option value='alloy'>🧑 Alloy (Trung tính - Tự nhiên, cân bằng)</Select.Option>
+                            <Select.Option value='onyx'>👨 Onyx (Nam - Trầm ấm, đĩnh đạc)</Select.Option>
+                            <Select.Option value='echo'>👨 Echo (Nam - Rõ ràng, dứt khoát)</Select.Option>
+                            <Select.Option value='fable'>👨 Fable (Nam - Biểu cảm kể chuyện)</Select.Option>
+                          </Select>
+                        </Form.Item>
+                      );
+                    }
+                    if (provider === 'elevenlabs') {
+                      return (
+                        <Form.Item 
+                          name='tts_voice' 
+                          label={<Text strong>Voice ID (ElevenLabs / Giọng Clone của bạn)</Text>} 
+                          rules={[{required: true}]}
+                          tooltip="Dán mã Voice ID từ ElevenLabs sau khi bạn clone giọng thật của mình, hoặc dùng mã giọng mẫu."
+                        >
+                          <Input size="large" placeholder="VD: 21m00Tcm4TlvDq8ikWAM hoặc Voice ID đã clone" />
+                        </Form.Item>
+                      );
+                    }
+                    if (provider === 'google_studio') {
+                      return (
+                        <Form.Item name='tts_voice' label={<Text strong>Mô hình Audio</Text>}>
+                          <Select size="large" disabled defaultValue="gemini-2.0-flash">
+                            <Select.Option value="gemini-2.0-flash">Gemini 2.0 Flash Audio (Tự sinh giọng qua Prompt)</Select.Option>
+                          </Select>
+                        </Form.Item>
+                      );
+                    }
+                    return (
+                      <Form.Item name='tts_voice' label={<Text strong>Ngôn ngữ</Text>}>
+                        <Select size="large" disabled defaultValue="vi">
+                          <Select.Option value="vi">Tiếng Việt (Google Translate)</Select.Option>
+                        </Select>
+                      </Form.Item>
+                    );
+                  }}
+                </Form.Item>
+              </Col>
+            </Row>
+
+            {/* Dynamic Provider Extra Fields */}
+            <Form.Item noStyle shouldUpdate={(prev, curr) => prev.tts_provider !== curr.tts_provider}>
+              {({ getFieldValue }) => {
+                const provider = getFieldValue('tts_provider') || 'microsoft';
+                if (provider === 'google_studio') {
+                  return (
+                    <Form.Item 
+                      name='tts_style_prompt' 
+                      label={<Text strong>Mô tả Phong cách & Biểu cảm Giọng đọc (Prompt)</Text>}
+                      tooltip="Mô tả thần thái, độ tuổi, cảm xúc bạn muốn AI thể hiện khi đọc câu trả lời."
+                    >
+                      <Input.TextArea 
+                        rows={2} 
+                        placeholder='VD: Giọng nữ 24 tuổi miền Bắc, hào hứng, tươi cười, phong cách livestream bán hàng chốt sale năng lượng, ngắt nghỉ dứt khoát...' 
+                      />
+                    </Form.Item>
+                  );
+                }
+                if (provider === 'elevenlabs') {
+                  return (
+                    <Row gutter={16}>
+                      <Col xs={24} md={12}>
+                        <Form.Item 
+                          name='tts_stability' 
+                          label={<Space><Text strong>Độ ổn định cảm xúc (Stability)</Text><Tooltip title="Càng thấp giọng càng bay bổng, biểu cảm phong phú; càng cao giọng càng đều đặn, chuẩn xác. Khuyên dùng: 0.5"><InfoCircleOutlined /></Tooltip></Space>}
+                        >
+                          <Slider min={0} max={1} step={0.05} marks={{ 0: 'Cảm xúc', 0.5: '0.5', 1: 'Ổn định' }} />
+                        </Form.Item>
+                      </Col>
+                      <Col xs={24} md={12}>
+                        <Form.Item 
+                          name='tts_similarity' 
+                          label={<Space><Text strong>Độ giống giọng gốc (Similarity Boost)</Text><Tooltip title="Tăng cao để giọng sát với mẫu ghi âm bạn đã tải lên. Khuyên dùng: 0.75"><InfoCircleOutlined /></Tooltip></Space>}
+                        >
+                          <Slider min={0} max={1} step={0.05} marks={{ 0: '0', 0.75: '0.75', 1: '1.0' }} />
+                        </Form.Item>
+                      </Col>
+                    </Row>
+                  );
+                }
+                if (provider === 'microsoft') {
+                  return (
+                    <Row gutter={16}>
+                      <Col xs={24} md={12}>
+                        <Form.Item name='tts_pitch' label={<Text strong>Cao độ giọng (Pitch)</Text>} tooltip="Chỉnh giọng thanh hơn (+5Hz, +10Hz) hoặc trầm hơn (-5Hz, -10Hz). Mặc định +0Hz">
+                          <Select size="middle">
+                            <Select.Option value="-10Hz">Rất trầm (-10Hz)</Select.Option>
+                            <Select.Option value="-5Hz">Trầm ấm (-5Hz)</Select.Option>
+                            <Select.Option value="+0Hz">Tự nhiên (+0Hz - Mặc định)</Select.Option>
+                            <Select.Option value="+5Hz">Thanh thoát (+5Hz)</Select.Option>
+                            <Select.Option value="+10Hz">Trong trẻo (+10Hz)</Select.Option>
+                          </Select>
+                        </Form.Item>
+                      </Col>
+                    </Row>
+                  );
+                }
+                return null;
+              }}
+            </Form.Item>
+
+            {/* Tốc độ đọc Speed Slider */}
+            <Row gutter={16} align="middle">
+              <Col xs={24} md={16}>
+                <Form.Item 
+                  name='tts_speed' 
+                  label={
+                    <Space>
+                      <Text strong>Tốc độ giọng đọc (Speed)</Text>
+                      <Tooltip title="Tốc độ nói của AI. Khuyên dùng: 1.15x - 1.2x cho livestream bán hàng sôi nổi, hoạt ngôn. Giọng dự phòng cũng sẽ tự động kế thừa đúng tốc độ này.">
+                        <InfoCircleOutlined />
+                      </Tooltip>
+                    </Space>
+                  }
+                >
+                  <Slider 
+                    min={0.7} 
+                    max={1.5} 
+                    step={0.05} 
+                    marks={{ 0.8: '0.8x (Chậm)', 1.0: '1.0x (Chuẩn)', 1.15: '1.15x (Livestream)', 1.3: '1.3x (Nhanh)' }} 
+                  />
+                </Form.Item>
+              </Col>
+              <Col xs={24} md={8}>
+                <div style={{ padding: '8px 12px', background: '#e0f2fe', borderRadius: 8, textAlign: 'center', marginTop: 10, border: '1px solid #bae6fd' }}>
+                  <Text type="secondary" style={{ fontSize: 12, display: 'block' }}>Khuyên dùng Livestream:</Text>
+                  <Text strong style={{ color: '#0369a1', fontSize: 14 }}>1.15x - 1.2x (Sôi nổi)</Text>
+                </div>
+              </Col>
+            </Row>
+
+            {/* Ô Nghe thử giọng */}
+            <div style={{ background: '#fff', border: '1px dashed #94a3b8', borderRadius: 8, padding: 12, marginTop: 8 }}>
+              <Text strong style={{ fontSize: 13, display: 'block', marginBottom: 6, color: '#334155' }}>🔊 Nghe thử giọng đọc trực tiếp:</Text>
+              <Row gutter={12}>
+                <Col flex="auto">
+                  <Form.Item name='tts_preview_text' style={{ marginBottom: 0 }}>
+                    <Input placeholder="Nhập câu bạn muốn nghe thử (VD: Dạ xin chào mọi người, hôm nay shop có deal hot ạ...)" />
+                  </Form.Item>
+                </Col>
+                <Col flex="none">
+                  <Button 
+                    type="primary" 
+                    icon={<PlayCircleOutlined />} 
+                    loading={previewLoading}
+                    onClick={handlePreviewTts}
+                    style={{ background: '#0284c7', borderColor: '#0284c7', borderRadius: 6 }}
+                  >
+                    Phát thử giọng
+                  </Button>
+                </Col>
+              </Row>
+              {previewStatus && (
+                <div style={{ marginTop: 8 }}>
+                  {previewStatus.isFallback ? (
+                    <Alert 
+                      type="warning" 
+                      showIcon 
+                      message={`Đã tự động phát qua giọng dự phòng [${previewStatus.provider.toUpperCase()}] do: ${previewStatus.reason}`} 
+                      style={{ fontSize: 12, padding: '4px 8px', borderRadius: 6 }}
+                    />
+                  ) : (
+                    <Alert 
+                      type="success" 
+                      showIcon 
+                      message={`Âm thanh phát thành công từ [${previewStatus.provider.toUpperCase()}] với tốc độ ${previewStatus.speed}x.`} 
+                      style={{ fontSize: 12, padding: '4px 8px', borderRadius: 6 }}
+                    />
+                  )}
+                </div>
+              )}
+            </div>
+
+            {/* Thông báo cơ chế an toàn xoay vòng */}
+            <Alert 
+              message="🛡️ Cơ chế xoay vòng dự phòng thông minh:"
+              description="Nếu nền tảng bạn chọn bị hết tiền (429 Quota) hoặc lỗi mạng, hệ thống sẽ tự động chuyển sang giọng Microsoft Edge TTS (Hoài My/Nam Minh) mà vẫn GIỮ NGUYÊN TỐC ĐỘ và GIỚI TÍNH bạn đã cài đặt, đảm bảo livestream không bao giờ bị im lặng!"
+              type="info"
+              showIcon
+              style={{ marginTop: 12, borderRadius: 8, fontSize: 12 }}
+            />
+          </div>
+
           <div style={{ background: '#fafafa', border: '1px solid #f0f0f0', borderRadius: 8, padding: '16px 20px', marginTop: 8 }}>
             <div style={{ marginBottom: 16 }}>
               <Space>
@@ -1032,6 +1348,7 @@ export default function AiAgentSettings() {
               <Select.Option value='openai'>OpenAI (ChatGPT)</Select.Option>
               <Select.Option value='gemini'>Google Gemini</Select.Option>
               <Select.Option value='anthropic'>Anthropic (Claude)</Select.Option>
+              <Select.Option value='elevenlabs'>ElevenLabs (Voice Clone / TTS)</Select.Option>
             </Select>
           </Form.Item>
           <Form.Item name='api_key' label='API Key' rules={[{required: true}]}>

@@ -49,10 +49,61 @@ class AiAgentViewSet(viewsets.ModelViewSet):
         'usage_stats': 'ai_agent.view_dashboard',
         'extract_conversation': 'ai_agent.manage_knowledge',
         'save_extracted_conversation': 'ai_agent.manage_knowledge',
+        'tts_preview': 'ai_agent.manage_agents',
     }
     
     def get_queryset(self):
         return AiAgent.objects.filter(company=self.request.user.company).prefetch_related('knowledge_docs')
+
+    @action(detail=False, methods=['post'], url_path='tts-preview')
+    def tts_preview(self, request):
+        """
+        Tạo file âm thanh đọc thử (Preview TTS) trực tiếp từ giao diện với cấu hình tùy chỉnh.
+        """
+        import base64
+        from types import SimpleNamespace
+        from live_sessions.audio.tts import generate_tts_with_failover
+        
+        text = request.data.get('text') or "Dạ xin chào mọi người đang xem live! Cảm ơn mọi người đã theo dõi buổi livestream hôm nay ạ."
+        provider = request.data.get('tts_provider', 'microsoft')
+        voice = request.data.get('tts_voice', 'vi-VN-HoaiMyNeural')
+        speed = float(request.data.get('tts_speed', 1.0))
+        pitch = request.data.get('tts_pitch', '+0Hz')
+        style_prompt = request.data.get('tts_style_prompt', '')
+        stability = float(request.data.get('tts_stability', 0.5))
+        similarity = float(request.data.get('tts_similarity', 0.75))
+
+        mock_agent = SimpleNamespace(
+            tts_provider=provider,
+            tts_voice=voice,
+            tts_speed=speed,
+            tts_pitch=pitch,
+            tts_style_prompt=style_prompt,
+            tts_stability=stability,
+            tts_similarity=similarity
+        )
+        
+        company = getattr(request.user, 'company', None)
+        try:
+            audio_result, used_provider, is_fallback, fallback_reason = generate_tts_with_failover(
+                text=text,
+                agent=mock_agent,
+                company=company
+            )
+            audio_b64 = base64.b64encode(audio_result.audio_bytes).decode('utf-8')
+            return Response({
+                'audio_base64': audio_b64,
+                'format': audio_result.format,
+                'mime_type': audio_result.mime_type,
+                'provider': used_provider,
+                'is_fallback': is_fallback,
+                'fallback_reason': fallback_reason,
+                'speed': speed,
+                'voice': voice if not is_fallback else ("vi-VN-NamMinhNeural" if "nam" in voice.lower() else "vi-VN-HoaiMyNeural")
+            })
+        except Exception as e:
+            logger.error(f"TTS preview error: {e}")
+            return Response({'error': str(e)}, status=400)
 
     @action(detail=False, methods=['get'], url_path='default-prompt')
     def default_prompt(self, request):

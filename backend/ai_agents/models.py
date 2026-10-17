@@ -10,6 +10,7 @@ class SystemAiKey(models.Model):
         ('openai', 'OpenAI'),
         ('anthropic', 'Anthropic'),
         ('gemini', 'Google Gemini'),
+        ('elevenlabs', 'ElevenLabs'),
     )
     provider = models.CharField(max_length=50, choices=PROVIDER_CHOICES, default='openai')
     api_key = models.CharField(max_length=255)
@@ -50,6 +51,7 @@ class CompanyAiKey(models.Model):
         ('openai', 'OpenAI'),
         ('anthropic', 'Anthropic'),
         ('gemini', 'Google Gemini'),
+        ('elevenlabs', 'ElevenLabs'),
     )
     company = models.ForeignKey(Company, on_delete=models.CASCADE, related_name='ai_keys')
     provider = models.CharField(max_length=50, choices=PROVIDER_CHOICES, default='openai')
@@ -109,8 +111,45 @@ class AiAgent(models.Model):
     debounce_delay = models.IntegerField(default=4, help_text="Thời gian chờ (giây) sau tin nhắn cuối để gộp các tin nhắn lại. Khuyên dùng: 4-15 giây", verbose_name="Thời gian chờ gộp tin (Debounce)")
     
     # Cấu hình Giọng nói (TTS)
-    tts_voice = models.CharField(max_length=50, default='alloy', help_text="Giọng đọc (vd: alloy, nova, fable, onyx, echo, shimmer)")
-    tts_speed = models.FloatField(default=1.0, help_text="Tốc độ đọc (0.25 - 4.0)")
+    TTS_PROVIDER_CHOICES = (
+        ('microsoft', 'Microsoft Edge TTS (Miễn phí)'),
+        ('google_studio', 'Google AI Studio (Gemini Voice Prompt)'),
+        ('elevenlabs', 'ElevenLabs (Voice Clone / Chuyên nghiệp)'),
+        ('openai', 'OpenAI TTS'),
+        ('google_free', 'Google Translate (Dự phòng cơ bản)'),
+    )
+    tts_provider = models.CharField(
+        max_length=50,
+        choices=TTS_PROVIDER_CHOICES,
+        default='microsoft',
+        help_text="Nền tảng giọng đọc AI"
+    )
+    tts_voice = models.CharField(
+        max_length=100,
+        default='vi-VN-HoaiMyNeural',
+        help_text="Tên giọng đọc (vd: vi-VN-HoaiMyNeural, nova, hoặc ElevenLabs Voice ID)"
+    )
+    tts_speed = models.FloatField(default=1.0, help_text="Tốc độ đọc (0.5 - 2.0)")
+    tts_pitch = models.CharField(
+        max_length=20,
+        default='+0Hz',
+        blank=True,
+        null=True,
+        help_text="Cao độ giọng đọc (vd: +0Hz, +5Hz, -5Hz)"
+    )
+    tts_style_prompt = models.TextField(
+        blank=True,
+        null=True,
+        help_text="Mô tả phong cách, ngữ điệu, cảm xúc giọng đọc (cho Google AI Studio)"
+    )
+    tts_stability = models.FloatField(
+        default=0.5,
+        help_text="Độ ổn định cảm xúc (0.0 - 1.0 cho ElevenLabs)"
+    )
+    tts_similarity = models.FloatField(
+        default=0.75,
+        help_text="Độ tương đồng giọng thật (0.0 - 1.0 cho ElevenLabs)"
+    )
     
     is_active = models.BooleanField(default=True)
     created_at = models.DateTimeField(auto_now_add=True)

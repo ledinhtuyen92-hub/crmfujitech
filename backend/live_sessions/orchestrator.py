@@ -10,7 +10,7 @@ from django.conf import settings
 from live_sessions.models import LiveSession
 from ai_agents.services import generate_ai_reply
 from ai_agents.rag_processor import search_knowledge
-from live_sessions.audio.tts import OpenAITTSProvider, DummyTTSProvider, GoogleTTSProvider
+from live_sessions.audio.tts import OpenAITTSProvider, DummyTTSProvider, GoogleTTSProvider, MicrosoftEdgeTTSProvider, generate_tts_with_failover
 from live_sessions.audio.storage import LocalAudioStorageBackend
 from live_sessions.protocol.commands import SpeechSpeakPayloadSerializer, StreamStartPayloadSerializer, StreamStopPayloadSerializer
 from live_sessions.protocol.envelope import ProtocolEnvelopeSerializer
@@ -413,35 +413,30 @@ class LiveOrchestrator:
             logger.info(f"[Session: {session_id}][Corr: {correlation_id}] AI replied with empty or [STOP]. No TTS.")
             return {"status": "suppressed", "reason": "empty_reply"}
 
-        # 6. Generate TTS
+        # 6. Generate TTS via Multi-Tier Failover Engine (Inherits Speed & Gender)
         try:
-            # Configure voice: map from agent
-            voice_config = {
-                "voice": getattr(agent, 'tts_voice', 'alloy'), 
-                "speed": getattr(agent, 'tts_speed', 1.0)
-            }
-            
-            # Resolve AI credential via existing AI Core resolver
-            from ai_agents.services import get_api_keys
-            tts_keys = get_api_keys(session.company, 'openai')
-            resolved_key = tts_keys[0] if tts_keys else None
-            
-            if getattr(settings, 'DEBUG', False) and resolved_key == 'dummy':
-                self.tts_provider = DummyTTSProvider()
-            elif resolved_key:
-                try:
-                    self.tts_provider = OpenAITTSProvider(api_key=resolved_key)
-                    audio_result = self.tts_provider.generate(reply_text, voice_config)
-                except Exception as e:
-                    logger.warning(f"[Session: {session_id}] OpenAI TTS failed ({e}), using Google TTS fallback")
-                    self.tts_provider = GoogleTTSProvider()
-                    audio_result = self.tts_provider.generate(reply_text, voice_config)
-            else:
-                self.tts_provider = GoogleTTSProvider()
-                audio_result = self.tts_provider.generate(reply_text, voice_config)
-            
-            logger.info(f"[Session: {session_id}][Corr: {correlation_id}] TTS completed.")
-            LiveConsoleEventService.emit(session_id, "live.tts.completed", {"format": audio_result.format, "bytes": len(audio_result.audio_bytes)}, correlation_id)
+            audio_result, used_provider, is_fallback, fallback_reason = generate_tts_with_failover(
+                text=reply_text,
+                agent=agent,
+                company=session.company,
+                session_id=session_id,
+                correlation_id=correlation_id
+            )
+            logger.info(f"[Session: {session_id}][Corr: {correlation_id}] TTS completed via '{used_provider}' (fallback={is_fallback}): {len(audio_result.audio_bytes)} bytes.")
+            LiveConsoleEventService.emit(session_id, "live.tts.completed", {
+                "format": audio_result.format,
+                "bytes": len(audio_result.audio_bytes),
+                "provider": used_provider,
+                "is_fallback": is_fallback,
+                "fallback_reason": fallback_reason if is_fallback else None
+            }, correlation_id)
+            if is_fallback:
+                LiveConsoleEventService.emit(session_id, "live.tts.fallback", {
+                    "requested_provider": getattr(agent, 'tts_provider', 'microsoft'),
+                    "fallback_provider": used_provider,
+                    "reason": fallback_reason,
+                    "speed": getattr(agent, 'tts_speed', 1.0)
+                }, correlation_id)
         except Exception as e:
             logger.error(f"[Session: {session_id}][Corr: {correlation_id}] TTS error: {e}")
             LiveConsoleEventService.emit(session_id, "live.tts.error", {"error": str(e)}, correlation_id)
@@ -653,26 +648,16 @@ class LiveOrchestrator:
         import time
         LiveContextService.update_context(str(session.company_id), str(session.id), {"last_speech_time": time.time()})
 
-        # 3. Generate TTS (OpenAI nếu có Key, fallback Google TTS 100%)
+        # 3. Generate Proactive TTS via Multi-Tier Failover Engine
         try:
-            voice_config = {"voice": getattr(agent, 'tts_voice', 'alloy') if agent else 'alloy', "speed": getattr(agent, 'tts_speed', 1.0) if agent else 1.0}
-            from ai_agents.services import get_api_keys
-            tts_keys = get_api_keys(session.company, 'openai') if session.company else []
-            resolved_key = tts_keys[0] if tts_keys else None
-            
-            if resolved_key and resolved_key != 'dummy':
-                try:
-                    self.tts_provider = OpenAITTSProvider(api_key=resolved_key)
-                    audio_result = self.tts_provider.generate(reply_text, voice_config)
-                except Exception as e:
-                    logger.warning(f"[Session: {session_id}] OpenAI TTS error ({e}), using Google TTS fallback")
-                    self.tts_provider = GoogleTTSProvider()
-                    audio_result = self.tts_provider.generate(reply_text, voice_config)
-            else:
-                self.tts_provider = GoogleTTSProvider()
-                audio_result = self.tts_provider.generate(reply_text, voice_config)
-                
-            logger.info(f"[Session: {session_id}][Corr: {correlation_id}] Proactive TTS completed: {len(audio_result.audio_bytes)} bytes")
+            audio_result, used_provider, is_fallback, fallback_reason = generate_tts_with_failover(
+                text=reply_text,
+                agent=agent,
+                company=session.company,
+                session_id=session_id,
+                correlation_id=correlation_id
+            )
+            logger.info(f"[Session: {session_id}][Corr: {correlation_id}] Proactive TTS completed via '{used_provider}' (fallback={is_fallback}): {len(audio_result.audio_bytes)} bytes")
         except Exception as e:
             logger.error(f"[Session: {session_id}] TTS error: {e}")
             return {"status": "error", "reason": "tts_failure"}

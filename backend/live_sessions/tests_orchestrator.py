@@ -175,7 +175,7 @@ class LiveOrchestratorTests(TestCase):
 
     @patch('live_sessions.orchestrator.search_knowledge')
     @patch('live_sessions.orchestrator.generate_ai_reply')
-    @patch('live_sessions.audio.tts.OpenAITTSProvider.generate')
+    @patch('live_sessions.orchestrator.generate_tts_with_failover')
     def test_orchestrator_tts_failure(self, mock_tts, mock_ai_reply, mock_rag):
         mock_rag.return_value = ""
         mock_ai_reply.return_value = {"reply": "Hi", "action": "RESPOND"}

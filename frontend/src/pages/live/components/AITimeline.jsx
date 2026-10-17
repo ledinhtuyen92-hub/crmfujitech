@@ -78,7 +78,12 @@ const STAGE_META = {
     label: 'TTS',
     labelVi: 'Tổng hợp giọng nói',
     pendingText: 'Đang tổng hợp giọng nói...',
-    successText: (d) => d?.format ? `${d.format.toUpperCase()}, ${d.bytes ? (d.bytes / 1024).toFixed(1) + ' KB' : ''}` : 'Đã tổng hợp',
+    successText: (d) => {
+      const size = d?.bytes ? `${(d.bytes / 1024).toFixed(1)} KB` : ''
+      const prov = d?.provider ? `[${d.provider.toUpperCase()}]` : ''
+      const fb = d?.is_fallback ? '⚠️ (Dự phòng)' : ''
+      return `${prov} ${d?.format ? d.format.toUpperCase() : 'MP3'}, ${size} ${fb}`.trim()
+    },
     errorText: (d) => sanitizeError(d?.error),
     color: '#13c2c2',
   },
@@ -286,6 +291,16 @@ function applyEvent(interactions, event) {
     case 'live.tts.completed':
       interaction.stages.tts = { status: 'success', details: payload }
       break
+    case 'live.tts.fallback':
+      if (interaction.stages?.tts) {
+        interaction.stages.tts.details = {
+          ...(interaction.stages.tts.details || {}),
+          is_fallback: true,
+          fallback_provider: payload?.fallback_provider,
+          fallback_reason: payload?.reason
+        }
+      }
+      break
     case 'live.tts.error':
       interaction.stages.tts = { status: 'error', details: payload }
       break
@@ -312,7 +327,7 @@ const PIPELINE_EVENTS = new Set([
   'live.rag.completed', 'live.rag.error',
   'live.product_truth.loaded',
   'live.ai.completed', 'live.ai.error', 'live.ai.suppressed',
-  'live.tts.completed', 'live.tts.error',
+  'live.tts.completed', 'live.tts.fallback', 'live.tts.error',
   'live.speech.dispatched', 'live.speech.error',
 ])
 
