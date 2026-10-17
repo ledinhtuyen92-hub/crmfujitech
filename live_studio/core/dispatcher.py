@@ -215,7 +215,9 @@ class ProtocolDispatcher:
             background_asset_url=payload_data.get("background_asset_url"),
             overlay_asset_url=payload_data.get("overlay_asset_url"),
             audio_asset_url=payload_data.get("audio_asset_url"),
-            avatar_actions=payload_data.get("avatar_actions", [])
+            avatar_actions=payload_data.get("avatar_actions", []),
+            bgm_volume=float(payload_data.get("bgm_volume", 0.35)),
+            ai_volume=float(payload_data.get("ai_volume", 1.0))
         )
         
         success = await self.stream_controller.handle_start(payload)

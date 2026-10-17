@@ -20,6 +20,8 @@ class StreamConfig:
     audio_sample_rate: int = 44100
     audio_channels: int = 2
     audio_format: str = "s16le"
+    bgm_volume: float = 0.35
+    ai_volume: float = 1.0
 
 
 class FfmpegLocator:
@@ -249,10 +251,10 @@ class StreamEncoder:
             input_idx += 1
             
         # BGM
-        if self.cached_assets.get('audio'):
+        bgm_vol = getattr(self.config, 'bgm_volume', 0.35)
+        if self.cached_assets.get('audio') and bgm_vol > 0.001:
             inputs.extend(["-stream_loop", "-1", "-i", self.cached_assets['audio']])
-            # volume=0.5 for bgm so it is clearly audible while keeping TTS prominent
-            filter_complex.append(f"[{input_idx}:a]volume=0.5[bgm];{audio_out}[bgm]amix=inputs=2:duration=first:dropout_transition=0[a1]")
+            filter_complex.append(f"[{input_idx}:a]volume={bgm_vol:.2f}[bgm];{audio_out}[bgm]amix=inputs=2:duration=first:dropout_transition=0[a1]")
             audio_out = "[a1]"
             input_idx += 1
             

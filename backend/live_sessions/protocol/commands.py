@@ -45,6 +45,8 @@ class StreamStartPayloadSerializer(serializers.Serializer):
     overlay_asset_url = serializers.CharField(required=False, allow_null=True, allow_blank=True)
     audio_asset_url = serializers.CharField(required=False, allow_null=True, allow_blank=True)
     avatar_actions = serializers.ListField(child=serializers.DictField(), required=False, default=list)
+    bgm_volume = serializers.FloatField(required=False, default=0.35)
+    ai_volume = serializers.FloatField(required=False, default=1.0)
 
 class StreamStopPayloadSerializer(serializers.Serializer):
     command_id = serializers.UUIDField(required=True)

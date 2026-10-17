@@ -230,7 +230,9 @@ class StreamController:
             video_codec=self._current_payload.video_codec,
             bitrate=self._current_payload.bitrate,
             audio_sample_rate=self._current_payload.audio_sample_rate,
-            audio_channels=self._current_payload.audio_channels
+            audio_channels=self._current_payload.audio_channels,
+            bgm_volume=getattr(self._current_payload, 'bgm_volume', 0.35),
+            ai_volume=getattr(self._current_payload, 'ai_volume', 1.0)
         )
         
         # Always push to local MediaMTX first.

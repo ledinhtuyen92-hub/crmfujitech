@@ -99,44 +99,48 @@ export default function LiveTtsVoiceCard({
   const rawBgmUrl = session?.audio_asset_url || '/media/live_assets/2026/10/bgm_lofi_livestream.mp3'
   const bgmUrl = getFullMediaUrl(rawBgmUrl)
 
-  // Manage background music playback based on isMasterMuted and bgmVolume
+  const [isPreviewPlaying, setIsPreviewPlaying] = useState(false)
+  const isSessionLive = session?.status === 'running' || session?.status === 'human_takeover'
+
+  // When live stream is running, stop any local preview so music NEVER duplicates!
+  useEffect(() => {
+    if (isSessionLive && isPreviewPlaying) {
+      setIsPreviewPlaying(false)
+      if (bgmAudioRef.current) {
+        bgmAudioRef.current.pause()
+      }
+    }
+  }, [isSessionLive, isPreviewPlaying])
+
+  // Update volume of local preview if user is previewing and adjusts slider
   useEffect(() => {
     const audio = bgmAudioRef.current
     if (!audio) return
-
-    const effectiveBgmVolume = (isMasterMuted || bgmVolume === 0) ? 0 : Math.max(0, Math.min(1, bgmVolume / 100))
-    audio.volume = effectiveBgmVolume
-
-    if (effectiveBgmVolume > 0) {
-      if (audio.paused) {
-        audio.play().catch((err) => {
-          // Autoplay policy: will resume on first click
-          console.debug('[LiveTtsVoiceCard] BGM autoplay waiting for interaction:', err?.message)
-        })
-      }
-    } else {
-      if (!audio.paused) {
+    if (isPreviewPlaying) {
+      if (isMasterMuted || bgmVolume === 0) {
         audio.pause()
+        setIsPreviewPlaying(false)
+      } else {
+        audio.volume = Math.max(0, Math.min(1, bgmVolume / 100))
       }
     }
-  }, [isMasterMuted, bgmVolume, bgmUrl])
+  }, [isMasterMuted, bgmVolume, isPreviewPlaying])
 
-  // Resume BGM on first user interaction if blocked by browser policy
-  useEffect(() => {
-    const resumeOnGesture = () => {
-      const audio = bgmAudioRef.current
-      if (audio && !isMasterMuted && bgmVolume > 0 && audio.paused) {
-        audio.play().catch(() => {})
-      }
+  const handleTogglePreviewPlay = () => {
+    const audio = bgmAudioRef.current
+    if (!audio) return
+    if (isPreviewPlaying) {
+      audio.pause()
+      setIsPreviewPlaying(false)
+    } else {
+      audio.volume = Math.max(0, Math.min(1, bgmVolume / 100))
+      audio.play().then(() => {
+        setIsPreviewPlaying(true)
+      }).catch((err) => {
+        console.warn('Cannot play BGM preview:', err)
+      })
     }
-
-    window.addEventListener('click', resumeOnGesture, { once: true })
-    window.addEventListener('keydown', resumeOnGesture, { once: true })
-    return () => {
-      window.removeEventListener('click', resumeOnGesture)
-      window.removeEventListener('keydown', resumeOnGesture)
-    }
-  }, [isMasterMuted, bgmVolume])
+  }
 
   const handleToggleAiMute = () => {
     if (aiVolume > 0) {
@@ -168,12 +172,12 @@ export default function LiveTtsVoiceCard({
       }}
       bodyStyle={{ padding: '10px 14px' }}
     >
-      {/* Background Music Audio Element */}
+      {/* Background Music Preview Audio Element (Chỉ phát khi bấm Nghe thử, tự ngắt khi live) */}
       <audio
         ref={bgmAudioRef}
         src={bgmUrl}
-        loop
-        preload="auto"
+        preload="none"
+        onEnded={() => setIsPreviewPlaying(false)}
       />
 
       {/* Header: Title, Status Badge, and Sound Toggle Button */}
@@ -341,16 +345,27 @@ export default function LiveTtsVoiceCard({
           />
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: 11, color: '#8c8c8c', marginTop: 3 }}>
             <span
-              style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '78%' }}
+              style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '65%' }}
               title={session?.audio_asset_name || 'Chill Lofi Livestream Vui Tươi (BGM)'}
             >
               🎵 {session?.audio_asset_name || 'Chill Lofi Livestream Vui Tươi (BGM)'}
             </span>
-            {onOpenSceneBuilder && (
-              <a onClick={onOpenSceneBuilder} style={{ color: '#1890ff', cursor: 'pointer', whiteSpace: 'nowrap' }}>
-                Đổi nhạc
-              </a>
-            )}
+            <Space size={8}>
+              {!isSessionLive && (
+                <a
+                  onClick={handleTogglePreviewPlay}
+                  style={{ color: isPreviewPlaying ? '#faad14' : '#52c41a', cursor: 'pointer', whiteSpace: 'nowrap', fontWeight: 500 }}
+                  title="Nghe thử bài nhạc nền trước khi phát live"
+                >
+                  {isPreviewPlaying ? '⏸ Dừng' : '▶ Nghe thử'}
+                </a>
+              )}
+              {onOpenSceneBuilder && (
+                <a onClick={onOpenSceneBuilder} style={{ color: '#1890ff', cursor: 'pointer', whiteSpace: 'nowrap' }}>
+                  Đổi nhạc
+                </a>
+              )}
+            </Space>
           </div>
         </div>
       </div>

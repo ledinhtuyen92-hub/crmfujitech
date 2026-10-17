@@ -86,6 +86,8 @@ class LiveOrchestrator:
             "background_asset_url": session.background_asset.file.url if session.background_asset and session.background_asset.file else None,
             "overlay_asset_url": session.overlay_asset.file.url if session.overlay_asset and session.overlay_asset.file else None,
             "audio_asset_url": session.audio_asset.file.url if session.audio_asset and session.audio_asset.file else None,
+            "bgm_volume": float(getattr(session, 'bgm_volume', 35) if getattr(session, 'bgm_volume', 35) is not None else 35) / 100.0,
+            "ai_volume": float(getattr(session, 'ai_volume', 100) if getattr(session, 'ai_volume', 100) is not None else 100) / 100.0,
             "avatar_actions": [],
         }
         

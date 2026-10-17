@@ -296,6 +296,14 @@ class LiveSession(models.Model):
         related_name="audio_sessions",
         verbose_name="Âm thanh nền (Tùy chọn)"
     )
+    bgm_volume = models.IntegerField(
+        default=35,
+        verbose_name="Âm lượng nhạc nền (%)"
+    )
+    ai_volume = models.IntegerField(
+        default=100,
+        verbose_name="Âm lượng giọng đọc AI (%)"
+    )
     avatar_actions = models.JSONField(
         default=list,
         blank=True,

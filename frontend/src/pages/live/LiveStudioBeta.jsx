@@ -107,6 +107,9 @@ export default function LiveStudioBeta() {
     }
     try {
       localStorage.setItem('fujitech_live_ai_volume', String(val))
+      if (id) {
+        api.patch(`/live_sessions/sessions/${id}/`, { ai_volume: val }).catch(() => {})
+      }
     } catch (_) {}
   }
 
@@ -120,6 +123,9 @@ export default function LiveStudioBeta() {
     }
     try {
       localStorage.setItem('fujitech_live_bgm_volume', String(val))
+      if (id) {
+        api.patch(`/live_sessions/sessions/${id}/`, { bgm_volume: val }).catch(() => {})
+      }
     } catch (_) {}
   }
 
@@ -129,6 +135,14 @@ export default function LiveStudioBeta() {
       try {
         const res = await api.get(`/live_sessions/sessions/${id}/`)
         setSession(res.data)
+        if (res.data) {
+          if (res.data.ai_volume !== undefined && res.data.ai_volume !== null) {
+            setAiVolume(res.data.ai_volume)
+          }
+          if (res.data.bgm_volume !== undefined && res.data.bgm_volume !== null) {
+            setBgmVolume(res.data.bgm_volume)
+          }
+        }
       } catch (err) {
         console.error('Failed to load session', err)
       } finally {

@@ -52,6 +52,8 @@ class StreamStartPayload:
     overlay_asset_url: Optional[str] = None
     audio_asset_url: Optional[str] = None
     avatar_actions: Optional[list] = None
+    bgm_volume: float = 0.35
+    ai_volume: float = 1.0
 
 @dataclass
 class StreamStopPayload:
