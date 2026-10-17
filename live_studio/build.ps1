@@ -17,8 +17,13 @@ $ErrorActionPreference = "Stop"
 $env:PYTHONIOENCODING = "utf-8"
 $env:PYTHONUTF8 = "1"
 
-$ProjectRoot = Resolve-Path "..\."
-$LiveStudioDir = "$ProjectRoot\live_studio"
+if ($PSScriptRoot) {
+    $LiveStudioDir = $PSScriptRoot
+    $ProjectRoot = Split-Path $LiveStudioDir -Parent
+} else {
+    $LiveStudioDir = (Get-Item "live_studio").FullName
+    $ProjectRoot = (Get-Item ".").FullName
+}
 $VenvDir = "$LiveStudioDir\.venv"
 $DistDir = "$LiveStudioDir\dist"
 $BuildDir = "$LiveStudioDir\build"
