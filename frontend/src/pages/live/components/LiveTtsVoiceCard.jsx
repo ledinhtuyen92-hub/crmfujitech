@@ -1,11 +1,12 @@
-import React, { useState, useEffect } from 'react'
-import { Card, Tag, Typography, Space, Tooltip, Alert } from 'antd'
+import React, { useState, useEffect, useRef } from 'react'
+import { Card, Tag, Typography, Space, Tooltip, Button, Slider } from 'antd'
 import {
   SoundOutlined,
+  MutedOutlined,
+  CustomerServiceOutlined,
   CheckCircleFilled,
   WarningFilled,
   SettingOutlined,
-  ThunderboltFilled,
 } from '@ant-design/icons'
 import { Link } from 'react-router-dom'
 
@@ -36,8 +37,28 @@ const VOICE_LABELS = {
   onyx: 'Onyx (Nam)',
 }
 
-export default function LiveTtsVoiceCard({ session, lastEvent }) {
+const getFullMediaUrl = (url) => {
+  if (!url) return null
+  if (url.startsWith('http://') || url.startsWith('https://')) return url
+  const apiBase = (import.meta.env.VITE_API_URL || 'http://localhost:8000/api').replace(/\/api\/?$/, '')
+  return `${apiBase}${url.startsWith('/') ? '' : '/'}${url}`
+}
+
+export default function LiveTtsVoiceCard({
+  session,
+  lastEvent,
+  isMasterMuted = false,
+  onToggleMute,
+  aiVolume = 100,
+  onAiVolumeChange,
+  bgmVolume = 35,
+  onBgmVolumeChange,
+  onOpenSceneBuilder,
+}) {
   const [recentTts, setRecentTts] = useState(null)
+  const [prevAiVolume, setPrevAiVolume] = useState(100)
+  const [prevBgmVolume, setPrevBgmVolume] = useState(35)
+  const bgmAudioRef = useRef(null)
 
   // Listen to live realtime TTS events via WebSocket
   useEffect(() => {
@@ -74,6 +95,67 @@ export default function LiveTtsVoiceCard({ session, lastEvent }) {
   const providerLabel = PROVIDER_NAMES[activeProvider] || activeProvider.toUpperCase()
   const voiceLabel = VOICE_LABELS[configuredVoice] || configuredVoice
 
+  // BGM audio resolution
+  const rawBgmUrl = session?.audio_asset_url || '/media/live_assets/2026/10/bgm_lofi_livestream.mp3'
+  const bgmUrl = getFullMediaUrl(rawBgmUrl)
+
+  // Manage background music playback based on isMasterMuted and bgmVolume
+  useEffect(() => {
+    const audio = bgmAudioRef.current
+    if (!audio) return
+
+    const effectiveBgmVolume = (isMasterMuted || bgmVolume === 0) ? 0 : Math.max(0, Math.min(1, bgmVolume / 100))
+    audio.volume = effectiveBgmVolume
+
+    if (effectiveBgmVolume > 0) {
+      if (audio.paused) {
+        audio.play().catch((err) => {
+          // Autoplay policy: will resume on first click
+          console.debug('[LiveTtsVoiceCard] BGM autoplay waiting for interaction:', err?.message)
+        })
+      }
+    } else {
+      if (!audio.paused) {
+        audio.pause()
+      }
+    }
+  }, [isMasterMuted, bgmVolume, bgmUrl])
+
+  // Resume BGM on first user interaction if blocked by browser policy
+  useEffect(() => {
+    const resumeOnGesture = () => {
+      const audio = bgmAudioRef.current
+      if (audio && !isMasterMuted && bgmVolume > 0 && audio.paused) {
+        audio.play().catch(() => {})
+      }
+    }
+
+    window.addEventListener('click', resumeOnGesture, { once: true })
+    window.addEventListener('keydown', resumeOnGesture, { once: true })
+    return () => {
+      window.removeEventListener('click', resumeOnGesture)
+      window.removeEventListener('keydown', resumeOnGesture)
+    }
+  }, [isMasterMuted, bgmVolume])
+
+  const handleToggleAiMute = () => {
+    if (aiVolume > 0) {
+      setPrevAiVolume(aiVolume)
+      onAiVolumeChange?.(0)
+    } else {
+      onAiVolumeChange?.(prevAiVolume || 100)
+    }
+  }
+
+  const handleToggleBgmMute = () => {
+    if (bgmVolume > 0) {
+      setPrevBgmVolume(bgmVolume)
+      onBgmVolumeChange?.(0)
+    } else {
+      onBgmVolumeChange?.(prevBgmVolume || 35)
+    }
+  }
+
   return (
     <Card
       size="small"
@@ -86,27 +168,56 @@ export default function LiveTtsVoiceCard({ session, lastEvent }) {
       }}
       bodyStyle={{ padding: '10px 14px' }}
     >
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
+      {/* Background Music Audio Element */}
+      <audio
+        ref={bgmAudioRef}
+        src={bgmUrl}
+        loop
+        preload="auto"
+      />
+
+      {/* Header: Title, Status Badge, and Sound Toggle Button */}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
         <Space size={6} align="center">
-          <SoundOutlined style={{ color: isFallback ? '#faad14' : '#52c41a', fontSize: 15 }} />
+          <SoundOutlined style={{ color: isMasterMuted ? '#8c8c8c' : (isFallback ? '#faad14' : '#52c41a'), fontSize: 16 }} />
           <Text strong style={{ color: '#fff', fontSize: 13 }}>
             Giọng đọc AI Livestream
           </Text>
-        </Space>
-        
-        {isFallback ? (
-          <Tooltip title={recentTts?.fallbackReason || 'Nhà cung cấp chính lỗi, hệ thống tự động chuyển sang giọng dự phòng'}>
-            <Tag color="warning" icon={<WarningFilled />} style={{ margin: 0, fontSize: 11 }}>
-              Đang phát qua dự phòng
+          {isFallback ? (
+            <Tooltip title={recentTts?.fallbackReason || 'Nhà cung cấp chính lỗi, hệ thống tự động chuyển sang giọng dự phòng'}>
+              <Tag color="warning" icon={<WarningFilled />} style={{ margin: 0, fontSize: 11 }}>
+                Dự phòng
+              </Tag>
+            </Tooltip>
+          ) : (
+            <Tag color="success" icon={<CheckCircleFilled />} style={{ margin: 0, fontSize: 11 }}>
+              Đang hoạt động
             </Tag>
-          </Tooltip>
-        ) : (
-          <Tag color="success" icon={<CheckCircleFilled />} style={{ margin: 0, fontSize: 11 }}>
-            Đang hoạt động
-          </Tag>
-        )}
+          )}
+        </Space>
+
+        {/* Nút bật/tắt âm thanh tổng đưa xuống đây theo yêu cầu người dùng */}
+        <Button
+          type={isMasterMuted ? 'default' : 'primary'}
+          shape="round"
+          size="small"
+          icon={isMasterMuted ? <MutedOutlined /> : <SoundOutlined />}
+          onClick={onToggleMute}
+          style={{
+            backgroundColor: isMasterMuted ? 'rgba(255, 255, 255, 0.08)' : '#1677ff',
+            borderColor: isMasterMuted ? 'rgba(255, 255, 255, 0.25)' : '#1677ff',
+            color: '#fff',
+            fontWeight: 500,
+            fontSize: 12,
+            height: 28,
+            boxShadow: isMasterMuted ? 'none' : '0 2px 6px rgba(22, 119, 255, 0.35)',
+          }}
+        >
+          {isMasterMuted ? 'Bật âm thanh' : 'Tắt âm thanh'}
+        </Button>
       </div>
 
+      {/* Provider & Voice Details Row */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 6, fontSize: 12 }}>
         <div>
           <span style={{ color: '#8c8c8c' }}>Nguồn phát: </span>
@@ -146,6 +257,103 @@ export default function LiveTtsVoiceCard({ session, lastEvent }) {
           Lý do chuyển dự phòng: {recentTts.fallbackReason.length > 90 ? recentTts.fallbackReason.slice(0, 90) + '...' : recentTts.fallbackReason}
         </div>
       )}
+
+      {/* ── 2 Thanh kéo điều khiển Âm lượng: Âm thanh AI & Âm thanh nền ── */}
+      <div
+        style={{
+          marginTop: 10,
+          paddingTop: 10,
+          borderTop: '1px solid #262626',
+          display: 'flex',
+          flexDirection: 'column',
+          gap: 10,
+        }}
+      >
+        {/* Thanh kéo 1: Âm lượng Giọng đọc AI */}
+        <div>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 2 }}>
+            <Space size={6} align="center">
+              <Button
+                type="text"
+                size="small"
+                onClick={handleToggleAiMute}
+                icon={(aiVolume === 0 || isMasterMuted) ? <MutedOutlined style={{ color: '#ff4d4f' }} /> : <SoundOutlined style={{ color: '#52c41a' }} />}
+                style={{ padding: '0 2px', height: 'auto', color: '#fff' }}
+                title="Bấm để Tắt / Bật nhanh tiếng AI"
+              />
+              <Text style={{ color: '#d9d9d9', fontSize: 12, fontWeight: 500 }}>
+                Âm thanh AI (Giọng đọc)
+              </Text>
+            </Space>
+            <Tag
+              color={(aiVolume === 0 || isMasterMuted) ? 'default' : 'success'}
+              style={{ margin: 0, fontSize: 11, minWidth: 46, textAlign: 'center', fontWeight: 600 }}
+            >
+              {(aiVolume === 0 || isMasterMuted) ? 'Tắt' : `${aiVolume}%`}
+            </Tag>
+          </div>
+          <Slider
+            min={0}
+            max={100}
+            step={1}
+            value={isMasterMuted ? 0 : aiVolume}
+            onChange={(val) => onAiVolumeChange?.(val)}
+            tooltip={{ formatter: (val) => `${val}%` }}
+            style={{ margin: '4px 0 0 0' }}
+            trackStyle={{ backgroundColor: '#52c41a' }}
+            handleStyle={{ borderColor: '#52c41a' }}
+          />
+        </div>
+
+        {/* Thanh kéo 2: Âm lượng Nhạc nền (BGM) */}
+        <div>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 2 }}>
+            <Space size={6} align="center">
+              <Button
+                type="text"
+                size="small"
+                onClick={handleToggleBgmMute}
+                icon={(bgmVolume === 0 || isMasterMuted) ? <CustomerServiceOutlined style={{ color: '#8c8c8c' }} /> : <CustomerServiceOutlined style={{ color: '#1890ff' }} />}
+                style={{ padding: '0 2px', height: 'auto', color: '#fff' }}
+                title="Bấm để Tắt / Bật nhanh nhạc nền"
+              />
+              <Text style={{ color: '#d9d9d9', fontSize: 12, fontWeight: 500 }}>
+                Âm thanh nền (Nhạc BGM)
+              </Text>
+            </Space>
+            <Tag
+              color={(bgmVolume === 0 || isMasterMuted) ? 'default' : 'processing'}
+              style={{ margin: 0, fontSize: 11, minWidth: 46, textAlign: 'center', fontWeight: 600 }}
+            >
+              {(bgmVolume === 0 || isMasterMuted) ? 'Tắt' : `${bgmVolume}%`}
+            </Tag>
+          </div>
+          <Slider
+            min={0}
+            max={100}
+            step={1}
+            value={isMasterMuted ? 0 : bgmVolume}
+            onChange={(val) => onBgmVolumeChange?.(val)}
+            tooltip={{ formatter: (val) => `${val}%` }}
+            style={{ margin: '4px 0 0 0' }}
+            trackStyle={{ backgroundColor: '#1890ff' }}
+            handleStyle={{ borderColor: '#1890ff' }}
+          />
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: 11, color: '#8c8c8c', marginTop: 3 }}>
+            <span
+              style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '78%' }}
+              title={session?.audio_asset_name || 'Chill Lofi Livestream Vui Tươi (BGM)'}
+            >
+              🎵 {session?.audio_asset_name || 'Chill Lofi Livestream Vui Tươi (BGM)'}
+            </span>
+            {onOpenSceneBuilder && (
+              <a onClick={onOpenSceneBuilder} style={{ color: '#1890ff', cursor: 'pointer', whiteSpace: 'nowrap' }}>
+                Đổi nhạc
+              </a>
+            )}
+          </div>
+        </div>
+      </div>
     </Card>
   )
 }

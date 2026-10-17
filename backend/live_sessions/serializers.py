@@ -59,6 +59,7 @@ class LiveSessionSerializer(serializers.ModelSerializer):
     background_asset_url = serializers.SerializerMethodField()
     overlay_asset_url = serializers.SerializerMethodField()
     audio_asset_url = serializers.SerializerMethodField()
+    audio_asset_name = serializers.CharField(source='audio_asset.name', read_only=True, default='')
 
     def get_avatar_asset_url(self, obj):
         if obj.avatar_asset and obj.avatar_asset.file:

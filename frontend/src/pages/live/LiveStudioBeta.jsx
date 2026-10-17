@@ -59,6 +59,70 @@ export default function LiveStudioBeta() {
   const [startDispatched, setStartDispatched] = useState(false)
   const [stopDispatched, setStopDispatched]   = useState(false)
 
+  // ── Audio & Volume controls ────────────────────────────────────────────────
+  const [isMasterMuted, setIsMasterMuted] = useState(() => {
+    try {
+      // Default sound is ON (false) unless user previously explicitly turned it off
+      return localStorage.getItem('fujitech_live_master_muted') === 'true'
+    } catch {
+      return false
+    }
+  })
+
+  const [aiVolume, setAiVolume] = useState(() => {
+    try {
+      const saved = localStorage.getItem('fujitech_live_ai_volume')
+      return saved !== null ? Number(saved) : 100
+    } catch {
+      return 100
+    }
+  })
+
+  const [bgmVolume, setBgmVolume] = useState(() => {
+    try {
+      const saved = localStorage.getItem('fujitech_live_bgm_volume')
+      return saved !== null ? Number(saved) : 35
+    } catch {
+      return 35
+    }
+  })
+
+  const handleToggleMasterMute = () => {
+    setIsMasterMuted((prev) => {
+      const next = !prev
+      try {
+        localStorage.setItem('fujitech_live_master_muted', next ? 'true' : 'false')
+      } catch (_) {}
+      return next
+    })
+  }
+
+  const handleAiVolumeChange = (val) => {
+    setAiVolume(val)
+    if (val > 0 && isMasterMuted) {
+      setIsMasterMuted(false)
+      try {
+        localStorage.setItem('fujitech_live_master_muted', 'false')
+      } catch (_) {}
+    }
+    try {
+      localStorage.setItem('fujitech_live_ai_volume', String(val))
+    } catch (_) {}
+  }
+
+  const handleBgmVolumeChange = (val) => {
+    setBgmVolume(val)
+    if (val > 0 && isMasterMuted) {
+      setIsMasterMuted(false)
+      try {
+        localStorage.setItem('fujitech_live_master_muted', 'false')
+      } catch (_) {}
+    }
+    try {
+      localStorage.setItem('fujitech_live_bgm_volume', String(val))
+    } catch (_) {}
+  }
+
   // ── Initial load ───────────────────────────────────────────────────────────
   useEffect(() => {
     const fetchSession = async () => {
@@ -360,8 +424,24 @@ export default function LiveStudioBeta() {
       <Row gutter={[16, 16]} style={{ flex: 1, minHeight: 600 }}>
         {/* Left Column: Video Preview & Active Voice Info */}
         <Col xs={24} lg={8} style={{ display: 'flex', flexDirection: 'column' }}>
-          <VideoPreview session={session} streamEvent={lastEvent} />
-          <LiveTtsVoiceCard session={session} lastEvent={lastEvent} />
+          <VideoPreview
+            session={session}
+            streamEvent={lastEvent}
+            isMasterMuted={isMasterMuted}
+            aiVolume={aiVolume}
+            onToggleMute={handleToggleMasterMute}
+          />
+          <LiveTtsVoiceCard
+            session={session}
+            lastEvent={lastEvent}
+            isMasterMuted={isMasterMuted}
+            onToggleMute={handleToggleMasterMute}
+            aiVolume={aiVolume}
+            onAiVolumeChange={handleAiVolumeChange}
+            bgmVolume={bgmVolume}
+            onBgmVolumeChange={handleBgmVolumeChange}
+            onOpenSceneBuilder={() => setSceneBuilderVisible(true)}
+          />
         </Col>
 
         {/* Center Column: AI Timeline */}

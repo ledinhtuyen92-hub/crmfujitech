@@ -11,7 +11,13 @@ import {
 
 const { Title, Text } = Typography
 
-export default function VideoPreview({ session, streamEvent }) {
+export default function VideoPreview({
+  session,
+  streamEvent,
+  isMasterMuted = false,
+  aiVolume = 100,
+  onToggleMute,
+}) {
   const videoRef = useRef(null)
   const hlsRef = useRef(null)
   const retryTimerRef = useRef(null)
@@ -26,29 +32,34 @@ export default function VideoPreview({ session, streamEvent }) {
   const [deviceTelemetry, setDeviceTelemetry] = useState(null)
   const [isPlaybackReady, setIsPlaybackReady] = useState(false)
   const [isBuffering, setIsBuffering] = useState(false)
-  const [isMuted, setIsMuted] = useState(() => {
-    try {
-      return localStorage.getItem('fujitech_live_muted') !== 'false'
-    } catch {
-      return true
-    }
-  })
+  const [internalMuted, setInternalMuted] = useState(false)
   const [isMockupAvatarLoaded, setIsMockupAvatarLoaded] = useState(false)
   const hasStartedPlaybackRef = useRef(false)
   const hasJumpedToLiveEdgeRef = useRef(false)
+
+  const activeMuted = (isMasterMuted !== undefined) ? isMasterMuted : internalMuted
+  const activeVolume = Math.max(0, Math.min(1, (aiVolume ?? 100) / 100))
+
+  useEffect(() => {
+    if (videoRef.current) {
+      const shouldMute = activeMuted || aiVolume === 0
+      videoRef.current.muted = shouldMute
+      videoRef.current.defaultMuted = shouldMute
+      videoRef.current.volume = activeVolume
+    }
+  }, [activeMuted, activeVolume, aiVolume])
 
   useEffect(() => {
     setIsMockupAvatarLoaded(false)
   }, [session?.avatar_asset_url, session?.avatar_speaking_asset_url])
 
   const toggleMute = () => {
-    if (videoRef.current) {
+    if (onToggleMute) {
+      onToggleMute()
+    } else if (videoRef.current) {
       const nextMuted = !videoRef.current.muted
       videoRef.current.muted = nextMuted
-      setIsMuted(nextMuted)
-      try {
-        localStorage.setItem('fujitech_live_muted', nextMuted ? 'true' : 'false')
-      } catch (_) {}
+      setInternalMuted(nextMuted)
     }
   }
 
@@ -335,16 +346,13 @@ export default function VideoPreview({ session, streamEvent }) {
       if (hlsRef.current) {
         hlsRef.current.startLoad()
       }
-      videoRef.current.muted = true
-      videoRef.current.defaultMuted = true
+      const shouldMute = activeMuted || aiVolume === 0
+      videoRef.current.muted = shouldMute
+      videoRef.current.defaultMuted = shouldMute
+      videoRef.current.volume = activeVolume
       videoRef.current.play()
         .then(() => {
           setHlsStatus('live')
-          videoRef.current.muted = false
-          setIsMuted(false)
-          try {
-            localStorage.setItem('fujitech_live_muted', 'false')
-          } catch (_) {}
         })
         .catch((e) => {
           console.warn('Manual play pending buffer:', e)
@@ -418,9 +426,10 @@ export default function VideoPreview({ session, streamEvent }) {
       hls.loadSource(absoluteUrl)
       hls.attachMedia(video)
 
-      const wantsUnmuted = localStorage.getItem('fujitech_live_muted') === 'false'
-      video.muted = !wantsUnmuted
-      video.defaultMuted = !wantsUnmuted
+      const shouldMuteInit = activeMuted || aiVolume === 0
+      video.muted = shouldMuteInit
+      video.defaultMuted = shouldMuteInit
+      video.volume = activeVolume
 
       // Jump over initial timestamp gap once on cold start or browser refresh (F5)
       const jumpToLiveEdgeOnce = () => {
@@ -450,28 +459,37 @@ export default function VideoPreview({ session, streamEvent }) {
 
       const tryPlay = () => {
         if (!video) return
-        const preferSound = localStorage.getItem('fujitech_live_muted') === 'false'
-        video.muted = !preferSound
-        video.defaultMuted = !preferSound
+        const shouldMute = activeMuted || aiVolume === 0
+        video.muted = shouldMute
+        video.defaultMuted = shouldMute
+        video.volume = activeVolume
         video.playsInline = true
         const p = video.play()
         if (p && typeof p.then === 'function') {
           p.then(() => {
             setHlsStatus('live')
             jumpToLiveEdgeOnce()
-            if (preferSound) {
-              setIsMuted(false)
-            }
           }).catch((err) => {
-            if (preferSound && (err.name === 'NotAllowedError' || err.name === 'SecurityError')) {
+            if (!shouldMute && (err.name === 'NotAllowedError' || err.name === 'SecurityError')) {
               console.warn('[VideoPreview] Autoplay with audio blocked by browser policy. Falling back to muted playback...')
               video.muted = true
               video.defaultMuted = true
-              setIsMuted(true)
               video.play().then(() => {
                 setHlsStatus('live')
                 jumpToLiveEdgeOnce()
               }).catch(() => {})
+
+              // Automatically unmute on the first interaction anywhere
+              const unmuteOnInteraction = () => {
+                if (videoRef.current && !activeMuted && aiVolume > 0) {
+                  videoRef.current.muted = false
+                  videoRef.current.volume = activeVolume
+                }
+                window.removeEventListener('click', unmuteOnInteraction)
+                window.removeEventListener('keydown', unmuteOnInteraction)
+              }
+              window.addEventListener('click', unmuteOnInteraction, { once: true })
+              window.addEventListener('keydown', unmuteOnInteraction, { once: true })
               return
             }
             // Keep status as loading during initial stream connection
@@ -609,8 +627,8 @@ export default function VideoPreview({ session, streamEvent }) {
       <video
         ref={videoRef}
         autoPlay
-        muted
         playsInline
+        muted={activeMuted || (aiVolume === 0)}
         style={{
           width: '100%',
           height: '100%',
@@ -647,28 +665,6 @@ export default function VideoPreview({ session, streamEvent }) {
           if (isPlaybackReady) setIsBuffering(true)
         }}
       />
-
-      {/* Floating Audio Control Button */}
-      {hlsStatus === 'live' && isPlaybackReady && (
-        <div style={{ position: 'absolute', top: 16, right: 16, zIndex: 12 }}>
-          <Button
-            type={isMuted ? 'default' : 'primary'}
-            shape="round"
-            icon={isMuted ? <MutedOutlined /> : <SoundOutlined />}
-            onClick={toggleMute}
-            style={{
-              backgroundColor: isMuted ? 'rgba(0, 0, 0, 0.7)' : '#1649c9',
-              borderColor: isMuted ? 'rgba(255, 255, 255, 0.35)' : '#1649c9',
-              color: '#fff',
-              backdropFilter: 'blur(6px)',
-              boxShadow: '0 2px 8px rgba(0,0,0,0.5)',
-              fontWeight: 500,
-            }}
-          >
-            {isMuted ? 'Bật âm thanh' : 'Tắt âm thanh'}
-          </Button>
-        </div>
-      )}
 
       {/* Buffering badge: subtle non-intrusive indicator that never blacks out the video */}
       {hlsStatus === 'live' && isPlaybackReady && isBuffering && (
