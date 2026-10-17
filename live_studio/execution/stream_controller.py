@@ -127,6 +127,7 @@ class StreamController:
         self._current_payload = payload
         self._current_target = target
         self.retry_count = 0
+        telemetry.clear_error()
         
         target_log = target.get_safe_log_metadata() if target else "test_mode_local_only"
         logger.info(f"stream_start requested. target={target_log} resolution={payload.width}x{payload.height} fps={payload.fps}")

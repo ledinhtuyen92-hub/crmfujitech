@@ -192,6 +192,7 @@ class StreamEncoder:
         self.process = None
         self.timeline = AVTimeline(config.fps, config.audio_sample_rate)
         self.is_running = False
+        self._intentional_stop = False
         
     async def start(self):
         await self.video_transport.start()
@@ -339,7 +340,8 @@ class StreamEncoder:
             
         await self.process.wait()
         logger.info(f"FFmpeg process exited with code {self.process.returncode}")
-        if self.process.returncode not in (0, None, -15):
+        # On Windows, terminating a process yields exit code 1 or 255. Do not record as error if stopped intentionally.
+        if not self._intentional_stop and self.process.returncode not in (0, None, -15):
             telemetry.record_error(f"FFmpeg dừng bất ngờ với mã lỗi {self.process.returncode}")
         self.is_running = False
         await self.stop()
@@ -362,6 +364,7 @@ class StreamEncoder:
                 logger.debug(f"Audio transport write failed: {e}")
 
     async def stop(self):
+        self._intentional_stop = True
         self.is_running = False
         telemetry.stream_state = "stopped"
         if self.process and self.process.returncode is None:
