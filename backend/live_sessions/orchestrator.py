@@ -658,6 +658,20 @@ class LiveOrchestrator:
                 correlation_id=correlation_id
             )
             logger.info(f"[Session: {session_id}][Corr: {correlation_id}] Proactive TTS completed via '{used_provider}' (fallback={is_fallback}): {len(audio_result.audio_bytes)} bytes")
+            LiveConsoleEventService.emit(session_id, "live.tts.completed", {
+                "format": audio_result.format,
+                "bytes": len(audio_result.audio_bytes),
+                "provider": used_provider,
+                "is_fallback": is_fallback,
+                "fallback_reason": fallback_reason if is_fallback else None
+            }, correlation_id)
+            if is_fallback:
+                LiveConsoleEventService.emit(session_id, "live.tts.fallback", {
+                    "requested_provider": getattr(agent, 'tts_provider', 'microsoft'),
+                    "fallback_provider": used_provider,
+                    "reason": fallback_reason,
+                    "speed": getattr(agent, 'tts_speed', 1.0)
+                }, correlation_id)
         except Exception as e:
             logger.error(f"[Session: {session_id}] TTS error: {e}")
             return {"status": "error", "reason": "tts_failure"}

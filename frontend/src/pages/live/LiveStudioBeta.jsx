@@ -17,6 +17,7 @@ import LiveStatusBadge from './components/LiveStatusBadge'
 import AITimeline from './components/AITimeline'
 import StreamHealthRow from './components/StreamHealthRow'
 import VideoPreview from './components/VideoPreview'
+import LiveTtsVoiceCard from './components/LiveTtsVoiceCard'
 import LiveChat from './components/LiveChat'
 import LiveSceneBuilder from './components/LiveSceneBuilder'
 
@@ -357,9 +358,10 @@ export default function LiveStudioBeta() {
 
       {/* ── 3-Column Studio Layout ─────────────────────────────────────────── */}
       <Row gutter={[16, 16]} style={{ flex: 1, minHeight: 600 }}>
-        {/* Left Column: Video Preview */}
+        {/* Left Column: Video Preview & Active Voice Info */}
         <Col xs={24} lg={8} style={{ display: 'flex', flexDirection: 'column' }}>
           <VideoPreview session={session} streamEvent={lastEvent} />
+          <LiveTtsVoiceCard session={session} lastEvent={lastEvent} />
         </Col>
 
         {/* Center Column: AI Timeline */}
