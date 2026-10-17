@@ -93,32 +93,43 @@ class MicrosoftEdgeTTSProvider(BaseTTSProvider):
 
         logger.info(f"[MicrosoftEdgeTTS] Generating audio (voice={voice}, rate={rate_str}, pitch={pitch}): {clean_text[:60]}...")
 
-        try:
-            import edge_tts
+        import edge_tts
+        import time
 
-            async def _synthesize():
-                comm = edge_tts.Communicate(clean_text, voice, rate=rate_str, pitch=pitch)
-                data = b""
-                async for chunk in comm.stream():
-                    if chunk["type"] == "audio":
-                        data += chunk["data"]
-                return data
+        last_err = None
+        for attempt in range(1, 4):
+            try:
+                # Lần 1 dùng đúng rate/pitch cấu hình. Nếu lỗi, lần sau thử reset về chuẩn để đảm bảo thành công
+                cur_rate = rate_str if attempt <= 2 else "+0%"
+                cur_pitch = pitch if attempt == 1 else "+0Hz"
 
-            audio_bytes = _run_async(_synthesize())
+                async def _synthesize():
+                    comm = edge_tts.Communicate(clean_text, voice, rate=cur_rate, pitch=cur_pitch)
+                    data = b""
+                    async for chunk in comm.stream():
+                        if chunk["type"] == "audio":
+                            data += chunk["data"]
+                    return data
 
-            if not audio_bytes:
-                raise TTSProviderException("Microsoft Edge TTS returned empty audio bytes.")
+                audio_bytes = _run_async(_synthesize())
 
-            return AudioResult(
-                audio_bytes=audio_bytes,
-                mime_type="audio/mp3",
-                format="mp3",
-                sample_rate=24000,
-                channels=1
-            )
-        except Exception as e:
-            logger.error(f"[MicrosoftEdgeTTS] Generation failed: {e}")
-            raise TTSProviderException(f"Microsoft Edge TTS failed: {e}")
+                if audio_bytes and len(audio_bytes) > 500:
+                    if attempt > 1:
+                        logger.info(f"[MicrosoftEdgeTTS] Succeeded on attempt {attempt}")
+                    return AudioResult(
+                        audio_bytes=audio_bytes,
+                        mime_type="audio/mp3",
+                        format="mp3",
+                        sample_rate=24000,
+                        channels=1
+                    )
+            except Exception as e:
+                last_err = e
+                logger.warning(f"[MicrosoftEdgeTTS] Attempt {attempt}/3 failed: {e}. Retrying in 0.3s...")
+                time.sleep(0.3)
+
+        logger.error(f"[MicrosoftEdgeTTS] All 3 attempts failed. Last error: {last_err}")
+        raise TTSProviderException(f"Microsoft Edge TTS failed after 3 attempts: {last_err}")
 
 
 class ElevenLabsTTSProvider(BaseTTSProvider):

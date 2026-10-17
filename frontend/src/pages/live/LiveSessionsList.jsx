@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react'
 import { Card, Typography, Button, Space, Drawer, Form, Select, Input, Radio, message, Spin, Row, Col, Empty } from 'antd'
-import { PlusOutlined, SyncOutlined } from '@ant-design/icons'
+import { PlusOutlined, SyncOutlined, ThunderboltOutlined } from '@ant-design/icons'
 import api from '../../utils/api'
 import StreamCard from './components/StreamCard'
 
@@ -28,6 +28,26 @@ export default function LiveSessionsList() {
   const platform = Form.useWatch('platform', form)
   const shopeeMode = Form.useWatch('shopee_connection_mode', form)
   const productSource = Form.useWatch('product_source', form) || 'internal'
+
+  const [generatingScript, setGeneratingScript] = useState(false)
+  const handleSuggestScript = async (industry = 'general') => {
+    setGeneratingScript(true)
+    try {
+      const prodId = form.getFieldValue('product')
+      const res = await api.post('/live_sessions/sessions/suggest-script/', {
+        product_id: prodId,
+        industry: industry
+      })
+      if (res.data?.script_text) {
+        form.setFieldsValue({ session_prompt: res.data.script_text })
+        message.success('Đã nạp kịch bản bán hàng xoay vòng mẫu!')
+      }
+    } catch (e) {
+      message.error('Không thể lấy gợi ý kịch bản: ' + (e.response?.data?.detail || e.message))
+    } finally {
+      setGeneratingScript(false)
+    }
+  }
 
   const fetchSessions = async () => {
     setLoading(true)
@@ -279,10 +299,45 @@ export default function LiveSessionsList() {
               </Select>
             </Form.Item>
 
-            <Form.Item name="session_prompt" label="Kịch bản / Lưu ý riêng cho Phiên Live này (Tùy chọn)">
+            <div style={{ marginTop: 12, marginBottom: 8, display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 6 }}>
+              <span style={{ fontWeight: 600, color: '#262626', fontSize: 13 }}>
+                Kịch bản Bán hàng Xoay vòng (0đ Token khi Live im lặng):
+              </span>
+              <Space size={6}>
+                <Select
+                  size="small"
+                  placeholder="Chọn ngành hàng"
+                  defaultValue="general"
+                  style={{ width: 145 }}
+                  onChange={(val) => handleSuggestScript(val)}
+                  options={[
+                    { value: 'smart_lock', label: 'Khóa & Nội thất' },
+                    { value: 'fashion', label: 'Thời trang' },
+                    { value: 'cosmetics', label: 'Mỹ phẩm' },
+                    { value: 'home_appliances', label: 'Gia dụng / Thiết bị' },
+                    { value: 'general', label: 'Bán lẻ đa ngành' },
+                  ]}
+                />
+                <Button
+                  size="small"
+                  type="primary"
+                  ghost
+                  icon={<ThunderboltOutlined />}
+                  loading={generatingScript}
+                  onClick={() => handleSuggestScript('general')}
+                >
+                  Nạp kịch bản
+                </Button>
+              </Space>
+            </div>
+
+            <Form.Item 
+              name="session_prompt" 
+              help="💡 Mỗi dòng là 1 câu kịch bản. Khi phòng live không có ai hỏi, MC sẽ đọc tuần tự xoay vòng từng câu (0đ token). Khi có khách hỏi, AI sẽ ngắt câu để trả lời khách."
+            >
               <Input.TextArea 
-                rows={3} 
-                placeholder="VD: Nhấn mạnh đây là Flash Sale 10/10, freeship toàn quốc, nhớ nhắc khách bấm vào góc trái màn hình..." 
+                rows={5} 
+                placeholder="Mỗi dòng là 1 câu nói. Ví dụ:&#10;Dòng 1: Dạ em xin chào mừng toàn thể cả nhà mình đang theo dõi phiên live hôm nay nha...&#10;Dòng 2: Mẫu này trang bị công nghệ hiện đại, chất lượng vượt trội và bảo hành đầy đủ...&#10;Dòng 3: Số lượng suất flash sale trong live hôm nay chỉ còn đúng 5 suất thôi cả nhà ơi...&#10;Dòng 4: Bác nào ưng ý bấm ngay vào giỏ hàng góc trái màn hình để săn deal kẻo hết mã nha..." 
               />
             </Form.Item>
           </Card>

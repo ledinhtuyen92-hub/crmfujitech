@@ -21,8 +21,6 @@ export default function VideoPreview({
   const videoRef = useRef(null)
   const hlsRef = useRef(null)
   const retryTimerRef = useRef(null)
-  const watchdogTimerRef = useRef(null)
-  const hardResetTimerRef = useRef(null)
   const liveEdgeResyncRef = useRef(null)
 
   // idle | waiting | loading | paused | live | error
@@ -33,6 +31,7 @@ export default function VideoPreview({
   const [isPlaybackReady, setIsPlaybackReady] = useState(false)
   const [isBuffering, setIsBuffering] = useState(false)
   const [internalMuted, setInternalMuted] = useState(false)
+  const [isAutoMutedByBrowser, setIsAutoMutedByBrowser] = useState(false)
   const [isMockupAvatarLoaded, setIsMockupAvatarLoaded] = useState(false)
   const hasStartedPlaybackRef = useRef(false)
   const hasJumpedToLiveEdgeRef = useRef(false)
@@ -241,51 +240,6 @@ export default function VideoPreview({
     }
   }, [isSessionLive, session?.id, probeHls])
 
-  // Stall watchdog: ONLY active during initial connection before playback has ever started.
-  useEffect(() => {
-    if (!hlsUrl || isPlaybackReady || hasStartedPlaybackRef.current) {
-      if (watchdogTimerRef.current) clearTimeout(watchdogTimerRef.current)
-      if (hardResetTimerRef.current) clearTimeout(hardResetTimerRef.current)
-      return
-    }
-
-    watchdogTimerRef.current = setTimeout(() => {
-      if (!hasStartedPlaybackRef.current && videoRef.current && hlsRef.current) {
-        const v = videoRef.current
-        console.warn('[VideoPreview Watchdog] Waiting for frames after 2s. Nudging...')
-        try {
-          if (v.buffered.length > 0) {
-            const bufStart = v.buffered.start(0)
-            const bufEnd = v.buffered.end(v.buffered.length - 1)
-            v.currentTime = bufEnd < 5.0 ? bufStart + 0.05 : Math.max(bufStart, bufEnd - 1.0)
-            v.play().catch(() => {})
-          } else {
-            hlsRef.current.startLoad()
-          }
-        } catch (_) {}
-      }
-    }, 2000)
-
-    hardResetTimerRef.current = setTimeout(() => {
-      if (!hasStartedPlaybackRef.current && videoRef.current && videoRef.current.readyState < 2) {
-        console.warn('[VideoPreview Watchdog] Cold start timed out after 6s. Re-probing...')
-        if (hlsRef.current) {
-          hlsRef.current.destroy()
-          hlsRef.current = null
-        }
-        setIsPlaybackReady(false)
-        hasJumpedToLiveEdgeRef.current = false
-        setHlsUrl(null)
-        setHlsStatus('waiting')
-        probeHls()
-      }
-    }, 6000)
-
-    return () => {
-      if (watchdogTimerRef.current) clearTimeout(watchdogTimerRef.current)
-      if (hardResetTimerRef.current) clearTimeout(hardResetTimerRef.current)
-    }
-  }, [hlsUrl, isPlaybackReady, probeHls])
 
   // Continuous Live Runtime Watchdog: monitors active playback, auto-recovers freezes/stalls
   const frozenCountRef = useRef(0)
@@ -397,18 +351,17 @@ export default function VideoPreview({
       const hls = new Hls({
         enableWorker: true,
         lowLatencyMode: false,
-        // Buffer limits: keep tight to let Hls.js GC old segments aggressively.
-        // maxBufferSize (bytes) is the primary GC trigger — keep it small to evict
-        // old segments before MSE buffers grow unboundedly over hours of live streaming.
-        backBufferLength: 8,
-        maxBufferLength: 8,
-        maxMaxBufferLength: 12,
-        maxBufferSize: 24 * 1024 * 1024, // 24 MB hard cap — aggressive GC
+        // Buffer limits: keep generous forward cushion (15s) so network or proxy
+        // hiccups do not starve the player, while capping back buffer to avoid memory leaks.
+        backBufferLength: 15,
+        maxBufferLength: 15,
+        maxMaxBufferLength: 30,
+        maxBufferSize: 64 * 1024 * 1024, // 64 MB cap
         liveDurationInfinity: true,
         initialLiveManifestSize: 1,
         liveSyncDurationCount: 3,
-        liveMaxLatencyDurationCount: 6,
-        maxLiveSyncPlaybackRate: 1.1,
+        liveMaxLatencyDurationCount: 8,
+        maxLiveSyncPlaybackRate: 1.05, // Smoothly catch up at 1.05x without jarring seek pauses
         manifestLoadingMaxRetry: 10,
         manifestLoadingRetryDelay: 300,
         manifestLoadingMaxRetryTimeout: 8000,
@@ -431,27 +384,17 @@ export default function VideoPreview({
       video.defaultMuted = shouldMuteInit
       video.volume = activeVolume
 
-      // Jump over initial timestamp gap once on cold start or browser refresh (F5)
-      const jumpToLiveEdgeOnce = () => {
-        if (!video || hasJumpedToLiveEdgeRef.current) return
+      const syncToLiveEdge = () => {
+        if (!video) return
         try {
-          if (video.buffered.length > 0) {
+          if (video.buffered && video.buffered.length > 0) {
             const bufStart = video.buffered.start(0)
             const bufEnd = video.buffered.end(video.buffered.length - 1)
-            
-            // Only jump if playhead is uninitialized (0) or behind buffer start
-            if (video.currentTime < bufStart || video.currentTime === 0) {
+            // If playhead is behind buffer start, or ahead of buffer end, or at 0 while stream has progressed
+            if (video.currentTime < bufStart || video.currentTime > bufEnd || (video.currentTime === 0 && bufStart > 1.0)) {
               const livePos = hls.liveSyncPosition
-              let target
-              if (livePos && livePos >= bufStart && livePos <= bufEnd - 0.5) {
-                target = livePos
-              } else if (bufEnd < 5.0) {
-                target = bufStart + 0.05
-              } else {
-                target = Math.max(bufStart + 0.1, bufEnd - 2.5)
-              }
+              let target = (livePos && livePos >= bufStart && livePos <= bufEnd) ? livePos : Math.max(bufStart + 0.05, bufEnd - 1.5)
               video.currentTime = target
-              hasJumpedToLiveEdgeRef.current = true
             }
           }
         } catch (_) {}
@@ -459,6 +402,7 @@ export default function VideoPreview({
 
       const tryPlay = () => {
         if (!video) return
+        syncToLiveEdge()
         const shouldMute = activeMuted || aiVolume === 0
         video.muted = shouldMute
         video.defaultMuted = shouldMute
@@ -468,22 +412,28 @@ export default function VideoPreview({
         if (p && typeof p.then === 'function') {
           p.then(() => {
             setHlsStatus('live')
-            jumpToLiveEdgeOnce()
+            setIsPlaybackReady(true)
+            syncToLiveEdge()
           }).catch((err) => {
-            if (!shouldMute && (err.name === 'NotAllowedError' || err.name === 'SecurityError')) {
-              console.warn('[VideoPreview] Autoplay with audio blocked by browser policy. Falling back to muted playback...')
+            if (err.name === 'NotAllowedError' || err.name === 'SecurityError') {
+              console.warn('[VideoPreview] Autoplay with audio blocked by browser policy. Retrying muted...')
               video.muted = true
               video.defaultMuted = true
+              setIsAutoMutedByBrowser(true)
               video.play().then(() => {
                 setHlsStatus('live')
-                jumpToLiveEdgeOnce()
-              }).catch(() => {})
+                setIsPlaybackReady(true)
+                syncToLiveEdge()
+              }).catch(() => {
+                setHlsStatus('paused')
+              })
 
               // Automatically unmute on the first interaction anywhere
               const unmuteOnInteraction = () => {
                 if (videoRef.current && !activeMuted && aiVolume > 0) {
                   videoRef.current.muted = false
                   videoRef.current.volume = activeVolume
+                  setIsAutoMutedByBrowser(false)
                 }
                 window.removeEventListener('click', unmuteOnInteraction)
                 window.removeEventListener('keydown', unmuteOnInteraction)
@@ -492,46 +442,46 @@ export default function VideoPreview({
               window.addEventListener('keydown', unmuteOnInteraction, { once: true })
               return
             }
-            // Keep status as loading during initial stream connection
-            if (!hasStartedPlaybackRef.current) {
-              setHlsStatus('loading')
-            } else if (err && err.name === 'NotAllowedError') {
-              setHlsStatus('paused')
-            }
+            setHlsStatus('paused')
           })
         }
       }
 
       hls.on(Hls.Events.MANIFEST_PARSED, () => {
-        jumpToLiveEdgeOnce()
+        syncToLiveEdge()
         tryPlay()
       })
 
       hls.on(Hls.Events.LEVEL_LOADED, () => {
-        jumpToLiveEdgeOnce()
+        syncToLiveEdge()
       })
 
       hls.on(Hls.Events.FRAG_BUFFERED, () => {
-        jumpToLiveEdgeOnce()
-        if (video.paused && !video.seeking) {
+        syncToLiveEdge()
+        hasStartedPlaybackRef.current = true
+        setIsPlaybackReady(true)
+        setIsBuffering(false)
+        if (video.paused) {
           tryPlay()
+        } else {
+          setHlsStatus('live')
         }
       })
 
-      // Periodic live-edge resync: every 30s, check if playhead has drifted too far
-      // behind the live edge. Over long sessions (30min+), cumulative latency can grow
-      // from network jitter or brief tab backgrounding. Snap back gently to live edge.
+      // Extreme drift safety guard: only triggers if tab was backgrounded/sleeping for minutes
+      // and playhead fell > 12 seconds behind live edge. Normal 1-4s jitter is handled smoothly
+      // by maxLiveSyncPlaybackRate without any seek stutter.
       if (liveEdgeResyncRef.current) clearInterval(liveEdgeResyncRef.current)
       liveEdgeResyncRef.current = setInterval(() => {
         if (!video || video.paused || !hls) return
         try {
           const liveEdge = hls.liveSyncPosition
-          if (liveEdge && video.currentTime < liveEdge - 4.0) {
-            console.info(`[VideoPreview] Live edge resync: currentTime=${video.currentTime.toFixed(1)}s liveEdge=${liveEdge.toFixed(1)}s. Snapping forward.`)
-            video.currentTime = Math.max(video.currentTime, liveEdge - 1.0)
+          if (liveEdge && video.currentTime < liveEdge - 12.0) {
+            console.info(`[VideoPreview] Large tab drift recovered: currentTime=${video.currentTime.toFixed(1)}s liveEdge=${liveEdge.toFixed(1)}s. Resyncing...`)
+            video.currentTime = Math.max(video.currentTime, liveEdge - 2.0)
           }
         } catch (_) {}
-      }, 30000)
+      }, 15000)
 
       hls.on(Hls.Events.ERROR, (_, data) => {
         console.warn('[HLS Event]', data.type, data.details, data.fatal)
@@ -582,14 +532,19 @@ export default function VideoPreview({
     }
   }, [hlsUrl])
 
-  // Video frame readiness handler: only mark ready when real visual video dimensions exist!
+  // Video frame readiness handler: mark ready when real visual video dimensions or buffer exist!
   const markFrameReady = () => {
     if (videoRef.current) {
       const v = videoRef.current
-      if (v.videoWidth > 0 && (v.readyState >= 2 || v.currentTime > 0)) {
+      if (v.videoWidth > 0 || v.readyState >= 1 || v.currentTime > 0) {
         hasStartedPlaybackRef.current = true
         setIsPlaybackReady(true)
         setIsBuffering(false)
+        if (v.paused && !v.seeking) {
+          v.play().then(() => setHlsStatus('live')).catch(() => setHlsStatus('paused'))
+        } else {
+          setHlsStatus('live')
+        }
       }
     }
   }
@@ -628,7 +583,18 @@ export default function VideoPreview({
         ref={videoRef}
         autoPlay
         playsInline
-        muted={activeMuted || (aiVolume === 0)}
+        muted={activeMuted || (aiVolume === 0) || isAutoMutedByBrowser}
+        onClick={() => {
+          if (videoRef.current) {
+            if (isAutoMutedByBrowser) {
+              videoRef.current.muted = activeMuted || (aiVolume === 0)
+              setIsAutoMutedByBrowser(false)
+            }
+            if (videoRef.current.paused) {
+              videoRef.current.play().then(() => setHlsStatus('live')).catch(() => {})
+            }
+          }
+        }}
         style={{
           width: '100%',
           height: '100%',
@@ -637,9 +603,10 @@ export default function VideoPreview({
           top: 0,
           left: 0,
           backgroundColor: '#000',
-          opacity: (hlsStatus === 'live' && isPlaybackReady) ? 1 : 0,
+          opacity: (hlsStatus === 'live' || isPlaybackReady) ? 1 : 0,
           transition: 'opacity 0.25s ease-in-out',
-          pointerEvents: (hlsStatus === 'live' && isPlaybackReady) ? 'auto' : 'none',
+          pointerEvents: (hlsStatus === 'live' || isPlaybackReady) ? 'auto' : 'none',
+          cursor: 'pointer',
           zIndex: 2,
         }}
         onLoadedMetadata={markFrameReady}
@@ -666,6 +633,40 @@ export default function VideoPreview({
         }}
       />
 
+      {/* Click to unmute banner if browser autoplay policy muted the video */}
+      {isAutoMutedByBrowser && !activeMuted && isPlaybackReady && (
+        <div
+          onClick={() => {
+            if (videoRef.current) {
+              videoRef.current.muted = false
+              videoRef.current.volume = activeVolume
+              setIsAutoMutedByBrowser(false)
+            }
+          }}
+          style={{
+            position: 'absolute',
+            bottom: 24,
+            left: '50%',
+            transform: 'translateX(-50%)',
+            display: 'flex',
+            alignItems: 'center',
+            gap: 8,
+            backgroundColor: 'rgba(24, 144, 255, 0.9)',
+            color: '#fff',
+            padding: '8px 20px',
+            borderRadius: 24,
+            cursor: 'pointer',
+            zIndex: 10,
+            boxShadow: '0 4px 16px rgba(0,0,0,0.4)',
+            fontWeight: 600,
+            fontSize: 13,
+            backdropFilter: 'blur(6px)',
+          }}
+        >
+          🔊 Nhấn vào đây để bật âm thanh
+        </div>
+      )}
+
       {/* Buffering badge: subtle non-intrusive indicator that never blacks out the video */}
       {hlsStatus === 'live' && isPlaybackReady && isBuffering && (
         <div style={{
@@ -679,8 +680,8 @@ export default function VideoPreview({
         </div>
       )}
 
-      {/* Synchronizing overlay: shown during stream connect and until first frame appears */}
-      {(hlsStatus === 'waiting' || hlsStatus === 'loading' || (hlsStatus === 'live' && !isPlaybackReady) || (hlsStatus === 'paused' && !isPlaybackReady)) && isSessionLive && (
+      {/* Synchronizing overlay: only shown while actively waiting/loading manifest before segments exist */}
+      {(hlsStatus === 'waiting' || hlsStatus === 'loading') && !isPlaybackReady && isSessionLive && (
         <div style={{
           position: 'absolute', top: 0, left: 0, width: '100%', height: '100%',
           display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
@@ -846,9 +847,9 @@ export default function VideoPreview({
         '#faad14'
       )}
 
-      {/* Autoplay blocked — ONLY shown when video frame is ready but browser explicitly stopped playback */}
-      {hlsStatus === 'paused' && isPlaybackReady && renderOverlay(
-        <PlayCircleOutlined style={{ cursor: 'pointer', color: '#52c41a', fontSize: 72 }} />,
+      {/* Autoplay blocked — show play button so user can click to play */}
+      {(hlsStatus === 'paused' || (isPlaybackReady && videoRef.current && videoRef.current.paused)) && isSessionLive && renderOverlay(
+        <PlayCircleOutlined style={{ cursor: 'pointer', color: '#52c41a', fontSize: 72 }} onClick={handleManualPlay} />,
         'NHẤN ĐỂ XEM',
         'Trình duyệt yêu cầu tương tác để phát video',
         '#d9d9d9',

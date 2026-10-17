@@ -148,19 +148,52 @@ def trigger_proactive_speech(self, session_id: str):
             trigger_proactive_speech.apply_async(kwargs={"session_id": session_id}, countdown=4)
             return
 
-        last_speech_time = context.get("last_speech_time", 0)
+        import random
         
-        # Threshold for proactive speech (e.g., 15 seconds) or initial start
-        idle_time = time.time() - float(last_speech_time) if float(last_speech_time) > 0 else 999.0
+        # 1. Đảm bảo nếu máy trạm đang phát câu trước đó, chờ đợi cho đến khi phát xong hoàn toàn
+        is_speaking = context.get("is_device_speaking", False)
+        if is_speaking:
+            logger.debug(f"[Session {session_id}] Device is currently speaking. Deferring proactive trigger.")
+            trigger_proactive_speech.apply_async(kwargs={"session_id": session_id}, countdown=2)
+            return
+
+        last_speech_time = float(context.get("last_speech_time", 0) or 0)
+        now = time.time()
         
-        if idle_time > 15.0:
-            logger.info(f"[Session {session_id}] Idle for {idle_time}s. Triggering proactive speech.")
+        # Nếu phiên mới bắt đầu chưa nói câu nào, cho nói câu đầu tiên sau 3-5 giây
+        if last_speech_time <= 0:
+            last_speech_time = now
+            LiveContextService.update_context(str(session.company_id), str(session.id), {
+                "last_speech_time": now,
+                "proactive_idle_threshold": round(random.uniform(3.0, 5.0), 1)
+            })
+
+        # Ngưỡng ngắt nghỉ linh hoạt ngẫu nhiên (Random Idle Pause: từ 4.0 đến 9.0 giây)
+        target_idle = float(context.get("proactive_idle_threshold", 0) or 0)
+        if target_idle <= 0:
+            target_idle = round(random.uniform(4.0, 9.0), 1)
+            LiveContextService.update_context(str(session.company_id), str(session.id), {
+                "proactive_idle_threshold": target_idle
+            })
+
+        idle_time = now - last_speech_time
+        
+        if idle_time >= target_idle:
+            logger.info(f"[Session {session_id}] Idle for {idle_time:.1f}s (target: {target_idle:.1f}s). Triggering proactive speech.")
+            # Sau khi kích hoạt, ngay lập tức random khoảng ngắt nghỉ ngẫu nhiên cho câu kế tiếp
+            next_idle = round(random.uniform(4.0, 9.0), 1)
+            LiveContextService.update_context(str(session.company_id), str(session.id), {
+                "proactive_idle_threshold": next_idle,
+                "is_device_speaking": True,
+                "last_speech_time": now + 999999  # Tạm khóa cho đến khi máy trạm gửi ACK completed
+            })
+            
             orchestrator = LiveOrchestrator()
             orchestrator.process_proactive_speech(session_id=session_id)
             
-        # Reschedule itself
+        # Reschedule kiểm tra lại sau 2 giây
         if session.status == LiveSession.STATUS_RUNNING:
-            trigger_proactive_speech.apply_async(kwargs={"session_id": session_id}, countdown=10)
+            trigger_proactive_speech.apply_async(kwargs={"session_id": session_id}, countdown=2)
             
     except LiveSession.DoesNotExist:
         pass

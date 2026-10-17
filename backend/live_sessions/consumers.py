@@ -233,7 +233,26 @@ class DeviceAgentConsumer(AsyncWebsocketConsumer):
                 logger.error(f"Error auto-resuming stream on session.sync: {e}")
             
         elif msg_type == 'ack':
-            logger.info(f"Received ACK for command {payload.get('command_id')}: {payload.get('status')}")
+            cmd_id = payload.get('command_id')
+            cmd_status = payload.get('status')
+            logger.info(f"Received ACK for command {cmd_id}: {cmd_status}")
+            try:
+                import time
+                session_id = str(getattr(self, 'session_id', ''))
+                company_id = str(self.session.company_id) if hasattr(self, 'session') and self.session else ''
+                if session_id and company_id:
+                    if cmd_status in ('completed', 'interrupted', 'failed'):
+                        # Ghi nhận thời điểm câu nói THỰC SỰ KẾT THÚC trên máy khách
+                        await database_sync_to_async(LiveContextService.update_context)(company_id, session_id, {
+                            "last_speech_time": time.time(),
+                            "is_device_speaking": False
+                        })
+                    elif cmd_status == 'playing':
+                        await database_sync_to_async(LiveContextService.update_context)(company_id, session_id, {
+                            "is_device_speaking": True
+                        })
+            except Exception as ack_err:
+                logger.debug(f"Error updating context on ACK: {ack_err}")
 
     async def send_command(self, event):
         """

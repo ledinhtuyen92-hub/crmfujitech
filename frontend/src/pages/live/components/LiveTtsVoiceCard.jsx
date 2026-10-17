@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react'
-import { Card, Tag, Typography, Space, Tooltip, Button, Slider } from 'antd'
+import { Card, Tag, Typography, Space, Tooltip, Button, Slider, Modal, Input, Select, message } from 'antd'
 import {
   SoundOutlined,
   MutedOutlined,
@@ -7,8 +7,11 @@ import {
   CheckCircleFilled,
   WarningFilled,
   SettingOutlined,
+  ThunderboltOutlined,
+  EditOutlined,
 } from '@ant-design/icons'
 import { Link } from 'react-router-dom'
+import api from '../../../utils/api'
 
 const { Text } = Typography
 
@@ -60,11 +63,98 @@ export default function LiveTtsVoiceCard({
   const [prevBgmVolume, setPrevBgmVolume] = useState(35)
   const bgmAudioRef = useRef(null)
 
-  // Listen to live realtime TTS events via WebSocket
+  const [tokenStats, setTokenStats] = useState({
+    totalTokens: session?.token_usage?.total_tokens || 0,
+    costUsd: session?.token_usage?.total_cost_usd || 0.0,
+    replies: session?.token_usage?.total_ai_replies || 0,
+    lastTokens: 0,
+    lastCostUsd: 0.0,
+    lastTime: null,
+    isTemplate: false,
+    model: session?.ai_agent_model || 'gemini-flash'
+  })
+
+  const [scriptModalOpen, setScriptModalOpen] = useState(false)
+  const [scriptText, setScriptText] = useState(session?.session_prompt || '')
+  const [selectedIndustry, setSelectedIndustry] = useState('general')
+  const [loadingSuggestion, setLoadingSuggestion] = useState(false)
+  const [savingScript, setSavingScript] = useState(false)
+
+  useEffect(() => {
+    if (session?.session_prompt !== undefined) {
+      setScriptText(session.session_prompt || '')
+    }
+  }, [session?.session_prompt])
+
+  const handleLoadSuggestion = async () => {
+    setLoadingSuggestion(true)
+    try {
+      const res = await api.post('/live_sessions/sessions/suggest-script/', {
+        product_id: session?.product,
+        industry: selectedIndustry
+      })
+      if (res.data?.script_text) {
+        setScriptText(res.data.script_text)
+        message.success('Đã nạp kịch bản mẫu thành công!')
+      }
+    } catch (e) {
+      message.error('Không thể lấy kịch bản gợi ý')
+    } finally {
+      setLoadingSuggestion(false)
+    }
+  }
+
+  const handleSaveScript = async () => {
+    if (!session?.id) return
+    setSavingScript(true)
+    try {
+      await api.patch(`/live_sessions/sessions/${session.id}/`, {
+        session_prompt: scriptText
+      })
+      message.success('Đã lưu kịch bản xoay vòng! MC sẽ đọc theo kịch bản này.')
+      setScriptModalOpen(false)
+    } catch (e) {
+      message.error('Lỗi khi lưu kịch bản: ' + (e.response?.data?.detail || e.message))
+    } finally {
+      setSavingScript(false)
+    }
+  }
+
+  // Đồng bộ khi session prop thay đổi
+  useEffect(() => {
+    if (session?.token_usage) {
+      setTokenStats(prev => ({
+        ...prev,
+        totalTokens: session.token_usage.total_tokens || 0,
+        costUsd: session.token_usage.total_cost_usd || 0.0,
+        replies: session.token_usage.total_ai_replies || 0,
+        model: session.ai_agent_model || prev.model
+      }))
+    }
+  }, [session])
+
+  // Lắng nghe sự kiện realtime TTS và AI Token qua WebSocket
   useEffect(() => {
     if (!lastEvent) return
 
-    if (lastEvent.type === 'live.tts.completed') {
+    if (lastEvent.type === 'live.ai.completed') {
+      const payload = lastEvent.payload || {}
+      setTokenStats(prev => {
+        const newTotalTokens = payload.session_total_tokens !== undefined ? payload.session_total_tokens : (prev.totalTokens + (payload.total_tokens || 0))
+        const newCostUsd = payload.session_total_cost_usd !== undefined ? payload.session_total_cost_usd : (prev.costUsd + (payload.cost_usd || 0.0))
+        const newReplies = payload.session_total_replies !== undefined ? payload.session_total_replies : (prev.replies + 1)
+        return {
+          totalTokens: newTotalTokens,
+          costUsd: newCostUsd,
+          replies: newReplies,
+          lastTokens: payload.total_tokens || 0,
+          lastCostUsd: payload.cost_usd || 0.0,
+          lastTime: new Date().toLocaleTimeString('vi-VN', { hour12: false }),
+          isTemplate: !!payload.is_template,
+          model: payload.model || prev.model
+        }
+      })
+    } else if (lastEvent.type === 'live.tts.completed') {
       setRecentTts({
         provider: lastEvent.payload?.provider,
         isFallback: !!lastEvent.payload?.is_fallback,
@@ -91,6 +181,7 @@ export default function LiveTtsVoiceCard({
 
   const activeProvider = recentTts?.provider || configuredProvider
   const isFallback = recentTts?.isFallback || false
+  const costVnd = Math.round((tokenStats.costUsd || 0) * 25400)
 
   const providerLabel = PROVIDER_NAMES[activeProvider] || activeProvider.toUpperCase()
   const voiceLabel = VOICE_LABELS[configuredVoice] || configuredVoice
@@ -262,6 +353,95 @@ export default function LiveTtsVoiceCard({
         </div>
       )}
 
+      {/* ── Thống kê Tiêu tốn Token & Chi phí AI Phiên Live ── */}
+      <div
+        style={{
+          marginTop: 8,
+          padding: '8px 10px',
+          backgroundColor: '#191924',
+          border: '1px solid #28283c',
+          borderRadius: 8,
+          fontSize: 12,
+        }}
+      >
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 }}>
+          <Space size={5} align="center">
+            <ThunderboltOutlined style={{ color: '#faad14', fontSize: 13 }} />
+            <Text style={{ color: '#d9d9d9', fontSize: 11, fontWeight: 600 }}>
+              Tiêu tốn Token AI phiên live:
+            </Text>
+          </Space>
+          <Tooltip title="Mô hình não AI đang suy nghĩ câu trả lời">
+            <Tag color="cyan" style={{ margin: 0, fontSize: 10, padding: '0 6px', height: 18, lineHeight: '18px' }}>
+              🧠 {tokenStats.model || 'gemini-flash'}
+            </Tag>
+          </Tooltip>
+        </div>
+
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 6 }}>
+          <Tooltip title={`Đã thực hiện ${tokenStats.replies || 0} lượt phản hồi AI trong phiên này`}>
+            <span style={{ color: '#e6f7ff', fontSize: 12 }}>
+              <span style={{ color: '#8c8c8c', fontSize: 11 }}>Đã dùng: </span>
+              <strong style={{ color: '#13c2c2', fontSize: 13 }}>
+                {(tokenStats.totalTokens || 0).toLocaleString()}
+              </strong>
+              <span style={{ color: '#8c8c8c', fontSize: 11, marginLeft: 2 }}>tokens</span>
+              {(tokenStats.replies || 0) > 0 && (
+                <span style={{ color: '#8c8c8c', fontSize: 10, marginLeft: 4 }}>
+                  ({tokenStats.replies} câu)
+                </span>
+              )}
+            </span>
+          </Tooltip>
+
+          <Tooltip title={`Ước tính theo đơn giá API: $${Number(tokenStats.costUsd || 0).toFixed(4)} USD`}>
+            <span style={{ color: '#52c41a', fontSize: 12 }}>
+              <span style={{ color: '#8c8c8c', fontSize: 11 }}>Ước tính: </span>
+              <strong style={{ color: '#52c41a', fontSize: 13 }}>
+                ~{costVnd.toLocaleString()}đ
+              </strong>
+              <span style={{ color: '#8c8c8c', fontSize: 10, marginLeft: 3 }}>
+                (${Number(tokenStats.costUsd || 0).toFixed(3)})
+              </span>
+            </span>
+          </Tooltip>
+        </div>
+
+        {/* Cập nhật gần nhất */}
+        {tokenStats.lastTokens > 0 && (
+          <div style={{ marginTop: 4, paddingTop: 4, borderTop: '1px solid rgba(255,255,255,0.06)', fontSize: 10, color: '#8c8c8c', display: 'flex', justifyContent: 'space-between' }}>
+            <span>
+              ⚡ Vừa gọi: <strong style={{ color: '#40a9ff' }}>+{tokenStats.lastTokens.toLocaleString()} tokens</strong> (~{Math.round((tokenStats.lastCostUsd || 0) * 25400)}đ)
+            </span>
+            <span>{tokenStats.lastTime}</span>
+          </div>
+        )}
+        {tokenStats.isTemplate && (
+          <div style={{ marginTop: 4, paddingTop: 4, borderTop: '1px solid rgba(255,255,255,0.06)', fontSize: 10, color: '#52c41a', display: 'flex', justifyContent: 'space-between' }}>
+            <span>
+              💡 Kịch bản xoay vòng tự động: <strong>0 token (0đ)</strong>
+            </span>
+            <span>{tokenStats.lastTime}</span>
+          </div>
+        )}
+      </div>
+
+      {/* ── Nút mở Modal Chỉnh sửa Kịch bản Xoay vòng Live 0đ ── */}
+      <div style={{ marginTop: 6, display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0 2px' }}>
+        <span style={{ fontSize: 11, color: '#8c8c8c' }}>
+          Kịch bản nói mồi (0đ):
+        </span>
+        <Button
+          type="link"
+          size="small"
+          icon={<EditOutlined />}
+          style={{ padding: 0, fontSize: 11, color: '#40a9ff', height: 'auto', display: 'inline-flex', alignItems: 'center', gap: 3 }}
+          onClick={() => setScriptModalOpen(true)}
+        >
+          {session?.session_prompt ? 'Chỉnh sửa kịch bản' : 'Nạp kịch bản xoay vòng'}
+        </Button>
+      </div>
+
       {/* ── 2 Thanh kéo điều khiển Âm lượng: Âm thanh AI & Âm thanh nền ── */}
       <div
         style={{
@@ -369,6 +549,60 @@ export default function LiveTtsVoiceCard({
           </div>
         </div>
       </div>
+
+      {/* ── Modal Quản lý Kịch bản Xoay vòng Live 0đ ── */}
+      <Modal
+        title="Kịch bản Bán hàng Xoay vòng (0đ Token khi Live im lặng)"
+        open={scriptModalOpen}
+        onCancel={() => setScriptModalOpen(false)}
+        footer={[
+          <Button key="close" onClick={() => setScriptModalOpen(false)}>
+            Đóng
+          </Button>,
+          <Button key="save" type="primary" loading={savingScript} onClick={handleSaveScript}>
+            Lưu kịch bản
+          </Button>,
+        ]}
+        width={650}
+      >
+        <p style={{ fontSize: 12, color: '#8c8c8c', marginBottom: 12 }}>
+          💡 <strong>Quy tắc hoạt động:</strong> Mỗi dòng là 1 câu kịch bản. Khi phòng live không có ai hỏi, MC sẽ đọc tuần tự xoay vòng từng câu này (<strong>hoàn toàn 0 token, 0đ</strong>). Khi có khán giả bình luận hỏi thật, AI sẽ ngắt câu để trả lời khách.
+        </p>
+
+        <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 10, flexWrap: 'wrap' }}>
+          <span style={{ fontSize: 12, fontWeight: 500 }}>Chọn ngành hàng:</span>
+          <Select
+            size="small"
+            value={selectedIndustry}
+            onChange={setSelectedIndustry}
+            style={{ width: 170 }}
+            options={[
+              { value: 'smart_lock', label: 'Khóa & Nội thất' },
+              { value: 'fashion', label: 'Thời trang' },
+              { value: 'cosmetics', label: 'Mỹ phẩm' },
+              { value: 'home_appliances', label: 'Gia dụng / Thiết bị' },
+              { value: 'general', label: 'Bán lẻ đa ngành' },
+            ]}
+          />
+          <Button
+            size="small"
+            type="dashed"
+            icon={<ThunderboltOutlined />}
+            loading={loadingSuggestion}
+            onClick={handleLoadSuggestion}
+          >
+            Nạp mẫu gợi ý
+          </Button>
+        </div>
+
+        <Input.TextArea
+          rows={8}
+          value={scriptText}
+          onChange={(e) => setScriptText(e.target.value)}
+          placeholder="Mỗi dòng là 1 câu kịch bản..."
+          style={{ fontFamily: 'inherit', fontSize: 13 }}
+        />
+      </Modal>
     </Card>
   )
 }

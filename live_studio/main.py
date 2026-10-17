@@ -304,6 +304,13 @@ class LiveStudioApp:
                     self.dedup_registry.update_status(cmd_id, ACK_COMPLETED)
                     ack_msg = self.ack_manager.build_ack(cmd_id, ACK_COMPLETED, "")
                     await self.ws_client.send(ack_msg)
+                    
+                    # Nếu trong queue còn câu nói kế tiếp, dừng nghỉ nhẹ tự nhiên (1.2s - 2.5s)
+                    if hasattr(self.queue_manager, '_queue') and self.queue_manager._queue.qsize() > 0:
+                        import random
+                        pause_s = round(random.uniform(1.2, 2.5), 1)
+                        logger.info(f"Natural breath pause: waiting {pause_s}s before next speech")
+                        await asyncio.sleep(pause_s)
                 else:
                     if self._current_playing_interrupted or self.state.is_paused():
                         # Interrupted intentionally (High Priority or Human Takeover)

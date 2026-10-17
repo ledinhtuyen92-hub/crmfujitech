@@ -421,6 +421,13 @@ TRẢ LỜI BẮT BUỘC THEO ĐỊNH DẠNG JSON SAU (chỉ trả về JSON thu
                 except Exception as log_e:
                     logger.error(f"Failed to log API usage: {log_e}")
                         
+                # Gắn metadata token và chi phí để caller (như LiveOrchestrator) có thể theo dõi realtime
+                if isinstance(result, dict):
+                    result['_usage'] = usage
+                    result['_cost_usd'] = float(total_cost)
+                    result['_model'] = model_name_for_pricing
+                    result['_provider'] = current_provider
+
                 # Khôi phục model_name
                 agent.model_name = original_model_name
                 return result

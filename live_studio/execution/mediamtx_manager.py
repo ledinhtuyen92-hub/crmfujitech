@@ -59,10 +59,9 @@ rtmpAddress: :{MEDIAMTX_LOCAL_RTMP_PORT}
 hls: yes
 hlsAddress: :{MEDIAMTX_LOCAL_HLS_PORT}
 hlsAlwaysRemux: yes
-hlsVariant: lowLatency
-hlsSegmentCount: 10
+hlsVariant: mpegts
+hlsSegmentCount: 15
 hlsSegmentDuration: 1s
-hlsPartDuration: 200ms
 
 api: yes
 apiAddress: :{MEDIAMTX_LOCAL_API_PORT}

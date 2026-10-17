@@ -375,6 +375,14 @@ export default function LiveConsolePage() {
                     <Col span={12}><Text type="secondary">Nền tảng:</Text> <Text strong>{selectedSession.platform}</Text></Col>
                     <Col span={12}><Text type="secondary">Thiết bị (ID):</Text> <Text strong>{selectedSession.device}</Text></Col>
                     <Col span={12}><Text type="secondary">AI Agent (ID):</Text> <Text strong>{selectedSession.ai_agent}</Text></Col>
+                    <Col span={12}>
+                      <Text type="secondary">Token AI phiên live:</Text>{' '}
+                      <Tag color="cyan" style={{ fontWeight: 600 }}>{(selectedSession.token_usage?.total_tokens || 0).toLocaleString()} tokens</Tag>
+                    </Col>
+                    <Col span={12}>
+                      <Text type="secondary">Ước tính chi phí:</Text>{' '}
+                      <Tag color="green" style={{ fontWeight: 600 }}>~{Math.round((selectedSession.token_usage?.total_cost_usd || 0) * 25400).toLocaleString()}đ (${Number(selectedSession.token_usage?.total_cost_usd || 0).toFixed(4)})</Tag>
+                    </Col>
                     <Col span={24}>
                       <Text type="secondary">Trạng thái:</Text>{' '}
                       <Tag color={getStatusColor(selectedSession.status)}>{getStatusText(selectedSession.status)}</Tag>

@@ -160,6 +160,7 @@ class LiveSessionViewSet(viewsets.ModelViewSet):
         'test_comment': 'ai_agent.manage_agents',
         'setup_manual_rtmp': 'ai_agent.manage_agents',
         'hls_proxy': 'ai_agent.manage_agents',
+        'suggest_script': 'ai_agent.manage_agents',
     }
 
     def get_authenticators(self):
@@ -321,9 +322,19 @@ class LiveSessionViewSet(viewsets.ModelViewSet):
         e.g. /api/live_sessions/sessions/<id>/hls-proxy/live/index.m3u8
         """
         import requests as http_client
+        from requests.adapters import HTTPAdapter
         from django.http import HttpResponse, Http404
         from django.conf import settings
         from .models import LiveSession
+        
+        # Use persistent connection pool to eliminate TCP handshake latency on every segment
+        if not hasattr(LiveSessionViewSet, '_hls_session') or LiveSessionViewSet._hls_session is None:
+            sess = http_client.Session()
+            adapter = HTTPAdapter(pool_connections=20, pool_maxsize=50)
+            sess.mount('http://', adapter)
+            sess.mount('https://', adapter)
+            LiveSessionViewSet._hls_session = sess
+        http_session = LiveSessionViewSet._hls_session
         
         try:
             session = LiveSession.objects.get(pk=pk)
@@ -366,12 +377,12 @@ class LiveSessionViewSet(viewsets.ModelViewSet):
             max_retries = 3 if hls_path.endswith('.m3u8') else 1
             for attempt in range(max_retries):
                 try:
-                    resp = http_client.get(upstream_url, params=upstream_params, timeout=10, stream=True)
+                    resp = http_session.get(upstream_url, params=upstream_params, timeout=10, stream=True)
                 except http_client.ConnectionError:
                     # Docker container network fallback: if 127.0.0.1 failed, try 'mediamtx'
                     if '127.0.0.1' in upstream_url or 'localhost' in upstream_url:
                         fallback_url = upstream_url.replace('127.0.0.1', 'mediamtx').replace('localhost', 'mediamtx')
-                        resp = http_client.get(fallback_url, params=upstream_params, timeout=10, stream=True)
+                        resp = http_session.get(fallback_url, params=upstream_params, timeout=10, stream=True)
                     else:
                         raise
                 if resp.status_code == 404 and attempt < max_retries - 1:
@@ -508,6 +519,80 @@ class LiveSessionViewSet(viewsets.ModelViewSet):
             'connection_mode': 'manual_rtmp',
             'server_url_preview': serializer.validated_data['server_url'][:50],
             # stream_key deliberately omitted
+        })
+
+    @action(detail=False, methods=['post'], url_path='suggest-script')
+    def suggest_script(self, request):
+        """
+        Gợi ý kịch bản bán hàng livestream đa ngành hàng (0đ Token khi chạy).
+        Tự động tạo câu theo phễu bán hàng chuẩn quốc tế (5-6 câu) dựa vào sản phẩm được chọn.
+        """
+        product_id = request.data.get('product_id')
+        industry = request.data.get('industry', 'general')
+        
+        product_name = "sản phẩm đang ghim"
+        price_str = "ưu đãi độc quyền"
+        
+        if product_id:
+            try:
+                from inventory.models import Product
+                prod = Product.objects.get(id=product_id, company=request.user.company)
+                product_name = prod.name
+                if prod.price:
+                    price_str = f"chỉ {int(prod.price):,} đồng"
+            except Exception:
+                pass
+
+        templates_by_industry = {
+            'smart_lock': [
+                f"Dạ em xin chào mừng toàn thể cả nhà mình đang theo dõi phiên live hôm nay nha! Mẫu {product_name} bên em đang ghim trực tiếp với giá trợ giá cực sốc {price_str} thôi cả nhà ơi!",
+                f"Sản phẩm {product_name} này trang bị công nghệ nhận diện vân tay FPC siêu nhạy, mở cửa chỉ 0.3 giây và tích hợp chuông hình kết nối điện thoại cực kỳ tiện lợi!",
+                f"Thân khóa đúc từ hợp kim nguyên khối chống cưa cắt tuyệt đối, chìa cơ dự phòng chống sao chép và bảo hành chính hãng 2 năm 1 đổi 1 tận nơi cho các bác!",
+                f"Số lượng suất flash sale dành cho {product_name} {price_str} trong phiên live hôm nay chỉ còn đúng 5 suất thôi cả nhà ơi! Bác nào nhanh tay thì còn, chậm tay là về giá gốc nha!",
+                f"Dạ các bác nhanh tay bấm vào giỏ hàng góc trái màn hình để nhận ngay voucher giảm 200k và mã miễn phí lắp đặt toàn quốc cho {product_name} nha!",
+                f"Bác nào đang chuẩn bị hoàn thiện nhà hoặc cần thay khóa cửa phòng thì cứ thả bình luận xuống bên dưới, em sẽ hướng dẫn chọn mẫu chuẩn kích thước cho mình luôn ạ!"
+            ],
+            'fashion': [
+                f"Dạ em chào toàn thể các tình yêu đang xem live nha! Mẫu {product_name} hot hit nhất tuần này bên em đang ghim trực tiếp với giá sale sốc {price_str} thôi cả nhà ơi!",
+                f"Chất vải mềm mịn, co giãn 4 chiều cực thoáng mát, thấm hút mồ hôi tốt và form dáng chuẩn tôn dáng che khuyết điểm siêu đỉnh luôn các chị em ơi!",
+                f"Hàng chuẩn từng đường kim mũi chỉ, bao giặt máy không lo xù lông hay bai dão, bên em bao kiểm tra hàng trước khi thanh toán nên cả nhà cứ yên tâm nha!",
+                f"Dạ mẫu {product_name} hôm nay chỉ trợ giá {price_str} trực tiếp trên live cho 10 đơn đầu tiên thôi, các chị em nhanh tay chọn size trong giỏ hàng nha!",
+                f"Mọi người bấm liền vào giỏ hàng góc trái màn hình, áp mã voucher giảm giá và mã freeship extra để chốt đơn ngay kẻo hết size nhé!",
+                f"Chị nào chưa biết mình mặc size gì thì cứ comment chiều cao cân nặng xuống bên dưới, em tư vấn size chuẩn xác cho từng người luôn ạ!"
+            ],
+            'cosmetics': [
+                f"Dạ em chào cả nhà mình nha! Siêu phẩm {product_name} được săn đón nhiều nhất hôm nay bên em đang có deal hời {price_str} trực tiếp trong phiên live này ạ!",
+                f"Thành phần lành tính, an toàn cho mọi loại da kể cả da nhạy cảm nhất, giúp cấp ẩm sâu và phục hồi làn da căng bóng mịn màng chỉ sau 2 tuần sử dụng!",
+                f"Cam kết hàng chuẩn chính hãng một trăm phần trăm, đầy đủ tem mác xuất xứ và hạn sử dụng cực xa, phát hiện hàng không chuẩn bên em đền gấp 10 lần luôn ạ!",
+                f"Duy nhất trong phiên live hôm nay, {product_name} được tặng kèm quà tặng độc quyền và giá sale chỉ còn {price_str} thôi, số lượng có hạn nha cả nhà!",
+                f"Các tình yêu nhanh tay bấm vào giỏ hàng góc trái màn hình để chốt đơn và nhận ngay mã miễn phí vận chuyển toàn quốc nha!",
+                f"Ai đang gặp tình trạng da khô, mụn hay cần routine chăm sóc chuyên sâu thì cứ để lại bình luận, em sẽ tư vấn tận tình cho từng làn da luôn nhé!"
+            ],
+            'home_appliances': [
+                f"Dạ em xin chào toàn thể mọi người đang theo dõi phiên live! Hôm nay bên em xả kho trợ giá cực sốc cho siêu phẩm {product_name} chỉ với {price_str} thôi cả nhà ơi!",
+                f"Sản phẩm {product_name} công suất mạnh mẽ, tiết kiệm điện năng chuẩn 5 sao và vận hành siêu êm ái, hỗ trợ công việc gia đình nhanh chóng gấp 3 lần!",
+                f"Hàng chính hãng bảo hành lên đến 24 tháng, lỗi 1 đổi 1 trong 30 ngày đầu tiên và có đội ngũ hỗ trợ kỹ thuật tận tình cho mình luôn ạ!",
+                f"Dạ chỉ còn duy nhất 5 suất flash sale với mức giá {price_str} trong live hôm nay thôi, các bác nhanh tay bấm vào giỏ hàng chốt deal kẻo lỡ nha!",
+                f"Bác nào ưng ý thì bấm ngay nút Mua trong giỏ hàng góc trái màn hình để được áp dụng mã giảm giá và miễn phí vận chuyển tận cửa nhà nha!",
+                f"Mọi người đang xem live nếu có câu hỏi về thông số kỹ thuật hay chế độ bảo hành của {product_name} thì cứ comment xuống dưới, em giải đáp ngay ạ!"
+            ],
+            'general': [
+                f"Dạ em xin chào mừng toàn thể cả nhà mình đang theo dõi phiên livestream hôm nay ạ! Sản phẩm bên em đang ghim trực tiếp là {product_name}, hôm nay trợ giá đặc biệt {price_str} thôi cả nhà ơi!",
+                f"Sản phẩm {product_name} này bên em sở hữu chất lượng vượt trội, thiết kế thông minh và độ bền cực kỳ cao, bác nào ưng ý bấm ngay vào giỏ hàng săn deal nha!",
+                f"Bên em cam kết {product_name} chuẩn hàng chính hãng một trăm phần trăm, bảo hành đầy đủ và bao kiểm tra hàng thoải mái trước khi nhận, cả nhà hoàn toàn yên tâm nhé!",
+                f"Số lượng suất flash sale dành cho {product_name} {price_str} trong live hôm nay chỉ còn rất ít thôi cả nhà ơi! Mọi người nhanh tay chốt đơn kẻo hết mã giảm giá nha!",
+                f"Dạ các bác nhanh tay bấm vào giỏ hàng góc trái màn hình để nhận ngay voucher độc quyền và mã miễn phí vận chuyển toàn quốc cho {product_name} nha!",
+                f"Mọi người đang xem live nếu có bất kỳ thắc mắc nào về sản phẩm {product_name} thì cứ thả bình luận xuống bên dưới, em sẽ giải đáp chi tiết cho từng người luôn ạ!"
+            ]
+        }
+
+        chosen_template = templates_by_industry.get(industry, templates_by_industry['general'])
+        script_text = "\n".join(chosen_template)
+        
+        return Response({
+            'script_text': script_text,
+            'script_lines': chosen_template,
+            'templates_by_industry': templates_by_industry
         })
 
 

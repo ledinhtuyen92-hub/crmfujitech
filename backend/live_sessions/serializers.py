@@ -47,11 +47,13 @@ class LiveSessionSerializer(serializers.ModelSerializer):
     
     platform_display = serializers.CharField(source='get_platform_display', read_only=True)
     ai_agent_name = serializers.CharField(source='ai_agent.name', read_only=True)
+    ai_agent_model = serializers.CharField(source='ai_agent.model_name', read_only=True, default='')
     ai_agent_tts_provider = serializers.CharField(source='ai_agent.tts_provider', read_only=True, default='microsoft')
     ai_agent_tts_voice = serializers.CharField(source='ai_agent.tts_voice', read_only=True, default='')
     ai_agent_tts_speed = serializers.FloatField(source='ai_agent.tts_speed', read_only=True, default=1.0)
     device_name = serializers.CharField(source='device.name', read_only=True)
     product_name = serializers.CharField(source='product.name', read_only=True)
+    token_usage = serializers.SerializerMethodField()
     
     avatar_asset_url = serializers.SerializerMethodField()
     avatar_asset_thumbnail_url = serializers.SerializerMethodField()
@@ -90,6 +92,10 @@ class LiveSessionSerializer(serializers.ModelSerializer):
         if obj.audio_asset and obj.audio_asset.file:
             return obj.audio_asset.file.url
         return None
+
+    def get_token_usage(self, obj):
+        from .services import LiveContextService
+        return LiveContextService.get_token_usage(str(obj.company_id), str(obj.id))
 
     class Meta:
         model = LiveSession

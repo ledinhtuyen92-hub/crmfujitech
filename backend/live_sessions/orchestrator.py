@@ -392,11 +392,31 @@ class LiveOrchestrator:
 
         reply_text = ai_result.get("reply", "").strip()
         
+        usage = ai_result.get('_usage', {}) if isinstance(ai_result, dict) else {}
+        input_tokens = usage.get('input', 0)
+        output_tokens = usage.get('output', 0)
+        total_tokens = input_tokens + output_tokens
+        cost_usd = ai_result.get('_cost_usd', 0.0) if isinstance(ai_result, dict) else 0.0
+        model_used = ai_result.get('_model', getattr(agent, 'model_name', '')) if isinstance(ai_result, dict) else getattr(agent, 'model_name', '')
+        
+        # Ghi nhận và lấy thống kê token tích lũy cho phiên live
+        token_stats = LiveContextService.record_token_usage(
+            str(session.company_id), str(session.id), input_tokens, output_tokens, cost_usd
+        )
+
         LiveConsoleEventService.emit(session_id, "live.ai.completed", {
             "intent": intent,
             "action": action,
             "reply_length": len(reply_text),
-            "reply_text": reply_text
+            "reply_text": reply_text,
+            "input_tokens": input_tokens,
+            "output_tokens": output_tokens,
+            "total_tokens": total_tokens,
+            "cost_usd": cost_usd,
+            "model": model_used,
+            "session_total_tokens": token_stats.get('total_tokens', 0),
+            "session_total_cost_usd": token_stats.get('total_cost_usd', 0.0),
+            "session_total_replies": token_stats.get('total_ai_replies', 0),
         }, correlation_id)
         
         # Save to context
@@ -535,10 +555,35 @@ class LiveOrchestrator:
 
     def generate_proactive_sales_pitch(self, product, session, context_data: dict) -> str:
         """
-        Tự động tạo câu tư vấn sản phẩm bán hàng chuyên nghiệp khi livestream chưa có comment.
-        Xoay vòng đa dạng: Lời chào mừng, nêu bật tính năng & độ bền, báo giá flash sale, ưu đãi vận chuyển, kêu gọi chốt đơn.
+        Tự động tạo câu tư vấn sản phẩm bán hàng chuyên nghiệp khi livestream chưa có comment (0đ TOKEN).
+        Ưu tiên:
+        1. Nếu người dùng có nhập kịch bản xoay vòng trong session.session_prompt (nhiều dòng),
+           hệ thống sẽ lần lượt xoay vòng các câu kịch bản đó của người dùng.
+        2. Nếu không có hoặc chỉ có 1 ghi chú ngắn, hệ thống dùng bộ kịch bản bán hàng đa ngành
+           chuẩn mực (chào mừng, USP tính năng, cam kết chính hãng, báo giá flash sale, kêu gọi giỏ hàng).
         """
         pitch_index = context_data.get("proactive_pitch_index", 0)
+        
+        # 1. Kiểm tra kịch bản người dùng tự nhập (phân tách theo dòng)
+        custom_pitches = []
+        if getattr(session, 'session_prompt', None):
+            lines = [line.strip() for line in session.session_prompt.split('\n') if line.strip()]
+            if len(lines) >= 2 or (len(lines) == 1 and len(lines[0]) > 25):
+                import re
+                for l in lines:
+                    cleaned = re.sub(r'^(?:[-*•]|\d+[\.\/\)])\s*', '', l).strip()
+                    if cleaned:
+                        custom_pitches.append(cleaned)
+
+        if custom_pitches:
+            chosen = custom_pitches[pitch_index % len(custom_pitches)]
+            from live_sessions.services import LiveContextService
+            LiveContextService.update_context(str(session.company_id), str(session.id), {
+                "proactive_pitch_index": pitch_index + 1
+            })
+            return chosen
+
+        # 2. Bộ kịch bản bán hàng đa ngành chuẩn phễu (tự động theo sản phẩm đang ghim)
         prod_name = product.name if product else "sản phẩm nổi bật của bên em"
         
         price_val = None
@@ -561,14 +606,15 @@ class LiveOrchestrator:
                 price_val = f"{product.price} đồng"
                 
         price_str = f"chỉ với mức giá {price_val}" if price_val else "với mức giá cực kỳ ưu đãi"
-        extra_note = f". Đặc biệt lưu ý: {session.session_prompt}" if getattr(session, 'session_prompt', None) else ""
+        extra_note = f". Đặc biệt lưu ý: {session.session_prompt}" if (getattr(session, 'session_prompt', None) and len(session.session_prompt) <= 25) else ""
         
         pitches = [
-            f"Dạ em xin chào mừng toàn thể mọi người đang theo dõi phiên livestream hôm nay ạ! Sản phẩm bên em đang ghim trực tiếp là {prod_name}, hôm nay trợ giá đặc biệt {price_str} thôi cả nhà ơi! Các bác nhanh tay bấm vào giỏ hàng bên dưới để săn deal ngay nhé{extra_note}!",
-            f"Dạ sản phẩm {prod_name} này bên em cam kết hàng chuẩn chính hãng một trăm phần trăm, độ bền vượt trội và bảo hành đầy đủ. Bác nào ưng ý thì bấm đặt ngay trong live để nhận mã miễn phí vận chuyển toàn quốc nha!",
-            f"Số lượng suất flash sale dành cho {prod_name} {price_str} trong phiên live hôm nay chỉ còn rất ít thôi cả nhà ơi! Anh chị em mình nhanh tay chốt đơn kẻo hết mã giảm giá nhé!",
-            f"Mọi người đang xem livestream nếu có bất kỳ thắc mắc nào về kích thước, chất liệu hay cách sử dụng của {prod_name} thì cứ thả bình luận xuống bên dưới, em sẽ tư vấn và giải đáp chi tiết cho từng người luôn ạ!",
-            f"Dạ các bác nhanh tay bấm vào giỏ hàng màu cam để nhận ngay voucher độc quyền cho {prod_name} nha. Mức giá ưu đãi {price_str} chỉ áp dụng trực tiếp trong lúc phiên live đang phát thôi ạ!"
+            f"Dạ em xin chào mừng toàn thể cả nhà mình đang theo dõi phiên livestream hôm nay ạ! Sản phẩm bên em đang ghim trực tiếp là {prod_name}, hôm nay trợ giá đặc biệt {price_str} thôi cả nhà ơi! Các bác nhanh tay bấm vào giỏ hàng góc trái săn deal ngay nhé{extra_note}!",
+            f"Sản phẩm {prod_name} này bên em sở hữu chất lượng vượt trội, thiết kế thông minh và độ bền cực kỳ cao, bác nào ưng ý bấm ngay vào giỏ hàng săn deal nha!",
+            f"Bên em cam kết {prod_name} chuẩn hàng chính hãng một trăm phần trăm, bảo hành đầy đủ và bao kiểm tra hàng thoải mái trước khi nhận, cả nhà hoàn toàn yên tâm nhé!",
+            f"Số lượng suất flash sale dành cho {prod_name} {price_str} trong phiên live hôm nay chỉ còn rất ít thôi cả nhà ơi! Mọi người nhanh tay chốt đơn kẻo hết mã giảm giá nha!",
+            f"Dạ các bác nhanh tay bấm vào giỏ hàng góc trái màn hình để nhận ngay voucher độc quyền và mã miễn phí vận chuyển toàn quốc cho {prod_name} nha!",
+            f"Mọi người đang xem live nếu có bất kỳ thắc mắc nào về sản phẩm {prod_name} thì cứ thả bình luận xuống bên dưới, em sẽ giải đáp chi tiết cho từng người luôn ạ!"
         ]
         
         chosen = pitches[pitch_index % len(pitches)]
@@ -580,7 +626,9 @@ class LiveOrchestrator:
 
     def process_proactive_speech(self, session_id: str, correlation_id: Optional[str] = None) -> Dict[str, Any]:
         """
-        Generates proactive speech when the session is idle (no comments) or starting up.
+        Kích hoạt câu nói mồi khi phiên live im lặng (không có comment).
+        MẶC ĐỊNH: Sử dụng Kịch bản bán hàng xoay vòng tự động (0đ TOKEN) để duy trì không khí live sôi nổi
+        mà không phát sinh chi phí API.
         """
         logger.info(f"[Session: {session_id}][Corr: {correlation_id}] Proactive speech started.")
 
@@ -601,54 +649,34 @@ class LiveOrchestrator:
         from live_sessions.services import LiveContextService
         context_data = LiveContextService.get_context(str(session.company_id), str(session.id))
         
-        reply_text = ""
-        # 1. Thử gọi LLM nếu có agent cấu hình
-        if agent:
-            product_truth = f"THÔNG TIN SẢN PHẨM ĐANG LIVE (BẮT BUỘC SỬ DỤNG LÀM CHUẨN):\n- Tên: {product.name if product else 'Sản phẩm hot'}\n"
-            if product:
-                product_truth += f"- Mã (SKU): {product.sku}\n- Giá tiêu chuẩn: {product.price}\n- Mô tả cơ bản: {product.description}\n"
-            
-            try:
-                from live_sessions.models import LivePlatformProduct
-                if product:
-                    platform_product = LivePlatformProduct.objects.filter(
-                        company_id=session.company_id,
-                        product_id=product.id,
-                        platform=session.platform
-                    ).first()
-                    if platform_product and platform_product.live_price_override:
-                        product_truth += f"- GIÁ ĐANG CHẠY FLASH SALE TRÊN LIVE: {platform_product.live_price_override} (Ưu tiên báo giá này cho khách livestream)\n"
-            except Exception:
-                pass
-
-            conversation_history = [
-                {"role": "system", "content": product_truth},
-                {"role": "system", "content": "BẮT BUỘC: Không có ai bình luận trong thời gian qua. Hãy chủ động nói một câu ngắn gọn (1-2 câu) bằng tiếng Việt tự nhiên để chào người xem, giới thiệu sản phẩm đang ghim, nêu bật điểm mạnh hoặc kêu gọi chốt đơn trong giỏ hàng. Định dạng trả về JSON với 'intent'='PROACTIVE', 'action'='RESPOND', và 'reply' chứa câu nói của bạn."}
-            ]
-            
-            recent_history = context_data.get("recent_history", [])
-            if isinstance(recent_history, list):
-                for msg in recent_history:
-                    conversation_history.append(msg)
-                    
-            try:
-                ai_result = generate_ai_reply(agent, conversation_history, "Khách hàng Livestream")
-                candidate_reply = ai_result.get("reply", "").strip() if isinstance(ai_result, dict) else ""
-                if candidate_reply and candidate_reply != "[STOP]" and not candidate_reply.startswith("Hệ thống AI chưa được cấu hình"):
-                    reply_text = candidate_reply
-            except Exception as e:
-                logger.warning(f"[Session: {session_id}] AI error in proactive speech: {e}, falling back to sales pitch")
-
-        # 2. Nếu LLM không khả dụng hoặc lỗi hoặc chưa có API key -> Dùng kịch bản tư vấn thông minh
-        if not reply_text:
-            reply_text = self.generate_proactive_sales_pitch(product, session, context_data)
+        # Sử dụng Kịch bản bán hàng xoay vòng tự động (0đ TOKEN)
+        reply_text = self.generate_proactive_sales_pitch(product, session, context_data)
+        
+        token_stats = LiveContextService.get_token_usage(str(session.company_id), str(session.id))
+        LiveConsoleEventService.emit(session_id, "live.ai.completed", {
+            "intent": "PROACTIVE_PITCH",
+            "action": "RESPOND",
+            "reply_length": len(reply_text) if reply_text else 0,
+            "reply_text": reply_text or "",
+            "input_tokens": 0,
+            "output_tokens": 0,
+            "total_tokens": 0,
+            "cost_usd": 0.0,
+            "is_template": True,
+            "session_total_tokens": token_stats.get('total_tokens', 0),
+            "session_total_cost_usd": token_stats.get('total_cost_usd', 0.0),
+            "session_total_replies": token_stats.get('total_ai_replies', 0),
+        }, correlation_id)
 
         if not reply_text or reply_text == "[STOP]":
+            import time
+            LiveContextService.update_context(str(session.company_id), str(session.id), {
+                "is_device_speaking": False,
+                "last_speech_time": time.time()
+            })
             return {"status": "suppressed", "reason": "empty_reply"}
 
         LiveContextService.add_to_history(str(session.company_id), str(session.id), "assistant", reply_text)
-        import time
-        LiveContextService.update_context(str(session.company_id), str(session.id), {"last_speech_time": time.time()})
 
         # 3. Generate Proactive TTS via Multi-Tier Failover Engine
         try:
@@ -676,6 +704,11 @@ class LiveOrchestrator:
                 }, correlation_id)
         except Exception as e:
             logger.error(f"[Session: {session_id}] TTS error: {e}")
+            import time
+            LiveContextService.update_context(str(session.company_id), str(session.id), {
+                "is_device_speaking": False,
+                "last_speech_time": time.time()
+            })
             return {"status": "error", "reason": "tts_failure"}
 
         # 4. Lưu Audio Asset
@@ -683,6 +716,11 @@ class LiveOrchestrator:
             audio_asset_dict = self.audio_storage.store(audio_result, session.company_id, session.id)
         except Exception as e:
             logger.error(f"[Session: {session_id}] Storage error: {e}")
+            import time
+            LiveContextService.update_context(str(session.company_id), str(session.id), {
+                "is_device_speaking": False,
+                "last_speech_time": time.time()
+            })
             return {"status": "error", "reason": "storage_failure"}
 
         # 5. Build speech.speak command

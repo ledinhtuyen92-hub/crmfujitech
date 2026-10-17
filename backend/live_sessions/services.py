@@ -87,6 +87,61 @@ class LiveContextService:
         key = cls._get_key(company_id, session_id)
         redis_client.delete(key)
 
+    @classmethod
+    def record_token_usage(cls, company_id, session_id, input_tokens=0, output_tokens=0, cost_usd=0.0):
+        """Ghi nhận token và chi phí tích lũy theo thời gian thực cho phiên live"""
+        if not redis_client:
+            return {
+                'total_tokens': input_tokens + output_tokens,
+                'total_input_tokens': input_tokens,
+                'total_output_tokens': output_tokens,
+                'total_cost_usd': round(float(cost_usd), 5),
+                'total_ai_replies': 1
+            }
+        key = cls._get_key(company_id, session_id)
+        total_tokens = input_tokens + output_tokens
+        try:
+            redis_client.hincrby(key, 'total_input_tokens', int(input_tokens))
+            redis_client.hincrby(key, 'total_output_tokens', int(output_tokens))
+            redis_client.hincrby(key, 'total_tokens', int(total_tokens))
+            redis_client.hincrby(key, 'total_ai_replies', 1)
+            redis_client.hincrbyfloat(key, 'total_cost_usd', float(cost_usd))
+            redis_client.expire(key, cls.TTL_SECONDS)
+        except Exception as e:
+            logger.warning(f"Error recording token usage in LiveContext: {e}")
+        return cls.get_token_usage(company_id, session_id)
+
+    @classmethod
+    def get_token_usage(cls, company_id, session_id):
+        """Lấy tổng hợp token và chi phí tích lũy của phiên live"""
+        if not redis_client:
+            return {
+                'total_tokens': 0,
+                'total_input_tokens': 0,
+                'total_output_tokens': 0,
+                'total_cost_usd': 0.0,
+                'total_ai_replies': 0,
+            }
+        key = cls._get_key(company_id, session_id)
+        try:
+            raw = redis_client.hmget(key, ['total_tokens', 'total_input_tokens', 'total_output_tokens', 'total_cost_usd', 'total_ai_replies'])
+            return {
+                'total_tokens': int(raw[0] or 0),
+                'total_input_tokens': int(raw[1] or 0),
+                'total_output_tokens': int(raw[2] or 0),
+                'total_cost_usd': round(float(raw[3] or 0.0), 5),
+                'total_ai_replies': int(raw[4] or 0),
+            }
+        except Exception as e:
+            logger.debug(f"Error getting token usage from LiveContext: {e}")
+            return {
+                'total_tokens': 0,
+                'total_input_tokens': 0,
+                'total_output_tokens': 0,
+                'total_cost_usd': 0.0,
+                'total_ai_replies': 0,
+            }
+
 class LiveCommentDedupService:
     TTL_SECONDS = 3600
 
