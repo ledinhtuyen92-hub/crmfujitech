@@ -275,8 +275,8 @@ class StreamEncoder:
             # Calibrated chroma key avatar and put on background
             ck_col, ck_sim, ck_blend = self._detect_chroma_params()
             filter_complex.append(
-                f"[0:v]chromakey={ck_col}:{ck_sim}:{ck_blend},scale=-1:{self.config.height}[ckout];"
-                f"[{input_idx}:v]scale={self.config.width}:{self.config.height}[bg];"
+                f"[0:v]chromakey={ck_col}:{ck_sim}:{ck_blend},scale=-1:{self.config.height}:eval=init[ckout];"
+                f"[{input_idx}:v]scale={self.config.width}:{self.config.height}:eval=init[bg];"
                 f"[bg][ckout]overlay=(W-w)/2:(H-h)/2[v1]"
             )
             video_out = "[v1]"
@@ -285,7 +285,7 @@ class StreamEncoder:
         # Overlay
         if self.cached_assets.get('overlay'):
             inputs.extend(["-loop", "1", "-i", self.cached_assets['overlay']])
-            filter_complex.append(f"[{input_idx}:v]scale={self.config.width}:{self.config.height}[ovl];{video_out}[ovl]overlay=0:0[v2]")
+            filter_complex.append(f"[{input_idx}:v]scale={self.config.width}:{self.config.height}:eval=init[ovl];{video_out}[ovl]overlay=0:0[v2]")
             video_out = "[v2]"
             input_idx += 1
             
@@ -319,19 +319,25 @@ class StreamEncoder:
 
         encoder_args = ["-c:v", codec, "-b:v", self.config.bitrate]
         if codec == "libx264":
-            encoder_args.extend(["-preset", "ultrafast", "-tune", "zerolatency", "-bf", "0"])
+            encoder_args.extend(["-preset", "ultrafast", "-tune", "zerolatency", "-bf", "0", "-threads", "3"])
         elif codec == "h264_nvenc":
             encoder_args.extend(["-preset", "p1", "-tune", "ull", "-zerolatency", "1", "-bf", "0"])
         elif codec == "h264_qsv":
             encoder_args.extend(["-preset", "veryfast", "-bf", "0"])
+        elif codec == "h264_mf":
+            encoder_args.extend(["-hw_encoding", "1", "-scenario", "4", "-rate_control", "0"])
 
         cmd.extend(encoder_args)
         
+        # Native GPU pixel format for Windows MediaFoundation is nv12, CPU is yuv420p
+        pix_fmt = "nv12" if codec == "h264_mf" else "yuv420p"
+
         # Ultra-low latency GOP: emit keyframe every 1 second (e.g. 30 frames at 30fps)
         # Slicing short HLS segments requires keyframes at least every 1s.
         gop_size = str(max(15, self.config.fps))
         cmd.extend([
-            "-pix_fmt", "yuv420p",
+            "-threads", "4",
+            "-pix_fmt", pix_fmt,
             "-g", gop_size,
             "-keyint_min", gop_size,
             "-sc_threshold", "0",
