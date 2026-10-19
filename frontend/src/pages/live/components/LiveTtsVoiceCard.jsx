@@ -57,6 +57,7 @@ export default function LiveTtsVoiceCard({
   bgmVolume = 35,
   onBgmVolumeChange,
   onOpenSceneBuilder,
+  onSessionUpdate,
 }) {
   const [recentTts, setRecentTts] = useState(null)
   const [prevAiVolume, setPrevAiVolume] = useState(100)
@@ -113,6 +114,9 @@ export default function LiveTtsVoiceCard({
       })
       message.success('Đã lưu kịch bản xoay vòng! MC sẽ đọc theo kịch bản này.')
       setScriptModalOpen(false)
+      if (typeof onSessionUpdate === 'function') {
+        onSessionUpdate({ session_prompt: scriptText })
+      }
     } catch (e) {
       message.error('Lỗi khi lưu kịch bản: ' + (e.response?.data?.detail || e.message))
     } finally {
@@ -136,8 +140,9 @@ export default function LiveTtsVoiceCard({
   // Lắng nghe sự kiện realtime TTS và AI Token qua WebSocket
   useEffect(() => {
     if (!lastEvent) return
+    const eventType = lastEvent.event_type || lastEvent.type
 
-    if (lastEvent.type === 'live.ai.completed') {
+    if (eventType === 'live.ai.completed') {
       const payload = lastEvent.payload || {}
       setTokenStats(prev => {
         const newTotalTokens = payload.session_total_tokens !== undefined ? payload.session_total_tokens : (prev.totalTokens + (payload.total_tokens || 0))
@@ -154,7 +159,7 @@ export default function LiveTtsVoiceCard({
           model: payload.model || prev.model
         }
       })
-    } else if (lastEvent.type === 'live.tts.completed') {
+    } else if (eventType === 'live.tts.completed') {
       setRecentTts({
         provider: lastEvent.payload?.provider,
         isFallback: !!lastEvent.payload?.is_fallback,
@@ -163,7 +168,7 @@ export default function LiveTtsVoiceCard({
         format: lastEvent.payload?.format || 'mp3',
         time: new Date().toLocaleTimeString('vi-VN', { hour12: false }),
       })
-    } else if (lastEvent.type === 'live.tts.fallback') {
+    } else if (eventType === 'live.tts.fallback') {
       setRecentTts((prev) => ({
         ...prev,
         isFallback: true,
@@ -255,6 +260,7 @@ export default function LiveTtsVoiceCard({
     <Card
       size="small"
       style={{
+        width: '100%',
         backgroundColor: '#141414',
         border: isFallback ? '1px solid #d46b08' : '1px solid #262626',
         borderRadius: 10,
@@ -272,24 +278,24 @@ export default function LiveTtsVoiceCard({
       />
 
       {/* Header: Title, Status Badge, and Sound Toggle Button */}
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
-        <Space size={6} align="center">
-          <SoundOutlined style={{ color: isMasterMuted ? '#8c8c8c' : (isFallback ? '#faad14' : '#52c41a'), fontSize: 16 }} />
-          <Text strong style={{ color: '#fff', fontSize: 13 }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, flexWrap: 'wrap', marginBottom: 8 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'nowrap', minWidth: 0 }}>
+          <SoundOutlined style={{ color: isMasterMuted ? '#8c8c8c' : (isFallback ? '#faad14' : '#52c41a'), fontSize: 16, flexShrink: 0 }} />
+          <Text strong style={{ color: '#fff', fontSize: 13, whiteSpace: 'nowrap' }}>
             Giọng đọc AI Livestream
           </Text>
           {isFallback ? (
             <Tooltip title={recentTts?.fallbackReason || 'Nhà cung cấp chính lỗi, hệ thống tự động chuyển sang giọng dự phòng'}>
-              <Tag color="warning" icon={<WarningFilled />} style={{ margin: 0, fontSize: 11 }}>
+              <Tag color="warning" icon={<WarningFilled />} style={{ margin: 0, fontSize: 11, flexShrink: 0 }}>
                 Dự phòng
               </Tag>
             </Tooltip>
           ) : (
-            <Tag color="success" icon={<CheckCircleFilled />} style={{ margin: 0, fontSize: 11 }}>
+            <Tag color="success" icon={<CheckCircleFilled />} style={{ margin: 0, fontSize: 11, flexShrink: 0 }}>
               Đang hoạt động
             </Tag>
           )}
-        </Space>
+        </div>
 
         {/* Nút bật/tắt âm thanh tổng đưa xuống đây theo yêu cầu người dùng */}
         <Button

@@ -66,6 +66,14 @@ class LiveOrchestrator:
         if not stream_url:
             return {"status": "error", "reason": "missing_stream_url"}
 
+        # Reset proactive pitch index and speech timing so configured script starts fresh at sentence 1
+        from live_sessions.services import LiveContextService
+        LiveContextService.update_context(str(session.company_id), str(session.id), {
+            "proactive_pitch_index": 0,
+            "last_speech_time": 0,
+            "is_device_speaking": False,
+        })
+
         command_id = str(uuid.uuid4())
         message_id = str(uuid.uuid4())
 
@@ -352,6 +360,13 @@ class LiveOrchestrator:
             "content": product_truth
         })
         
+        # Inject Custom Session Script / Rules
+        if getattr(session, 'session_prompt', None):
+            conversation_history.append({
+                "role": "system",
+                "content": f"[LƯU Ý / KỊCH BẢN PHIÊN LIVE HIỆN TẠI (Ưu tiên tuân thủ)]:\n{session.session_prompt}"
+            })
+        
         # Inject Intent/Action Schema Override
         conversation_history.append({
             "role": "system",
@@ -567,13 +582,13 @@ class LiveOrchestrator:
         # 1. Kiểm tra kịch bản người dùng tự nhập (phân tách theo dòng)
         custom_pitches = []
         if getattr(session, 'session_prompt', None):
-            lines = [line.strip() for line in session.session_prompt.split('\n') if line.strip()]
-            if len(lines) >= 2 or (len(lines) == 1 and len(lines[0]) > 25):
-                import re
-                for l in lines:
-                    cleaned = re.sub(r'^(?:[-*•]|\d+[\.\/\)])\s*', '', l).strip()
-                    if cleaned:
-                        custom_pitches.append(cleaned)
+            raw_prompt = session.session_prompt.replace('\r\n', '\n').replace('\r', '\n')
+            lines = [line.strip() for line in raw_prompt.split('\n') if line.strip()]
+            import re
+            for l in lines:
+                cleaned = re.sub(r'^(?:[-*•]|\d+[\.\/\)]|(?:Câu|Dòng|Ý)\s*\d+[:\.\)])\s*', '', l, flags=re.IGNORECASE).strip()
+                if cleaned:
+                    custom_pitches.append(cleaned)
 
         if custom_pitches:
             chosen = custom_pitches[pitch_index % len(custom_pitches)]

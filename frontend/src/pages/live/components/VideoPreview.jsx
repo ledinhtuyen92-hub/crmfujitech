@@ -29,12 +29,16 @@ export default function VideoPreview({
   const [errorMsg, setErrorMsg] = useState(null)
   const [deviceTelemetry, setDeviceTelemetry] = useState(null)
   const [isPlaybackReady, setIsPlaybackReady] = useState(false)
+  const [hasFirstFrameRendered, setHasFirstFrameRendered] = useState(false)
   const [isBuffering, setIsBuffering] = useState(false)
   const [internalMuted, setInternalMuted] = useState(false)
   const [isAutoMutedByBrowser, setIsAutoMutedByBrowser] = useState(false)
   const [isMockupAvatarLoaded, setIsMockupAvatarLoaded] = useState(false)
   const hasStartedPlaybackRef = useRef(false)
   const hasJumpedToLiveEdgeRef = useRef(false)
+  const [loadProgress, setLoadProgress] = useState(0)
+  const [progressStatusText, setProgressStatusText] = useState('Đang thiết lập kết nối...')
+  const frameReadyLockRef = useRef(false)
 
   const activeMuted = (isMasterMuted !== undefined) ? isMasterMuted : internalMuted
   const activeVolume = Math.max(0, Math.min(1, (aiVolume ?? 100) / 100))
@@ -62,7 +66,10 @@ export default function VideoPreview({
     }
   }
 
-  const isSessionLive = session?.status === 'running' || session?.status === 'human_takeover'
+  const isStreamLiveFromEvent = streamEvent?.event_type === 'live.stream.status' &&
+    (streamEvent?.payload?.state === 'LIVE' || streamEvent?.payload?.stream_state === 'LIVE')
+  const isStreamStarting = streamEvent?.event_type === 'live.stream_start.dispatched'
+  const isSessionLive = session?.status === 'running' || session?.status === 'human_takeover' || isStreamLiveFromEvent || isStreamStarting
 
   // Build absolute HLS proxy URL with ?token= so HLS.js segments authenticate
   const buildHlsProxyUrl = (sessionId) => {
@@ -134,7 +141,7 @@ export default function VideoPreview({
 
       if (!masterResp.ok && masterResp.status !== 200) {
         setHlsStatus('waiting')
-        retryTimerRef.current = setTimeout(probeHls, 200)
+        retryTimerRef.current = setTimeout(probeHls, 1000)
         return
       }
 
@@ -153,7 +160,7 @@ export default function VideoPreview({
         const variantUrl = extractVariantUrl(masterText, proxyUrl)
         if (!variantUrl) {
           setHlsStatus('waiting')
-          retryTimerRef.current = setTimeout(probeHls, 200)
+          retryTimerRef.current = setTimeout(probeHls, 1000)
           return
         }
 
@@ -176,16 +183,16 @@ export default function VideoPreview({
 
         // Stream connected but waiting for first segment to be muxed
         setHlsStatus('waiting')
-        retryTimerRef.current = setTimeout(probeHls, 200)
+        retryTimerRef.current = setTimeout(probeHls, 1000)
         return
       }
 
       // Other playlist status, retry shortly
       setHlsStatus('waiting')
-      retryTimerRef.current = setTimeout(probeHls, 200)
+      retryTimerRef.current = setTimeout(probeHls, 1000)
     } catch {
       setHlsStatus('waiting')
-      retryTimerRef.current = setTimeout(probeHls, 200)
+      retryTimerRef.current = setTimeout(probeHls, 1000)
     }
   }, [isSessionLive, session?.id]) // eslint-disable-line
 
@@ -202,6 +209,9 @@ export default function VideoPreview({
         setHlsUrl(null)
         setHlsStatus('idle')
         setIsPlaybackReady(false)
+        setHasFirstFrameRendered(false)
+        setLoadProgress(0)
+        frameReadyLockRef.current = false
         hasStartedPlaybackRef.current = false
         hasJumpedToLiveEdgeRef.current = false
         if (hlsRef.current) { hlsRef.current.destroy(); hlsRef.current = null }
@@ -223,6 +233,9 @@ export default function VideoPreview({
       setHlsUrl(null)
       setHlsStatus('idle')
       setIsPlaybackReady(false)
+      setHasFirstFrameRendered(false)
+      setLoadProgress(0)
+      frameReadyLockRef.current = false
       hasStartedPlaybackRef.current = false
       hasJumpedToLiveEdgeRef.current = false
       setErrorMsg(null)
@@ -245,7 +258,7 @@ export default function VideoPreview({
   const frozenCountRef = useRef(0)
   const watchdogLastTimeRef = useRef(0)
   useEffect(() => {
-    if (!isSessionLive || !hlsUrl || hlsStatus !== 'live' || !isPlaybackReady) return
+    if (!isSessionLive || !hlsUrl) return
 
     // Reset counters when watchdog (re)activates
     frozenCountRef.current = 0
@@ -254,6 +267,21 @@ export default function VideoPreview({
     const interval = setInterval(() => {
       const v = videoRef.current
       if (!v) return
+
+      // Auto-rescue: If buffer exists but playhead is stuck behind buffer start or at 0 (fixes black screen)
+      if (v.buffered && v.buffered.length > 0) {
+        const bufStart = v.buffered.start(0)
+        const bufEnd = v.buffered.end(v.buffered.length - 1)
+        if (v.currentTime < bufStart - 0.2 || (v.currentTime < 1.0 && bufStart > 1.5)) {
+          const livePos = hlsRef.current?.liveSyncPosition
+          const target = (livePos && livePos >= bufStart && livePos <= bufEnd)
+            ? livePos
+            : Math.max(bufStart + 0.1, bufEnd - 1.5)
+          v.currentTime = target
+          v.play().catch(() => {})
+          return
+        }
+      }
 
       // If video paused unexpectedly during live session
       if (v.paused && !v.seeking) {
@@ -292,7 +320,127 @@ export default function VideoPreview({
     }, 1000)
 
     return () => clearInterval(interval)
-  }, [isSessionLive, hlsUrl, hlsStatus, isPlaybackReady])
+  }, [isSessionLive, hlsUrl])
+
+  // Video frame readiness handler: strictly verifies moving video frames before marking 100% ready!
+  const markFrameReady = useCallback(() => {
+    const v = videoRef.current
+    if (!v) return
+
+    // 1. Ready state >= 2 (HAVE_CURRENT_DATA or higher)
+    // 2. videoWidth > 0 (decoded video dimensions exist)
+    if (v.readyState >= 2 && v.videoWidth > 0) {
+      let isPlayheadInBuffer = true
+      if (v.buffered && v.buffered.length > 0) {
+        const bufStart = v.buffered.start(0)
+        const bufEnd = v.buffered.end(v.buffered.length - 1)
+        if (v.currentTime < bufStart - 0.2 || (v.currentTime < 1.0 && bufStart > 1.5)) {
+          isPlayheadInBuffer = false
+          const livePos = hlsRef.current?.liveSyncPosition
+          const target = (livePos && livePos >= bufStart && livePos <= bufEnd)
+            ? livePos
+            : Math.max(bufStart + 0.1, bufEnd - 1.5)
+          v.currentTime = target
+          v.play().catch(() => {})
+        }
+      }
+
+      // Check if video clock is ACTUALLY moving and decoded frames are actively painted!
+      // v.currentTime > 0.08 proves that decoder has pushed past initial empty/black keyframe
+      if (isPlayheadInBuffer && v.currentTime > 0.08 && !v.paused) {
+        if (!frameReadyLockRef.current) {
+          frameReadyLockRef.current = true
+          hasStartedPlaybackRef.current = true
+          setLoadProgress(100)
+          setProgressStatusText('Hoàn tất 100%! Đang mở luồng phát...')
+
+          // Delay revealing video until 100% progress animation renders cleanly
+          setTimeout(() => {
+            setHasFirstFrameRendered(true)
+            setIsPlaybackReady(true)
+            setIsBuffering(false)
+            setHlsStatus('live')
+          }, 350)
+        }
+      } else {
+        if (v.paused && !v.seeking) {
+          v.play().catch(() => {})
+        }
+      }
+    }
+  }, [])
+
+  // Progressive percentage simulation and status tracker (0% -> 95% while waiting for real video frames)
+  useEffect(() => {
+    if (!isSessionLive) {
+      setLoadProgress(0)
+      frameReadyLockRef.current = false
+      return
+    }
+
+    if (hasFirstFrameRendered) {
+      setLoadProgress(100)
+      return
+    }
+
+    // Set initial minimum progress as soon as session is live
+    setLoadProgress(prev => Math.max(prev, 12))
+
+    const progressTimer = setInterval(() => {
+      // Check frame readiness on each timer tick
+      markFrameReady()
+
+      setLoadProgress(prev => {
+        if (frameReadyLockRef.current || prev >= 100) return 100
+
+        // Stage 1: Waiting for HLS URL / master playlist (0% - 42%)
+        if (!hlsUrl || hlsStatus === 'waiting') {
+          if (prev < 42) {
+            const next = prev + Math.floor(Math.random() * 4 + 3)
+            return Math.min(42, next)
+          }
+          return prev
+        }
+
+        // Stage 2: HLS loaded, fetching segments (42% - 75%)
+        if (hlsStatus === 'loading' || !hasStartedPlaybackRef.current) {
+          if (prev < 75) {
+            const next = prev + Math.floor(Math.random() * 3 + 2)
+            return Math.min(75, next)
+          }
+          return prev
+        }
+
+        // Stage 3: Segments buffering, waiting for first rendered frame (75% - 94%)
+        if (prev < 94) {
+          const next = prev + Math.floor(Math.random() * 2 + 1)
+          return Math.min(94, next)
+        }
+
+        // Hold at 94% until markFrameReady detects real painted frame and triggers 100%
+        return 94
+      })
+    }, 280)
+
+    return () => clearInterval(progressTimer)
+  }, [isSessionLive, hasFirstFrameRendered, hlsUrl, hlsStatus, markFrameReady])
+
+  // Dynamic progress status text
+  useEffect(() => {
+    if (!isSessionLive) {
+      setProgressStatusText('Đang thiết lập kết nối...')
+    } else if (loadProgress >= 100) {
+      setProgressStatusText('Hoàn tất 100%! Đang mở luồng phát...')
+    } else if (loadProgress >= 90) {
+      setProgressStatusText('Đang dựng khung hình & khởi chạy video...')
+    } else if (loadProgress >= 70) {
+      setProgressStatusText('Đang nạp bộ đệm phát mượt (0% giật lag)...')
+    } else if (loadProgress >= 40) {
+      setProgressStatusText('Đang tải luồng phát & đồng bộ âm thanh AI...')
+    } else {
+      setProgressStatusText('Đang đồng bộ mã hóa hình ảnh & tách phông AI...')
+    }
+  }, [isSessionLive, loadProgress])
 
   // Manual play (bypass browser autoplay block)
   const handleManualPlay = () => {
@@ -300,13 +448,20 @@ export default function VideoPreview({
       if (hlsRef.current) {
         hlsRef.current.startLoad()
       }
-      const shouldMute = activeMuted || aiVolume === 0
-      videoRef.current.muted = shouldMute
-      videoRef.current.defaultMuted = shouldMute
+      if (isAutoMutedByBrowser) {
+        videoRef.current.muted = activeMuted || (aiVolume === 0)
+        setIsAutoMutedByBrowser(false)
+      } else {
+        const shouldMute = activeMuted || aiVolume === 0
+        videoRef.current.muted = shouldMute
+        videoRef.current.defaultMuted = shouldMute
+      }
       videoRef.current.volume = activeVolume
       videoRef.current.play()
         .then(() => {
           setHlsStatus('live')
+          setIsPlaybackReady(true)
+          markFrameReady()
         })
         .catch((e) => {
           console.warn('Manual play pending buffer:', e)
@@ -352,23 +507,24 @@ export default function VideoPreview({
         enableWorker: true,
         lowLatencyMode: false,
         // Buffer limits: keep generous forward cushion (15s) so network or proxy
-        // hiccups do not starve the player, while capping back buffer to avoid memory leaks.
+        // hiccups do not starve the player, while capping back buffer strictly to 15s
+        // to completely eliminate memory leaks during multi-hour streams.
         backBufferLength: 15,
         maxBufferLength: 15,
-        maxMaxBufferLength: 30,
-        maxBufferSize: 64 * 1024 * 1024, // 64 MB cap
+        maxMaxBufferLength: 25,
+        maxBufferSize: 32 * 1024 * 1024, // 32 MB heap cap
         liveDurationInfinity: true,
         initialLiveManifestSize: 1,
         liveSyncDurationCount: 3,
         liveMaxLatencyDurationCount: 8,
-        maxLiveSyncPlaybackRate: 1.05, // Smoothly catch up at 1.05x without jarring seek pauses
+        maxLiveSyncPlaybackRate: 1.05, // Smoothly catch up at 1.05x without pitch changes or seek pauses
         manifestLoadingMaxRetry: 10,
-        manifestLoadingRetryDelay: 300,
-        manifestLoadingMaxRetryTimeout: 8000,
+        manifestLoadingRetryDelay: 500,
+        manifestLoadingMaxRetryTimeout: 10000,
         levelLoadingMaxRetry: 10,
-        levelLoadingRetryDelay: 300,
+        levelLoadingRetryDelay: 500,
         fragLoadingMaxRetry: 10,
-        fragLoadingRetryDelay: 300,
+        fragLoadingRetryDelay: 500,
         startFragPrefetch: true,
         xhrSetup: (xhr) => {
           if (token) xhr.setRequestHeader('Authorization', `Bearer ${token}`)
@@ -390,10 +546,10 @@ export default function VideoPreview({
           if (video.buffered && video.buffered.length > 0) {
             const bufStart = video.buffered.start(0)
             const bufEnd = video.buffered.end(video.buffered.length - 1)
-            // If playhead is behind buffer start, or ahead of buffer end, or at 0 while stream has progressed
-            if (video.currentTime < bufStart || video.currentTime > bufEnd || (video.currentTime === 0 && bufStart > 1.0)) {
+            // Only jump if playhead is behind buffer start, or at 0 while stream has progressed far ahead
+            if (video.currentTime < bufStart - 0.2 || (video.currentTime === 0 && bufStart > 1.5)) {
               const livePos = hls.liveSyncPosition
-              let target = (livePos && livePos >= bufStart && livePos <= bufEnd) ? livePos : Math.max(bufStart + 0.05, bufEnd - 1.5)
+              let target = (livePos && livePos >= bufStart && livePos <= bufEnd) ? livePos : Math.max(bufStart + 0.1, bufEnd - 1.5)
               video.currentTime = target
             }
           }
@@ -412,8 +568,7 @@ export default function VideoPreview({
         if (p && typeof p.then === 'function') {
           p.then(() => {
             setHlsStatus('live')
-            setIsPlaybackReady(true)
-            syncToLiveEdge()
+            markFrameReady()
           }).catch((err) => {
             if (err.name === 'NotAllowedError' || err.name === 'SecurityError') {
               console.warn('[VideoPreview] Autoplay with audio blocked by browser policy. Retrying muted...')
@@ -422,8 +577,7 @@ export default function VideoPreview({
               setIsAutoMutedByBrowser(true)
               video.play().then(() => {
                 setHlsStatus('live')
-                setIsPlaybackReady(true)
-                syncToLiveEdge()
+                markFrameReady()
               }).catch(() => {
                 setHlsStatus('paused')
               })
@@ -457,10 +611,10 @@ export default function VideoPreview({
       })
 
       hls.on(Hls.Events.FRAG_BUFFERED, () => {
-        syncToLiveEdge()
         hasStartedPlaybackRef.current = true
-        setIsPlaybackReady(true)
         setIsBuffering(false)
+        syncToLiveEdge()
+        markFrameReady()
         if (video.paused) {
           tryPlay()
         } else {
@@ -532,23 +686,6 @@ export default function VideoPreview({
     }
   }, [hlsUrl])
 
-  // Video frame readiness handler: mark ready when real visual video dimensions or buffer exist!
-  const markFrameReady = () => {
-    if (videoRef.current) {
-      const v = videoRef.current
-      if (v.videoWidth > 0 || v.readyState >= 1 || v.currentTime > 0) {
-        hasStartedPlaybackRef.current = true
-        setIsPlaybackReady(true)
-        setIsBuffering(false)
-        if (v.paused && !v.seeking) {
-          v.play().then(() => setHlsStatus('live')).catch(() => setHlsStatus('paused'))
-        } else {
-          setHlsStatus('live')
-        }
-      }
-    }
-  }
-
   // ── Overlays ──────────────────────────────────────────────────────────────
   const renderOverlay = (icon, title, subtitle, color = '#d9d9d9', extra = null) => (
     <div style={{
@@ -566,7 +703,7 @@ export default function VideoPreview({
   return (
     <Card
       style={{
-        height: '100%', minHeight: 500, backgroundColor: '#141414',
+        width: '100%', minHeight: 520, backgroundColor: '#141414',
         borderRadius: 12, display: 'flex', alignItems: 'center',
         justifyContent: 'center', border: '1px solid #262626', overflow: 'hidden',
       }}
@@ -578,7 +715,457 @@ export default function VideoPreview({
         }
       }}
     >
-      {/* Video element - invisible until real frame is decoded to prevent black screen */}
+      {/* ── Keyframe animations for connecting state ── */}
+      <style>{`
+        @keyframes pulseRadarGlow {
+          0% { transform: scale(0.85); opacity: 0.9; }
+          50% { transform: scale(1.3); opacity: 0.25; }
+          100% { transform: scale(1.6); opacity: 0; }
+        }
+        @keyframes progressShimmer {
+          0% { transform: translateX(-100%); }
+          100% { transform: translateX(100%); }
+        }
+      `}</style>
+
+      {/* ── Base Layer: Scene Composition / Avatar Studio (Only rendered in offline/preview mode) ── */}
+      {!isSessionLive && (session?.background_asset_url || session?.avatar_asset_url || session?.avatar_speaking_asset_url || session?.overlay_asset_url) ? (
+        <div style={{
+          position: 'absolute', top: 0, left: 0, width: '100%', height: '100%',
+          overflow: 'hidden', display: 'flex', justifyContent: 'center', alignItems: 'center',
+          zIndex: 1, pointerEvents: 'none',
+        }}>
+          <div style={{ position: 'relative', height: '100%', aspectRatio: '9/16', backgroundColor: '#000', overflow: 'hidden' }}>
+            {(() => {
+              const resolveUrl = (url) => {
+                if (!url) return null;
+                if (url.startsWith('http://') || url.startsWith('https://')) return url;
+                let base = (import.meta.env.VITE_API_URL || '').replace(/\/api\/?$/, '');
+                if (!base) {
+                  base = `${window.location.protocol}//${window.location.hostname}:8000`;
+                }
+                return `${base}${url.startsWith('/') ? '' : '/'}${url}`;
+              };
+              const bgUrl = resolveUrl(session.background_asset_url);
+              const avatarUrl = resolveUrl(session.avatar_asset_url || session.avatar_speaking_asset_url);
+              const avatarPosterUrl = resolveUrl(session.avatar_asset_thumbnail_url);
+              const overlayUrl = resolveUrl(session.overlay_asset_url);
+              return (
+                <>
+                  {bgUrl && (
+                    bgUrl.match(/\.(mp4|webm)$/i) ? (
+                      <video src={bgUrl} autoPlay loop muted playsInline preload="auto" style={{ width: '100%', height: '100%', objectFit: 'cover', position: 'absolute', top: 0, left: 0 }} />
+                    ) : (
+                      <img src={bgUrl} alt="Background" style={{ width: '100%', height: '100%', objectFit: 'cover', position: 'absolute', top: 0, left: 0 }} />
+                    )
+                  )}
+                  {avatarUrl && (
+                    avatarUrl.match(/\.(mp4|webm)$/i) ? (
+                      <>
+                        <video
+                          src={avatarUrl}
+                          poster={avatarPosterUrl || undefined}
+                          autoPlay
+                          loop
+                          muted
+                          playsInline
+                          preload="auto"
+                          onLoadedData={() => setIsMockupAvatarLoaded(true)}
+                          onCanPlay={() => setIsMockupAvatarLoaded(true)}
+                          style={{
+                            width: '100%',
+                            height: '100%',
+                            objectFit: 'contain',
+                            position: 'absolute',
+                            top: 0,
+                            left: 0,
+                            opacity: isMockupAvatarLoaded || avatarPosterUrl ? 1 : 0,
+                            transition: 'opacity 0.25s ease-in-out',
+                            zIndex: 1
+                          }}
+                        />
+                        {!isMockupAvatarLoaded && !avatarPosterUrl && (
+                          <div style={{
+                            position: 'absolute',
+                            top: '45%',
+                            left: '50%',
+                            transform: 'translate(-50%, -50%)',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: 8,
+                            backgroundColor: 'rgba(0,0,0,0.65)',
+                            padding: '8px 16px',
+                            borderRadius: 20,
+                            backdropFilter: 'blur(6px)',
+                            border: '1px solid rgba(255,255,255,0.15)',
+                            color: '#fff',
+                            zIndex: 2,
+                            pointerEvents: 'none'
+                          }}>
+                            <LoadingOutlined spin style={{ fontSize: 16, color: '#1890ff' }} />
+                            <span style={{ fontSize: 12, fontWeight: 500 }}>Đang nạp người mẫu...</span>
+                          </div>
+                        )}
+                      </>
+                    ) : (
+                      <img src={avatarUrl} alt="Avatar" style={{ width: '100%', height: '100%', objectFit: 'contain', position: 'absolute', top: 0, left: 0 }} />
+                    )
+                  )}
+                  {overlayUrl && (
+                    <img src={overlayUrl} alt="Overlay" style={{ width: '100%', height: '100%', objectFit: 'cover', position: 'absolute', top: 0, left: 0, pointerEvents: 'none', zIndex: 3 }} />
+                  )}
+                </>
+              );
+            })()}
+            <div style={{ position: 'absolute', bottom: 16, right: 16, background: 'rgba(0,0,0,0.8)', padding: '4px 12px', borderRadius: 4, color: 'white', fontSize: 12, border: '1px solid #434343', zIndex: 4 }}>
+              Bản xem trước Cảnh
+            </div>
+          </div>
+        </div>
+      ) : !isSessionLive && (
+        <div style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', zIndex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          {renderOverlay(
+            <VideoCameraOutlined />,
+            'STREAM PREVIEW',
+            'Bấm "Thiết kế Cảnh" để thêm Avatar/Background hoặc bấm "Bắt đầu LIVE"',
+            '#595959'
+          )}
+        </div>
+      )}
+
+      {/* ── Connecting Stage: Broadcast Preparation Screen (0% raw green screen, no duplicate video decoding) ── */}
+      {isSessionLive && !hasFirstFrameRendered && (
+        <div style={{
+          position: 'absolute',
+          top: 0,
+          left: 0,
+          width: '100%',
+          height: '100%',
+          zIndex: 6,
+          background: 'radial-gradient(ellipse at center, #11141e 0%, #07080c 100%)',
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          justifyContent: 'center',
+          padding: 24,
+          boxSizing: 'border-box',
+          userSelect: 'none',
+        }}>
+          {/* Animated Glowing Radar Pulse */}
+          <div style={{
+            position: 'relative',
+            width: 80,
+            height: 80,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            marginBottom: 16,
+          }}>
+            <div style={{
+              position: 'absolute',
+              width: '100%',
+              height: '100%',
+              borderRadius: '50%',
+              background: 'rgba(24, 144, 255, 0.18)',
+              animation: 'pulseRadarGlow 2s infinite ease-out',
+            }} />
+            <div style={{
+              position: 'absolute',
+              width: '72%',
+              height: '72%',
+              borderRadius: '50%',
+              background: 'rgba(24, 144, 255, 0.28)',
+            }} />
+            <div style={{
+              width: 48,
+              height: 48,
+              borderRadius: '50%',
+              background: 'linear-gradient(135deg, #1890ff, #096dd9)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              boxShadow: '0 0 24px rgba(24, 144, 255, 0.65)',
+              zIndex: 2,
+            }}>
+              <VideoCameraOutlined style={{ fontSize: 22, color: '#fff' }} />
+            </div>
+          </div>
+
+          {/* Title & Loading indicator */}
+          <div style={{
+            fontSize: 15,
+            fontWeight: 700,
+            letterSpacing: 1.1,
+            color: '#e6f7ff',
+            textTransform: 'uppercase',
+            marginBottom: 6,
+            textAlign: 'center',
+            display: 'flex',
+            alignItems: 'center',
+            gap: 9,
+          }}>
+            <LoadingOutlined spin style={{ color: '#1890ff', fontSize: 15 }} />
+            <span>Đang chuẩn bị luồng phát trực tiếp</span>
+          </div>
+
+          <div style={{
+            fontSize: 12.5,
+            color: '#8c8c8c',
+            textAlign: 'center',
+            maxWidth: 360,
+            lineHeight: 1.5,
+            marginBottom: 16,
+          }}>
+            {progressStatusText}
+          </div>
+
+          {/* Progress Bar (0% - 100%) */}
+          <div style={{
+            width: '100%',
+            maxWidth: 370,
+            marginBottom: 18,
+            display: 'flex',
+            flexDirection: 'column',
+            gap: 6,
+          }}>
+            <div style={{
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              fontSize: 12,
+              fontWeight: 600,
+            }}>
+              <span style={{ color: '#a0aab8', display: 'flex', alignItems: 'center', gap: 6 }}>
+                <span style={{
+                  width: 6,
+                  height: 6,
+                  borderRadius: '50%',
+                  backgroundColor: loadProgress >= 100 ? '#52c41a' : '#1890ff',
+                  boxShadow: `0 0 8px ${loadProgress >= 100 ? 'rgba(82,196,26,0.85)' : 'rgba(24,144,255,0.85)'}`,
+                }} />
+                {loadProgress >= 100 ? 'Đã tải hoàn tất' : 'Đang xử lý & đệm khung hình'}
+              </span>
+              <span style={{
+                color: loadProgress >= 100 ? '#52c41a' : '#40a9ff',
+                fontFamily: 'monospace',
+                fontSize: 13,
+                fontWeight: 700,
+              }}>
+                {Math.round(loadProgress)}%
+              </span>
+            </div>
+
+            {/* Track */}
+            <div style={{
+              width: '100%',
+              height: 7,
+              backgroundColor: 'rgba(255, 255, 255, 0.08)',
+              borderRadius: 10,
+              overflow: 'hidden',
+              position: 'relative',
+              border: '1px solid rgba(255, 255, 255, 0.1)',
+              boxShadow: 'inset 0 1px 3px rgba(0, 0, 0, 0.5)',
+            }}>
+              <div style={{
+                width: `${Math.min(100, Math.max(0, loadProgress))}%`,
+                height: '100%',
+                background: loadProgress >= 100
+                  ? 'linear-gradient(90deg, #52c41a, #73d13d)'
+                  : 'linear-gradient(90deg, #096dd9 0%, #1890ff 50%, #69c0ff 100%)',
+                borderRadius: 10,
+                transition: 'width 0.22s cubic-bezier(0.4, 0, 0.2, 1)',
+                boxShadow: loadProgress >= 100
+                  ? '0 0 12px rgba(82, 196, 26, 0.8)'
+                  : '0 0 12px rgba(24, 144, 255, 0.65)',
+                position: 'relative',
+              }}>
+                <div style={{
+                  position: 'absolute',
+                  top: 0,
+                  left: 0,
+                  bottom: 0,
+                  right: 0,
+                  background: 'linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.35), transparent)',
+                  animation: 'progressShimmer 1.8s infinite',
+                }} />
+              </div>
+            </div>
+          </div>
+
+          {/* Readiness Checklist */}
+          <div style={{
+            width: '100%',
+            maxWidth: 370,
+            background: 'linear-gradient(165deg, rgba(255, 255, 255, 0.05) 0%, rgba(18, 22, 31, 0.75) 100%)',
+            border: '1px solid rgba(255, 255, 255, 0.09)',
+            borderRadius: 14,
+            padding: '12px 14px',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: 7,
+            backdropFilter: 'blur(14px)',
+            boxShadow: '0 12px 28px rgba(0, 0, 0, 0.45), inset 0 1px 0 rgba(255, 255, 255, 0.1)',
+          }}>
+            {/* Item 1: Trạm Live Studio */}
+            <div style={{
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              padding: '7px 10px',
+              borderRadius: 8,
+              backgroundColor: 'rgba(255, 255, 255, 0.025)',
+              border: '1px solid rgba(255, 255, 255, 0.035)',
+            }}>
+              <span style={{ color: '#f0f2f5', display: 'flex', alignItems: 'center', gap: 9, fontSize: 12.5, fontWeight: 500 }}>
+                <span style={{
+                  width: 8,
+                  height: 8,
+                  borderRadius: '50%',
+                  backgroundColor: '#52c41a',
+                  boxShadow: '0 0 8px rgba(82, 196, 26, 0.85)',
+                  flexShrink: 0,
+                }} />
+                Trạm Live Studio
+              </span>
+              <span style={{
+                backgroundColor: 'rgba(82, 196, 26, 0.12)',
+                border: '1px solid rgba(82, 196, 26, 0.3)',
+                color: '#73d13d',
+                padding: '2.5px 9px',
+                borderRadius: 12,
+                fontSize: 11,
+                fontWeight: 600,
+                letterSpacing: 0.2,
+                whiteSpace: 'nowrap',
+              }}>
+                Đã kết nối
+              </span>
+            </div>
+
+            {/* Item 2: Tách phông xanh & Ghép nền AI */}
+            <div style={{
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              padding: '7px 10px',
+              borderRadius: 8,
+              backgroundColor: 'rgba(255, 255, 255, 0.025)',
+              border: '1px solid rgba(255, 255, 255, 0.035)',
+            }}>
+              <span style={{ color: '#f0f2f5', display: 'flex', alignItems: 'center', gap: 9, fontSize: 12.5, fontWeight: 500 }}>
+                <span style={{
+                  width: 8,
+                  height: 8,
+                  borderRadius: '50%',
+                  backgroundColor: loadProgress >= 40 ? '#52c41a' : '#1890ff',
+                  boxShadow: `0 0 8px ${loadProgress >= 40 ? 'rgba(82, 196, 26, 0.85)' : 'rgba(24, 144, 255, 0.85)'}`,
+                  flexShrink: 0,
+                }} />
+                Tách phông xanh & Ghép nền AI
+              </span>
+              <span style={{
+                backgroundColor: loadProgress >= 40 ? 'rgba(82, 196, 26, 0.12)' : 'rgba(24, 144, 255, 0.12)',
+                border: `1px solid ${loadProgress >= 40 ? 'rgba(82, 196, 26, 0.3)' : 'rgba(24, 144, 255, 0.3)'}`,
+                color: loadProgress >= 40 ? '#73d13d' : '#40a9ff',
+                padding: '2.5px 9px',
+                borderRadius: 12,
+                fontSize: 11,
+                fontWeight: 600,
+                letterSpacing: 0.2,
+                whiteSpace: 'nowrap',
+              }}>
+                {loadProgress >= 40 ? 'Hoàn tất ghép nền' : 'Đang kết xuất luồng'}
+              </span>
+            </div>
+
+            {/* Item 3: Giọng nói AI & Nhạc nền */}
+            <div style={{
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              padding: '7px 10px',
+              borderRadius: 8,
+              backgroundColor: 'rgba(255, 255, 255, 0.025)',
+              border: '1px solid rgba(255, 255, 255, 0.035)',
+            }}>
+              <span style={{ color: '#f0f2f5', display: 'flex', alignItems: 'center', gap: 9, fontSize: 12.5, fontWeight: 500 }}>
+                <span style={{
+                  width: 8,
+                  height: 8,
+                  borderRadius: '50%',
+                  backgroundColor: '#52c41a',
+                  boxShadow: '0 0 8px rgba(82, 196, 26, 0.85)',
+                  flexShrink: 0,
+                }} />
+                Giọng nói AI & Nhạc nền
+              </span>
+              <span style={{
+                backgroundColor: 'rgba(82, 196, 26, 0.12)',
+                border: '1px solid rgba(82, 196, 26, 0.3)',
+                color: '#73d13d',
+                padding: '2.5px 9px',
+                borderRadius: 12,
+                fontSize: 11,
+                fontWeight: 600,
+                letterSpacing: 0.2,
+                whiteSpace: 'nowrap',
+              }}>
+                Sẵn sàng
+              </span>
+            </div>
+
+            {/* Item 4: Bộ đệm phát mượt */}
+            <div style={{
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              padding: '7px 10px',
+              borderRadius: 8,
+              backgroundColor: 'rgba(255, 255, 255, 0.025)',
+              border: '1px solid rgba(255, 255, 255, 0.035)',
+            }}>
+              <span style={{ color: '#f0f2f5', display: 'flex', alignItems: 'center', gap: 9, fontSize: 12.5, fontWeight: 500 }}>
+                <span style={{
+                  width: 8,
+                  height: 8,
+                  borderRadius: '50%',
+                  backgroundColor: loadProgress >= 100 ? '#52c41a' : '#faad14',
+                  boxShadow: `0 0 8px ${loadProgress >= 100 ? 'rgba(82, 196, 26, 0.85)' : 'rgba(250, 173, 20, 0.85)'}`,
+                  flexShrink: 0,
+                }} />
+                Bộ đệm phát mượt (0% lag)
+              </span>
+              <span style={{
+                backgroundColor: loadProgress >= 100 ? 'rgba(82, 196, 26, 0.12)' : 'rgba(250, 173, 20, 0.12)',
+                border: `1px solid ${loadProgress >= 100 ? 'rgba(82, 196, 26, 0.3)' : 'rgba(250, 173, 20, 0.3)'}`,
+                color: loadProgress >= 100 ? '#73d13d' : '#ffc53d',
+                padding: '2.5px 9px',
+                borderRadius: 12,
+                fontSize: 11,
+                fontWeight: 600,
+                letterSpacing: 0.2,
+                whiteSpace: 'nowrap',
+              }}>
+                {loadProgress >= 100 ? 'Đã nạp đầy đủ (100%)' : loadProgress >= 70 ? `Đang nạp buffer (${Math.round(loadProgress)}%)` : 'Khởi tạo bộ đệm...'}
+              </span>
+            </div>
+          </div>
+
+          {/* Subtext info */}
+          <div style={{
+            marginTop: 16,
+            fontSize: 11.5,
+            color: '#6e7687',
+            display: 'flex',
+            alignItems: 'center',
+            gap: 6,
+          }}>
+            <span>⚡ Video đầy đủ sẽ tự động xuất hiện ngay khi nạp đủ 100% khung hình</span>
+          </div>
+        </div>
+      )}
+
+      {/* ── Live Video Stream Layer: Fades in smoothly once stream is fully ready ── */}
       <video
         ref={videoRef}
         autoPlay
@@ -603,11 +1190,11 @@ export default function VideoPreview({
           top: 0,
           left: 0,
           backgroundColor: '#000',
-          opacity: (hlsStatus === 'live' || isPlaybackReady) ? 1 : 0,
-          transition: 'opacity 0.25s ease-in-out',
-          pointerEvents: (hlsStatus === 'live' || isPlaybackReady) ? 'auto' : 'none',
+          opacity: hasFirstFrameRendered ? 1 : 0,
+          transition: 'opacity 0.4s cubic-bezier(0.4, 0, 0.2, 1)',
+          pointerEvents: hasFirstFrameRendered ? 'auto' : 'none',
           cursor: 'pointer',
-          zIndex: 2,
+          zIndex: 4,
         }}
         onLoadedMetadata={markFrameReady}
         onLoadedData={markFrameReady}
@@ -629,12 +1216,12 @@ export default function VideoPreview({
           }
         }}
         onWaiting={() => {
-          if (isPlaybackReady) setIsBuffering(true)
+          if (hasFirstFrameRendered) setIsBuffering(true)
         }}
       />
 
       {/* Click to unmute banner if browser autoplay policy muted the video */}
-      {isAutoMutedByBrowser && !activeMuted && isPlaybackReady && (
+      {isAutoMutedByBrowser && !activeMuted && hasFirstFrameRendered && (
         <div
           onClick={() => {
             if (videoRef.current) {
@@ -668,7 +1255,7 @@ export default function VideoPreview({
       )}
 
       {/* Buffering badge: subtle non-intrusive indicator that never blacks out the video */}
-      {hlsStatus === 'live' && isPlaybackReady && isBuffering && (
+      {hasFirstFrameRendered && isBuffering && (
         <div style={{
           position: 'absolute', top: 16, left: 16,
           display: 'flex', alignItems: 'center', gap: 8,
@@ -680,54 +1267,8 @@ export default function VideoPreview({
         </div>
       )}
 
-      {/* Synchronizing overlay: only shown while actively waiting/loading manifest before segments exist */}
-      {(hlsStatus === 'waiting' || hlsStatus === 'loading') && !isPlaybackReady && isSessionLive && (
-        <div style={{
-          position: 'absolute', top: 0, left: 0, width: '100%', height: '100%',
-          display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
-          backgroundColor: '#141414', zIndex: 5, gap: 12, padding: 24,
-        }}>
-          <LoadingOutlined spin style={{ fontSize: 52, color: '#1890ff' }} />
-          <Title level={4} style={{ color: '#1890ff', margin: 0 }}>ĐANG KẾT NỐI LUỒNG VIDEO</Title>
-          <Text style={{ color: '#8c8c8c', fontSize: 13 }}>Đang kết nối tín hiệu và đồng bộ luồng phát...</Text>
-          
-          {deviceTelemetry && (
-            <div style={{
-              marginTop: 10,
-              padding: '10px 18px',
-              backgroundColor: 'rgba(255, 255, 255, 0.05)',
-              borderRadius: 8,
-              border: '1px solid rgba(255, 255, 255, 0.1)',
-              textAlign: 'center',
-              maxWidth: 380,
-              backdropFilter: 'blur(4px)'
-            }}>
-              <div style={{ color: '#52c41a', fontSize: 12, fontWeight: 600, marginBottom: 4 }}>
-                {deviceTelemetry.encoder_label || deviceTelemetry.encoder}
-              </div>
-              <div style={{ color: '#bfbfbf', fontSize: 11 }}>
-                GPU: {deviceTelemetry.gpu_model?.length > 32 ? deviceTelemetry.gpu_model.substring(0, 32) + '...' : deviceTelemetry.gpu_model} • CPU: {deviceTelemetry.cpu_percent}% • RAM: {deviceTelemetry.ram_used_gb || 0}GB
-              </div>
-              {deviceTelemetry.last_error && (
-                <div style={{ 
-                  color: '#ff4d4f', 
-                  fontSize: 11, 
-                  marginTop: 6, 
-                  padding: '4px 8px', 
-                  backgroundColor: 'rgba(255, 77, 79, 0.15)', 
-                  borderRadius: 4,
-                  border: '1px solid rgba(255, 77, 79, 0.3)' 
-                }}>
-                  ⚠️ Sự cố: {deviceTelemetry.last_error}
-                </div>
-              )}
-            </div>
-          )}
-        </div>
-      )}
-
       {/* Floating Hardware Badge during live playback */}
-      {isPlaybackReady && deviceTelemetry && (
+      {hasFirstFrameRendered && deviceTelemetry && (
         <div style={{
           position: 'absolute', top: 16, right: 16,
           display: 'flex', alignItems: 'center', gap: 6,
@@ -739,116 +1280,47 @@ export default function VideoPreview({
         </div>
       )}
 
-      {/* ── Status overlays ── */}
-      {!isSessionLive && hlsStatus === 'idle' && (
-        session?.background_asset_url || session?.avatar_asset_url || session?.avatar_speaking_asset_url || session?.overlay_asset_url ? (
-          <div style={{ position: 'relative', width: '100%', height: '100%', overflow: 'hidden', display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
-            <div style={{ position: 'relative', height: '100%', aspectRatio: '9/16', backgroundColor: '#000', overflow: 'hidden', boxShadow: '0 0 20px rgba(0,0,0,0.5)' }}>
-              {(() => {
-                const resolveUrl = (url) => {
-                  if (!url) return null;
-                  if (url.startsWith('http://') || url.startsWith('https://')) return url;
-                  let base = (import.meta.env.VITE_API_URL || '').replace(/\/api\/?$/, '');
-                  if (!base) {
-                    base = `${window.location.protocol}//${window.location.hostname}:8000`;
-                  }
-                  return `${base}${url.startsWith('/') ? '' : '/'}${url}`;
-                };
-                const bgUrl = resolveUrl(session.background_asset_url);
-                const avatarUrl = resolveUrl(session.avatar_asset_url || session.avatar_speaking_asset_url);
-                const avatarPosterUrl = resolveUrl(session.avatar_asset_thumbnail_url);
-                const overlayUrl = resolveUrl(session.overlay_asset_url);
-                return (
-                  <>
-                    {bgUrl && (
-                      bgUrl.match(/\.(mp4|webm)$/i) ? (
-                        <video src={bgUrl} autoPlay loop muted playsInline preload="auto" style={{ width: '100%', height: '100%', objectFit: 'cover', position: 'absolute', top: 0, left: 0 }} />
-                      ) : (
-                        <img src={bgUrl} alt="Background" style={{ width: '100%', height: '100%', objectFit: 'cover', position: 'absolute', top: 0, left: 0 }} />
-                      )
-                    )}
-                    {avatarUrl && (
-                      avatarUrl.match(/\.(mp4|webm)$/i) ? (
-                        <>
-                          <video
-                            src={avatarUrl}
-                            poster={avatarPosterUrl || undefined}
-                            autoPlay
-                            loop
-                            muted
-                            playsInline
-                            preload="auto"
-                            onLoadedData={() => setIsMockupAvatarLoaded(true)}
-                            onCanPlay={() => setIsMockupAvatarLoaded(true)}
-                            style={{
-                              width: '100%',
-                              height: '100%',
-                              objectFit: 'contain',
-                              position: 'absolute',
-                              top: 0,
-                              left: 0,
-                              opacity: isMockupAvatarLoaded || avatarPosterUrl ? 1 : 0,
-                              transition: 'opacity 0.25s ease-in-out',
-                              zIndex: 1
-                            }}
-                          />
-                          {!isMockupAvatarLoaded && !avatarPosterUrl && (
-                            <div style={{
-                              position: 'absolute',
-                              top: '45%',
-                              left: '50%',
-                              transform: 'translate(-50%, -50%)',
-                              display: 'flex',
-                              alignItems: 'center',
-                              gap: 8,
-                              backgroundColor: 'rgba(0,0,0,0.65)',
-                              padding: '8px 16px',
-                              borderRadius: 20,
-                              backdropFilter: 'blur(6px)',
-                              border: '1px solid rgba(255,255,255,0.15)',
-                              color: '#fff',
-                              zIndex: 2,
-                              pointerEvents: 'none'
-                            }}>
-                              <LoadingOutlined spin style={{ fontSize: 16, color: '#1890ff' }} />
-                              <span style={{ fontSize: 12, fontWeight: 500 }}>Đang nạp người mẫu...</span>
-                            </div>
-                          )}
-                        </>
-                      ) : (
-                        <img src={avatarUrl} alt="Avatar" style={{ width: '100%', height: '100%', objectFit: 'contain', position: 'absolute', top: 0, left: 0 }} />
-                      )
-                    )}
-                    {overlayUrl && (
-                      <img src={overlayUrl} alt="Overlay" style={{ width: '100%', height: '100%', objectFit: 'cover', position: 'absolute', top: 0, left: 0, pointerEvents: 'none', zIndex: 3 }} />
-                    )}
-                  </>
-                );
-              })()}
-              <div style={{ position: 'absolute', bottom: 16, right: 16, background: 'rgba(0,0,0,0.8)', padding: '4px 12px', borderRadius: 4, color: 'white', fontSize: 12, border: '1px solid #434343' }}>
-                Mockup Preview (Scene Builder)
-              </div>
-            </div>
-          </div>
-        ) : (
-          renderOverlay(
-            <VideoCameraOutlined />,
-            'STREAM PREVIEW',
-            'Bấm "Thiết kế Cảnh" để thêm Avatar/Background hoặc bấm "Bắt đầu LIVE"',
-            '#595959'
-          )
-        )
-      )}
-
-      {hlsStatus === 'waiting' && !isSessionLive && renderOverlay(
-        <LoadingOutlined spin />,
-        'ĐANG KẾT NỐI LUỒNG VIDEO',
-        'Đang đồng bộ tín hiệu từ thiết bị... Tự động kết nối ngay khi sẵn sàng',
-        '#faad14'
+      {/* Floating Audio Status & Quick Unmute Button */}
+      {hasFirstFrameRendered && (
+        <div 
+          onClick={(e) => {
+            e.stopPropagation()
+            toggleMute()
+            if (videoRef.current && activeMuted) {
+              videoRef.current.muted = false
+              videoRef.current.volume = activeVolume
+              setIsAutoMutedByBrowser(false)
+            }
+          }}
+          title={activeMuted ? "Bấm để bật âm thanh preview" : "Bấm để tắt âm thanh preview"}
+          style={{
+            position: 'absolute', bottom: 16, right: 16,
+            display: 'flex', alignItems: 'center', gap: 6,
+            backgroundColor: activeMuted ? 'rgba(255, 77, 79, 0.9)' : 'rgba(0, 0, 0, 0.7)',
+            padding: '5px 12px', borderRadius: 20,
+            zIndex: 11, cursor: 'pointer', backdropFilter: 'blur(6px)',
+            border: activeMuted ? '1px solid #ff4d4f' : '1px solid rgba(255,255,255,0.2)',
+            color: '#fff', fontSize: 12, fontWeight: 500,
+            transition: 'all 0.2s ease',
+            boxShadow: '0 2px 8px rgba(0,0,0,0.3)',
+          }}
+        >
+          {activeMuted ? (
+            <>
+              <MutedOutlined style={{ color: '#fff', fontSize: 14 }} />
+              <span>Đang tắt tiếng</span>
+            </>
+          ) : (
+            <>
+              <SoundOutlined style={{ color: '#52c41a', fontSize: 14 }} />
+              <span>Âm thanh bật</span>
+            </>
+          )}
+        </div>
       )}
 
       {/* Autoplay blocked — show play button so user can click to play */}
-      {(hlsStatus === 'paused' || (isPlaybackReady && videoRef.current && videoRef.current.paused)) && isSessionLive && renderOverlay(
+      {(hlsStatus === 'paused' || (hasFirstFrameRendered && videoRef.current && videoRef.current.paused)) && isSessionLive && renderOverlay(
         <PlayCircleOutlined style={{ cursor: 'pointer', color: '#52c41a', fontSize: 72 }} onClick={handleManualPlay} />,
         'NHẤN ĐỂ XEM',
         'Trình duyệt yêu cầu tương tác để phát video',
@@ -864,31 +1336,37 @@ export default function VideoPreview({
         </Button>
       )}
 
-      {hlsStatus === 'error' && renderOverlay(
-        <ExclamationCircleOutlined />,
-        'LỖI STREAM',
-        errorMsg || 'Không thể tải luồng video. Kiểm tra console (F12) để biết chi tiết.',
-        '#ff4d4f',
-        <Button
-          size="small"
-          onClick={() => {
-            if (hlsRef.current) {
-              hlsRef.current.destroy()
-              hlsRef.current = null
-            }
-            if (videoRef.current) {
-              videoRef.current.src = ''
-            }
-            setHlsUrl(null)
-            setIsPlaybackReady(false)
-            hasStartedPlaybackRef.current = false
-            hasJumpedToLiveEdgeRef.current = false
-            setHlsStatus('waiting')
-            setTimeout(probeHls, 600)
-          }}
-        >
-          Thử lại
-        </Button>
+      {/* Error state */}
+      {hlsStatus === 'error' && (
+        <div style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', zIndex: 12, backgroundColor: 'rgba(20,20,20,0.92)' }}>
+          {renderOverlay(
+            <ExclamationCircleOutlined />,
+            'LỖI STREAM',
+            errorMsg || 'Không thể tải luồng video. Kiểm tra console (F12) để biết chi tiết.',
+            '#ff4d4f',
+            <Button
+              size="small"
+              onClick={() => {
+                if (hlsRef.current) {
+                  hlsRef.current.destroy()
+                  hlsRef.current = null
+                }
+                if (videoRef.current) {
+                  videoRef.current.src = ''
+                }
+                setHlsUrl(null)
+                setIsPlaybackReady(false)
+                setHasFirstFrameRendered(false)
+                hasStartedPlaybackRef.current = false
+                hasJumpedToLiveEdgeRef.current = false
+                setHlsStatus('waiting')
+                setTimeout(probeHls, 600)
+              }}
+            >
+              Thử lại
+            </Button>
+          )}
+        </div>
       )}
     </Card>
   )

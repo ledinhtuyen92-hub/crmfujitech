@@ -149,16 +149,23 @@ def trigger_proactive_speech(self, session_id: str):
             return
 
         import random
+        now = time.time()
+        last_speech_time = float(context.get("last_speech_time", 0) or 0)
         
         # 1. Đảm bảo nếu máy trạm đang phát câu trước đó, chờ đợi cho đến khi phát xong hoàn toàn
         is_speaking = context.get("is_device_speaking", False)
         if is_speaking:
-            logger.debug(f"[Session {session_id}] Device is currently speaking. Deferring proactive trigger.")
-            trigger_proactive_speech.apply_async(kwargs={"session_id": session_id}, countdown=2)
-            return
-
-        last_speech_time = float(context.get("last_speech_time", 0) or 0)
-        now = time.time()
+            if last_speech_time > 0 and (now - last_speech_time) > 45:
+                logger.warning(f"[Session {session_id}] Device speaking flag stuck for >45s. Forcing reset.")
+                is_speaking = False
+                LiveContextService.update_context(str(session.company_id), str(session.id), {
+                    "is_device_speaking": False,
+                    "last_speech_time": now
+                })
+            else:
+                logger.debug(f"[Session {session_id}] Device is currently speaking. Deferring proactive trigger.")
+                trigger_proactive_speech.apply_async(kwargs={"session_id": session_id}, countdown=2)
+                return
         
         # Nếu phiên mới bắt đầu chưa nói câu nào, cho nói câu đầu tiên sau 3-5 giây
         if last_speech_time <= 0:

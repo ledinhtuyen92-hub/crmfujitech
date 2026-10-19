@@ -177,6 +177,9 @@ class DeviceAgentConsumer(AsyncWebsocketConsumer):
             }
             if hls_url:
                 updates['hls_url'] = hls_url
+            if state == 'LIVE' and self.session.status != LiveSession.STATUS_RUNNING:
+                self.session.status = LiveSession.STATUS_RUNNING
+                await database_sync_to_async(self.session.save)(update_fields=['status'])
             await database_sync_to_async(LiveContextService.update_context)(
                 self.session.company_id, self.session_id, updates
             )

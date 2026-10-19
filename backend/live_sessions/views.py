@@ -191,6 +191,16 @@ class LiveSessionViewSet(viewsets.ModelViewSet):
     def perform_create(self, serializer):
         serializer.save(company=self.request.user.company)
 
+    def perform_update(self, serializer):
+        instance = serializer.save()
+        if 'session_prompt' in self.request.data:
+            from .services import LiveContextService
+            LiveContextService.update_context(str(instance.company_id), str(instance.id), {
+                "proactive_pitch_index": 0,
+                "last_speech_time": 0,
+                "is_device_speaking": False,
+            })
+
     def destroy(self, request, *args, **kwargs):
         session = self.get_object()
         

@@ -210,6 +210,8 @@ _cors_origins = [
     "http://127.0.0.1:5175",
     "http://localhost:3000",
     "http://127.0.0.1:3000",
+    "http://localhost:3001",
+    "http://127.0.0.1:3001",
 ]
 # Tự động thêm SITE_URL vào CORS để hoạt động trên VPS
 if SITE_URL and SITE_URL not in _cors_origins:

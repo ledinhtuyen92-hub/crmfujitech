@@ -437,7 +437,7 @@ export default function LiveStudioBeta() {
       {/* ── 3-Column Studio Layout ─────────────────────────────────────────── */}
       <Row gutter={[16, 16]} style={{ flex: 1, minHeight: 600 }}>
         {/* Left Column: Video Preview & Active Voice Info */}
-        <Col xs={24} lg={8} style={{ display: 'flex', flexDirection: 'column' }}>
+        <Col xs={24} lg={8} style={{ display: 'flex', flexDirection: 'column', minWidth: 0 }}>
           <VideoPreview
             session={session}
             streamEvent={lastEvent}
@@ -455,6 +455,7 @@ export default function LiveStudioBeta() {
             bgmVolume={bgmVolume}
             onBgmVolumeChange={handleBgmVolumeChange}
             onOpenSceneBuilder={() => setSceneBuilderVisible(true)}
+            onSessionUpdate={(updated) => setSession((prev) => ({ ...prev, ...updated }))}
           />
         </Col>
 
@@ -465,7 +466,7 @@ export default function LiveStudioBeta() {
 
         {/* Right Column: Live Chat */}
         <Col xs={24} lg={6} style={{ display: 'flex', flexDirection: 'column', height: 600 }}>
-          <LiveChat lastEvent={lastEvent} />
+          <LiveChat lastEvent={lastEvent} sessionId={id} />
         </Col>
       </Row>
 

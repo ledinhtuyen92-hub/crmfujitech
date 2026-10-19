@@ -228,6 +228,14 @@ class ProtocolDispatcher:
             ack_comp = self.ack_manager.build_ack(cmd_id, ACK_COMPLETED, msg_id)
             await self.send_ack(ack_comp)
         else:
+            from live_studio.execution.stream_controller import StreamState
+            if getattr(self, 'stream_controller', None) and self.stream_controller.state == StreamState.LIVE:
+                logger.info("Stream is already LIVE. Acknowledging duplicate start command as completed.")
+                self.state.transition(STATE_RUNNING)
+                self.dedup_registry.update_status(cmd_id, ACK_COMPLETED)
+                ack_comp = self.ack_manager.build_ack(cmd_id, ACK_COMPLETED, msg_id)
+                await self.send_ack(ack_comp)
+                return
             self.state.transition(STATE_ERROR)
             self.dedup_registry.update_status(cmd_id, ACK_FAILED)
             ack_fail = self.ack_manager.build_ack(cmd_id, ACK_FAILED, msg_id, "STARTUP_FAILED")

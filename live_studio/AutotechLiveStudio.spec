@@ -21,6 +21,7 @@ hiddenimports = [
     'live_studio.core.ws_client',
     'live_studio.execution',
     'live_studio.execution.ack_manager',
+    'live_studio.execution.asset_fetcher',
     'live_studio.execution.audio_fetcher',
     'live_studio.execution.audio_player',
     'live_studio.execution.avatar_engine',
