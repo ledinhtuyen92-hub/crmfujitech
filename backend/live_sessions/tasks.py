@@ -175,10 +175,15 @@ def trigger_proactive_speech(self, session_id: str):
                 "proactive_idle_threshold": round(random.uniform(3.0, 5.0), 1)
             })
 
-        # Ngưỡng ngắt nghỉ linh hoạt ngẫu nhiên (Random Idle Pause: từ 4.0 đến 9.0 giây)
+        # Ngưỡng ngắt nghỉ linh hoạt ngẫu nhiên (cấu hình bởi người dùng hoặc mặc định 4 - 9 giây)
+        min_p = getattr(session, 'idle_pause_min', 4) or 4
+        max_p = getattr(session, 'idle_pause_max', 9) or 9
+        if min_p > max_p:
+            min_p, max_p = max_p, min_p
+
         target_idle = float(context.get("proactive_idle_threshold", 0) or 0)
         if target_idle <= 0:
-            target_idle = round(random.uniform(4.0, 9.0), 1)
+            target_idle = round(random.uniform(min_p, max_p), 1)
             LiveContextService.update_context(str(session.company_id), str(session.id), {
                 "proactive_idle_threshold": target_idle
             })
@@ -186,9 +191,9 @@ def trigger_proactive_speech(self, session_id: str):
         idle_time = now - last_speech_time
         
         if idle_time >= target_idle:
-            logger.info(f"[Session {session_id}] Idle for {idle_time:.1f}s (target: {target_idle:.1f}s). Triggering proactive speech.")
+            logger.info(f"[Session {session_id}] Idle for {idle_time:.1f}s (target: {target_idle:.1f}s, range: {min_p}-{max_p}s). Triggering proactive speech.")
             # Sau khi kích hoạt, ngay lập tức random khoảng ngắt nghỉ ngẫu nhiên cho câu kế tiếp
-            next_idle = round(random.uniform(4.0, 9.0), 1)
+            next_idle = round(random.uniform(min_p, max_p), 1)
             LiveContextService.update_context(str(session.company_id), str(session.id), {
                 "proactive_idle_threshold": next_idle,
                 "is_device_speaking": True,

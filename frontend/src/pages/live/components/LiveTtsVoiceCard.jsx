@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react'
-import { Card, Tag, Typography, Space, Tooltip, Button, Slider, Modal, Input, Select, message } from 'antd'
+import { Card, Tag, Typography, Space, Tooltip, Button, Slider, Modal, Input, InputNumber, Select, message } from 'antd'
 import {
   SoundOutlined,
   MutedOutlined,
@@ -9,6 +9,8 @@ import {
   SettingOutlined,
   ThunderboltOutlined,
   EditOutlined,
+  ClockCircleOutlined,
+  InfoCircleOutlined,
 } from '@ant-design/icons'
 import { Link } from 'react-router-dom'
 import api from '../../../utils/api'
@@ -80,12 +82,20 @@ export default function LiveTtsVoiceCard({
   const [selectedIndustry, setSelectedIndustry] = useState('general')
   const [loadingSuggestion, setLoadingSuggestion] = useState(false)
   const [savingScript, setSavingScript] = useState(false)
+  const [idlePauseMin, setIdlePauseMin] = useState(session?.idle_pause_min ?? 4)
+  const [idlePauseMax, setIdlePauseMax] = useState(session?.idle_pause_max ?? 9)
 
   useEffect(() => {
     if (session?.session_prompt !== undefined) {
       setScriptText(session.session_prompt || '')
     }
-  }, [session?.session_prompt])
+    if (session?.idle_pause_min !== undefined) {
+      setIdlePauseMin(session.idle_pause_min ?? 4)
+    }
+    if (session?.idle_pause_max !== undefined) {
+      setIdlePauseMax(session.idle_pause_max ?? 9)
+    }
+  }, [session?.session_prompt, session?.idle_pause_min, session?.idle_pause_max])
 
   const handleLoadSuggestion = async () => {
     setLoadingSuggestion(true)
@@ -109,13 +119,21 @@ export default function LiveTtsVoiceCard({
     if (!session?.id) return
     setSavingScript(true)
     try {
+      const minVal = Math.max(1, parseInt(idlePauseMin) || 4)
+      const maxVal = Math.max(minVal, parseInt(idlePauseMax) || 9)
       await api.patch(`/live_sessions/sessions/${session.id}/`, {
-        session_prompt: scriptText
+        session_prompt: scriptText,
+        idle_pause_min: minVal,
+        idle_pause_max: maxVal,
       })
-      message.success('Đã lưu kịch bản xoay vòng! MC sẽ đọc theo kịch bản này.')
+      message.success('Đã lưu kịch bản xoay vòng và thời gian ngắt nghỉ!')
       setScriptModalOpen(false)
       if (typeof onSessionUpdate === 'function') {
-        onSessionUpdate({ session_prompt: scriptText })
+        onSessionUpdate({
+          session_prompt: scriptText,
+          idle_pause_min: minVal,
+          idle_pause_max: maxVal,
+        })
       }
     } catch (e) {
       message.error('Lỗi khi lưu kịch bản: ' + (e.response?.data?.detail || e.message))
@@ -599,6 +617,57 @@ export default function LiveTtsVoiceCard({
           >
             Nạp mẫu gợi ý
           </Button>
+        </div>
+
+        {/* ── Cài đặt thời gian ngắt nghỉ ngẫu nhiên giữa các câu ── */}
+        <div style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          padding: '10px 14px',
+          backgroundColor: '#1f1f1f',
+          borderRadius: 8,
+          marginBottom: 12,
+          border: '1px solid #303030',
+          flexWrap: 'wrap',
+          gap: 10,
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <ClockCircleOutlined style={{ color: '#52c41a', fontSize: 15 }} />
+            <div>
+              <div style={{ fontSize: 13, fontWeight: 600, color: '#e6f7ff' }}>
+                Thời gian ngắt nghỉ giữa các câu:
+              </div>
+              <div style={{ fontSize: 11, color: '#8c8c8c' }}>
+                AI sẽ ngắt nghỉ ngẫu nhiên trong khoảng này trước khi đọc câu tiếp theo
+              </div>
+            </div>
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+            <span style={{ fontSize: 12, color: '#bfbfbf' }}>Từ</span>
+            <InputNumber
+              min={1}
+              max={60}
+              value={idlePauseMin}
+              onChange={(val) => setIdlePauseMin(val || 1)}
+              size="middle"
+              style={{ width: 75 }}
+              addonAfter="s"
+            />
+            <span style={{ fontSize: 12, color: '#bfbfbf' }}>đến</span>
+            <InputNumber
+              min={1}
+              max={120}
+              value={idlePauseMax}
+              onChange={(val) => setIdlePauseMax(val || 1)}
+              size="middle"
+              style={{ width: 75 }}
+              addonAfter="s"
+            />
+            <Tooltip title="Khoảng nghỉ ngẫu nhiên giúp giọng đọc livestream sống động, tự nhiên như người thật trò chuyện, tránh cảm giác máy móc đọc liên tục không ngừng.">
+              <InfoCircleOutlined style={{ color: '#8c8c8c', cursor: 'pointer', fontSize: 13, marginLeft: 4 }} />
+            </Tooltip>
+          </div>
         </div>
 
         <Input.TextArea

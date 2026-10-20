@@ -304,6 +304,16 @@ class LiveSession(models.Model):
         default=100,
         verbose_name="Âm lượng giọng đọc AI (%)"
     )
+    idle_pause_min = models.IntegerField(
+        default=4,
+        verbose_name="Thời gian nghỉ tối thiểu giữa các câu (giây)",
+        help_text="Khoảng dừng ngẫu nhiên ngắn nhất trước khi MC đọc câu kế tiếp."
+    )
+    idle_pause_max = models.IntegerField(
+        default=9,
+        verbose_name="Thời gian nghỉ tối đa giữa các câu (giây)",
+        help_text="Khoảng dừng ngẫu nhiên dài nhất trước khi MC đọc câu kế tiếp."
+    )
     avatar_actions = models.JSONField(
         default=list,
         blank=True,
