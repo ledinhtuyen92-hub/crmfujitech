@@ -9,11 +9,14 @@ logger = logging.getLogger(__name__)
 
 MEDIAMTX_LOCAL_RTMP_PORT = 1935
 MEDIAMTX_LOCAL_HLS_PORT = 8888
+MEDIAMTX_LOCAL_WEBRTC_PORT = 8889
 MEDIAMTX_LOCAL_API_PORT = 9997
+MEDIAMTX_INGEST_PATH = 'raw'
 MEDIAMTX_STREAM_PATH = 'live'
 
-MEDIAMTX_LOCAL_RTMP_URL = f'rtmp://127.0.0.1:{MEDIAMTX_LOCAL_RTMP_PORT}/{MEDIAMTX_STREAM_PATH}'
+MEDIAMTX_LOCAL_RTMP_URL = f'rtmp://127.0.0.1:{MEDIAMTX_LOCAL_RTMP_PORT}/{MEDIAMTX_INGEST_PATH}'
 MEDIAMTX_LOCAL_HLS_URL = f'http://127.0.0.1:{MEDIAMTX_LOCAL_HLS_PORT}/{MEDIAMTX_STREAM_PATH}/index.m3u8'
+MEDIAMTX_LOCAL_WEBRTC_URL = f'http://127.0.0.1:{MEDIAMTX_LOCAL_WEBRTC_PORT}/{MEDIAMTX_STREAM_PATH}/whep'
 
 
 class MediaMTXManager:
@@ -42,10 +45,10 @@ class MediaMTXManager:
     def _generate_config(self, config_path: str):
         if self.external_rtmp_url:
             rtmp_forward = f"""
-      runOnPublish: >-
-        ffmpeg -re -i rtmp://127.0.0.1:1935/
+      runOnAvailable: >-
+        ffmpeg -re -i rtmp://127.0.0.1:1935/raw
         -c copy -f flv {self.external_rtmp_url}
-      runOnPublishRestart: yes"""
+      runOnAvailableRestart: yes"""
         else:
             rtmp_forward = ''
 
@@ -63,11 +66,19 @@ hlsVariant: mpegts
 hlsSegmentCount: 15
 hlsSegmentDuration: 1s
 
+# WebRTC / WHEP — zero-latency browser preview
+webrtc: yes
+webrtcAddress: :{MEDIAMTX_LOCAL_WEBRTC_PORT}
+webrtcAllowOrigins: ['*']
+
 api: yes
 apiAddress: :{MEDIAMTX_LOCAL_API_PORT}
 
 paths:
-  {MEDIAMTX_STREAM_PATH}:{rtmp_forward}
+  raw:
+    runOnAvailable: ffmpeg -rtsp_transport tcp -i rtsp://localhost:8554/raw -vcodec copy -c:a libopus -b:a 128k -async 50 -f rtsp rtsp://localhost:8554/live
+    runOnAvailableRestart: yes{rtmp_forward}
+  all_others:
 """
         with open(config_path, 'w', encoding='utf-8') as f:
             f.write(config_content)

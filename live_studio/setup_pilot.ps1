@@ -15,7 +15,7 @@ $ErrorActionPreference = "Stop"
 $ProjectRoot = Resolve-Path "..\."
 $LiveStudioDir = "$ProjectRoot\live_studio"
 $BinDir = "$LiveStudioDir\bin"
-$FfmpegDir = "$BinDir\ffmpeg"
+$FfmpegExe = "$BinDir\ffmpeg.exe"
 $MediaMtxDir = "$BinDir\mediamtx"
 
 Write-Host "=========================================" -ForegroundColor Cyan
@@ -23,7 +23,7 @@ Write-Host " Setting up Pilot Environment Dependencies" -ForegroundColor Cyan
 Write-Host "=========================================" -ForegroundColor Cyan
 
 # 1. Create Directories
-if (-not (Test-Path $FfmpegDir)) { New-Item -ItemType Directory -Force -Path $FfmpegDir | Out-Null }
+if (-not (Test-Path $BinDir)) { New-Item -ItemType Directory -Force -Path $BinDir | Out-Null }
 if (-not (Test-Path $MediaMtxDir)) { New-Item -ItemType Directory -Force -Path $MediaMtxDir | Out-Null }
 
 # 2. Download MediaMTX (Windows amd64)
@@ -45,7 +45,7 @@ if (-not (Test-Path "$MediaMtxDir\mediamtx.exe")) {
 $FfmpegUrl = "https://www.gyan.dev/ffmpeg/builds/ffmpeg-release-essentials.zip"
 $FfmpegZip = "$BinDir\ffmpeg.zip"
 
-if (-not (Test-Path "$FfmpegDir\ffmpeg.exe")) {
+if (-not (Test-Path $FfmpegExe)) {
     Write-Host "Downloading FFmpeg..." -ForegroundColor Yellow
     Invoke-WebRequest -Uri $FfmpegUrl -OutFile $FfmpegZip
     Write-Host "Extracting FFmpeg (this might take a moment)..." -ForegroundColor Yellow
@@ -53,10 +53,10 @@ if (-not (Test-Path "$FfmpegDir\ffmpeg.exe")) {
     $TempFfmpegDir = "$BinDir\ffmpeg_temp"
     Expand-Archive -Path $FfmpegZip -DestinationPath $TempFfmpegDir -Force
     
-    # Move ffmpeg.exe and ffprobe.exe to the final directory
+    # Move ffmpeg.exe and ffprobe.exe directly to the bin directory
     $ExtractedBin = Get-ChildItem -Path $TempFfmpegDir -Directory | Select-Object -First 1
-    Move-Item -Path "$($ExtractedBin.FullName)\bin\ffmpeg.exe" -Destination $FfmpegDir -Force
-    Move-Item -Path "$($ExtractedBin.FullName)\bin\ffprobe.exe" -Destination $FfmpegDir -Force
+    Move-Item -Path "$($ExtractedBin.FullName)\bin\ffmpeg.exe" -Destination $BinDir -Force
+    Move-Item -Path "$($ExtractedBin.FullName)\bin\ffprobe.exe" -Destination $BinDir -Force
     
     # Cleanup
     Remove-Item -Recurse -Force $TempFfmpegDir

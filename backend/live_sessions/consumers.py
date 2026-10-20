@@ -170,8 +170,9 @@ class DeviceAgentConsumer(AsyncWebsocketConsumer):
                 correlation_id=envelope['message_id']
             )
         elif msg_type == 'event' and msg_name in ('stream.status', 'live.stream.status', 'stream.state'):
-            state = payload.get('state')
-            hls_url = payload.get('hls_url', '')
+            state       = payload.get('state')
+            hls_url     = payload.get('hls_url', '')
+            webrtc_url  = payload.get('webrtc_url', '')
             updates = {
                 'stream_state': state
             }
@@ -194,12 +195,15 @@ class DeviceAgentConsumer(AsyncWebsocketConsumer):
                 path = parsed.path.lstrip('/')
                 proxy_hls_url = f"/api/live_sessions/sessions/{self.session_id}/hls-proxy/{path}"
             
+            # webrtc_url: device-local URL (e.g. http://127.0.0.1:8889/live/whep)
+            # Browser connects directly via WebRTC — no proxy needed
             await LiveConsoleEventService.aemit(
                 session_id=self.session_id,
                 event_type="live.stream.status",
-                payload={"state": state, "hls_url": proxy_hls_url},
+                payload={"state": state, "hls_url": proxy_hls_url, "webrtc_url": webrtc_url},
                 correlation_id=envelope['message_id']
             )
+
         elif msg_type == 'command' and msg_name == 'session.sync':
             logger.info(f"Session Sync: {payload}")
             # Mark the connection as ready to receive/send commands

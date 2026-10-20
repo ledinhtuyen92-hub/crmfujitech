@@ -136,11 +136,15 @@ class LiveStudioApp:
         from live_studio.execution.stream_controller import StreamState
         from live_studio.protocol.constants import STATE_RUNNING, STATE_STOPPED
         try:
-            from live_studio.execution.mediamtx_manager import MEDIAMTX_LOCAL_HLS_URL
+            from live_studio.execution.mediamtx_manager import (
+                MEDIAMTX_LOCAL_HLS_URL,
+                MEDIAMTX_LOCAL_WEBRTC_URL,
+            )
             logger.info(f"[_on_stream_state_change] state={getattr(state, 'value', state)}")
             extra_payload = {"state": state.value}
             if state == StreamState.LIVE:
-                extra_payload["hls_url"] = MEDIAMTX_LOCAL_HLS_URL
+                extra_payload["hls_url"]    = MEDIAMTX_LOCAL_HLS_URL
+                extra_payload["webrtc_url"] = MEDIAMTX_LOCAL_WEBRTC_URL
                 if self.state.state in ["stopped", "paused", "disconnected", "connected"]:
                     self.state.transition(STATE_RUNNING)
             elif state == StreamState.STOPPED:
@@ -149,6 +153,7 @@ class LiveStudioApp:
         except Exception as e:
             logger.error(f"[_on_stream_state_change] Error: {e}")
             extra_payload = {"state": getattr(state, 'value', str(state))}
+
 
         if hasattr(self, 'ws_client') and self.ws_client:
             payload = {

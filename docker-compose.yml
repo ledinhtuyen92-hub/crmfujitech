@@ -144,6 +144,7 @@ services:
     restart: unless-stopped
     environment:
       - MTX_WEBRTCADDRESS=:8889
+      - MTX_WEBRTCALLOWORIGIN=*
       - MTX_RTMPADDRESS=:1935
       - MTX_HLSADDRESS=:8888
       - MTX_APIADDRESS=:9997
@@ -152,8 +153,11 @@ services:
       - MTX_HLSVARIANT=mpegts
       - MTX_HLSSEGMENTDURATION=1s
       - MTX_HLSSEGMENTCOUNT=15
+      - MTX_PATHS_RAW_RUNONREADY=ffmpeg -rtsp_transport tcp -i rtsp://localhost:8554/raw -vcodec copy -c:a libopus -b:a 128k -async 50 -f rtsp rtsp://localhost:8554/live
+      - MTX_PATHS_RAW_RUNONREADYRESTART=yes
     ports:
       - "1935:1935" # RTMP push (public)
+      - "8554:8554" # RTSP
       - "8888:8888" # HLS proxy pull (can also be internal)
       - "8889:8889" # WebRTC (public)
       - "8189:8189/udp" # WebRTC ICE

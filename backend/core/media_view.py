@@ -92,6 +92,10 @@ def serve_media_with_ranges(request, path, document_root=None):
             response['Accept-Ranges'] = 'bytes'
             response['Last-Modified'] = last_modified
             response['Cache-Control'] = 'public, max-age=86400'
+            response['Access-Control-Allow-Origin'] = '*'
+            response['Access-Control-Allow-Methods'] = 'GET, HEAD, OPTIONS'
+            response['Access-Control-Allow-Headers'] = 'Range, Authorization, Content-Type, Accept'
+            response['Access-Control-Expose-Headers'] = 'Content-Range, Content-Length, Accept-Ranges'
             return response
 
     # Full content response
@@ -104,4 +108,8 @@ def serve_media_with_ranges(request, path, document_root=None):
     response['Accept-Ranges'] = 'bytes'
     response['Last-Modified'] = last_modified
     response['Cache-Control'] = 'public, max-age=86400'
+    response['Access-Control-Allow-Origin'] = '*'
+    response['Access-Control-Allow-Methods'] = 'GET, HEAD, OPTIONS'
+    response['Access-Control-Allow-Headers'] = 'Range, Authorization, Content-Type, Accept'
+    response['Access-Control-Expose-Headers'] = 'Content-Range, Content-Length, Accept-Ranges'
     return response

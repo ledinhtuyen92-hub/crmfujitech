@@ -624,48 +624,49 @@ export default function LiveTtsVoiceCard({
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'space-between',
-          padding: '10px 14px',
-          backgroundColor: '#1f1f1f',
+          padding: '12px 16px',
+          backgroundColor: '#ffffff',
           borderRadius: 8,
           marginBottom: 12,
-          border: '1px solid #303030',
+          border: '1px solid #262626',
           flexWrap: 'wrap',
           gap: 10,
+          boxShadow: '0 1px 3px rgba(0, 0, 0, 0.05)',
         }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <ClockCircleOutlined style={{ color: '#52c41a', fontSize: 15 }} />
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <ClockCircleOutlined style={{ color: '#1677ff', fontSize: 16 }} />
             <div>
-              <div style={{ fontSize: 13, fontWeight: 600, color: '#e6f7ff' }}>
+              <div style={{ fontSize: 13, fontWeight: 700, color: '#000000' }}>
                 Thời gian ngắt nghỉ giữa các câu:
               </div>
-              <div style={{ fontSize: 11, color: '#8c8c8c' }}>
+              <div style={{ fontSize: 12, color: '#595959' }}>
                 AI sẽ ngắt nghỉ ngẫu nhiên trong khoảng này trước khi đọc câu tiếp theo
               </div>
             </div>
           </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-            <span style={{ fontSize: 12, color: '#bfbfbf' }}>Từ</span>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <span style={{ fontSize: 13, fontWeight: 600, color: '#000000' }}>Từ</span>
             <InputNumber
               min={1}
               max={60}
               value={idlePauseMin}
               onChange={(val) => setIdlePauseMin(val || 1)}
               size="middle"
-              style={{ width: 75 }}
+              style={{ width: 80 }}
               addonAfter="s"
             />
-            <span style={{ fontSize: 12, color: '#bfbfbf' }}>đến</span>
+            <span style={{ fontSize: 13, fontWeight: 600, color: '#000000' }}>đến</span>
             <InputNumber
               min={1}
               max={120}
               value={idlePauseMax}
               onChange={(val) => setIdlePauseMax(val || 1)}
               size="middle"
-              style={{ width: 75 }}
+              style={{ width: 80 }}
               addonAfter="s"
             />
             <Tooltip title="Khoảng nghỉ ngẫu nhiên giúp giọng đọc livestream sống động, tự nhiên như người thật trò chuyện, tránh cảm giác máy móc đọc liên tục không ngừng.">
-              <InfoCircleOutlined style={{ color: '#8c8c8c', cursor: 'pointer', fontSize: 13, marginLeft: 4 }} />
+              <InfoCircleOutlined style={{ color: '#595959', cursor: 'pointer', fontSize: 14, marginLeft: 4 }} />
             </Tooltip>
           </div>
         </div>
