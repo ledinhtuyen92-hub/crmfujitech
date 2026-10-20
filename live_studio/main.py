@@ -206,8 +206,8 @@ class LiveStudioApp:
                     if frame:
                         self.frame_queue.put(frame)
                         
-                # Render avatar matching framerate (~40 FPS) to drastically save CPU
-                await asyncio.sleep(0.025)
+                # Render avatar matching stream framerate (30 FPS) to drastically save CPU
+                await asyncio.sleep(0.033)
             except asyncio.CancelledError:
                 break
             except Exception as e:

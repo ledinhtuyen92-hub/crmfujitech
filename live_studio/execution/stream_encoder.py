@@ -197,11 +197,11 @@ class StreamEncoder:
         self.is_running = False
         self._intentional_stop = False
         
-    def _detect_chroma_params(self) -> Tuple[str, str, str]:
+    def _detect_chroma_params(self) -> Tuple[str, str, str, str]:
         """
         Auto-detects whether the avatar video uses Blue Screen or Green Screen.
         Samples top-left corner pixels to determine dominant hue.
-        Returns: (color_hex, similarity, blend)
+        Returns: (color_hex, similarity, blend, despill_type)
         """
         avatar_path = self.cached_assets.get('avatar') or self.cached_assets.get('avatar_speaking')
         if avatar_path and os.path.exists(avatar_path) and self.ffmpeg_path:
@@ -218,17 +218,17 @@ class StreamEncoder:
                     logger.info(f"[StreamEncoder] Sampled avatar corner pixel RGB=({r}, {g}, {b})")
                     # If Blue is dominant over Green and Red
                     if b > g and b > r and b > 100:
-                        logger.info("[StreamEncoder] Auto-detected BLUE screen avatar. Using 0x1976BC:0.13:0.02.")
-                        return ("0x1976BC", "0.13", "0.02")
+                        logger.info("[StreamEncoder] Auto-detected BLUE screen avatar. Using 0x1976BC:0.17:0.04 with despill=blue.")
+                        return ("0x1976BC", "0.17", "0.04", "blue")
                     # If Green is dominant over Blue and Red
                     elif g > b and g > r and g > 80:
-                        logger.info("[StreamEncoder] Auto-detected GREEN screen avatar. Using 0x2BB754:0.15:0.02.")
-                        return ("0x2BB754", "0.15", "0.02")
+                        logger.info("[StreamEncoder] Auto-detected GREEN screen avatar. Using 0x2BB754:0.17:0.04 with despill=green.")
+                        return ("0x2BB754", "0.17", "0.04", "green")
             except Exception as e:
                 logger.warning(f"[StreamEncoder] Could not auto-detect chroma color: {e}")
 
         # Default fallback to green screen
-        return ("0x2BB754", "0.15", "0.02")
+        return ("0x2BB754", "0.17", "0.04", "green")
 
     async def start(self):
         await self.video_transport.start()
@@ -272,10 +272,10 @@ class StreamEncoder:
             else:
                 inputs.extend(["-loop", "1", "-i", bg])
                 
-            # Calibrated chroma key avatar and put on background
-            ck_col, ck_sim, ck_blend = self._detect_chroma_params()
+            # Calibrated chroma key avatar with despill and soft edge feathering
+            ck_col, ck_sim, ck_blend, ck_type = self._detect_chroma_params()
             filter_complex.append(
-                f"[0:v]chromakey={ck_col}:{ck_sim}:{ck_blend},scale=-1:{self.config.height}:eval=init[ckout];"
+                f"[0:v]chromakey={ck_col}:{ck_sim}:{ck_blend},despill=type={ck_type}:mix=0.6:expand=0.1,scale=-1:{self.config.height}:eval=init[ckout];"
                 f"[{input_idx}:v]scale={self.config.width}:{self.config.height}:eval=init[bg];"
                 f"[bg][ckout]overlay=(W-w)/2:(H-h)/2[v1]"
             )

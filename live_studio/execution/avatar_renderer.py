@@ -63,11 +63,13 @@ class DummyAvatarRenderer(BaseAvatarRenderer):
         self.is_initialized = False
 
 
+import collections
+
 class VideoFrameSequence:
     """
     Loads and manages a sequence of frames for Idle, Speaking, or Action video loops.
     Supports both image files (.png, .jpg, etc.) and video files (.mp4, .webm, etc.).
-    Uses JPEG byte buffer in memory with dynamic single-surface cache for ultra-low RAM footprint (~35MB for 60s).
+    Uses JPEG byte buffer in memory with an active surface ring cache to eliminate repeated CPU JPEG decompression.
     """
     def __init__(self, file_path: Optional[str], target_width: int = 720, target_height: int = 1280, ffmpeg_bin: Optional[str] = None, fps: int = 25, max_duration: int = 120):
         self.static_surf = None
@@ -75,8 +77,9 @@ class VideoFrameSequence:
         self.fps = fps
         self.target_width = target_width
         self.target_height = target_height
-        self._cached_idx = -1
-        self._cached_surf = None
+        self._surface_cache = {}
+        self._cache_keys = collections.deque()
+        self._max_cache = 75  # Cache up to 75 decoded surfaces (~270MB RAM), saves massive CPU
         
         if not file_path or not os.path.exists(file_path):
             return
@@ -152,16 +155,20 @@ class VideoFrameSequence:
         if not self.frame_bytes:
             return None
         idx = int(elapsed_seconds * self.fps) % len(self.frame_bytes)
-        if idx == self._cached_idx and self._cached_surf:
-            return self._cached_surf
+        cached = self._surface_cache.get(idx)
+        if cached is not None:
+            return cached
         try:
             surf = self.pygame.image.load(self.io.BytesIO(self.frame_bytes[idx]))
-            self._cached_idx = idx
-            self._cached_surf = surf
+            self._surface_cache[idx] = surf
+            self._cache_keys.append(idx)
+            if len(self._cache_keys) > self._max_cache:
+                oldest = self._cache_keys.popleft()
+                self._surface_cache.pop(oldest, None)
             return surf
         except Exception as e:
             logger.error(f"Failed to decode frame {idx}: {e}")
-            return self._cached_surf
+            return None
 
     def __len__(self):
         return 1 if self.static_surf else len(self.frame_bytes)
@@ -169,8 +176,8 @@ class VideoFrameSequence:
     def cleanup(self):
         self.frame_bytes.clear()
         self.static_surf = None
-        self._cached_surf = None
-        self._cached_idx = -1
+        self._surface_cache.clear()
+        self._cache_keys.clear()
 
 
 class PygameAvatarRenderer(BaseAvatarRenderer):

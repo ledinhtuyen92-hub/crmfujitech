@@ -22,6 +22,7 @@ export default function VideoPreview({
   const hlsRef = useRef(null)
   const retryTimerRef = useRef(null)
   const liveEdgeResyncRef = useRef(null)
+  const bufferingTimerRef = useRef(null)
 
   // idle | waiting | loading | paused | live | error
   const [hlsStatus, setHlsStatus] = useState('idle')
@@ -515,9 +516,9 @@ export default function VideoPreview({
         maxBufferSize: 32 * 1024 * 1024, // 32 MB heap cap
         liveDurationInfinity: true,
         initialLiveManifestSize: 1,
-        liveSyncDurationCount: 3,
-        liveMaxLatencyDurationCount: 8,
-        maxLiveSyncPlaybackRate: 1.05, // Smoothly catch up at 1.05x without pitch changes or seek pauses
+        liveSyncDurationCount: 4,
+        liveMaxLatencyDurationCount: 10,
+        maxLiveSyncPlaybackRate: 1.0, // Strictly real-time lock (1.0x) so forward buffer is never drained
         manifestLoadingMaxRetry: 10,
         manifestLoadingRetryDelay: 500,
         manifestLoadingMaxRetryTimeout: 10000,
@@ -611,6 +612,10 @@ export default function VideoPreview({
       })
 
       hls.on(Hls.Events.FRAG_BUFFERED, () => {
+        if (bufferingTimerRef.current) {
+          clearTimeout(bufferingTimerRef.current)
+          bufferingTimerRef.current = null
+        }
         hasStartedPlaybackRef.current = true
         setIsBuffering(false)
         syncToLiveEdge()
@@ -675,6 +680,10 @@ export default function VideoPreview({
     })
 
     return () => {
+      if (bufferingTimerRef.current) {
+        clearTimeout(bufferingTimerRef.current)
+        bufferingTimerRef.current = null
+      }
       if (liveEdgeResyncRef.current) {
         clearInterval(liveEdgeResyncRef.current)
         liveEdgeResyncRef.current = null
@@ -1200,11 +1209,20 @@ export default function VideoPreview({
         onLoadedData={markFrameReady}
         onTimeUpdate={markFrameReady}
         onPlaying={() => {
+          if (bufferingTimerRef.current) {
+            clearTimeout(bufferingTimerRef.current)
+            bufferingTimerRef.current = null
+          }
           markFrameReady()
           setIsBuffering(false)
         }}
         onCanPlay={() => {
+          if (bufferingTimerRef.current) {
+            clearTimeout(bufferingTimerRef.current)
+            bufferingTimerRef.current = null
+          }
           markFrameReady()
+          setIsBuffering(false)
           if (videoRef.current && videoRef.current.paused) {
             videoRef.current.play().catch(() => {})
           }
@@ -1216,7 +1234,11 @@ export default function VideoPreview({
           }
         }}
         onWaiting={() => {
-          if (hasFirstFrameRendered) setIsBuffering(true)
+          if (!hasFirstFrameRendered) return
+          if (bufferingTimerRef.current) clearTimeout(bufferingTimerRef.current)
+          bufferingTimerRef.current = setTimeout(() => {
+            setIsBuffering(true)
+          }, 1200)
         }}
       />
 
