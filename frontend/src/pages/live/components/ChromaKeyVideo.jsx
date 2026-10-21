@@ -94,37 +94,62 @@ export default function ChromaKeyVideo({
         vec3 keyYUV = rgb2yuv(activeKey);
         vec3 colorYUV = rgb2yuv(color.rgb);
         
-        // 2. Pure Chroma UV distance (measures true color separation):
-        float dist = distance(colorYUV.yz, keyYUV.yz);
+        // 2. Pure Chroma UV distance + 2.0-pixel Matte Choke:
+        // Morphological erosion strips the 1-2 pixel camera chroma subsampling blur halo along arms & table
+        vec2 onePixel = vec2(2.0 / 1080.0, 2.0 / 1920.0);
+        float distCenter = distance(colorYUV.yz, keyYUV.yz);
+        float distUp = distance(rgb2yuv(texture2D(u_image, v_texCoord + vec2(0.0, -onePixel.y)).rgb).yz, keyYUV.yz);
+        float distDown = distance(rgb2yuv(texture2D(u_image, v_texCoord + vec2(0.0, onePixel.y)).rgb).yz, keyYUV.yz);
+        float distLeft = distance(rgb2yuv(texture2D(u_image, v_texCoord + vec2(-onePixel.x, 0.0)).rgb).yz, keyYUV.yz);
+        float distRight = distance(rgb2yuv(texture2D(u_image, v_texCoord + vec2(onePixel.x, 0.0)).rgb).yz, keyYUV.yz);
 
-        // 3. Crisp keying:
-        // Background has UV distance <= 0.022 -> strictly alpha = 0.0 (100% transparent, ZERO HAZE)
-        float alpha = smoothstep(u_similarity, u_similarity + u_smoothness, dist);
+        float aCenter = smoothstep(u_similarity, u_similarity + u_smoothness, distCenter);
+        float aUp = smoothstep(u_similarity, u_similarity + u_smoothness, distUp);
+        float aDown = smoothstep(u_similarity, u_similarity + u_smoothness, distDown);
+        float aLeft = smoothstep(u_similarity, u_similarity + u_smoothness, distLeft);
+        float aRight = smoothstep(u_similarity, u_similarity + u_smoothness, distRight);
 
-        // 4. Targeted Hair & Torso Despill:
-        // On head & hair (v_texCoord.y < 0.48):
-        // Natural human hair (melanin) has Red as dominant or balanced channel.
-        // Background spill (cyan/blue/green) causes G or B to spike above R.
-        // Clamping both G and B to R * 1.05 completely eradicates all cyan, blue, or green halos on hair!
+        // Choked alpha: cleanly eliminates the 1-2 pixel blue/green fringe along outer silhouette & table line
+        float minNeighborAlpha = min(min(aUp, aDown), min(aLeft, aRight));
+        float alpha = min(aCenter, minNeighborAlpha);
+
+        // Clear shadow boundary where blue/green wall meets the table on outer margins:
+        bool isGreen = (activeKey.g > activeKey.r && activeKey.g > activeKey.b);
+        if (v_texCoord.y > 0.68 && v_texCoord.y < 0.74 && (v_texCoord.x < 0.08 || v_texCoord.x > 0.91)) {
+          if (!isGreen && color.b > max(color.r, color.g)) {
+            alpha = 0.0;
+          } else if (isGreen && color.g > max(color.r, color.b)) {
+            alpha = 0.0;
+          }
+        }
+
+        // 3. Targeted Hair & Lower Body Contour Despill:
         if (v_texCoord.y < 0.48) {
+          // Head & hair: Melanin clamp eliminates all cyan, blue, or green halos on hair
           float maxColor = color.r * 1.05;
           color.g = min(color.g, maxColor);
           color.b = min(color.b, maxColor);
         } else {
-          // On torso & clothing (v_texCoord.y >= 0.48):
-          // Edge-aware despill to protect solid colored clothing (blue jacket or green collar)
-          float edgeFactor = 1.0 - smoothstep(0.6, 0.95, alpha);
-          bool isGreen = (activeKey.g > activeKey.r && activeKey.g > activeKey.b);
+          // Torso & arms (v_texCoord.y >= 0.48):
+          // Outer sleeves (x < 0.24 || x > 0.75) are 100% orange/white fabric with NO blue/green fabric.
+          // Clamping any excess key color on the outer arms completely eliminates the sleeve border!
+          bool isOuterArm = (v_texCoord.x < 0.24 || v_texCoord.x > 0.75);
+          float edgeFactor = 1.0 - clamp(minNeighborAlpha, 0.0, 1.0);
+
           if (isGreen) {
             float maxRB = max(color.r, color.b);
-            if (color.g > maxRB) {
-              float targetG = (color.r + color.b) * 0.5;
+            if (isOuterArm) {
+              color.g = min(color.g, maxRB * 0.95);
+            } else if (edgeFactor > 0.01) {
+              float targetG = min(color.g, maxRB * 0.98);
               color.g = mix(color.g, targetG, edgeFactor);
             }
           } else {
             float maxRG = max(color.r, color.g);
-            if (color.b > maxRG) {
-              float targetB = maxRG * 1.02;
+            if (isOuterArm) {
+              color.b = min(color.b, maxRG * 0.95);
+            } else if (edgeFactor > 0.01) {
+              float targetB = min(color.b, maxRG * 0.98);
               color.b = mix(color.b, targetB, edgeFactor);
             }
           }
