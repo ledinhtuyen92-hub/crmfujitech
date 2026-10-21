@@ -101,17 +101,22 @@ export default function ChromaKeyVideo({
         // Background has UV distance <= 0.022 -> strictly alpha = 0.0 (100% transparent, ZERO HAZE)
         float alpha = smoothstep(u_similarity, u_similarity + u_smoothness, dist);
 
-        // 4. Adaptive Despill (handles both Green and Blue screens automatically):
+        // 4. Edge-Aware Adaptive Despill (handles both Green and Blue screens dynamically):
+        // Only despill semi-transparent edge pixels (alpha < 0.95) to eliminate halos on hair,
+        // while 100% protecting solid clothing, collar, and necklace colors inside the body!
+        float edgeFactor = 1.0 - smoothstep(0.6, 1.0, alpha);
         bool isGreen = (activeKey.g > activeKey.r && activeKey.g > activeKey.b);
         if (isGreen) {
           float maxRB = max(color.r, color.b);
           if (color.g > maxRB) {
-            color.g = min(color.g, maxRB * 1.02);
+            float targetG = min(color.g, maxRB * 1.02);
+            color.g = mix(color.g, targetG, edgeFactor);
           }
         } else {
           float maxRG = max(color.r, color.g);
           if (color.b > maxRG) {
-            color.b = min(color.b, maxRG * 1.02);
+            float targetB = min(color.b, maxRG * 1.02);
+            color.b = mix(color.b, targetB, edgeFactor);
           }
         }
 
