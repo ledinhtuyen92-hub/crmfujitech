@@ -12,8 +12,8 @@ export default function ChromaKeyVideo({
   onLoaded,
   style = {},
   keyColorHex, // e.g. '#166CA6'
-  similarity = 0.052,
-  smoothness = 0.020,
+  similarity = 0.038,
+  smoothness = 0.022,
 }) {
   const videoRef = useRef(null)
   const canvasRef = useRef(null)
@@ -31,10 +31,10 @@ export default function ChromaKeyVideo({
     const canvas = canvasRef.current
     if (!video || !canvas || useFallback) return
 
-    // Initialize WebGL with alpha channel
+    // Initialize WebGL with alpha channel (premultipliedAlpha: true ensures natural soft edge blending without dark halos)
     try {
-      gl = canvas.getContext('webgl', { premultipliedAlpha: false, alpha: true }) ||
-           canvas.getContext('experimental-webgl', { premultipliedAlpha: false, alpha: true })
+      gl = canvas.getContext('webgl', { premultipliedAlpha: true, alpha: true }) ||
+           canvas.getContext('experimental-webgl', { premultipliedAlpha: true, alpha: true })
     } catch (e) {
       console.warn('[ChromaKeyVideo] WebGL not supported, falling back to standard video:', e)
       setUseFallback(true)
@@ -77,24 +77,30 @@ export default function ChromaKeyVideo({
         vec3 keyYUV = rgb2yuv(u_keyColor);
         vec3 colorYUV = rgb2yuv(color.rgb);
         
-        float dist = distance(colorYUV.yz, keyYUV.yz);
+        // 1. Dual Chroma (U, V) and Luminance (Y) keying:
+        // UV distance measures hue match; Luminance distance protects lighter/darker details (wrist cuffs, collar, necklace)
+        float uvDist = distance(colorYUV.yz, keyYUV.yz);
+        float lumaDist = abs(colorYUV.x - keyYUV.x);
+        float dist = sqrt(uvDist * uvDist + 0.15 * lumaDist * lumaDist);
 
-        // Dynamic spatial tolerance:
-        // Torso area (x: 0.18 -> 0.82, y: 0.40 -> 1.0): strictly protect model clothes
-        // Outside torso: boost similarity to 0.085 to cleanly erase 100% background macroblocks/noise
-        float isTorso = step(0.18, v_texCoord.x) * (1.0 - step(0.82, v_texCoord.x)) * step(0.40, v_texCoord.y);
-        float effectiveSim = mix(0.085, u_similarity, isTorso);
-        
-        float alpha = smoothstep(effectiveSim, effectiveSim + u_smoothness, dist);
+        // 2. Smooth feathered alpha transition (zero black rim)
+        float alpha = smoothstep(u_similarity, u_similarity + u_smoothness, dist);
 
-        // Professional Despill (Spill Suppression):
-        // Blue backdrop bounce light spills onto hair & shoulders creating dirty cyan/blue halos.
-        // Clamping blue to max(red, green) on edge pixels turns the blue fringe into natural dark hair.
-        float maxRG = max(color.r, color.g);
-        if (color.b > maxRG) {
-          color.b = min(color.b, maxRG * 1.05);
+        // 3. Adaptive Despill (handles both Green and Blue screens automatically):
+        // Completely suppresses color bounce on hair and edges without changing clothing colors
+        bool isGreen = (u_keyColor.g > u_keyColor.r && u_keyColor.g > u_keyColor.b);
+        if (isGreen) {
+          float maxRB = max(color.r, color.b);
+          if (color.g > maxRB) {
+            color.g = min(color.g, maxRB * 1.02);
+          }
+        } else {
+          float maxRG = max(color.r, color.g);
+          if (color.b > maxRG) {
+            color.b = min(color.b, maxRG * 1.02);
+          }
         }
-        
+
         gl_FragColor = vec4(color.rgb * alpha, alpha);
       }
     `
