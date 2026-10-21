@@ -231,12 +231,12 @@ class StreamEncoder:
                     detected_hex = f"0x{r:02X}{g:02X}{b:02X}"
                     logger.info(f"[StreamEncoder] Sampled avatar corner pixel RGB=({r}, {g}, {b}) -> {detected_hex}")
                     screen_type = "blue" if (b > r and b > g) else "green"
-                    return (detected_hex, "0.038", "0.022", screen_type)
+                    return (detected_hex, "0.032", "0.014", screen_type)
             except Exception as e:
                 logger.warning(f"[StreamEncoder] Could not auto-detect chroma color: {e}")
 
         # Default fallback to clean green screen
-        return ("0x2BB754", "0.038", "0.022", "green")
+        return ("0x2BB754", "0.032", "0.014", "green")
 
     async def start(self):
         await self.video_transport.start()

@@ -12,8 +12,8 @@ export default function ChromaKeyVideo({
   onLoaded,
   style = {},
   keyColorHex, // e.g. '#166CA6'
-  similarity = 0.038,
-  smoothness = 0.022,
+  similarity = 0.032,
+  smoothness = 0.014,
 }) {
   const videoRef = useRef(null)
   const canvasRef = useRef(null)
@@ -74,21 +74,35 @@ export default function ChromaKeyVideo({
 
       void main() {
         vec4 color = texture2D(u_image, v_texCoord);
-        vec3 keyYUV = rgb2yuv(u_keyColor);
+        
+        // 1. Directly sample 4 top corners of the video texture in GPU:
+        // This is 100% immune to CORS, cross-origin canvas tainting, or timing race conditions!
+        vec3 autoCorner = (
+          texture2D(u_image, vec2(0.01, 0.01)).rgb +
+          texture2D(u_image, vec2(0.99, 0.01)).rgb +
+          texture2D(u_image, vec2(0.02, 0.02)).rgb +
+          texture2D(u_image, vec2(0.98, 0.02)).rgb
+        ) * 0.25;
+
+        // Choose the active key color:
+        // If manual keyColorHex was provided and non-zero, use it; otherwise use GPU auto-corner
+        vec3 activeKey = autoCorner;
+        if (length(u_keyColor) > 0.05) {
+          activeKey = u_keyColor;
+        }
+
+        vec3 keyYUV = rgb2yuv(activeKey);
         vec3 colorYUV = rgb2yuv(color.rgb);
         
-        // 1. Dual Chroma (U, V) and Luminance (Y) keying:
-        // UV distance measures hue match; Luminance distance protects lighter/darker details (wrist cuffs, collar, necklace)
-        float uvDist = distance(colorYUV.yz, keyYUV.yz);
-        float lumaDist = abs(colorYUV.x - keyYUV.x);
-        float dist = sqrt(uvDist * uvDist + 0.15 * lumaDist * lumaDist);
+        // 2. Pure Chroma UV distance (measures true color separation):
+        float dist = distance(colorYUV.yz, keyYUV.yz);
 
-        // 2. Smooth feathered alpha transition (zero black rim)
+        // 3. Crisp keying:
+        // Background has UV distance <= 0.022 -> strictly alpha = 0.0 (100% transparent, ZERO HAZE)
         float alpha = smoothstep(u_similarity, u_similarity + u_smoothness, dist);
 
-        // 3. Adaptive Despill (handles both Green and Blue screens automatically):
-        // Completely suppresses color bounce on hair and edges without changing clothing colors
-        bool isGreen = (u_keyColor.g > u_keyColor.r && u_keyColor.g > u_keyColor.b);
+        // 4. Adaptive Despill (handles both Green and Blue screens automatically):
+        bool isGreen = (activeKey.g > activeKey.r && activeKey.g > activeKey.b);
         if (isGreen) {
           float maxRB = max(color.r, color.b);
           if (color.g > maxRB) {
@@ -179,8 +193,8 @@ export default function ChromaKeyVideo({
     const similarityLoc = gl.getUniformLocation(program, 'u_similarity')
     const smoothnessLoc = gl.getUniformLocation(program, 'u_smoothness')
 
-    // Initial default chroma key: Blue #166CA6 (22, 108, 166)
-    let currentKeyColor = [22 / 255, 108 / 255, 166 / 255]
+    // Initial chroma key: [0, 0, 0] signals the GPU shader to sample the true video background corner dynamically
+    let currentKeyColor = [0, 0, 0]
     if (keyColorHex && keyColorHex.startsWith('#') && keyColorHex.length === 7) {
       const r = parseInt(keyColorHex.slice(1, 3), 16) / 255
       const g = parseInt(keyColorHex.slice(3, 5), 16) / 255
@@ -188,35 +202,10 @@ export default function ChromaKeyVideo({
       currentKeyColor = [r, g, b]
     }
 
-    let hasSampledCorner = false
-
-    const sampleCorner = () => {
-      if (hasSampledCorner || !video || video.readyState < 2) return
-      try {
-        const scratch = document.createElement('canvas')
-        scratch.width = 10
-        scratch.height = 10
-        const sctx = scratch.getContext('2d')
-        // Sample true top-left corner (4, 4) of original video to capture 100% clean background
-        sctx.drawImage(video, 4, 4, 10, 10, 0, 0, 10, 10)
-        const pixel = sctx.getImageData(5, 5, 1, 1).data
-        if (pixel[3] > 100 && (pixel[0] + pixel[1] + pixel[2] > 30)) {
-          currentKeyColor = [pixel[0] / 255, pixel[1] / 255, pixel[2] / 255]
-          hasSampledCorner = true
-        }
-      } catch (e) {
-        hasSampledCorner = true
-      }
-    }
-
     const render = () => {
       if (isCancelled) return
 
       if (video && !video.paused && !video.ended && video.readyState >= 2) {
-        if (!hasSampledCorner) {
-          sampleCorner()
-        }
-
         const targetW = video.videoWidth || 720
         const targetH = video.videoHeight || 1280
         if (canvas.width !== targetW || canvas.height !== targetH) {
