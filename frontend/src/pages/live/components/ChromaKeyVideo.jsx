@@ -12,8 +12,8 @@ export default function ChromaKeyVideo({
   onLoaded,
   style = {},
   keyColorHex, // e.g. '#166CA6'
-  similarity = 0.032,
-  smoothness = 0.014,
+  similarity = 0.044,
+  smoothness = 0.012,
 }) {
   const videoRef = useRef(null)
   const canvasRef = useRef(null)
@@ -101,22 +101,32 @@ export default function ChromaKeyVideo({
         // Background has UV distance <= 0.022 -> strictly alpha = 0.0 (100% transparent, ZERO HAZE)
         float alpha = smoothstep(u_similarity, u_similarity + u_smoothness, dist);
 
-        // 4. Edge-Aware Adaptive Despill (handles both Green and Blue screens dynamically):
-        // Only despill semi-transparent edge pixels (alpha < 0.95) to eliminate halos on hair,
-        // while 100% protecting solid clothing, collar, and necklace colors inside the body!
-        float edgeFactor = 1.0 - smoothstep(0.6, 1.0, alpha);
-        bool isGreen = (activeKey.g > activeKey.r && activeKey.g > activeKey.b);
-        if (isGreen) {
-          float maxRB = max(color.r, color.b);
-          if (color.g > maxRB) {
-            float targetG = min(color.g, maxRB * 1.02);
-            color.g = mix(color.g, targetG, edgeFactor);
-          }
+        // 4. Targeted Hair & Torso Despill:
+        // On head & hair (v_texCoord.y < 0.48):
+        // Natural human hair (melanin) has Red as dominant or balanced channel.
+        // Background spill (cyan/blue/green) causes G or B to spike above R.
+        // Clamping both G and B to R * 1.05 completely eradicates all cyan, blue, or green halos on hair!
+        if (v_texCoord.y < 0.48) {
+          float maxColor = color.r * 1.05;
+          color.g = min(color.g, maxColor);
+          color.b = min(color.b, maxColor);
         } else {
-          float maxRG = max(color.r, color.g);
-          if (color.b > maxRG) {
-            float targetB = min(color.b, maxRG * 1.02);
-            color.b = mix(color.b, targetB, edgeFactor);
+          // On torso & clothing (v_texCoord.y >= 0.48):
+          // Edge-aware despill to protect solid colored clothing (blue jacket or green collar)
+          float edgeFactor = 1.0 - smoothstep(0.6, 0.95, alpha);
+          bool isGreen = (activeKey.g > activeKey.r && activeKey.g > activeKey.b);
+          if (isGreen) {
+            float maxRB = max(color.r, color.b);
+            if (color.g > maxRB) {
+              float targetG = (color.r + color.b) * 0.5;
+              color.g = mix(color.g, targetG, edgeFactor);
+            }
+          } else {
+            float maxRG = max(color.r, color.g);
+            if (color.b > maxRG) {
+              float targetB = maxRG * 1.02;
+              color.b = mix(color.b, targetB, edgeFactor);
+            }
           }
         }
 
