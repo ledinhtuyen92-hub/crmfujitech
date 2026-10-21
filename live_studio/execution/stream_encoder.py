@@ -230,12 +230,14 @@ class StreamEncoder:
                     r, g, b = res.stdout[0], res.stdout[1], res.stdout[2]
                     detected_hex = f"0x{r:02X}{g:02X}{b:02X}"
                     logger.info(f"[StreamEncoder] Sampled avatar corner pixel RGB=({r}, {g}, {b}) -> {detected_hex}")
-                    return (detected_hex, "0.11", "0.03")
+                    # similarity 0.046 cleanly keys digital solid green/blue backdrop (variance ~0.033)
+                    # while completely protecting model clothes/letters with blue tones (dist >= 0.077) from being erased
+                    return (detected_hex, "0.046", "0.018")
             except Exception as e:
                 logger.warning(f"[StreamEncoder] Could not auto-detect chroma color: {e}")
 
         # Default fallback to clean green screen
-        return ("0x2BB754", "0.11", "0.03")
+        return ("0x2BB754", "0.046", "0.018")
 
     async def start(self):
         await self.video_transport.start()

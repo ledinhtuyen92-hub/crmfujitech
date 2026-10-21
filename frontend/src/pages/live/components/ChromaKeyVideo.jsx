@@ -12,8 +12,8 @@ export default function ChromaKeyVideo({
   onLoaded,
   style = {},
   keyColorHex, // e.g. '#166CA6'
-  similarity = 0.12,
-  smoothness = 0.05,
+  similarity = 0.046,
+  smoothness = 0.018,
 }) {
   const videoRef = useRef(null)
   const canvasRef = useRef(null)
