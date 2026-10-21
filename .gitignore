@@ -57,4 +57,5 @@ test_seg_frame.png
 session_credentials*.txt
 ascii.py
 live_studio/bin/ffmpeg/
+live_studio/bin/mediamtx/*.exe
 live_studio/bin/mediamtx/mediamtx.exe

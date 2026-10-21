@@ -241,7 +241,7 @@ class StreamController:
             from live_studio.execution.mediamtx_manager import MEDIAMTX_LOCAL_RTMP_URL
             output_url = MEDIAMTX_LOCAL_RTMP_URL
         except ImportError:
-            output_url = self._current_target.get_full_url() if self._current_target else "rtmp://127.0.0.1:1935/live"
+            output_url = self._current_target.get_full_url() if self._current_target else "rtmp://127.0.0.1:19350/live"
         
         self.encoder = StreamEncoder(config, ffmpeg_path, output_url, self.cached_assets)
         try:
