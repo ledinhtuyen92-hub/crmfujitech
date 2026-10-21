@@ -5,7 +5,11 @@ import time
 logger = logging.getLogger(__name__)
 
 class BaseAudioPlayer:
-    async def play(self, filepath: str) -> bool:
+    @property
+    def is_playing(self) -> bool:
+        return False
+
+    async def play(self, filepath: str, pcm_data: bytes = None) -> bool:
         """
         Plays the audio file. Returns True if completed normally, False if failed/interrupted.
         """
@@ -38,7 +42,11 @@ class DummyAudioPlayer(BaseAudioPlayer):
         self._start_time = 0.0
         self._last_position_ms = 0
 
-    async def play(self, filepath: str) -> bool:
+    @property
+    def is_playing(self) -> bool:
+        return self._is_playing
+
+    async def play(self, filepath: str, pcm_data: bytes = None) -> bool:
         self._is_playing = True
         self._stop_event.clear()
         self._start_time = time.monotonic()
@@ -93,7 +101,11 @@ class PygameAudioPlayer(BaseAudioPlayer):
         self._start_time = 0.0
         self._last_position_ms = 0
 
-    async def play(self, filepath: str) -> bool:
+    @property
+    def is_playing(self) -> bool:
+        return self._is_playing
+
+    async def play(self, filepath: str, pcm_data: bytes = None) -> bool:
         if not self._available:
             logger.error("Cannot play audio: pygame not installed")
             return False
@@ -103,21 +115,36 @@ class PygameAudioPlayer(BaseAudioPlayer):
             # When broadcasting live, stream directly to stream_sink via PCM.
             # PC speakers remain completely silent so unbuffered audio never leaks out!
             if self.stream_sink and self.stream_sink.is_streaming:
-                pcm_data = b""
-                try:
-                    from live_studio.execution.media_pipeline import Mp3Decoder
-                    pcm_data = await asyncio.to_thread(Mp3Decoder.decode_to_pcm, filepath)
-                    self.stream_sink.set_speaking(True)
-                except Exception as e:
-                    logger.error(f"Stream sink preparation failed: {e}")
+                if pcm_data is None:
+                    try:
+                        from live_studio.execution.media_pipeline import Mp3Decoder
+                        pcm_data = await asyncio.to_thread(Mp3Decoder.decode_to_pcm, filepath)
+                    except Exception as e:
+                        logger.error(f"Stream sink preparation failed: {e}")
+                        pcm_data = b""
 
                 bytes_per_sec = getattr(self.stream_sink, 'bytes_per_sec', 176400)
                 duration_ms = (len(pcm_data) / bytes_per_sec * 1000.0) if pcm_data else 0.0
 
+                # Atomic start: notify stream_sink and mark playing in the exact same tick
+                self.stream_sink.set_speaking(True)
                 self._is_playing = True
                 self._start_time = time.monotonic()
                 self._last_position_ms = 0
                 pcm_offset = 0
+
+                # Immediately write initial 20ms burst so audio transport starts without waiting 10ms for first sleep
+                INITIAL_BURST_MS = 20
+                if pcm_data:
+                    init_bytes = int((INITIAL_BURST_MS / 1000.0) * bytes_per_sec)
+                    init_bytes -= init_bytes % 4
+                    init_bytes = min(init_bytes, len(pcm_data))
+                    if init_bytes > 0:
+                        try:
+                            self.stream_sink.write_pcm(pcm_data[0:init_bytes])
+                        except Exception as e:
+                            logger.error(f"Stream sink initial burst failed: {e}")
+                        pcm_offset = init_bytes
 
                 while self._is_playing:
                     elapsed_ms = (time.monotonic() - self._start_time) * 1000.0
@@ -131,7 +158,10 @@ class PygameAudioPlayer(BaseAudioPlayer):
                         target_offset -= target_offset % 4
                         if target_offset > pcm_offset:
                             chunk = pcm_data[pcm_offset:target_offset]
-                            self.stream_sink.write_pcm(chunk)
+                            try:
+                                self.stream_sink.write_pcm(chunk)
+                            except Exception as e:
+                                logger.error(f"Stream sink write failed: {e}")
                             pcm_offset = target_offset
 
                     await asyncio.sleep(0.01)

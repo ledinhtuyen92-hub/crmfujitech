@@ -203,7 +203,8 @@ class LiveStudioApp:
             try:
                 # Update avatar state based on current audio clock
                 pos = self.audio_player.get_position_ms()
-                self.avatar_engine.update(pos)
+                is_playing = getattr(self.audio_player, 'is_playing', False)
+                self.avatar_engine.update(pos, is_audio_playing=is_playing)
                 
                 # Phase 1E-2: Extract frame directly after rendering
                 if self.frame_source:
@@ -273,7 +274,11 @@ class LiveStudioApp:
                 
                 logger.info(f"Starting playback for {cmd_id}")
                 
-                # Start Avatar Speech & Trigger Associated Action Gesture
+                # 1. Pre-decode PCM audio ONCE in background worker thread BEFORE speech activation
+                from live_studio.execution.media_pipeline import Mp3Decoder
+                pcm_data = await asyncio.to_thread(Mp3Decoder.decode_to_pcm, audio_path)
+
+                # 2. Start Avatar Speech & Trigger Associated Action Gesture
                 if self.avatar_engine:
                     text = getattr(item.payload, 'text', "")
                     action_to_trigger = getattr(item.payload, 'action', None)
@@ -290,9 +295,9 @@ class LiveStudioApp:
                         logger.info(f"Triggering action gesture '{action_to_trigger}' for speech {cmd_id}")
                         self.avatar_engine.trigger_action(action_to_trigger)
                         
-                    self.avatar_engine.start_speech(audio_path, text)
+                    self.avatar_engine.start_speech(audio_path, text, pcm_data=pcm_data)
                     
-                completed = await self.audio_player.play(audio_path)
+                completed = await self.audio_player.play(audio_path, pcm_data=pcm_data)
                 
                 # Finish Avatar Speech
                 if self.avatar_engine:

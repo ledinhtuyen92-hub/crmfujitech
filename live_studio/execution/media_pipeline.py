@@ -126,9 +126,9 @@ class AudioStreamSink:
         all at once on connect — causing a timestamp burst that MediaMTX stutters on.
         """
         MAX_SILENCE_MS = 200  # Never inject more than 200ms silence per 100ms tick
-        # Wait for write_callback (FFmpeg TCP) to be ready, up to 3s
+        # Wait for write_callback (FFmpeg TCP) to be ready if configured to wait, up to 3s
         wait_elapsed = 0.0
-        while self.is_streaming and not self.write_callback and wait_elapsed < 3.0:
+        while self.is_streaming and getattr(self, '_waiting_for_encoder', False) and not self.write_callback and wait_elapsed < 3.0:
             await asyncio.sleep(0.05)
             wait_elapsed += 0.05
         # Sync start time to NOW (after connection) to avoid injecting backlogged silence
@@ -183,9 +183,19 @@ class Mp3Decoder:
     """
     Decodes MP3 to s16le, 44100Hz, 2 channel PCM using FFmpeg subprocess.
     Designed to fail gracefully if FFmpeg is not installed (Phase 1E-1).
+    Caches decoded PCM in memory by file path to eliminate redundant decodes.
     """
-    @staticmethod
-    def decode_to_pcm(filepath: str) -> bytes:
+    _cache = {}
+    _max_cache_size = 30
+
+    @classmethod
+    def decode_to_pcm(cls, filepath: str) -> bytes:
+        if not filepath:
+            return b""
+        if filepath in cls._cache:
+            logger.debug(f"[Mp3Decoder] Cache hit for {filepath}")
+            return cls._cache[filepath]
+
         ffmpeg_bin = get_ffmpeg_binary()
         flags = 0x08000000 if sys.platform == 'win32' else 0
         startupinfo = None
@@ -199,10 +209,22 @@ class Mp3Decoder:
                 '-f', 's16le', '-acodec', 'pcm_s16le',
                 '-ar', '44100', '-ac', '2', '-'
             ], stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=True, creationflags=flags, startupinfo=startupinfo)
-            return result.stdout
+            pcm = result.stdout
+            if pcm:
+                if len(cls._cache) >= cls._max_cache_size:
+                    cls._cache.pop(next(iter(cls._cache)))
+                cls._cache[filepath] = pcm
+            return pcm
         except FileNotFoundError:
             logger.warning("FFmpeg not found. Cannot decode MP3 to PCM. Stream sink will receive empty chunks.")
             return b""
         except subprocess.CalledProcessError as e:
             logger.error(f"FFmpeg decode failed: {e.stderr.decode('utf-8', errors='ignore')}")
             return b""
+
+    @classmethod
+    def clear_cache(cls, filepath: str = None):
+        if filepath:
+            cls._cache.pop(filepath, None)
+        else:
+            cls._cache.clear()

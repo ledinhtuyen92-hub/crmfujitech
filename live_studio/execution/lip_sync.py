@@ -25,11 +25,18 @@ class LipSyncAnalyzer:
         self._last_state_idx = 0
         self._state_map = [MOUTH_STATE_CLOSED, MOUTH_STATE_SMALL, MOUTH_STATE_MEDIUM, MOUTH_STATE_OPEN]
 
-    def prepare(self, audio_filepath: str, text: str):
+    def prepare(self, audio_filepath: str, text: str, pcm_data: bytes = None):
         """
-        Prepares analysis for a given audio file by decoding it to raw PCM.
+        Prepares analysis for a given audio file by decoding it to raw PCM or using pre-decoded PCM.
         """
         self._is_speaking = True
+        self._last_state_idx = 0
+        self._current_energy = 0.0
+        if pcm_data is not None:
+            self._pcm_data = pcm_data
+            logger.info(f"LipSyncAnalyzer prepared with pre-decoded PCM ({len(self._pcm_data)} bytes) for: {audio_filepath}")
+            return
+
         try:
             self._pcm_data = Mp3Decoder.decode_to_pcm(audio_filepath)
             logger.info(f"LipSyncAnalyzer prepared, decoded {len(self._pcm_data)} bytes of PCM for: {audio_filepath}")
@@ -39,6 +46,8 @@ class LipSyncAnalyzer:
 
     def stop(self):
         self._is_speaking = False
+        self._last_state_idx = 0
+        self._current_energy = 0.0
 
     def get_mouth_state(self, position_ms: int) -> str:
         """

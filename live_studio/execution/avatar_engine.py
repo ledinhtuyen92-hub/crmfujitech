@@ -25,13 +25,13 @@ class BaseAvatarEngine:
         """
         return False
 
-    def start_speech(self, audio_filepath: str, text: str):
+    def start_speech(self, audio_filepath: str, text: str, pcm_data: bytes = None):
         """
         Prepares the avatar for speech playback.
         """
         raise NotImplementedError
 
-    def update(self, position_ms: int):
+    def update(self, position_ms: int, is_audio_playing: bool = True):
         """
         Updates the avatar state based on the audio playback clock.
         """
@@ -79,12 +79,12 @@ class DummyAvatarEngine(BaseAvatarEngine):
         self.events.append(("trigger_action", action_id))
         return True
 
-    def start_speech(self, audio_filepath: str, text: str):
+    def start_speech(self, audio_filepath: str, text: str, pcm_data: bytes = None):
         self.is_speaking = True
         self.events.append(("start_speech", {"filepath": audio_filepath, "text": text}))
         logger.info(f"[DummyAvatar] Start speech: {audio_filepath}")
 
-    def update(self, position_ms: int):
+    def update(self, position_ms: int, is_audio_playing: bool = True):
         if self.is_speaking:
             self.events.append(("update", position_ms))
 
@@ -132,16 +132,16 @@ class Local2DAvatarEngine(BaseAvatarEngine):
             return self.renderer.play_action(action_id)
         return False
 
-    def start_speech(self, audio_filepath: str, text: str):
+    def start_speech(self, audio_filepath: str, text: str, pcm_data: bytes = None):
         self.is_speaking = True
         if hasattr(self.renderer, 'notify_speech_start'):
             self.renderer.notify_speech_start()
-        self.lip_sync.prepare(audio_filepath, text)
-        # Force a render update immediately
-        self.update(0)
+        self.lip_sync.prepare(audio_filepath, text, pcm_data=pcm_data)
+        # Keep mouth closed until audio actually starts streaming
+        self.update(0, is_audio_playing=False)
         logger.info(f"[Local2DAvatarEngine] Start speech: {audio_filepath}")
 
-    def update(self, position_ms: int):
+    def update(self, position_ms: int, is_audio_playing: bool = True):
         import time
         now = time.time()
         
@@ -157,11 +157,15 @@ class Local2DAvatarEngine(BaseAvatarEngine):
         mouth_state = "CLOSED"
         audio_energy = 0.0
         if self.is_speaking:
-            mouth_state = self.lip_sync.get_mouth_state(position_ms)
-            if hasattr(self.lip_sync, 'get_audio_energy'):
-                audio_energy = self.lip_sync.get_audio_energy(position_ms)
+            if is_audio_playing:
+                mouth_state = self.lip_sync.get_mouth_state(position_ms)
+                if hasattr(self.lip_sync, 'get_audio_energy'):
+                    audio_energy = self.lip_sync.get_audio_energy(position_ms)
+                else:
+                    audio_energy = 0.0 if mouth_state == "CLOSED" else 1.0
             else:
-                audio_energy = 0.0 if mouth_state == "CLOSED" else 1.0
+                mouth_state = "CLOSED"
+                audio_energy = 0.0
             
         self.renderer.render(
             is_speaking=self.is_speaking,

@@ -137,3 +137,44 @@ class TestAvatarEngine(unittest.TestCase):
             mock_time.return_value = 3.3
             engine.update(0)
             self.assertFalse(renderer.last_state["blinking"])
+
+    def test_audio_video_synchronization_lock(self):
+        """
+        Verifies that before audio actually starts playing (is_audio_playing=False),
+        the avatar mouth is locked strictly CLOSED with 0.0 audio energy,
+        even if start_speech has been called with high amplitude PCM.
+        """
+        import struct
+        from live_studio.execution.avatar_engine import Local2DAvatarEngine
+        from live_studio.execution.lip_sync import LipSyncAnalyzer
+        from live_studio.execution.avatar_renderer import DummyAvatarRenderer
+
+        renderer = DummyAvatarRenderer()
+        lip_sync = LipSyncAnalyzer()
+        engine = Local2DAvatarEngine(renderer, lip_sync)
+        engine.initialize()
+
+        # Generate 1 second of loud audio (amplitude 30,000)
+        loud_samples = [30000] * (44100 * 2)
+        loud_pcm = struct.pack(f"<{len(loud_samples)}h", *loud_samples)
+
+        # 1. Start speech with loud PCM
+        engine.start_speech("dummy.wav", "Hello", pcm_data=loud_pcm)
+        self.assertTrue(engine.is_speaking)
+        # On start_speech, mouth MUST be held strictly CLOSED
+        self.assertEqual(renderer.last_state["mouth"], "CLOSED")
+        self.assertEqual(renderer.last_state["audio_energy"], 0.0)
+
+        # 2. While audio is decoding / preparing (is_audio_playing=False),
+        # render updates at pos=0 MUST keep mouth CLOSED
+        engine.update(0, is_audio_playing=False)
+        self.assertEqual(renderer.last_state["mouth"], "CLOSED")
+        self.assertEqual(renderer.last_state["audio_energy"], 0.0)
+
+        # 3. Once audio actually begins playing (is_audio_playing=True),
+        # mouth immediately opens according to audio amplitude
+        engine.update(0, is_audio_playing=True)
+        self.assertIn(renderer.last_state["mouth"], ["SMALL", "MEDIUM", "OPEN"])
+        self.assertGreater(renderer.last_state["audio_energy"], 0.5)
+
+        engine.shutdown()
