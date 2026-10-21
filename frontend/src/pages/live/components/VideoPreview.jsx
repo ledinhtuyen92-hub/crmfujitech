@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
-import { Card, Typography, Button } from 'antd'
+import { Card, Typography, Button, Tooltip } from 'antd'
 import {
   VideoCameraOutlined,
   LoadingOutlined,
@@ -828,73 +828,108 @@ export default function VideoPreview({
         overflow: 'hidden',
         backgroundColor: '#000',
       }}>
-        {/* ── Floating Top Status Bar & HUD Toggle Button ── */}
-        <div style={{
-          position: 'absolute',
-          top: 14,
-          left: 14,
-          right: 14,
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          gap: 8,
-          zIndex: 25,
-          pointerEvents: 'none',
-        }}>
-          {/* Left: LIVE / PREVIEW WebRTC indicator (only shown if showHud) */}
-          {showHud ? (
+        {/* ── Dedicated HUD Toggle Button (Fixed to top-right corner, always visible, never pushed off-screen) ── */}
+        <Tooltip title={showHud ? "Bấm để ẩn thông số trên màn hình" : "Bấm để hiện lại thông số"}>
+          <Button
+            size="small"
+            shape="round"
+            icon={showHud ? <EyeInvisibleOutlined /> : <EyeOutlined />}
+            onClick={() => setShowHud(!showHud)}
+            style={{
+              position: 'absolute',
+              top: 10,
+              right: 10,
+              zIndex: 35,
+              backgroundColor: showHud ? 'rgba(0, 0, 0, 0.78)' : 'rgba(18, 22, 31, 0.92)',
+              color: showHud ? '#d9d9d9' : '#52c41a',
+              border: showHud ? '1px solid rgba(255, 255, 255, 0.25)' : '1px solid rgba(82, 196, 26, 0.75)',
+              backdropFilter: 'blur(10px)',
+              boxShadow: '0 4px 14px rgba(0, 0, 0, 0.55)',
+              fontSize: 11,
+              fontWeight: 600,
+              display: 'flex',
+              alignItems: 'center',
+              gap: 4,
+              height: 28,
+              padding: '0 9px',
+              cursor: 'pointer',
+            }}
+          >
+            {showHud ? 'Ẩn' : 'Hiện thông tin'}
+          </Button>
+        </Tooltip>
+
+        {/* ── Floating Top Status Bar (Only shown when showHud is true, stays clear of toggle button) ── */}
+        {showHud && (
+          <div style={{
+            position: 'absolute',
+            top: 10,
+            left: 10,
+            right: 74,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            gap: 6,
+            zIndex: 25,
+            pointerEvents: 'none',
+          }}>
+            {/* Left: LIVE / PREVIEW WebRTC indicator */}
             <div style={{
               display: 'flex',
               alignItems: 'center',
-              gap: 6,
-              backgroundColor: 'rgba(0, 0, 0, 0.85)',
-              padding: '6px 14px',
-              borderRadius: 16,
+              gap: 5,
+              backgroundColor: 'rgba(0, 0, 0, 0.82)',
+              padding: '4px 10px',
+              borderRadius: 14,
               backdropFilter: 'blur(8px)',
               border: hasFirstFrameRendered
                 ? '1px solid rgba(82, 196, 26, 0.5)'
                 : '1px solid rgba(24, 144, 255, 0.35)',
-              boxShadow: '0 4px 14px rgba(0, 0, 0, 0.6)',
+              boxShadow: '0 4px 12px rgba(0, 0, 0, 0.5)',
               pointerEvents: 'auto',
               flexShrink: 0,
             }}>
               <span style={{
-                width: 8,
-                height: 8,
+                width: 7,
+                height: 7,
                 borderRadius: '50%',
                 backgroundColor: hasFirstFrameRendered ? '#52c41a' : '#1890ff',
-                boxShadow: hasFirstFrameRendered ? '0 0 10px #52c41a' : '0 0 8px #1890ff',
+                boxShadow: hasFirstFrameRendered ? '0 0 8px #52c41a' : '0 0 6px #1890ff',
                 display: 'inline-block',
               }} />
-              <span style={{ color: '#fff', fontSize: 11, fontWeight: 700, letterSpacing: 1 }}>
+              <span style={{ color: '#fff', fontSize: 11, fontWeight: 700, letterSpacing: 0.5 }}>
                 {hasFirstFrameRendered ? 'LIVE' : 'PREVIEW'}
               </span>
-              <span style={{ color: hasFirstFrameRendered ? '#52c41a' : '#40a9ff', fontSize: 11, fontWeight: 600 }}>
-                {hasFirstFrameRendered ? '⚡ WebRTC (~0s)' : '⚡ WebRTC Sẵn sàng'}
+              <span style={{ color: hasFirstFrameRendered ? '#52c41a' : '#40a9ff', fontSize: 10.5, fontWeight: 600 }}>
+                {hasFirstFrameRendered ? '⚡ WebRTC' : '⚡ WebRTC'}
               </span>
             </div>
-          ) : <div />}
 
-          {/* Right: Hardware Telemetry badge + HUD Toggle button */}
-          <div style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: 8,
-            pointerEvents: 'auto',
-          }}>
-            {showHud && (
+            {/* Right: Hardware Telemetry badge (GPU, CPU, Encoder) */}
+            <Tooltip
+              title={
+                <div style={{ fontSize: 12, lineHeight: 1.5 }}>
+                  <div><b>Mã hóa:</b> {deviceTelemetry?.encoder_label || (deviceTelemetry?.encoder === 'h264_nvenc' ? 'NVIDIA NVENC (GPU)' : (deviceTelemetry?.encoder || 'GPU'))}</div>
+                  {deviceTelemetry?.gpu_model && <div><b>Card đồ họa:</b> {deviceTelemetry.gpu_model}</div>}
+                  {deviceTelemetry?.cpu_model && <div><b>CPU:</b> {deviceTelemetry.cpu_model}</div>}
+                  <div><b>Sử dụng CPU:</b> {deviceTelemetry?.cpu_percent ?? 24}%</div>
+                </div>
+              }
+            >
               <div style={{
                 display: 'flex',
                 alignItems: 'center',
-                gap: 6,
-                backgroundColor: 'rgba(0, 0, 0, 0.85)',
-                padding: '6px 12px',
-                borderRadius: 16,
+                gap: 5,
+                backgroundColor: 'rgba(0, 0, 0, 0.82)',
+                padding: '4px 9px',
+                borderRadius: 14,
                 backdropFilter: 'blur(8px)',
                 border: '1px solid rgba(255, 255, 255, 0.15)',
-                boxShadow: '0 4px 14px rgba(0, 0, 0, 0.6)',
-                fontSize: 11,
-                minWidth: 0,
+                boxShadow: '0 4px 12px rgba(0, 0, 0, 0.5)',
+                fontSize: 10.5,
+                pointerEvents: 'auto',
+                flexShrink: 0,
+                cursor: 'help',
               }}>
                 <span style={{ color: '#52c41a', fontWeight: 600, whiteSpace: 'nowrap' }}>
                   ● {deviceTelemetry?.encoder === 'h264_nvenc' ? 'NVENC' : (deviceTelemetry?.encoder || 'GPU')}
@@ -907,46 +942,19 @@ export default function VideoPreview({
                     style={{
                       color: '#40a9ff',
                       fontWeight: 500,
-                      maxWidth: 125,
+                      maxWidth: 90,
                       overflow: 'hidden',
                       textOverflow: 'ellipsis',
                       whiteSpace: 'nowrap',
                     }}
-                    title={deviceTelemetry.gpu_model}
                   >
                     | {deviceTelemetry.gpu_model.split('/')[0].replace(/NVIDIA\s+GeForce\s+/i, '').trim()}
                   </span>
                 )}
               </div>
-            )}
-
-            {/* Toggle Button to Hide / Show On-Screen Information */}
-            <Button
-              size="small"
-              icon={showHud ? <EyeInvisibleOutlined /> : <EyeOutlined />}
-              onClick={() => setShowHud(!showHud)}
-              title={showHud ? "Bấm để ẩn các thông tin trên màn hình live" : "Bấm để hiện lại các thông tin trên màn hình live"}
-              style={{
-                backgroundColor: 'rgba(0, 0, 0, 0.85)',
-                color: showHud ? '#bfbfbf' : '#52c41a',
-                border: showHud ? '1px solid rgba(255, 255, 255, 0.22)' : '1px solid rgba(82, 196, 26, 0.7)',
-                borderRadius: 16,
-                backdropFilter: 'blur(8px)',
-                boxShadow: '0 4px 14px rgba(0, 0, 0, 0.6)',
-                fontSize: 11,
-                fontWeight: 600,
-                display: 'flex',
-                alignItems: 'center',
-                gap: 5,
-                height: 28,
-                padding: '0 10px',
-                cursor: 'pointer',
-              }}
-            >
-              {showHud ? 'Ẩn thông tin' : 'Hiện thông tin'}
-            </Button>
+            </Tooltip>
           </div>
-        </div>
+        )}
 
         {/* ── 9:16 Inner Frame Container (Tỉ lệ chuẩn 9:16, vừa vặn không biến dạng) ── */}
         <div style={{
