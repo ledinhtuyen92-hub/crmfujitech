@@ -146,9 +146,9 @@ class LocalTcpTransport:
                 # Timeout drain: if FFmpeg reads too slowly (CPU spike, encoding pressure),
                 # drain() would block indefinitely, stalling the entire audio_worker task.
                 # Dropping one chunk is much better than freezing all audio for seconds.
-                await asyncio.wait_for(self.client_writer.drain(), timeout=0.5)
+                await asyncio.wait_for(self.client_writer.drain(), timeout=0.15)
             except asyncio.TimeoutError:
-                logger.warning(f"[LocalTcpTransport:{self.port}] drain() timed out (500ms). Dropping chunk to prevent audio stall.")
+                pass
             except (ConnectionResetError, BrokenPipeError, ConnectionAbortedError, OSError, asyncio.CancelledError):
                 pass
         
@@ -199,11 +199,12 @@ class StreamEncoder:
         self.is_running = False
         self._intentional_stop = False
         
-    def _detect_chroma_params(self) -> Tuple[str, str, str]:
+    def _detect_chroma_params(self) -> Tuple[str, str, str, str]:
         """
         Auto-detects the exact chroma key color from the avatar video by sampling corner pixels.
-        Returns: (color_hex, similarity, blend)
-        Preserves 100% natural colors of the model and removes despill to prevent bright spots/blotchiness.
+        Returns: (color_hex, similarity, blend, screen_type)
+        Preserves 100% natural colors of the model matching preview settings (0.044, 0.012)
+        without destructive despill filters.
         """
         avatar_path = self.cached_assets.get('avatar') or self.cached_assets.get('avatar_speaking')
         if avatar_path and os.path.exists(avatar_path) and self.ffmpeg_path:
@@ -237,8 +238,8 @@ class StreamEncoder:
             except Exception as e:
                 logger.warning(f"[StreamEncoder] Could not auto-detect chroma color: {e}")
 
-        # Default fallback to clean green screen
-        return ("0x2BB754", "0.044", "0.012", "green")
+        # Default fallback to clean blue screen (0x166CA6) or green matching preview
+        return ("0x166CA6", "0.044", "0.012", "blue")
 
     async def start(self):
         await self.video_transport.start()
@@ -254,6 +255,8 @@ class StreamEncoder:
         inputs = []
         # Input 0: Video (Streamed from Avatar Engine via Clock-driven TCP transport)
         inputs.extend([
+            "-probesize", "32",
+            "-analyzeduration", "0",
             "-f", "rawvideo",
             "-pixel_format", self.config.video_pixel_format,
             "-video_size", f"{self.config.width}x{self.config.height}",
@@ -263,6 +266,8 @@ class StreamEncoder:
             
         # Input 1: Audio (TCP)
         inputs.extend([
+            "-probesize", "32",
+            "-analyzeduration", "0",
             "-f", self.config.audio_format,
             "-ar", str(self.config.audio_sample_rate),
             "-ac", str(self.config.audio_channels),
@@ -280,22 +285,23 @@ class StreamEncoder:
             if bg.endswith(('.mp4', '.webm')):
                 inputs.extend(["-stream_loop", "-1", "-i", bg])
             else:
-                inputs.extend(["-loop", "1", "-i", bg])
+                inputs.extend(["-framerate", str(self.config.fps), "-loop", "1", "-i", bg])
                 
-            # Calibrated chroma key + despill spill suppression for clean hair & borders
+            # Calibrated chroma key matching preview parameters exactly (similarity 0.044, blend 0.012)
+            # Preserves 100% natural model colors & clean backdrop with zero despill noise
             ck_col, ck_sim, ck_blend, screen_type = self._detect_chroma_params()
             filter_complex.append(
-                f"[0:v]chromakey={ck_col}:{ck_sim}:{ck_blend},despill=type={screen_type}:mix=0.5,scale=-1:{self.config.height}:eval=init[ckout];"
+                f"[0:v]chromakey={ck_col}:{ck_sim}:{ck_blend}[ckout];"
                 f"[{input_idx}:v]scale={self.config.width}:{self.config.height}:eval=init[bg];"
-                f"[bg][ckout]overlay=(W-w)/2:(H-h)/2[v1]"
+                f"[bg][ckout]overlay=0:0[v1]"
             )
             video_out = "[v1]"
             input_idx += 1
             
         # Overlay
         if self.cached_assets.get('overlay'):
-            inputs.extend(["-loop", "1", "-i", self.cached_assets['overlay']])
-            filter_complex.append(f"[{input_idx}:v]scale={self.config.width}:{self.config.height}:eval=init[ovl];{video_out}[ovl]overlay=0:0[v2]")
+            inputs.extend(["-framerate", str(self.config.fps), "-loop", "1", "-i", self.cached_assets['overlay']])
+            filter_complex.append(f"[{input_idx}:v]scale={self.config.width}:{self.config.height}:eval=init,fps=fps={self.config.fps}:round=near[ovl];{video_out}[ovl]overlay=0:0,fps=fps={self.config.fps}:round=near[v2]")
             video_out = "[v2]"
             input_idx += 1
             
@@ -303,7 +309,7 @@ class StreamEncoder:
         bgm_vol = getattr(self.config, 'bgm_volume', 0.35)
         if self.cached_assets.get('audio') and bgm_vol > 0.001:
             inputs.extend(["-stream_loop", "-1", "-i", self.cached_assets['audio']])
-            filter_complex.append(f"[{input_idx}:a]volume={bgm_vol:.2f}[bgm];{audio_out}[bgm]amix=inputs=2:duration=first:dropout_transition=0[a1]")
+            filter_complex.append(f"[{input_idx}:a]aresample={self.config.audio_sample_rate},volume={bgm_vol:.2f}[bgm];{audio_out}[bgm]amix=inputs=2:duration=first:dropout_transition=0[a1]")
             audio_out = "[a1]"
             input_idx += 1
             
@@ -346,6 +352,8 @@ class StreamEncoder:
         # Slicing short HLS segments requires keyframes at least every 1s.
         gop_size = str(max(15, self.config.fps))
         cmd.extend([
+            "-r", str(self.config.fps),
+            "-vsync", "cfr",
             "-threads", "4",
             "-pix_fmt", pix_fmt,
             "-g", gop_size,
@@ -361,6 +369,8 @@ class StreamEncoder:
                 "-c:a", "libopus",
                 "-b:a", "128k",
                 "-ar", "48000",
+                "-application", "lowdelay",
+                "-frame_duration", "20",
                 "-f", "rtsp",
                 "-rtsp_transport", "tcp",
                 self.output_url

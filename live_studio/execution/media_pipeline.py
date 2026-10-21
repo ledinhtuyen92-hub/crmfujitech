@@ -43,12 +43,12 @@ class AudioStreamSink:
         self._stream_start_time = 0.0
         self.bytes_per_sec = clock.sample_rate * clock.channels * clock.sample_width
 
-    def start(self):
+    def start(self, start_time: float = None):
         if self.is_streaming: return
         self.is_streaming = True
         self.clock.total_samples_written = 0
-        self._stream_start_time = time.monotonic()
-        self._audio_queue = asyncio.Queue(maxsize=300)
+        self._stream_start_time = start_time if start_time is not None else time.monotonic()
+        self._audio_queue = asyncio.Queue(maxsize=5)
         self._pump_task = asyncio.create_task(self._silence_pump())
         self._worker_task = asyncio.create_task(self._audio_worker())
         logger.info("AudioStreamSink started")
@@ -67,7 +67,7 @@ class AudioStreamSink:
     def set_speaking(self, speaking: bool):
         self._is_speaking = speaking
         if speaking and self._audio_queue:
-            # Drain any buffered silence chunks so voice audio starts immediately with 0ms queue latency!
+            # Drain any backlogged silence chunks so speech audio is sent directly to FFmpeg with zero latency!
             while not self._audio_queue.empty():
                 try:
                     self._audio_queue.get_nowait()
@@ -132,34 +132,38 @@ class AudioStreamSink:
         If silence is injected before connection, it pre-fills the queue and dumps
         all at once on connect — causing a timestamp burst that MediaMTX stutters on.
         """
-        MAX_SILENCE_MS = 200  # Never inject more than 200ms silence per 100ms tick
         # Wait for write_callback (FFmpeg TCP) to be ready if configured to wait, up to 3s
         wait_elapsed = 0.0
         while self.is_streaming and getattr(self, '_waiting_for_encoder', False) and not self.write_callback and wait_elapsed < 3.0:
             await asyncio.sleep(0.05)
             wait_elapsed += 0.05
-        # Sync start time to NOW (after connection) to avoid injecting backlogged silence
-        if self.is_streaming:
+        # Sync start time to NOW only if not already set by start(start_time)
+        if self.is_streaming and self._stream_start_time <= 0.0:
             self._stream_start_time = time.monotonic() - self.clock.get_audio_pts()
         try:
             while self.is_streaming:
-                await asyncio.sleep(0.1) # Check every 100ms
+                await asyncio.sleep(0.02)  # Tick every 20ms matching audio frame granularity
                 
                 if self._is_speaking:
-                    # Sync our stream start time to prevent massive silence injection after speech ends
-                    # if the speech clock was slightly slower than wall clock
+                    # Sync stream start time to match current audio PTS so silence seamlessly resumes when speech ends
                     self._stream_start_time = time.monotonic() - self.clock.get_audio_pts()
                     continue
                     
-                elapsed_sec = time.monotonic() - self._stream_start_time
+                now = time.monotonic()
+                expected_pts = now - self._stream_start_time
                 current_pts = self.clock.get_audio_pts()
                 
-                lag_sec = elapsed_sec - current_pts
-                if lag_sec > 0:
-                    # Clamp to MAX_SILENCE_MS: if loop was blocked for multiple seconds,
-                    # injecting the full backlog at once would burst the audio pipe
-                    silence_ms = min(int(lag_sec * 1000), MAX_SILENCE_MS)
-                    self.write_silence(silence_ms)
+                lag_sec = expected_pts - current_pts
+                if lag_sec >= 0.005:  # More than 5ms behind
+                    # Clamp: if system stalled > 150ms, do not dump a massive backlog into TCP!
+                    # Advance _stream_start_time so audio timeline stays strictly locked to wall-clock real-time!
+                    if lag_sec > 0.15:
+                        self._stream_start_time = now - (current_pts + 0.04)
+                        lag_sec = 0.04
+                    
+                    duration_ms = int(lag_sec * 1000.0)
+                    if duration_ms > 0:
+                        self.write_silence(duration_ms)
         except asyncio.CancelledError:
             pass
 

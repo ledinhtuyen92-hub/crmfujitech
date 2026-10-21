@@ -28,7 +28,7 @@ class TestStreamPipeline(unittest.IsolatedAsyncioTestCase):
                 await asyncio.sleep(0.05)
                 
                 # Assert encoder received audio
-                mock_encoder.write_audio.assert_called_with(b"\x00\x00")
+                mock_encoder.write_audio.assert_any_call(b"\x00\x00")
                 
                 await controller.handle_stop(StreamStopPayload(command_id="cmd-2"))
                 

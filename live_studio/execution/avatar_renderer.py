@@ -312,7 +312,7 @@ class PygameAvatarRenderer(BaseAvatarRenderer):
         # - When audio drops (pause, comma, breathing): hold buffer bridges minor consonant gaps (120ms)
         #   before cleanly cross-fading back to closed-mouth idle pose!
         VOICE_ENERGY_THRESHOLD = 0.05
-        VOICE_HOLD_SEC = 0.12
+        VOICE_HOLD_SEC = 0.08
 
         if is_speaking:
             if audio_energy >= VOICE_ENERGY_THRESHOLD or mouth_state != MOUTH_STATE_CLOSED:

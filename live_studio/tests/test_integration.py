@@ -17,6 +17,10 @@ class TestIntegration(unittest.IsolatedAsyncioTestCase):
         self.avatar_engine = Local2DAvatarEngine(self.renderer, self.lip_sync)
         self.audio_player = DummyAudioPlayer()
         
+        # Override Mp3Decoder to prevent subprocess execution during test
+        self.mp3_patch = patch('live_studio.execution.media_pipeline.Mp3Decoder.decode_to_pcm', return_value=b"\x00\x00" * 44100)
+        self.mock_decode = self.mp3_patch.start()
+        
         # Override the audio fetcher to simulate fast downloads without network
         self.fetcher_patch = patch('live_studio.main.AudioFetcher.fetch', new_callable=AsyncMock)
         self.mock_fetch = self.fetcher_patch.start()
@@ -48,6 +52,7 @@ class TestIntegration(unittest.IsolatedAsyncioTestCase):
 
     async def asyncTearDown(self):
         await self.app.stop()
+        self.mp3_patch.stop()
         self.fetcher_patch.stop()
         self.ws_patch.stop()
         self.ws_send_patch.stop()

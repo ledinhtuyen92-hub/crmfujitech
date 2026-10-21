@@ -127,15 +127,23 @@ class TestStreamEncoderFoundation(unittest.IsolatedAsyncioTestCase):
         encoder = StreamEncoder(config, "ffmpeg", "null_output")
         
         async def fake_ffmpeg_connect():
-            await asyncio.sleep(0.1)
             import socket
-            v_sock = socket.socket()
-            v_sock.connect(('127.0.0.1', encoder.video_transport.port))
-            a_sock = socket.socket()
-            a_sock.connect(('127.0.0.1', encoder.audio_transport.port))
-            # Close immediately
-            v_sock.close()
-            a_sock.close()
+            for _ in range(40):
+                await asyncio.sleep(0.05)
+                if encoder.video_transport and encoder.video_transport.port and encoder.audio_transport and encoder.audio_transport.port:
+                    v_sock = None
+                    a_sock = None
+                    try:
+                        v_sock = socket.socket()
+                        v_sock.connect(('127.0.0.1', encoder.video_transport.port))
+                        a_sock = socket.socket()
+                        a_sock.connect(('127.0.0.1', encoder.audio_transport.port))
+                        break
+                    except OSError:
+                        pass
+                    finally:
+                        if v_sock: v_sock.close()
+                        if a_sock: a_sock.close()
 
         asyncio.create_task(fake_ffmpeg_connect())
         await encoder.start()

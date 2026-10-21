@@ -235,13 +235,17 @@ class PygameAudioPlayer(BaseAudioPlayer):
 
     def get_position_ms(self) -> int:
         """
-        pygame backend currently provides an estimated playback clock.
-        pygame.mixer.music.get_pos() returns ms since playback started.
+        Returns elapsed playback time in milliseconds.
+        When live streaming via stream_sink, time is strictly tracked by wall-clock monotonic time.
+        In offline mode, delegates to pygame.mixer.music.
         """
-        if self._is_playing and self._available:
-            import pygame
-            pos = pygame.mixer.music.get_pos()
-            if pos >= 0:
-                return pos
+        if self._is_playing:
+            if self.stream_sink and self.stream_sink.is_streaming:
+                return int((time.monotonic() - self._start_time) * 1000)
+            if self._available:
+                import pygame
+                pos = pygame.mixer.music.get_pos()
+                if pos >= 0:
+                    return pos
             return int((time.monotonic() - self._start_time) * 1000)
         return self._last_position_ms

@@ -65,12 +65,13 @@ class StreamController:
             except Exception as e:
                 logger.error(f"Failed to write audio to encoder.")
                 
-    async def _frame_pump(self):
+    async def _frame_pump(self, start_time: float = None):
         try:
-            start_time = None
             sent_frames = 0
             fps = self._current_payload.fps if self._current_payload else 30
             last_frame_data = None
+            if start_time is None:
+                start_time = getattr(self.encoder.timeline, 'start_time', time.monotonic()) if self.encoder else time.monotonic()
             
             while self.state == StreamState.LIVE:
                 # 1. Drain the frame queue to always fetch the most recent frame
@@ -85,17 +86,11 @@ class StreamController:
                 # 2. Clock-driven pacing: send exact number of frames corresponding to elapsed wall-clock time
                 if last_frame_data and self.encoder:
                     now = time.monotonic()
-                    if start_time is None:
-                        start_time = getattr(self.encoder.timeline, 'start_time', now) if self.encoder else now
-                        sent_frames = 0
-
                     target_frames = int((now - start_time) * fps)
-                    # Safety clamp: if event loop was blocked >1 second (OS scheduling jitter, GIL contention),
-                    # cap the debt to 2 frames. Without this, a single 2s freeze creates a backlog of 60 frames
-                    # that floods the TCP transport and causes MediaMTX to report timestamp discontinuities.
-                    if target_frames - sent_frames > fps:
-                        logger.debug(f"[FramePump] Clamping frame debt from {target_frames - sent_frames} to 2 frames")
-                        sent_frames = target_frames - 2
+                    # Real-time frame pacing: never burst-dump backlog raw frames (2.76MB each) into TCP!
+                    # If execution jitter caused frames to be missed, advance sent_frames and only send the latest frame.
+                    if target_frames - sent_frames > 1:
+                        sent_frames = target_frames - 1
 
                     while sent_frames < target_frames and self.state == StreamState.LIVE:
                         try:
@@ -249,13 +244,16 @@ class StreamController:
             self.state = StreamState.LIVE
             logger.info("Stream encoder started successfully.")
             
+            # Atomic synchronization: bind timeline, audio and video pumps to the exact same start timestamp!
+            live_start_time = time.monotonic()
+            if self.encoder and hasattr(self.encoder, 'timeline'):
+                self.encoder.timeline.start_time = live_start_time
+            
             if self.audio_sink:
-                if self.encoder and hasattr(self.encoder, 'timeline'):
-                    self.audio_sink._stream_start_time = self.encoder.timeline.start_time
-                self.audio_sink.start()
+                self.audio_sink.start(start_time=live_start_time)
             
             if self.frame_queue:
-                self._frame_pump_task = asyncio.create_task(self._frame_pump())
+                self._frame_pump_task = asyncio.create_task(self._frame_pump(start_time=live_start_time))
                 
             self._monitor_task = asyncio.create_task(self._health_monitor())
                 
