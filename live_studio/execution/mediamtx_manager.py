@@ -77,7 +77,7 @@ apiAddress: :{MEDIAMTX_LOCAL_API_PORT}
 
 paths:
   raw:
-    runOnReady: ffmpeg -rtsp_transport tcp -i rtsp://localhost:8554/raw -vcodec copy -c:a libopus -b:a 128k -async 50 -f rtsp rtsp://localhost:8554/live
+    runOnReady: ffmpeg -fflags nobuffer -flags low_delay -probesize 32 -analyzeduration 0 -rtsp_transport tcp -i rtsp://localhost:8554/raw -vcodec copy -c:a libopus -b:a 128k -application lowdelay -af aresample=async=1 -f rtsp -rtsp_transport tcp rtsp://localhost:8554/live
     runOnReadyRestart: yes{rtmp_forward}
   all_others:
 """
