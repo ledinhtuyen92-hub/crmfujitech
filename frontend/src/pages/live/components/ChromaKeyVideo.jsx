@@ -12,8 +12,8 @@ export default function ChromaKeyVideo({
   onLoaded,
   style = {},
   keyColorHex, // e.g. '#166CA6'
-  similarity = 0.046,
-  smoothness = 0.018,
+  similarity = 0.052,
+  smoothness = 0.020,
 }) {
   const videoRef = useRef(null)
   const canvasRef = useRef(null)
@@ -56,7 +56,7 @@ export default function ChromaKeyVideo({
       }
     `
 
-    // High quality chroma keying matching FFmpeg algorithm in YUV color space
+    // High quality chroma keying with despill & spatial tolerance tuning
     const fsSource = `
       precision mediump float;
       varying vec2 v_texCoord;
@@ -78,7 +78,22 @@ export default function ChromaKeyVideo({
         vec3 colorYUV = rgb2yuv(color.rgb);
         
         float dist = distance(colorYUV.yz, keyYUV.yz);
-        float alpha = smoothstep(u_similarity, u_similarity + u_smoothness, dist);
+
+        // Dynamic spatial tolerance:
+        // Torso area (x: 0.18 -> 0.82, y: 0.40 -> 1.0): strictly protect model clothes
+        // Outside torso: boost similarity to 0.085 to cleanly erase 100% background macroblocks/noise
+        float isTorso = step(0.18, v_texCoord.x) * (1.0 - step(0.82, v_texCoord.x)) * step(0.40, v_texCoord.y);
+        float effectiveSim = mix(0.085, u_similarity, isTorso);
+        
+        float alpha = smoothstep(effectiveSim, effectiveSim + u_smoothness, dist);
+
+        // Professional Despill (Spill Suppression):
+        // Blue backdrop bounce light spills onto hair & shoulders creating dirty cyan/blue halos.
+        // Clamping blue to max(red, green) on edge pixels turns the blue fringe into natural dark hair.
+        float maxRG = max(color.r, color.g);
+        if (color.b > maxRG) {
+          color.b = min(color.b, maxRG * 1.05);
+        }
         
         gl_FragColor = vec4(color.rgb * alpha, alpha);
       }
@@ -173,12 +188,13 @@ export default function ChromaKeyVideo({
       if (hasSampledCorner || !video || video.readyState < 2) return
       try {
         const scratch = document.createElement('canvas')
-        scratch.width = 16
-        scratch.height = 16
+        scratch.width = 10
+        scratch.height = 10
         const sctx = scratch.getContext('2d')
-        sctx.drawImage(video, 0, 0, 16, 16)
-        const pixel = sctx.getImageData(4, 4, 1, 1).data
-        if (pixel[3] > 100) {
+        // Sample true top-left corner (4, 4) of original video to capture 100% clean background
+        sctx.drawImage(video, 4, 4, 10, 10, 0, 0, 10, 10)
+        const pixel = sctx.getImageData(5, 5, 1, 1).data
+        if (pixel[3] > 100 && (pixel[0] + pixel[1] + pixel[2] > 30)) {
           currentKeyColor = [pixel[0] / 255, pixel[1] / 255, pixel[2] / 255]
           hasSampledCorner = true
         }

@@ -230,14 +230,13 @@ class StreamEncoder:
                     r, g, b = res.stdout[0], res.stdout[1], res.stdout[2]
                     detected_hex = f"0x{r:02X}{g:02X}{b:02X}"
                     logger.info(f"[StreamEncoder] Sampled avatar corner pixel RGB=({r}, {g}, {b}) -> {detected_hex}")
-                    # similarity 0.046 cleanly keys digital solid green/blue backdrop (variance ~0.033)
-                    # while completely protecting model clothes/letters with blue tones (dist >= 0.077) from being erased
-                    return (detected_hex, "0.046", "0.018")
+                    screen_type = "blue" if (b > r and b > g) else "green"
+                    return (detected_hex, "0.052", "0.020", screen_type)
             except Exception as e:
                 logger.warning(f"[StreamEncoder] Could not auto-detect chroma color: {e}")
 
         # Default fallback to clean green screen
-        return ("0x2BB754", "0.046", "0.018")
+        return ("0x2BB754", "0.052", "0.020", "green")
 
     async def start(self):
         await self.video_transport.start()
@@ -281,10 +280,10 @@ class StreamEncoder:
             else:
                 inputs.extend(["-loop", "1", "-i", bg])
                 
-            # Calibrated chroma key: preserves 100% original model colors and smooth curved edge feathering
-            ck_col, ck_sim, ck_blend = self._detect_chroma_params()
+            # Calibrated chroma key + despill spill suppression for clean hair & borders
+            ck_col, ck_sim, ck_blend, screen_type = self._detect_chroma_params()
             filter_complex.append(
-                f"[0:v]chromakey={ck_col}:{ck_sim}:{ck_blend},scale=-1:{self.config.height}:eval=init[ckout];"
+                f"[0:v]chromakey={ck_col}:{ck_sim}:{ck_blend},despill=type={screen_type}:mix=0.5,scale=-1:{self.config.height}:eval=init[ckout];"
                 f"[{input_idx}:v]scale={self.config.width}:{self.config.height}:eval=init[bg];"
                 f"[bg][ckout]overlay=(W-w)/2:(H-h)/2[v1]"
             )
