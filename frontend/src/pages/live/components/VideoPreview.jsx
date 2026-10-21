@@ -84,6 +84,7 @@ export default function VideoPreview({
   const [progressStatusText, setProgressStatusText] = useState('Đang thiết lập kết nối...')
   const [showHud, setShowHud] = useState(true)
   const retryCountRef = useRef(0)
+  const warmupRetryRef = useRef(0)
   const MAX_RETRY = 5
 
   const activeMuted = (isMasterMuted !== undefined) ? isMasterMuted : internalMuted
@@ -150,6 +151,7 @@ export default function VideoPreview({
         setStreamStatus('live')
         setErrorMsg('')
         retryCountRef.current = 0
+        warmupRetryRef.current = 0
       }, 350)
     }
   }, [])
@@ -227,12 +229,14 @@ export default function VideoPreview({
           err.message.toLowerCase().includes('not found') ||
           err.message.includes('Failed to fetch')
         )
-        const MAX_WARMUP_RETRIES = 25
+        // Cho phép tối đa 90 lần warmup retry (90s) – dùng counter riêng
+        // để không làm ảnh hưởng đến MAX_RETRY của lỗi kết nối thực.
+        const MAX_WARMUP_RETRIES = 90
 
-        if (isWarmupErr && retryCountRef.current < MAX_WARMUP_RETRIES) {
-          // Encoder is warming up, MediaMTX waiting for first frame.
-          // Keep status 'connecting' so progress radar continues smoothly without flashing error popup.
-          retryCountRef.current += 1
+        if (isWarmupErr && warmupRetryRef.current < MAX_WARMUP_RETRIES) {
+          // Encoder đang khởi động, MediaMTX chưa có stream.
+          // Giữ nguyên status 'connecting', không hiện popup lỗi.
+          warmupRetryRef.current += 1
           retryRef.current = setTimeout(() => connectRef.current?.(), 1000)
         } else {
           setStreamStatus('error')
@@ -264,6 +268,8 @@ export default function VideoPreview({
     setHasFirstFrameRendered(false)
     frameReadyLockRef.current = false
     setLoadProgress(0)
+    retryCountRef.current = 0
+    warmupRetryRef.current = 0
   }, [])
 
   // ── Auto-connect / disconnect when session status changes ────────────────────
@@ -1190,6 +1196,7 @@ export default function VideoPreview({
                   onClick={() => {
                     setStreamStatus('connecting')
                     retryCountRef.current = 0
+                    warmupRetryRef.current = 0
                     connect()
                   }}
                   style={{ marginTop: 8 }}
