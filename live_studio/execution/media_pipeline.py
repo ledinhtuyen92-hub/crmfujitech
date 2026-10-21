@@ -66,6 +66,13 @@ class AudioStreamSink:
 
     def set_speaking(self, speaking: bool):
         self._is_speaking = speaking
+        if speaking and self._audio_queue:
+            # Drain any buffered silence chunks so voice audio starts immediately with 0ms queue latency!
+            while not self._audio_queue.empty():
+                try:
+                    self._audio_queue.get_nowait()
+                except Exception:
+                    break
 
     def write_pcm(self, pcm_bytes: bytes):
         if not self.is_streaming:

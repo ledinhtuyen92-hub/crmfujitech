@@ -92,6 +92,29 @@ class TestStreamEncoderFoundation(unittest.IsolatedAsyncioTestCase):
         self.assertFalse(encoder.is_running)
 
     @patch('live_studio.execution.stream_encoder.asyncio.create_subprocess_exec')
+    async def test_rtsp_opus_encoder_args(self, mock_exec):
+        mock_proc = AsyncMock()
+        mock_proc.returncode = None
+        mock_proc.terminate = MagicMock()
+        mock_proc.kill = MagicMock()
+        mock_proc.stderr.readline.return_value = b""
+        mock_exec.return_value = mock_proc
+        
+        config = StreamConfig()
+        encoder = StreamEncoder(config, "ffmpeg", "rtsp://127.0.0.1:8554/live")
+        await encoder.start()
+
+        # Verify command arguments passed to ffmpeg
+        cmd_args = mock_exec.call_args[0]
+        self.assertIn("-c:a", cmd_args)
+        self.assertIn("libopus", cmd_args)
+        self.assertIn("-rtsp_transport", cmd_args)
+        self.assertIn("tcp", cmd_args)
+        self.assertIn("rtsp://127.0.0.1:8554/live", cmd_args)
+
+        await encoder.stop()
+
+    @patch('live_studio.execution.stream_encoder.asyncio.create_subprocess_exec')
     async def test_broken_pipe_detection(self, mock_exec):
         mock_proc = AsyncMock()
         mock_proc.returncode = None

@@ -86,7 +86,7 @@ class StreamController:
                 if last_frame_data and self.encoder:
                     now = time.monotonic()
                     if start_time is None:
-                        start_time = now
+                        start_time = getattr(self.encoder.timeline, 'start_time', now) if self.encoder else now
                         sent_frames = 0
 
                     target_frames = int((now - start_time) * fps)
@@ -235,13 +235,13 @@ class StreamController:
             ai_volume=getattr(self._current_payload, 'ai_volume', 1.0)
         )
         
-        # Always push to local MediaMTX first.
-        # MediaMTX handles HLS preview and re-pushes to external (Shopee/TikTok).
+        # Push to local MediaMTX via RTSP with Opus audio.
+        # This provides direct single-process A/V multiplexing with zero secondary transcoding lag.
         try:
-            from live_studio.execution.mediamtx_manager import MEDIAMTX_LOCAL_RTMP_URL
-            output_url = MEDIAMTX_LOCAL_RTMP_URL
+            from live_studio.execution.mediamtx_manager import MEDIAMTX_LOCAL_RTSP_URL
+            output_url = MEDIAMTX_LOCAL_RTSP_URL
         except ImportError:
-            output_url = self._current_target.get_full_url() if self._current_target else "rtmp://127.0.0.1:19350/live"
+            output_url = self._current_target.get_full_url() if self._current_target else "rtsp://127.0.0.1:8554/live"
         
         self.encoder = StreamEncoder(config, ffmpeg_path, output_url, self.cached_assets)
         try:
@@ -250,6 +250,8 @@ class StreamController:
             logger.info("Stream encoder started successfully.")
             
             if self.audio_sink:
+                if self.encoder and hasattr(self.encoder, 'timeline'):
+                    self.audio_sink._stream_start_time = self.encoder.timeline.start_time
                 self.audio_sink.start()
             
             if self.frame_queue:

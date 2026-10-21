@@ -126,6 +126,8 @@ class LocalTcpTransport:
         self._write_lock = asyncio.Lock()
 
     async def start(self):
+        if self.server:
+            return
         self.server = await asyncio.start_server(self.handle_client, self.host, 0)
         self.port = self.server.sockets[0].getsockname()[1]
         
@@ -352,13 +354,34 @@ class StreamEncoder:
             "-flags", "+global_header",
             "-fflags", "+nobuffer+flush_packets",
             "-flush_packets", "1",
-            "-c:a", "aac",
-            "-b:a", "128k",
-            "-ar", str(self.config.audio_sample_rate),
-            "-flvflags", "no_duration_filesize",
-            "-f", "flv" if self.output_url.startswith("rtmp") else "null",
-            self.output_url
         ])
+
+        if self.output_url.startswith("rtsp://"):
+            cmd.extend([
+                "-c:a", "libopus",
+                "-b:a", "128k",
+                "-ar", "48000",
+                "-f", "rtsp",
+                "-rtsp_transport", "tcp",
+                self.output_url
+            ])
+        elif self.output_url.startswith("rtmp://"):
+            cmd.extend([
+                "-c:a", "aac",
+                "-b:a", "128k",
+                "-ar", str(self.config.audio_sample_rate),
+                "-flvflags", "no_duration_filesize",
+                "-f", "flv",
+                self.output_url
+            ])
+        else:
+            cmd.extend([
+                "-c:a", "aac",
+                "-b:a", "128k",
+                "-ar", str(self.config.audio_sample_rate),
+                "-f", "null",
+                self.output_url
+            ])
         
         logger.info(f"FFmpeg command: {' '.join(cmd)}")
         flags = 0x08000000 if sys.platform == 'win32' else 0

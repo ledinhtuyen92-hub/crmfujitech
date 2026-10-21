@@ -133,8 +133,8 @@ class PygameAudioPlayer(BaseAudioPlayer):
                 self._last_position_ms = 0
                 pcm_offset = 0
 
-                # Immediately write initial 20ms burst so audio transport starts without waiting 10ms for first sleep
-                INITIAL_BURST_MS = 20
+                # Immediately write initial 60ms burst (3 Opus frames) so audio transport starts without delay
+                INITIAL_BURST_MS = 60
                 if pcm_data:
                     init_bytes = int((INITIAL_BURST_MS / 1000.0) * bytes_per_sec)
                     init_bytes -= init_bytes % 4

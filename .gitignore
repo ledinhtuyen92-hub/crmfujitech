@@ -38,6 +38,9 @@ crop*.ps1
 
 # Ignore large binaries
 live_studio/bin/*.exe
+live_studio/assets/cache/
+live_studio/build/
+live_studio/dist/
 
 # Live Studio builds and configs
 build/
