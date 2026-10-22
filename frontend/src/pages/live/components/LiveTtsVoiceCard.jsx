@@ -19,10 +19,12 @@ const { Text } = Typography
 
 const PROVIDER_NAMES = {
   google_studio: 'Google Studio (Gemini)',
+  google_cloud: 'Google Cloud TTS',
   microsoft: 'Microsoft Edge Neural (0đ)',
   elevenlabs: 'ElevenLabs AI',
   openai: 'OpenAI Audio',
   google: 'Google Translate',
+  google_free: 'Google Translate',
 }
 
 const VOICE_LABELS = {
@@ -34,6 +36,16 @@ const VOICE_LABELS = {
   Puck: 'Puck (Nam)',
   'vi-VN-HoaiMyNeural': 'Hoài My (Nữ)',
   'vi-VN-NamMinhNeural': 'Nam Minh (Nam)',
+  'vi-VN-Neural2-A': 'Neural2-A (Nữ)',
+  'vi-VN-Neural2-D': 'Neural2-D (Nam)',
+  'vi-VN-Wavenet-A': 'WaveNet-A (Nữ)',
+  'vi-VN-Wavenet-B': 'WaveNet-B (Nam)',
+  'vi-VN-Wavenet-C': 'WaveNet-C (Nữ)',
+  'vi-VN-Wavenet-D': 'WaveNet-D (Nam)',
+  'vi-VN-Standard-A': 'Standard-A (Nữ)',
+  'vi-VN-Standard-B': 'Standard-B (Nam)',
+  'vi-VN-Standard-C': 'Standard-C (Nữ)',
+  'vi-VN-Standard-D': 'Standard-D (Nam)',
   alloy: 'Alloy (Trung tính)',
   nova: 'Nova (Nữ)',
   shimmer: 'Shimmer (Nữ)',
@@ -199,7 +211,7 @@ export default function LiveTtsVoiceCard({
   }, [lastEvent])
 
   const configuredProvider = session?.ai_agent_tts_provider || 'microsoft'
-  const configuredVoice = session?.ai_agent_tts_voice || (configuredProvider === 'google_studio' ? 'Aoede' : 'vi-VN-HoaiMyNeural')
+  const configuredVoice = session?.ai_agent_tts_voice || (configuredProvider === 'google_studio' ? 'Aoede' : (configuredProvider === 'google_cloud' ? 'vi-VN-Neural2-A' : 'vi-VN-HoaiMyNeural'))
   const configuredSpeed = session?.ai_agent_tts_speed || 1.0
 
   const activeProvider = recentTts?.provider || configuredProvider

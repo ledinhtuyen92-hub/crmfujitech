@@ -12,8 +12,8 @@ export default function ChromaKeyVideo({
   onLoaded,
   style = {},
   keyColorHex, // e.g. '#166CA6'
-  similarity = 0.044,
-  smoothness = 0.012,
+  similarity = 0.072,
+  smoothness = 0.015,
 }) {
   const videoRef = useRef(null)
   const canvasRef = useRef(null)
@@ -103,18 +103,21 @@ export default function ChromaKeyVideo({
         float distLeft = distance(rgb2yuv(texture2D(u_image, v_texCoord + vec2(-onePixel.x, 0.0)).rgb).yz, keyYUV.yz);
         float distRight = distance(rgb2yuv(texture2D(u_image, v_texCoord + vec2(onePixel.x, 0.0)).rgb).yz, keyYUV.yz);
 
-        float aCenter = smoothstep(u_similarity, u_similarity + u_smoothness, distCenter);
-        float aUp = smoothstep(u_similarity, u_similarity + u_smoothness, distUp);
-        float aDown = smoothstep(u_similarity, u_similarity + u_smoothness, distDown);
-        float aLeft = smoothstep(u_similarity, u_similarity + u_smoothness, distLeft);
-        float aRight = smoothstep(u_similarity, u_similarity + u_smoothness, distRight);
+        bool isGreen = (activeKey.g > activeKey.r && activeKey.g > activeKey.b);
+        float effSim = isGreen ? 0.046 : 0.072;
+        float effSmooth = isGreen ? 0.012 : 0.015;
+
+        float aCenter = smoothstep(effSim, effSim + effSmooth, distCenter);
+        float aUp = smoothstep(effSim, effSim + effSmooth, distUp);
+        float aDown = smoothstep(effSim, effSim + effSmooth, distDown);
+        float aLeft = smoothstep(effSim, effSim + effSmooth, distLeft);
+        float aRight = smoothstep(effSim, effSim + effSmooth, distRight);
 
         // Choked alpha: cleanly eliminates the 1-2 pixel blue/green fringe along outer silhouette & table line
         float minNeighborAlpha = min(min(aUp, aDown), min(aLeft, aRight));
         float alpha = min(aCenter, minNeighborAlpha);
 
         // Clear shadow boundary where blue/green wall meets the table on outer margins:
-        bool isGreen = (activeKey.g > activeKey.r && activeKey.g > activeKey.b);
         if (v_texCoord.y > 0.68 && v_texCoord.y < 0.74 && (v_texCoord.x < 0.08 || v_texCoord.x > 0.91)) {
           if (!isGreen && color.b > max(color.r, color.g)) {
             alpha = 0.0;

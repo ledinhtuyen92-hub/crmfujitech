@@ -149,8 +149,9 @@ class AudioLayerTests(TestCase):
     @patch('edge_tts.Communicate')
     def test_edge_tts_provider_success(self, mock_communicate):
         # Mock communicate.stream() async generator
+        mock_data = b"edge_audio" * 60
         async def fake_stream():
-            yield {"type": "audio", "data": b"edge_audio"}
+            yield {"type": "audio", "data": mock_data}
         
         mock_comm_instance = MagicMock()
         mock_comm_instance.stream.return_value = fake_stream()
@@ -158,7 +159,7 @@ class AudioLayerTests(TestCase):
 
         provider = MicrosoftEdgeTTSProvider()
         result = provider.generate("Chào bạn", {"voice": "vi-VN-HoaiMyNeural", "speed": 1.2, "pitch": "+0Hz"})
-        self.assertEqual(result.audio_bytes, b"edge_audio")
+        self.assertEqual(result.audio_bytes, mock_data)
         self.assertEqual(result.format, "mp3")
 
     @patch('live_sessions.audio.tts.MicrosoftEdgeTTSProvider.generate')

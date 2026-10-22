@@ -199,47 +199,99 @@ class StreamEncoder:
         self.is_running = False
         self._intentional_stop = False
         
+    def _sample_file_chroma(self, file_path: str) -> Optional[Tuple[int, int, int, str]]:
+        """
+        Samples the top-left and top-right corners of a video asset to compute average RGB.
+        Returns: (r, g, b, screen_type) or None
+        """
+        if not file_path or not os.path.exists(file_path) or not self.ffmpeg_path:
+            return None
+        try:
+            flags = 0x08000000 if sys.platform == 'win32' else 0
+            startupinfo = None
+            if sys.platform == 'win32':
+                startupinfo = subprocess.STARTUPINFO()
+                startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
+                startupinfo.wShowWindow = 0
+
+            # Sample two corners: Top-Left (x=5..35, y=5..35) and Top-Right (x=w-35..w-5, y=5..35)
+            # Scale to 1x1 to get the average corner color
+            cmd = [
+                self.ffmpeg_path, '-y', '-ss', '0.5', '-i', file_path,
+                '-vf', 'split[a][b];[a]crop=30:30:5:5[c1];[b]crop=30:30:in_w-35:5[c2];[c1][c2]hstack,scale=1:1',
+                '-vframes', '1',
+                '-f', 'rawvideo', '-pix_fmt', 'rgb24', '-'
+            ]
+            res = subprocess.run(
+                cmd,
+                capture_output=True,
+                timeout=5,
+                creationflags=flags,
+                startupinfo=startupinfo
+            )
+            if res.returncode == 0 and len(res.stdout) >= 3:
+                r, g, b = res.stdout[0], res.stdout[1], res.stdout[2]
+                screen_type = "green" if (g > r and g > b) else ("blue" if (b > r and b > g) else "other")
+                logger.info(f"[StreamEncoder] Sampled {os.path.basename(file_path)} corner RGB=({r}, {g}, {b}) -> {screen_type}")
+                return (r, g, b, screen_type)
+        except Exception as e:
+            logger.warning(f"[StreamEncoder] Could not sample chroma from {file_path}: {e}")
+        return None
+
     def _detect_chroma_params(self) -> Tuple[str, str, str, str]:
         """
-        Auto-detects the exact chroma key color from the avatar video by sampling corner pixels.
-        Returns: (color_hex, similarity, blend, screen_type)
-        Preserves 100% natural colors of the model matching preview settings (0.044, 0.012)
-        without destructive despill filters.
+        Auto-detects the exact chroma key color by sampling both idle and speaking avatar assets.
+        Averages colors if both share the same screen type (blue/green), ensuring both poses key out cleanly.
+        Calibrated parameters: similarity=0.072, blend=0.015.
+        Eliminates the blue/green boundary halo and studio backdrop shadows while preserving
+        100% of the model's blue jacket, skin tones, and dark hair.
         """
-        avatar_path = self.cached_assets.get('avatar') or self.cached_assets.get('avatar_speaking')
-        if avatar_path and os.path.exists(avatar_path) and self.ffmpeg_path:
-            try:
-                cmd = [
-                    self.ffmpeg_path, '-y', '-ss', '0.5', '-i', avatar_path,
-                    '-vf', 'crop=30:30:5:5,scale=1:1',
-                    '-vframes', '1',
-                    '-f', 'rawvideo', '-pix_fmt', 'rgb24', '-'
-                ]
-                flags = 0x08000000 if sys.platform == 'win32' else 0
-                startupinfo = None
-                if sys.platform == 'win32':
-                    startupinfo = subprocess.STARTUPINFO()
-                    startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
-                    startupinfo.wShowWindow = 0
+        idle_path = self.cached_assets.get('avatar')
+        speaking_path = self.cached_assets.get('avatar_speaking')
 
-                res = subprocess.run(
-                    cmd,
-                    capture_output=True,
-                    timeout=5,
-                    creationflags=flags,
-                    startupinfo=startupinfo
-                )
-                if res.returncode == 0 and len(res.stdout) >= 3:
-                    r, g, b = res.stdout[0], res.stdout[1], res.stdout[2]
-                    detected_hex = f"0x{r:02X}{g:02X}{b:02X}"
-                    logger.info(f"[StreamEncoder] Sampled avatar corner pixel RGB=({r}, {g}, {b}) -> {detected_hex}")
-                    screen_type = "blue" if (b > r and b > g) else "green"
-                    return (detected_hex, "0.044", "0.012", screen_type)
-            except Exception as e:
-                logger.warning(f"[StreamEncoder] Could not auto-detect chroma color: {e}")
+        idle_sample = self._sample_file_chroma(idle_path) if idle_path else None
+        speaking_sample = self._sample_file_chroma(speaking_path) if speaking_path else None
 
-        # Default fallback to clean blue screen (0x166CA6) or green matching preview
-        return ("0x166CA6", "0.044", "0.012", "blue")
+        def get_calibrated_params(st: str) -> Tuple[str, str]:
+            if st == "blue":
+                # Blue screen: higher tolerance to eliminate backdrop shadow and halo without eating model's jacket
+                return ("0.072", "0.015")
+            elif st == "green":
+                # Green screen: tighter tolerance to protect natural skin tones and blonde/brown hair highlights
+                return ("0.046", "0.012")
+            return ("0.060", "0.015")
+
+        if idle_sample and speaking_sample:
+            r1, g1, b1, t1 = idle_sample
+            r2, g2, b2, t2 = speaking_sample
+            if t1 == t2:
+                # Same screen type: average the two colors so both idle and speaking key out perfectly
+                r_avg = int((r1 + r2) / 2)
+                g_avg = int((g1 + g2) / 2)
+                b_avg = int((b1 + b2) / 2)
+                detected_hex = f"0x{r_avg:02X}{g_avg:02X}{b_avg:02X}"
+                sim, blend = get_calibrated_params(t1)
+                logger.info(f"[StreamEncoder] Unified {t1} chroma key from idle & speaking: {detected_hex} (sim={sim}, blend={blend})")
+                return (detected_hex, sim, blend, t1)
+            else:
+                # Mismatched screen types (e.g. idle is blue, speaking is green)
+                logger.warning(f"[StreamEncoder] Mismatched avatar assets: idle is {t1} (RGB={r1},{g1},{b1}), speaking is {t2} (RGB={r2},{g2},{b2})")
+                detected_hex = f"0x{r1:02X}{g1:02X}{b1:02X}"
+                sim, blend = get_calibrated_params(t1)
+                return (detected_hex, sim, blend, t1)
+        elif idle_sample:
+            r, g, b, t = idle_sample
+            detected_hex = f"0x{r:02X}{g:02X}{b:02X}"
+            sim, blend = get_calibrated_params(t)
+            return (detected_hex, sim, blend, t)
+        elif speaking_sample:
+            r, g, b, t = speaking_sample
+            detected_hex = f"0x{r:02X}{g:02X}{b:02X}"
+            sim, blend = get_calibrated_params(t)
+            return (detected_hex, sim, blend, t)
+
+        # Default fallback (blue)
+        return ("0x166CA6", "0.072", "0.015", "blue")
 
     async def start(self):
         await self.video_transport.start()

@@ -8,6 +8,7 @@ from typing import Optional, Dict, Any, Tuple
 from dataclasses import dataclass
 from django.conf import settings
 import requests
+import base64
 
 from openai import OpenAI, APITimeoutError, APIError
 
@@ -18,6 +19,11 @@ logger = logging.getLogger(__name__)
 # Circuit breaker cache: maps (company_id, provider) -> timestamp until when to skip
 _CIRCUIT_BREAKER: Dict[Tuple[str, str], float] = {}
 _CIRCUIT_BREAKER_COOLDOWN = 300.0  # 5 minutes
+
+# In-memory rotation tracking and key cooldown maps for multi-key providers:
+_KEY_ROTATION_INDEX: Dict[str, int] = {}
+_KEY_COOLDOWNS: Dict[str, float] = {}
+_KEY_COOLDOWN_DURATION = 600.0  # 10 minutes cooldown when key hits quota
 
 
 def _run_async(coro):
@@ -88,7 +94,14 @@ class MicrosoftEdgeTTSProvider(BaseTTSProvider):
         rate_str = f"{rate_pct:+d}%" if rate_pct != 0 else "+0%"
 
         pitch = config.get("pitch") or "+0Hz"
-        if not pitch.endswith("Hz"):
+        if "st" in str(pitch).lower():
+            try:
+                st_val = float(str(pitch).lower().replace("st", "").replace("+", "").strip())
+                hz_val = int(round(st_val * 2))
+                pitch = f"{hz_val:+d}Hz"
+            except Exception:
+                pitch = "+0Hz"
+        elif not str(pitch).endswith("Hz"):
             pitch = f"{pitch}Hz"
 
         logger.info(f"[MicrosoftEdgeTTS] Generating audio (voice={voice}, rate={rate_str}, pitch={pitch}): {clean_text[:60]}...")
@@ -410,17 +423,204 @@ class DummyTTSProvider(BaseTTSProvider):
             return GoogleTTSProvider().generate(text, voice_config)
 
 
+class GoogleCloudTTSProvider(BaseTTSProvider):
+    """
+    Google Cloud Text-to-Speech Provider using official REST API v1.
+    Supports Neural2, WaveNet, Standard, and Studio voices.
+    Offers customizable speakingRate, pitch, and volumeGainDb.
+    """
+    ENDPOINT = "https://texttospeech.googleapis.com/v1/text:synthesize"
+
+    def __init__(self, api_key: str):
+        if not api_key or not api_key.strip():
+            raise TTSProviderException("Google Cloud API Key is missing.")
+        self.api_key = api_key.strip()
+
+    def generate(self, text: str, voice_config: Optional[Dict[str, Any]] = None) -> AudioResult:
+        if not text or not text.strip():
+            raise TTSProviderException("Text cannot be empty.")
+
+        clean_text = text.replace("[STOP]", "").strip()
+        if not clean_text:
+            clean_text = "Dạ xin chào mọi người đang xem live ạ"
+
+        config = voice_config or {}
+        voice_name = config.get("voice") or "vi-VN-Neural2-A"
+
+        # Determine languageCode from voice name (e.g. 'vi-VN-Neural2-A' -> 'vi-VN')
+        parts = voice_name.split("-")
+        if len(parts) >= 2:
+            language_code = f"{parts[0]}-{parts[1]}"
+        else:
+            language_code = "vi-VN"
+
+        # Detect SSML gender
+        detected_gender = _detect_gender(voice_name)
+        ssml_gender = "FEMALE" if detected_gender == "female" else "MALE"
+
+        # Speed (speakingRate: 0.25 to 4.0, default 1.0)
+        speed = float(config.get("speed", 1.0) or 1.0)
+        speaking_rate = max(0.25, min(4.0, speed))
+
+        # Pitch (-20.0 to 20.0 semitones, default 0.0)
+        pitch_raw = str(config.get("pitch", "0.0") or "0.0").replace("Hz", "").replace("st", "").strip()
+        try:
+            pitch_semitones = float(pitch_raw)
+        except ValueError:
+            pitch_semitones = 0.0
+        pitch_semitones = max(-20.0, min(20.0, pitch_semitones))
+
+        # Volume gain db (-96.0 to 16.0, default 0.0)
+        volume_gain = float(config.get("volume_gain_db", 0.0) or 0.0)
+        volume_gain = max(-96.0, min(16.0, volume_gain))
+
+        # Check if text is formatted with SSML
+        is_ssml = clean_text.strip().startswith("<speak>") and clean_text.strip().endswith("</speak>")
+        input_payload = {"ssml": clean_text} if is_ssml else {"text": clean_text}
+
+        payload = {
+            "input": input_payload,
+            "voice": {
+                "languageCode": language_code,
+                "name": voice_name,
+                "ssmlGender": ssml_gender
+            },
+            "audioConfig": {
+                "audioEncoding": "MP3",
+                "speakingRate": speaking_rate,
+                "pitch": pitch_semitones,
+                "volumeGainDb": volume_gain
+            }
+        }
+
+        url = f"{self.ENDPOINT}?key={self.api_key}"
+        try:
+            resp = requests.post(
+                url,
+                json=payload,
+                headers={"Content-Type": "application/json"},
+                timeout=12.0
+            )
+        except requests.Timeout:
+            logger.error("[GoogleCloudTTS] Timeout connecting to Google Cloud TTS API")
+            raise TTSTimeoutException("Timeout kết nối tới Google Cloud Text-to-Speech API.")
+        except Exception as e:
+            logger.error(f"[GoogleCloudTTS] Network error: {e}")
+            raise TTSProviderException(f"Lỗi mạng khi gọi Google Cloud TTS: {e}")
+
+        if resp.status_code != 200:
+            error_data = {}
+            try:
+                error_data = resp.json().get("error", {})
+            except Exception:
+                pass
+            error_message = error_data.get("message") or resp.text
+            error_status = error_data.get("status") or f"HTTP_{resp.status_code}"
+            logger.error(f"[GoogleCloudTTS] API returned error {resp.status_code} [{error_status}]: {error_message}")
+
+            if resp.status_code in (429, 403) or "RESOURCE_EXHAUSTED" in error_status or "quota" in error_message.lower():
+                raise TTSProviderException(f"Google Cloud TTS hết quota hoặc bị giới hạn (429/403): {error_message}")
+            elif resp.status_code in (400, 401) or "API_KEY_INVALID" in error_message or "PERMISSION_DENIED" in error_status:
+                raise TTSProviderException(f"Google Cloud API Key không hợp lệ hoặc chưa bật Cloud Text-to-Speech API: {error_message}")
+            else:
+                raise TTSProviderException(f"Google Cloud TTS lỗi ({resp.status_code}): {error_message}")
+
+        try:
+            res_json = resp.json()
+            audio_content_b64 = res_json.get("audioContent")
+            if not audio_content_b64:
+                raise TTSProviderException("Google Cloud TTS không trả về nội dung audioContent.")
+            audio_bytes = base64.b64decode(audio_content_b64)
+            return AudioResult(
+                audio_bytes=audio_bytes,
+                mime_type="audio/mpeg",
+                format="mp3",
+                sample_rate=24000,
+                channels=1
+            )
+        except Exception as e:
+            logger.error(f"[GoogleCloudTTS] Failed to decode audio response: {e}")
+            raise TTSProviderException(f"Lỗi giải mã âm thanh từ Google Cloud TTS: {e}")
+
+
 def _detect_gender(voice_name: str) -> str:
     """
     Detect whether a voice is male or female.
     Returns 'male' or 'female'. Defaults to 'female'.
     """
-    v = (voice_name or "").lower()
-    male_identifiers = ["namminh", "nam minh", "male", "onyx", "echo", "fable", "george", "charlie", "callum", "liam"]
+    v = (voice_name or "").lower().strip()
+    if v.endswith("-b") or v.endswith("-d") or "-male" in v:
+        return "male"
+    if v.endswith("-a") or v.endswith("-c") or "-female" in v:
+        return "female"
+
+    male_identifiers = ["namminh", "nam minh", "male", "onyx", "echo", "fable", "george", "charlie", "callum", "liam", "charon", "fenrir", "puck"]
     for m in male_identifiers:
         if m in v:
             return "male"
     return "female"
+
+
+def _execute_google_cloud_with_rotation(
+    company: Any,
+    text: str,
+    voice_config: Dict[str, Any],
+    session_id: Optional[str] = None,
+    skip_cooldown: bool = False
+) -> AudioResult:
+    """
+    Rotates through all active Google Cloud API keys configured in Company Key Storage.
+    If an API key fails with Quota Exceeded (429/403) or Auth Error, it is placed in cooldown
+    and the request immediately rotates to the next available key.
+    """
+    from ai_agents.services import get_api_keys
+    keys = get_api_keys(company, "google_cloud") if company else []
+    if not keys:
+        fallback_system_key = getattr(settings, "GOOGLE_CLOUD_TTS_API_KEY", None)
+        if fallback_system_key:
+            keys = [fallback_system_key]
+        else:
+            raise TTSProviderException("Chưa cấu hình API Key Google Cloud TTS trong Kho Key.")
+
+    company_id_str = str(company.id) if company else "system"
+    n_keys = len(keys)
+    start_idx = _KEY_ROTATION_INDEX.get(company_id_str, 0) % n_keys
+
+    # Order keys starting from the current rotation index
+    candidate_keys = [keys[(start_idx + i) % n_keys] for i in range(n_keys)]
+
+    # Filter out keys that are currently in cooldown (unless all are in cooldown or skip_cooldown is requested)
+    now = time.time()
+    active_keys = candidate_keys if skip_cooldown else [k for k in candidate_keys if _KEY_COOLDOWNS.get(k, 0.0) < now]
+    keys_to_attempt = active_keys if active_keys else candidate_keys
+
+    last_error = None
+    for attempt_idx, key in enumerate(keys_to_attempt):
+        key_masked = f"{key[:6]}...{key[-4:]}" if len(key) > 10 else "key"
+        try:
+            provider = GoogleCloudTTSProvider(api_key=key)
+            result = provider.generate(text, voice_config)
+
+            # Success! Advance the rotation index for subsequent requests
+            _KEY_ROTATION_INDEX[company_id_str] = (start_idx + attempt_idx + 1) % n_keys
+            _KEY_COOLDOWNS.pop(key, None)
+            logger.info(f"[GoogleCloudTTS][Session: {session_id}] Synthesis succeeded using key {key_masked}")
+            return result
+        except Exception as err:
+            last_error = err
+            err_str = str(err).lower()
+            # If quota or auth failure, put this key into cooldown and rotate to next key immediately
+            if "quota" in err_str or "429" in err_str or "403" in err_str or "resource_exhausted" in err_str or "invalid" in err_str or "billing" in err_str:
+                _KEY_COOLDOWNS[key] = now + _KEY_COOLDOWN_DURATION
+                logger.warning(
+                    f"[GoogleCloudTTS][Session: {session_id}] Key {key_masked} failed ({err}). "
+                    f"Cooling down for {_KEY_COOLDOWN_DURATION}s. Rotating to next key..."
+                )
+            else:
+                logger.warning(f"[GoogleCloudTTS][Session: {session_id}] Key {key_masked} error: {err}. Trying next key...")
+
+    # If all keys failed
+    raise TTSProviderException(f"Tất cả ({len(keys_to_attempt)}) API Key Google Cloud đều gặp lỗi hoặc hết quota. Lỗi: {last_error}")
 
 
 def generate_tts_with_failover(
@@ -428,7 +628,8 @@ def generate_tts_with_failover(
     agent: Any,
     company: Any,
     session_id: Optional[str] = None,
-    correlation_id: Optional[str] = None
+    correlation_id: Optional[str] = None,
+    skip_circuit_breaker: bool = False
 ) -> Tuple[AudioResult, str, bool, Optional[str]]:
     """
     Unified Multi-Tier TTS Engine with Automated Failover & Circuit Breaker.
@@ -453,6 +654,7 @@ def generate_tts_with_failover(
 
     configured_speed = float(getattr(agent, "tts_speed", 1.0) or 1.0)
     configured_pitch = getattr(agent, "tts_pitch", "+0Hz") or "+0Hz"
+    configured_volume_gain_db = float(getattr(agent, "tts_volume_gain_db", 0.0) or 0.0)
     configured_style_prompt = getattr(agent, "tts_style_prompt", "") or ""
     configured_stability = float(getattr(agent, "tts_stability", 0.5) or 0.5)
     configured_similarity = float(getattr(agent, "tts_similarity", 0.75) or 0.75)
@@ -461,6 +663,7 @@ def generate_tts_with_failover(
         "voice": configured_voice,
         "speed": configured_speed,
         "pitch": configured_pitch,
+        "volume_gain_db": configured_volume_gain_db,
         "style_prompt": configured_style_prompt,
         "stability": configured_stability,
         "similarity_boost": configured_similarity,
@@ -474,7 +677,7 @@ def generate_tts_with_failover(
     # Check if primary provider is currently in Circuit Breaker cooldown
     circuit_broken = False
     fail_reason = None
-    if requested_provider in ("openai", "elevenlabs", "google_studio"):
+    if requested_provider in ("openai", "elevenlabs", "google_studio", "google_cloud") and not skip_circuit_breaker:
         from django.core.cache import cache
         try:
             cached_reason = cache.get(cache_key)
@@ -502,7 +705,17 @@ def generate_tts_with_failover(
 
     if not circuit_broken:
         try:
-            if requested_provider == "elevenlabs":
+            if requested_provider == "google_cloud":
+                audio_res = _execute_google_cloud_with_rotation(
+                    company=company,
+                    text=text,
+                    voice_config=voice_config,
+                    session_id=session_id,
+                    skip_cooldown=skip_circuit_breaker
+                )
+                return audio_res, "google_cloud", False, None
+
+            elif requested_provider == "elevenlabs":
                 keys = get_api_keys(company, "elevenlabs") if company else []
                 if not keys:
                     raise TTSProviderException("Chưa cấu hình API Key ElevenLabs trong Kho Key.")

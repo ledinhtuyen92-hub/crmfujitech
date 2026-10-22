@@ -47,6 +47,7 @@ export default function AiAgentSettings() {
         tts_voice: values.tts_voice || 'vi-VN-HoaiMyNeural',
         tts_speed: values.tts_speed !== undefined ? values.tts_speed : 1.0,
         tts_pitch: values.tts_pitch || '+0Hz',
+        tts_volume_gain_db: values.tts_volume_gain_db !== undefined ? values.tts_volume_gain_db : 0.0,
         tts_style_prompt: values.tts_style_prompt || '',
         tts_stability: values.tts_stability !== undefined ? values.tts_stability : 0.5,
         tts_similarity: values.tts_similarity !== undefined ? values.tts_similarity : 0.75,
@@ -287,7 +288,17 @@ export default function AiAgentSettings() {
       fetchKeys();
       fetchAvailableProviders();
     } catch (error) {
-      message.error('Có lỗi xảy ra khi lưu API Key');
+      let errMsg = 'Có lỗi xảy ra khi lưu API Key';
+      if (error.response?.data) {
+        if (typeof error.response.data === 'string') {
+          errMsg = error.response.data;
+        } else if (typeof error.response.data === 'object') {
+          errMsg = Object.entries(error.response.data)
+            .map(([field, errs]) => `${field}: ${Array.isArray(errs) ? errs.join(', ') : errs}`)
+            .join(' | ');
+        }
+      }
+      message.error(errMsg);
     }
   };
 
@@ -303,7 +314,17 @@ export default function AiAgentSettings() {
   };
 
   const keyColumns = [
-    { title: 'Nhà cung cấp', dataIndex: 'provider', key: 'provider', render: (t) => <Tag color='blue'>{t?.toUpperCase()}</Tag> },
+    { 
+      title: 'Nhà cung cấp', 
+      dataIndex: 'provider', 
+      key: 'provider', 
+      render: (t) => {
+        if (t === 'google_cloud') return <Tag color='purple'>GOOGLE CLOUD TTS</Tag>;
+        if (t === 'elevenlabs') return <Tag color='orange'>ELEVENLABS TTS</Tag>;
+        if (t === 'gemini') return <Tag color='cyan'>GOOGLE GEMINI</Tag>;
+        return <Tag color='blue'>{t?.toUpperCase()}</Tag>;
+      } 
+    },
     { title: 'API Key', dataIndex: 'api_key', key: 'api_key', render: (t) => <Text>{t?.substring(0, 8)}...{t?.slice(-4)}</Text> },
     { title: 'Model dự phòng', dataIndex: 'fallback_model', key: 'fallback_model', render: (t) => t ? <Text code>{t}</Text> : <Text type="secondary" italic>Mặc định</Text> },
     { title: 'Độ ưu tiên', dataIndex: 'priority', key: 'priority' },
@@ -360,6 +381,7 @@ export default function AiAgentSettings() {
         tts_voice: agent.tts_voice || 'vi-VN-HoaiMyNeural',
         tts_speed: agent.tts_speed !== undefined ? agent.tts_speed : 1.0,
         tts_pitch: agent.tts_pitch || '+0Hz',
+        tts_volume_gain_db: agent.tts_volume_gain_db !== undefined && agent.tts_volume_gain_db !== null ? agent.tts_volume_gain_db : 0.0,
         tts_style_prompt: agent.tts_style_prompt || '',
         tts_stability: agent.tts_stability !== undefined ? agent.tts_stability : 0.5,
         tts_similarity: agent.tts_similarity !== undefined ? agent.tts_similarity : 0.75,
@@ -392,6 +414,7 @@ export default function AiAgentSettings() {
         tts_voice: 'vi-VN-HoaiMyNeural',
         tts_speed: 1.0,
         tts_pitch: '+0Hz',
+        tts_volume_gain_db: 0.0,
         tts_style_prompt: '',
         tts_stability: 0.5,
         tts_similarity: 0.75,
@@ -1064,18 +1087,20 @@ export default function AiAgentSettings() {
                   <Select
                     size="large"
                     onChange={(val) => {
-                      if (val === 'microsoft') form.setFieldsValue({ tts_voice: 'vi-VN-HoaiMyNeural' });
-                      else if (val === 'openai') form.setFieldsValue({ tts_voice: 'nova' });
+                      if (val === 'microsoft') form.setFieldsValue({ tts_voice: 'vi-VN-HoaiMyNeural', tts_pitch: '+0Hz', tts_volume_gain_db: 0.0 });
+                      else if (val === 'google_cloud') form.setFieldsValue({ tts_voice: 'vi-VN-Neural2-A', tts_pitch: '+0Hz', tts_volume_gain_db: 0.0 });
+                      else if (val === 'openai') form.setFieldsValue({ tts_voice: 'nova', tts_pitch: '+0Hz', tts_volume_gain_db: 0.0 });
                       else if (val === 'elevenlabs') form.setFieldsValue({ tts_voice: '21m00Tcm4TlvDq8ikWAM' });
                       else if (val === 'google_studio') form.setFieldsValue({ tts_voice: 'Aoede' });
                       else if (val === 'google_free') form.setFieldsValue({ tts_voice: 'vi' });
                     }}
                   >
-                    <Select.Option value='microsoft'>🟢 Microsoft Edge TTS (Miễn phí 100% - Khuyên dùng)</Select.Option>
-                    <Select.Option value='google_studio'>🟣 Google AI Studio (Gemini Voice Prompt)</Select.Option>
-                    <Select.Option value='elevenlabs'>🟠 ElevenLabs (Voice Clone / Chuyên nghiệp)</Select.Option>
-                    <Select.Option value='openai'>🔵 OpenAI TTS (Alloy, Nova, Shimmer...)</Select.Option>
-                    <Select.Option value='google_free'>🟡 Google Translate (Dự phòng cơ bản)</Select.Option>
+                    <Select.Option value='microsoft'>[Edge TTS] Microsoft Edge (Miễn phí 100% - Khuyên dùng)</Select.Option>
+                    <Select.Option value='google_cloud'>[Google Cloud] Google Cloud TTS (Miễn phí 1-4tr ký tự/tháng)</Select.Option>
+                    <Select.Option value='google_studio'>[Gemini] Google AI Studio (Gemini Voice Prompt)</Select.Option>
+                    <Select.Option value='elevenlabs'>[ElevenLabs] ElevenLabs (Voice Clone / Chuyên nghiệp)</Select.Option>
+                    <Select.Option value='openai'>[OpenAI] OpenAI Audio (Alloy, Nova, Shimmer...)</Select.Option>
+                    <Select.Option value='google_free'>[Google Translate] Google Dịch (Dự phòng cơ bản)</Select.Option>
                   </Select>
                 </Form.Item>
               </Col>
@@ -1088,8 +1113,32 @@ export default function AiAgentSettings() {
                       return (
                         <Form.Item name='tts_voice' label={<Text strong>Giọng đọc (Microsoft Neural)</Text>} rules={[{required: true}]}>
                           <Select size="large">
-                            <Select.Option value='vi-VN-HoaiMyNeural'>👩 Hoài My (Nữ - Truyền cảm, chuẩn MC bán hàng)</Select.Option>
-                            <Select.Option value='vi-VN-NamMinhNeural'>👨 Nam Minh (Nam - Trầm ấm, dõng dạc, uy tín)</Select.Option>
+                            <Select.Option value='vi-VN-HoaiMyNeural'>[Nữ] Hoài My (Truyền cảm, chuẩn MC bán hàng)</Select.Option>
+                            <Select.Option value='vi-VN-NamMinhNeural'>[Nam] Nam Minh (Trầm ấm, dõng dạc, uy tín)</Select.Option>
+                          </Select>
+                        </Form.Item>
+                      );
+                    }
+                    if (provider === 'google_cloud') {
+                      return (
+                        <Form.Item name='tts_voice' label={<Text strong>Giọng đọc (Google Cloud TTS)</Text>} rules={[{required: true}]}>
+                          <Select size="large">
+                            <Select.OptGroup label="★ Công nghệ Neural2 (DeepMind AI - Tự nhiên & Biểu cảm nhất)">
+                              <Select.Option value='vi-VN-Neural2-A'>[Nữ] vi-VN-Neural2-A (Truyền cảm, tự nhiên - Khuyên dùng)</Select.Option>
+                              <Select.Option value='vi-VN-Neural2-D'>[Nam] vi-VN-Neural2-D (Trầm ấm, dõng dạc, uy tín)</Select.Option>
+                            </Select.OptGroup>
+                            <Select.OptGroup label="◆ Công nghệ WaveNet (DeepMind WaveNet AI - Sắc nét, rõ ràng)">
+                              <Select.Option value='vi-VN-Wavenet-A'>[Nữ] vi-VN-Wavenet-A (Hoạt ngôn, sắc nét)</Select.Option>
+                              <Select.Option value='vi-VN-Wavenet-B'>[Nam] vi-VN-Wavenet-B (Mạnh mẽ, dứt khoát)</Select.Option>
+                              <Select.Option value='vi-VN-Wavenet-C'>[Nữ] vi-VN-Wavenet-C (Dịu dàng, trẻ trung)</Select.Option>
+                              <Select.Option value='vi-VN-Wavenet-D'>[Nam] vi-VN-Wavenet-D (Đĩnh đạc, trầm ấm)</Select.Option>
+                            </Select.OptGroup>
+                            <Select.OptGroup label="● Công nghệ Standard (Tiêu chuẩn - Tiết kiệm quota)">
+                              <Select.Option value='vi-VN-Standard-A'>[Nữ] vi-VN-Standard-A (Tiêu chuẩn)</Select.Option>
+                              <Select.Option value='vi-VN-Standard-B'>[Nam] vi-VN-Standard-B (Tiêu chuẩn)</Select.Option>
+                              <Select.Option value='vi-VN-Standard-C'>[Nữ] vi-VN-Standard-C (Tiêu chuẩn)</Select.Option>
+                              <Select.Option value='vi-VN-Standard-D'>[Nam] vi-VN-Standard-D (Tiêu chuẩn)</Select.Option>
+                            </Select.OptGroup>
                           </Select>
                         </Form.Item>
                       );
@@ -1098,12 +1147,12 @@ export default function AiAgentSettings() {
                       return (
                         <Form.Item name='tts_voice' label={<Text strong>Giọng đọc (OpenAI)</Text>} rules={[{required: true}]}>
                           <Select size="large">
-                            <Select.Option value='nova'>👩 Nova (Nữ - Trẻ trung, năng lượng bán hàng)</Select.Option>
-                            <Select.Option value='shimmer'>👩 Shimmer (Nữ - Ngọt ngào, dịu dàng)</Select.Option>
-                            <Select.Option value='alloy'>🧑 Alloy (Trung tính - Tự nhiên, cân bằng)</Select.Option>
-                            <Select.Option value='onyx'>👨 Onyx (Nam - Trầm ấm, đĩnh đạc)</Select.Option>
-                            <Select.Option value='echo'>👨 Echo (Nam - Rõ ràng, dứt khoát)</Select.Option>
-                            <Select.Option value='fable'>👨 Fable (Nam - Biểu cảm kể chuyện)</Select.Option>
+                            <Select.Option value='nova'>[Nữ] Nova (Trẻ trung, năng lượng bán hàng)</Select.Option>
+                            <Select.Option value='shimmer'>[Nữ] Shimmer (Ngọt ngào, dịu dàng)</Select.Option>
+                            <Select.Option value='alloy'>[Trung tính] Alloy (Tự nhiên, cân bằng)</Select.Option>
+                            <Select.Option value='onyx'>[Nam] Onyx (Trầm ấm, đĩnh đạc)</Select.Option>
+                            <Select.Option value='echo'>[Nam] Echo (Rõ ràng, dứt khoát)</Select.Option>
+                            <Select.Option value='fable'>[Nam] Fable (Biểu cảm kể chuyện)</Select.Option>
                           </Select>
                         </Form.Item>
                       );
@@ -1124,12 +1173,12 @@ export default function AiAgentSettings() {
                       return (
                         <Form.Item name='tts_voice' label={<Text strong>Giọng đọc (Gemini TTS)</Text>} rules={[{required: true}]}>
                           <Select size="large">
-                            <Select.Option value="Aoede">👩 Aoede (Nữ - Ấm áp, biểu cảm, sinh động)</Select.Option>
-                            <Select.Option value="Kore">👩 Kore (Nữ - Trẻ trung, rõ ràng, năng lượng)</Select.Option>
-                            <Select.Option value="Zephyr">👩 Zephyr (Nữ - Nhẹ nhàng, ngọt ngào, dịu dàng)</Select.Option>
-                            <Select.Option value="Charon">👨 Charon (Nam - Trầm ấm, uy tín, dõng dạc)</Select.Option>
-                            <Select.Option value="Fenrir">👨 Fenrir (Nam - Mạnh mẽ, dứt khoát, tự tin)</Select.Option>
-                            <Select.Option value="Puck">👨 Puck (Nam - Vui vẻ, hài hước, thân thiện)</Select.Option>
+                            <Select.Option value="Aoede">[Nữ] Aoede (Ấm áp, biểu cảm, sinh động)</Select.Option>
+                            <Select.Option value="Kore">[Nữ] Kore (Trẻ trung, rõ ràng, năng lượng)</Select.Option>
+                            <Select.Option value="Zephyr">[Nữ] Zephyr (Nhẹ nhàng, ngọt ngào, dịu dàng)</Select.Option>
+                            <Select.Option value="Charon">[Nam] Charon (Trầm ấm, uy tín, dõng dạc)</Select.Option>
+                            <Select.Option value="Fenrir">[Nam] Fenrir (Mạnh mẽ, dứt khoát, tự tin)</Select.Option>
+                            <Select.Option value="Puck">[Nam] Puck (Vui vẻ, hài hước, thân thiện)</Select.Option>
                           </Select>
                         </Form.Item>
                       );
@@ -1150,6 +1199,45 @@ export default function AiAgentSettings() {
             <Form.Item noStyle shouldUpdate={(prev, curr) => prev.tts_provider !== curr.tts_provider}>
               {({ getFieldValue }) => {
                 const provider = getFieldValue('tts_provider') || 'microsoft';
+                if (provider === 'google_cloud') {
+                  return (
+                    <div style={{ background: '#f1f5f9', padding: '14px 16px', borderRadius: 8, marginBottom: 16, border: '1px solid #cbd5e1' }}>
+                      <Row gutter={16}>
+                        <Col xs={24} md={12}>
+                          <Form.Item 
+                            name='tts_pitch' 
+                            label={<Space><Text strong>Cao độ giọng / Biểu cảm (Pitch)</Text><Tooltip title="Chỉnh cao độ từ trầm (-6.0 semitones) đến thanh nhẹ (+5.0 semitones). Mặc định +0Hz"><InfoCircleOutlined /></Tooltip></Space>}
+                          >
+                            <Select size="middle">
+                              <Select.Option value="-6.0st">Rất trầm ấm (-6.0 semitones)</Select.Option>
+                              <Select.Option value="-3.0st">Trầm nhẹ (-3.0 semitones)</Select.Option>
+                              <Select.Option value="+0Hz">Tự nhiên (+0 semitones - Mặc định)</Select.Option>
+                              <Select.Option value="+2.5st">Thanh thoát, tươi tắn (+2.5 semitones)</Select.Option>
+                              <Select.Option value="+5.0st">Trong trẻo, tươi vui (+5.0 semitones)</Select.Option>
+                            </Select>
+                          </Form.Item>
+                        </Col>
+                        <Col xs={24} md={12}>
+                          <Form.Item 
+                            name='tts_volume_gain_db' 
+                            label={<Space><Text strong>Độ lợi âm lượng (Volume Gain dB)</Text><Tooltip title="Khuếch đại hoặc giảm âm lượng gốc của giọng đọc (-6dB đến +6dB). Mặc định 0dB"><InfoCircleOutlined /></Tooltip></Space>}
+                          >
+                            <Slider 
+                              min={-6.0} 
+                              max={6.0} 
+                              step={0.5} 
+                              marks={{ '-6': '-6dB', '0': '0dB (Chuẩn)', '6': '+6dB' }} 
+                            />
+                          </Form.Item>
+                        </Col>
+                      </Row>
+                      <div style={{ fontSize: 12, color: '#334155', display: 'flex', alignItems: 'center', gap: 6 }}>
+                        <Tag color="geekblue" style={{ margin: 0, fontWeight: 600 }}>Cơ chế Quota & Xoay vòng</Tag>
+                        <span>Miễn phí <strong>4.000.000 ký tự/tháng</strong> (Standard & WaveNet) và <strong>1.000.000 ký tự/tháng</strong> (Neural2) cho mỗi API Key. Khi có nhiều API Key, hệ thống tự động xoay vòng và chuyển key khi hết quota.</span>
+                      </div>
+                    </div>
+                  );
+                }
                 if (provider === 'google_studio') {
                   return (
                     <Form.Item 
@@ -1353,6 +1441,7 @@ export default function AiAgentSettings() {
               <Select.Option value='openai'>OpenAI (ChatGPT)</Select.Option>
               <Select.Option value='gemini'>Google Gemini</Select.Option>
               <Select.Option value='anthropic'>Anthropic (Claude)</Select.Option>
+              <Select.Option value='google_cloud'>Google Cloud TTS (Text-to-Speech API Key)</Select.Option>
               <Select.Option value='elevenlabs'>ElevenLabs (Voice Clone / TTS)</Select.Option>
             </Select>
           </Form.Item>
@@ -1366,6 +1455,30 @@ export default function AiAgentSettings() {
               const currentApiKey = getFieldValue('api_key');
               const canFetch = currentProvider && currentApiKey && currentApiKey.trim().length > 5;
               
+              if (currentProvider === 'google_cloud') {
+                return (
+                  <Alert 
+                    type="info" 
+                    showIcon 
+                    message="Cơ chế Xoay vòng & Dự phòng Quota Google Cloud" 
+                    description="Google Cloud TTS sử dụng API Key REST (miễn phí 1-4 triệu ký tự/tháng mỗi key). Bạn có thể thêm nhiều API Key Google Cloud vào kho này. Nếu một key gặp lỗi quota (429/403/Resource Exhausted), hệ thống sẽ tự động xoay vòng sang key khác ngay lập tức."
+                    style={{ marginBottom: 16 }}
+                  />
+                );
+              }
+
+              if (currentProvider === 'elevenlabs') {
+                return (
+                  <Alert 
+                    type="info" 
+                    showIcon 
+                    message="ElevenLabs Voice Engine" 
+                    description="Key ElevenLabs dùng trực tiếp cho bộ tạo giọng nói cao cấp (Voice Clone / Voice ID)."
+                    style={{ marginBottom: 16 }}
+                  />
+                );
+              }
+
               return (
                 <Form.Item 
                   name='fallback_model' 

@@ -72,12 +72,14 @@ class AiAgentViewSet(viewsets.ModelViewSet):
         style_prompt = request.data.get('tts_style_prompt', '')
         stability = float(request.data.get('tts_stability', 0.5))
         similarity = float(request.data.get('tts_similarity', 0.75))
+        volume_gain_db = float(request.data.get('tts_volume_gain_db', 0.0) or 0.0)
 
         mock_agent = SimpleNamespace(
             tts_provider=provider,
             tts_voice=voice,
             tts_speed=speed,
             tts_pitch=pitch,
+            tts_volume_gain_db=volume_gain_db,
             tts_style_prompt=style_prompt,
             tts_stability=stability,
             tts_similarity=similarity
@@ -88,7 +90,8 @@ class AiAgentViewSet(viewsets.ModelViewSet):
             audio_result, used_provider, is_fallback, fallback_reason = generate_tts_with_failover(
                 text=text,
                 agent=mock_agent,
-                company=company
+                company=company,
+                skip_circuit_breaker=True
             )
             audio_b64 = base64.b64encode(audio_result.audio_bytes).decode('utf-8')
             return Response({

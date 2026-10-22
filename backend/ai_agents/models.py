@@ -11,6 +11,7 @@ class SystemAiKey(models.Model):
         ('anthropic', 'Anthropic'),
         ('gemini', 'Google Gemini'),
         ('elevenlabs', 'ElevenLabs'),
+        ('google_cloud', 'Google Cloud (TTS)'),
     )
     provider = models.CharField(max_length=50, choices=PROVIDER_CHOICES, default='openai')
     api_key = models.CharField(max_length=255)
@@ -52,6 +53,7 @@ class CompanyAiKey(models.Model):
         ('anthropic', 'Anthropic'),
         ('gemini', 'Google Gemini'),
         ('elevenlabs', 'ElevenLabs'),
+        ('google_cloud', 'Google Cloud (TTS)'),
     )
     company = models.ForeignKey(Company, on_delete=models.CASCADE, related_name='ai_keys')
     provider = models.CharField(max_length=50, choices=PROVIDER_CHOICES, default='openai')
@@ -113,6 +115,7 @@ class AiAgent(models.Model):
     # Cấu hình Giọng nói (TTS)
     TTS_PROVIDER_CHOICES = (
         ('microsoft', 'Microsoft Edge TTS (Miễn phí)'),
+        ('google_cloud', 'Google Cloud TTS (Miễn phí 1-4tr ký tự/tháng)'),
         ('google_studio', 'Google AI Studio (Gemini Voice Prompt)'),
         ('elevenlabs', 'ElevenLabs (Voice Clone / Chuyên nghiệp)'),
         ('openai', 'OpenAI TTS'),
@@ -136,6 +139,12 @@ class AiAgent(models.Model):
         blank=True,
         null=True,
         help_text="Cao độ giọng đọc (vd: +0Hz, +5Hz, -5Hz)"
+    )
+    tts_volume_gain_db = models.FloatField(
+        default=0.0,
+        blank=True,
+        null=True,
+        help_text="Độ lợi âm lượng dB (-10.0 đến +10.0 cho Google Cloud TTS)"
     )
     tts_style_prompt = models.TextField(
         blank=True,

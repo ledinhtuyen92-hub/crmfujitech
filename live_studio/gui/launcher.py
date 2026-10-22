@@ -297,15 +297,24 @@ class StudioLauncher(ctk.CTk):
                     cpu_model = platform.processor()
                     disk_total = round(psutil.disk_usage('/').total / (1024**3), 1)
                     
-                    try:
-                        gpu_output = subprocess.check_output(
-                            ['wmic', 'path', 'win32_VideoController', 'get', 'name'], 
-                            creationflags=0x08000000
-                        ).decode('utf-8', errors='ignore')
-                        gpu_lines = [line.strip() for line in gpu_output.split('\n') if line.strip() and 'Name' not in line]
-                        gpu_model = gpu_lines[0] if gpu_lines else "Unknown GPU"
-                    except:
-                        gpu_model = "Unknown GPU"
+                    if not hasattr(self, '_cached_gpu_model') or not self._cached_gpu_model:
+                        try:
+                            flags = 0x08000000 if sys.platform == 'win32' else 0
+                            startupinfo = None
+                            if sys.platform == 'win32':
+                                startupinfo = subprocess.STARTUPINFO()
+                                startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
+                                startupinfo.wShowWindow = 0
+                            gpu_output = subprocess.check_output(
+                                ['wmic', 'path', 'win32_VideoController', 'get', 'name'], 
+                                creationflags=flags,
+                                startupinfo=startupinfo
+                            ).decode('utf-8', errors='ignore')
+                            gpu_lines = [line.strip() for line in gpu_output.split('\n') if line.strip() and 'Name' not in line]
+                            self._cached_gpu_model = gpu_lines[0] if gpu_lines else "Unknown GPU"
+                        except:
+                            self._cached_gpu_model = "Unknown GPU"
+                    gpu_model = self._cached_gpu_model
                     
                     res = requests.post(
                         f"{self.server_url}/api/live_sessions/devices/{self.local_device_id}/ping/", 

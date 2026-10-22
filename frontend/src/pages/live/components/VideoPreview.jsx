@@ -83,6 +83,7 @@ export default function VideoPreview({
   const [loadProgress, setLoadProgress] = useState(0)
   const [progressStatusText, setProgressStatusText] = useState('Đang thiết lập kết nối...')
   const [showHud, setShowHud] = useState(true)
+  const [previewPose, setPreviewPose] = useState('idle') // 'idle' | 'speaking'
   const retryCountRef = useRef(0)
   const warmupRetryRef = useRef(0)
   const MAX_RETRY = 5
@@ -398,7 +399,11 @@ export default function VideoPreview({
       return `${base}${url.startsWith('/') ? '' : '/'}${url}`
     }
     const bgUrl = resolveUrl(session?.background_asset_url)
-    const avatarUrl = resolveUrl(session?.avatar_asset_url || session?.avatar_speaking_asset_url)
+    const avatarUrl = resolveUrl(
+      previewPose === 'speaking' && session?.avatar_speaking_asset_url
+        ? session?.avatar_speaking_asset_url
+        : (session?.avatar_asset_url || session?.avatar_speaking_asset_url)
+    )
     const avatarPosterUrl = resolveUrl(session?.avatar_asset_thumbnail_url)
     const overlayUrl = resolveUrl(session?.overlay_asset_url)
 
@@ -990,6 +995,37 @@ export default function VideoPreview({
                 zIndex: 2,
               }}>
                 {renderSceneComposition()}
+                {session?.avatar_asset_url && session?.avatar_speaking_asset_url && (
+                  <div style={{
+                    position: 'absolute',
+                    bottom: 16,
+                    left: 16,
+                    zIndex: 4,
+                    display: 'flex',
+                    gap: 6,
+                    background: 'rgba(0,0,0,0.65)',
+                    padding: '4px 6px',
+                    borderRadius: 6,
+                    backdropFilter: 'blur(4px)',
+                  }}>
+                    <Button
+                      size="small"
+                      type={previewPose === 'idle' ? 'primary' : 'text'}
+                      style={{ fontSize: 11, height: 24, padding: '0 8px', color: previewPose === 'idle' ? '#fff' : '#d9d9d9' }}
+                      onClick={(e) => { e.stopPropagation(); setPreviewPose('idle'); }}
+                    >
+                      Lúc nghỉ
+                    </Button>
+                    <Button
+                      size="small"
+                      type={previewPose === 'speaking' ? 'primary' : 'text'}
+                      style={{ fontSize: 11, height: 24, padding: '0 8px', color: previewPose === 'speaking' ? '#fff' : '#d9d9d9' }}
+                      onClick={(e) => { e.stopPropagation(); setPreviewPose('speaking'); }}
+                    >
+                      Lúc nói
+                    </Button>
+                  </div>
+                )}
                 <div style={{
                   position: 'absolute',
                   bottom: 16,

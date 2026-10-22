@@ -89,32 +89,53 @@ paths:{rtmp_forward}
 
     async def start(self) -> bool:
         self._stopping = False
-        binary = self._locate_binary()
-        if not binary:
-            # Check if an external MediaMTX server (e.g. Docker container) is listening
-            try:
-                sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-                sock.settimeout(0.5)
-                res = sock.connect_ex(('127.0.0.1', MEDIAMTX_LOCAL_HLS_PORT))
-                sock.close()
-                if res == 0:
-                    logger.info(f'[MediaMTX] Existing MediaMTX server detected on port {MEDIAMTX_LOCAL_HLS_PORT}. Reusing instance.')
-                    self.is_running = True
-                    return True
-            except Exception as e:
-                logger.debug(f'[MediaMTX] Port probe check: {e}')
 
-            logger.error('[MediaMTX] mediamtx.exe not found.')
-            return False
-
-        # If local binary exists, terminate any orphan mediamtx.exe so the fresh config is always loaded
+        # 1. Terminate any orphan Windows mediamtx.exe silently WITHOUT popping up a console window
         if sys.platform == 'win32':
             try:
-                import subprocess
-                subprocess.run(['taskkill', '/F', '/IM', 'mediamtx.exe'], capture_output=True, timeout=2)
-                await asyncio.sleep(0.2)
+                import psutil
+                for proc in psutil.process_iter(['name']):
+                    try:
+                        if proc.info['name'] and proc.info['name'].lower() == 'mediamtx.exe':
+                            proc.kill()
+                    except Exception:
+                        pass
+                await asyncio.sleep(0.1)
             except Exception:
-                pass
+                try:
+                    import subprocess
+                    flags = 0x08000000
+                    startupinfo = subprocess.STARTUPINFO()
+                    startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
+                    startupinfo.wShowWindow = 0
+                    subprocess.run(
+                        ['taskkill', '/F', '/IM', 'mediamtx.exe'],
+                        capture_output=True,
+                        timeout=2,
+                        creationflags=flags,
+                        startupinfo=startupinfo
+                    )
+                except Exception:
+                    pass
+
+        # 2. Check if an external MediaMTX server (e.g. Docker container) is already active and listening
+        try:
+            sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            sock.settimeout(0.5)
+            res = sock.connect_ex(('127.0.0.1', MEDIAMTX_LOCAL_HLS_PORT))
+            sock.close()
+            if res == 0:
+                logger.info(f'[MediaMTX] Existing MediaMTX server detected on port {MEDIAMTX_LOCAL_HLS_PORT} (e.g. Docker container). Reusing instance.')
+                self.is_running = True
+                return True
+        except Exception as e:
+            logger.debug(f'[MediaMTX] Port probe check: {e}')
+
+        # 3. If no server listening, check if local binary exists
+        binary = self._locate_binary()
+        if not binary:
+            logger.error('[MediaMTX] mediamtx.exe not found and no existing server detected.')
+            return False
 
         binary_dir = os.path.dirname(os.path.abspath(binary))
         # Write mediamtx.yml in binary_dir so mediamtx.exe picks it up by default without path quoting issues
@@ -147,6 +168,7 @@ paths:{rtmp_forward}
                 creationflags=flags
             )
             self.is_running = True
+            self._restart_count = 0
             logger.info(f'[MediaMTX] Started (PID {self.process.pid}). RTMP={MEDIAMTX_LOCAL_RTMP_URL} HLS={MEDIAMTX_LOCAL_HLS_URL}')
             asyncio.create_task(self._monitor())
             return True
@@ -157,24 +179,44 @@ paths:{rtmp_forward}
     async def _monitor(self):
         if not self.process:
             return
+
+        async def _read_stream(stream):
+            try:
+                while True:
+                    line = await stream.readline()
+                    if not line:
+                        break
+                    decoded = line.decode('utf-8', errors='ignore').strip()
+                    if not decoded:
+                        continue
+                    if 'ERR' in decoded or 'error' in decoded.lower():
+                        logger.error(f"[MediaMTX] {decoded}")
+                    else:
+                        logger.info(f"[MediaMTX] {decoded}")
+            except Exception:
+                pass
+
         try:
-            while True:
-                line = await self.process.stderr.readline()
-                if not line:
-                    break
-                decoded = line.decode('utf-8', errors='ignore').strip()
-                if 'ERR' in decoded or 'error' in decoded.lower():
-                    logger.error(f"[MediaMTX] {decoded}")
-                else:
-                    logger.info(f"[MediaMTX] {decoded}")
+            tasks = []
+            if self.process.stdout:
+                tasks.append(_read_stream(self.process.stdout))
+            if self.process.stderr:
+                tasks.append(_read_stream(self.process.stderr))
+            if tasks:
+                await asyncio.gather(*tasks)
         except Exception:
             pass
+
         await self.process.wait()
         returncode = self.process.returncode
         self.is_running = False
         logger.warning(f'[MediaMTX] Process exited with code {returncode}')
         if not self._stopping:
-            logger.error('[MediaMTX] Process died unexpectedly. Auto-restarting in 2s...')
+            self._restart_count = getattr(self, '_restart_count', 0) + 1
+            if self._restart_count > 3:
+                logger.error(f'[MediaMTX] Process crashed {self._restart_count} times. Aborting auto-restart to prevent window flickering.')
+                return
+            logger.error(f'[MediaMTX] Process died unexpectedly (attempt {self._restart_count}/3). Auto-restarting in 2s...')
             await asyncio.sleep(2.0)
             if not self._stopping:
                 await self.start()

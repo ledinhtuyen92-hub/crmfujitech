@@ -118,7 +118,12 @@ class VideoFrameSequence:
                     os.path.join(temp_dir, "frame_%04d.jpg")
                 ]
                 flags = 0x08000000 if os.name == 'nt' else 0
-                res = subprocess.run(cmd, capture_output=True, creationflags=flags)
+                startupinfo = None
+                if os.name == 'nt':
+                    startupinfo = subprocess.STARTUPINFO()
+                    startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
+                    startupinfo.wShowWindow = 0
+                res = subprocess.run(cmd, capture_output=True, creationflags=flags, startupinfo=startupinfo)
                 if res.returncode == 0:
                     frame_files = sorted([os.path.join(temp_dir, f) for f in os.listdir(temp_dir) if f.endswith('.jpg')])
                     for f in frame_files:

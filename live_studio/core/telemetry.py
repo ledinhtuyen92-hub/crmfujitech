@@ -47,9 +47,14 @@ class DeviceTelemetry:
     def _detect_gpu(self) -> str:
         if sys.platform == 'win32':
             try:
+                flags = 0x08000000
+                startupinfo = subprocess.STARTUPINFO()
+                startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
+                startupinfo.wShowWindow = 0
                 out = subprocess.check_output(
                     ['wmic', 'path', 'win32_VideoController', 'get', 'name'],
-                    creationflags=0x08000000
+                    creationflags=flags,
+                    startupinfo=startupinfo
                 ).decode('utf-8', errors='ignore')
                 lines = [line.strip() for line in out.split('\n') if line.strip() and 'Name' not in line]
                 if lines:
