@@ -63,12 +63,14 @@ class StreamController:
             try:
                 await self.encoder.write_audio(data)
             except Exception as e:
-                logger.error(f"Failed to write audio to encoder.")
+                logger.error(f"Failed to write audio to encoder: {e}")
                 
     async def _frame_pump(self, start_time: float = None):
         try:
             sent_frames = 0
             fps = self._current_payload.fps if self._current_payload else 30
+            sample_rate = self._current_payload.audio_sample_rate if self._current_payload else 44100
+            samples_per_frame = sample_rate // fps  # 44100 // 30 = 1470 samples
             last_frame_data = None
             if start_time is None:
                 start_time = getattr(self.encoder.timeline, 'start_time', time.monotonic()) if self.encoder else time.monotonic()
@@ -83,24 +85,34 @@ class StreamController:
                         else:
                             break
 
-                # 2. Clock-driven pacing: send exact number of frames corresponding to elapsed wall-clock time
+                # 2. Lock-step pacing: send EXACT pairs of (1 video frame, 1470 audio samples)
                 if last_frame_data and self.encoder:
                     now = time.monotonic()
                     target_frames = int((now - start_time) * fps)
-                    # Real-time frame pacing: never burst-dump backlog raw frames (2.76MB each) into TCP!
-                    # If execution jitter caused frames to be missed, advance sent_frames and only send the latest frame.
-                    if target_frames - sent_frames > 1:
-                        sent_frames = target_frames - 1
+                    
+                    # Prevent unbounded backlog in case of extreme system freeze (> 5 frames)
+                    if target_frames - sent_frames > 5:
+                        sent_frames = target_frames - 2
 
                     while sent_frames < target_frames and self.state == StreamState.LIVE:
                         try:
+                            # 2a. Fetch 1:1 synchronized audio chunk for this video frame
+                            if self.audio_sink and getattr(self.audio_sink, 'lockstep_mode', False):
+                                audio_chunk, energy, is_voice = self.audio_sink.get_audio_chunk(samples_per_frame)
+                            else:
+                                audio_chunk = None
+
+                            # 2b. Write video frame and audio chunk in lock-step
                             await self.encoder.write_video(last_frame_data)
+                            if audio_chunk:
+                                await self.encoder.write_audio(audio_chunk)
+                                
                             sent_frames += 1
                         except Exception as e:
-                            logger.error(f"Failed to write video frame to encoder: {e}")
+                            logger.error(f"Failed to write A/V frame pair to encoder: {e}")
                             break
 
-                await asyncio.sleep(0.015)
+                await asyncio.sleep(0.01)
         except asyncio.CancelledError:
             pass
         except Exception as e:
@@ -250,6 +262,7 @@ class StreamController:
                 self.encoder.timeline.start_time = live_start_time
             
             if self.audio_sink:
+                self.audio_sink.lockstep_mode = True
                 self.audio_sink.start(start_time=live_start_time)
             
             if self.frame_queue:

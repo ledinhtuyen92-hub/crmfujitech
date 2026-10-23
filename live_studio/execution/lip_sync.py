@@ -85,7 +85,7 @@ class LipSyncAnalyzer:
             self._current_energy = norm_amp
             
             # Map amplitude to target state index
-            if norm_amp < 0.05:  # Noise floor threshold
+            if norm_amp < 0.03:  # Noise floor threshold (calibrated for TTS voice detection)
                 target_idx = 0
             elif norm_amp < 0.2:
                 target_idx = 1
@@ -122,7 +122,7 @@ class LipSyncAnalyzer:
             self.get_mouth_state(position_ms)
         return getattr(self, '_current_energy', 0.0)
 
-    def is_voice_active(self, position_ms: int = None, threshold: float = 0.05) -> bool:
+    def is_voice_active(self, position_ms: int = None, threshold: float = 0.03) -> bool:
         """
         Determines whether the voice is actively making sound (not in pause/silence).
         """

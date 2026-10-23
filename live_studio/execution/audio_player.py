@@ -123,6 +123,18 @@ class PygameAudioPlayer(BaseAudioPlayer):
                         logger.error(f"Stream sink preparation failed: {e}")
                         pcm_data = b""
 
+                if getattr(self.stream_sink, 'lockstep_mode', False):
+                    # Lock-step streaming: delegate speech streaming completely to stream_sink!
+                    # Audio chunks are pulled frame-by-frame by _frame_pump in exact 1:1 synchronization with video!
+                    self._is_playing = True
+                    self._start_time = time.monotonic()
+                    self._last_position_ms = 0
+                    self.stream_sink.start_speech(pcm_data)
+                    await self.stream_sink.wait_for_speech_done()
+                    completed = self._is_playing
+                    self._is_playing = False
+                    return completed
+
                 bytes_per_sec = getattr(self.stream_sink, 'bytes_per_sec', 176400)
                 duration_ms = (len(pcm_data) / bytes_per_sec * 1000.0) if pcm_data else 0.0
 
@@ -201,7 +213,7 @@ class PygameAudioPlayer(BaseAudioPlayer):
                     self._last_position_ms = int((time.monotonic() - self._start_time) * 1000)
                 await asyncio.sleep(0.01)
                 
-            completed = self._is_playing
+                completed = self._is_playing
             self._is_playing = False
             return completed
         except Exception as e:
@@ -220,6 +232,8 @@ class PygameAudioPlayer(BaseAudioPlayer):
         self._is_playing = False
         if hasattr(self, 'stream_sink') and self.stream_sink:
             try:
+                if hasattr(self.stream_sink, 'interrupt_speech'):
+                    self.stream_sink.interrupt_speech()
                 self.stream_sink.set_speaking(False)
             except Exception:
                 pass
@@ -236,11 +250,13 @@ class PygameAudioPlayer(BaseAudioPlayer):
     def get_position_ms(self) -> int:
         """
         Returns elapsed playback time in milliseconds.
-        When live streaming via stream_sink, time is strictly tracked by wall-clock monotonic time.
+        When live streaming via lockstep stream_sink, position is strictly tracked by audio samples written.
         In offline mode, delegates to pygame.mixer.music.
         """
         if self._is_playing:
             if self.stream_sink and self.stream_sink.is_streaming:
+                if getattr(self.stream_sink, 'lockstep_mode', False) and hasattr(self.stream_sink, 'get_speech_position_ms'):
+                    return self.stream_sink.get_speech_position_ms()
                 return int((time.monotonic() - self._start_time) * 1000)
             if self._available:
                 import pygame
