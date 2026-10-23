@@ -8,6 +8,8 @@ import { LoadingOutlined } from '@ant-design/icons'
  */
 export default function ChromaKeyVideo({
   src,
+  speakingSrc,
+  activePose = 'idle', // 'idle' | 'speaking'
   poster,
   onLoaded,
   style = {},
@@ -15,8 +17,11 @@ export default function ChromaKeyVideo({
   similarity = 0.072,
   smoothness = 0.015,
 }) {
-  const videoRef = useRef(null)
+  const videoIdleRef = useRef(null)
+  const videoSpeakingRef = useRef(null)
   const canvasRef = useRef(null)
+  const activePoseRef = useRef(activePose)
+  activePoseRef.current = activePose
   const [isLoaded, setIsLoaded] = useState(false)
   const [useFallback, setUseFallback] = useState(false)
 
@@ -27,9 +32,9 @@ export default function ChromaKeyVideo({
     let program = null
     let isCancelled = false
 
-    const video = videoRef.current
+    const videoIdle = videoIdleRef.current
     const canvas = canvasRef.current
-    if (!video || !canvas || useFallback) return
+    if (!videoIdle || !canvas || useFallback) return
 
     // Initialize WebGL with alpha channel (premultipliedAlpha: true ensures natural soft edge blending without dark halos)
     try {
@@ -248,9 +253,28 @@ export default function ChromaKeyVideo({
     const render = () => {
       if (isCancelled) return
 
-      if (video && !video.paused && !video.ended && video.readyState >= 2) {
-        const targetW = video.videoWidth || 720
-        const targetH = video.videoHeight || 1280
+      const vIdle = videoIdleRef.current
+      const vSpk = videoSpeakingRef.current
+      const isSpeakingActive = (activePoseRef.current === 'speaking' && speakingSrc)
+
+      // Time sync between Idle and Speaking: lockstep twin playback
+      if (vIdle && vSpk && vIdle.readyState >= 2 && vSpk.readyState >= 2) {
+        if (!vIdle.paused && vSpk.paused) {
+          vSpk.play().catch(() => {})
+        } else if (vIdle.paused && !vSpk.paused) {
+          vSpk.pause()
+        }
+        const timeDiff = Math.abs(vSpk.currentTime - vIdle.currentTime)
+        if (timeDiff > 0.04) {
+          vSpk.currentTime = vIdle.currentTime
+        }
+      }
+
+      const activeVideo = (isSpeakingActive && vSpk && vSpk.readyState >= 2) ? vSpk : vIdle
+
+      if (activeVideo && !activeVideo.paused && !activeVideo.ended && activeVideo.readyState >= 2) {
+        const targetW = activeVideo.videoWidth || 720
+        const targetH = activeVideo.videoHeight || 1280
         if (canvas.width !== targetW || canvas.height !== targetH) {
           canvas.width = targetW
           canvas.height = targetH
@@ -264,7 +288,7 @@ export default function ChromaKeyVideo({
           gl.uniform1f(smoothnessLoc, smoothness)
 
           gl.bindTexture(gl.TEXTURE_2D, texture)
-          gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, video)
+          gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, activeVideo)
 
           gl.clearColor(0.0, 0.0, 0.0, 0.0)
           gl.clear(gl.COLOR_BUFFER_BIT)
@@ -294,40 +318,65 @@ export default function ChromaKeyVideo({
         if (program) gl.deleteProgram(program)
       }
     }
-  }, [src, useFallback, similarity, smoothness, keyColorHex])
+  }, [src, speakingSrc, useFallback, similarity, smoothness, keyColorHex])
 
   if (useFallback) {
+    const isSpeaking = activePose === 'speaking' && speakingSrc
     return (
-      <video
-        ref={videoRef}
-        src={src}
-        poster={poster}
-        autoPlay
-        loop
-        muted
-        playsInline
-        crossOrigin="anonymous"
-        onLoadedData={() => {
-          setIsLoaded(true)
-          if (onLoaded) onLoaded()
-        }}
-        style={{
-          width: '100%',
-          height: '100%',
-          objectFit: 'cover',
-          position: 'absolute',
-          top: 0,
-          left: 0,
-          ...style,
-        }}
-      />
+      <div style={{ position: 'absolute', inset: 0, overflow: 'hidden', ...style }}>
+        <video
+          ref={videoIdleRef}
+          src={src}
+          poster={poster}
+          autoPlay
+          loop
+          muted
+          playsInline
+          crossOrigin="anonymous"
+          onLoadedData={() => {
+            setIsLoaded(true)
+            if (onLoaded) onLoaded()
+          }}
+          style={{
+            width: '100%',
+            height: '100%',
+            objectFit: 'cover',
+            position: 'absolute',
+            top: 0,
+            left: 0,
+            opacity: isSpeaking ? 0 : 1,
+            pointerEvents: 'none',
+          }}
+        />
+        {speakingSrc && (
+          <video
+            ref={videoSpeakingRef}
+            src={speakingSrc}
+            autoPlay
+            loop
+            muted
+            playsInline
+            crossOrigin="anonymous"
+            style={{
+              width: '100%',
+              height: '100%',
+              objectFit: 'cover',
+              position: 'absolute',
+              top: 0,
+              left: 0,
+              opacity: isSpeaking ? 1 : 0,
+              pointerEvents: 'none',
+            }}
+          />
+        )}
+      </div>
     )
   }
 
   return (
     <>
       <video
-        ref={videoRef}
+        ref={videoIdleRef}
         src={src}
         poster={poster}
         autoPlay
@@ -347,6 +396,24 @@ export default function ChromaKeyVideo({
           pointerEvents: 'none',
         }}
       />
+      {speakingSrc && (
+        <video
+          ref={videoSpeakingRef}
+          src={speakingSrc}
+          autoPlay
+          loop
+          muted
+          playsInline
+          crossOrigin="anonymous"
+          style={{
+            position: 'absolute',
+            width: 1,
+            height: 1,
+            opacity: 0,
+            pointerEvents: 'none',
+          }}
+        />
+      )}
       <canvas
         ref={canvasRef}
         width={720}

@@ -399,11 +399,10 @@ export default function VideoPreview({
       return `${base}${url.startsWith('/') ? '' : '/'}${url}`
     }
     const bgUrl = resolveUrl(session?.background_asset_url)
-    const avatarUrl = resolveUrl(
-      previewPose === 'speaking' && session?.avatar_speaking_asset_url
-        ? session?.avatar_speaking_asset_url
-        : (session?.avatar_asset_url || session?.avatar_speaking_asset_url)
-    )
+    const idleAvatarUrl = resolveUrl(session?.avatar_asset_url)
+    const speakingAvatarUrl = resolveUrl(session?.avatar_speaking_asset_url)
+    const primaryAvatarUrl = idleAvatarUrl || speakingAvatarUrl
+    const speakingAvatarSrc = (idleAvatarUrl && speakingAvatarUrl) ? speakingAvatarUrl : null
     const avatarPosterUrl = resolveUrl(session?.avatar_asset_thumbnail_url)
     const overlayUrl = resolveUrl(session?.overlay_asset_url)
 
@@ -428,17 +427,19 @@ export default function VideoPreview({
             />
           )
         )}
-        {avatarUrl && (
-          avatarUrl.match(/\.(mp4|webm)$/i) ? (
+        {primaryAvatarUrl && (
+          primaryAvatarUrl.match(/\.(mp4|webm)$/i) ? (
             <ChromaKeyVideo
-              src={avatarUrl}
+              src={primaryAvatarUrl}
+              speakingSrc={speakingAvatarSrc}
+              activePose={previewPose}
               poster={avatarPosterUrl || undefined}
               onLoaded={() => setIsMockupAvatarLoaded(true)}
               style={{ zIndex: 1 }}
             />
           ) : (
             <img
-              src={avatarUrl}
+              src={previewPose === 'speaking' && speakingAvatarUrl ? speakingAvatarUrl : primaryAvatarUrl}
               alt="Avatar"
               style={{ width: '100%', height: '100%', objectFit: 'cover', position: 'absolute', top: 0, left: 0, zIndex: 1 }}
             />

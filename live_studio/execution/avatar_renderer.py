@@ -175,6 +175,27 @@ class VideoFrameSequence:
             logger.error(f"Failed to decode frame {idx}: {e}")
             return None
 
+    def get_frame_by_index(self, idx: int):
+        if self.static_surf:
+            return self.static_surf
+        if not self.frame_bytes:
+            return None
+        idx = idx % len(self.frame_bytes)
+        cached = self._surface_cache.get(idx)
+        if cached is not None:
+            return cached
+        try:
+            surf = self.pygame.image.load(self.io.BytesIO(self.frame_bytes[idx]))
+            self._surface_cache[idx] = surf
+            self._cache_keys.append(idx)
+            if len(self._cache_keys) > self._max_cache:
+                oldest = self._cache_keys.popleft()
+                self._surface_cache.pop(oldest, None)
+            return surf
+        except Exception as e:
+            logger.error(f"Failed to decode frame {idx}: {e}")
+            return None
+
     def __len__(self):
         return 1 if self.static_surf else len(self.frame_bytes)
 
@@ -297,7 +318,7 @@ class PygameAvatarRenderer(BaseAvatarRenderer):
         self._is_speaking_state = False
         self._voice_active_hold_timer = 0.0
         self._last_render_time = time.monotonic()
-        self._speaking_playback_time = 0.0
+        # Unified timeline continues advancing naturally (NEVER reset timeline)
 
     def render(self, is_speaking: bool, mouth_state: str, is_blinking: bool, audio_energy: float = 0.0):
         if not self.available or not self.screen:
@@ -336,7 +357,7 @@ class PygameAvatarRenderer(BaseAvatarRenderer):
             bool(self._current_action_seq)
         )
         
-        # Avatar Rendering with Action Support & Dynamic/Static Sequence Switching
+        # Avatar Rendering with Action Support & Unified-Timeline Dynamic/Static Sequence Switching
         if has_custom_avatar:
             surf = None
 
@@ -350,36 +371,44 @@ class PygameAvatarRenderer(BaseAvatarRenderer):
                     self._current_action_id = None
                     self._current_action_time = 0.0
 
-            # 2. Both Idle and Speaking sequences are available (Primary Dual-Sequence Avatar)
+            # 2. Both Idle and Speaking sequences are available (Phase-Locked Dual-Sequence Avatar)
+            # Idle and speaking share the exact same gestures and pose at every second t.
+            # When voice frequency is detected -> sample speaking_sequence at frame_idx
+            # When silent/paused/resting -> sample idle_sequence at that exact same frame_idx!
+            # The master timeline advances continuously without ever resetting to 0.
+            # Gestures, posture, hands, and scene remain 100% continuous and coherent!
             elif self.idle_sequence and len(self.idle_sequence) > 0 and self.speaking_sequence and len(self.speaking_sequence) > 0:
+                common_frames = min(len(self.idle_sequence.frame_bytes), len(self.speaking_sequence.frame_bytes))
+                if common_frames <= 0:
+                    common_frames = max(len(self.idle_sequence.frame_bytes), len(self.speaking_sequence.frame_bytes), 1)
+
+                fps = self.idle_sequence.fps if self.idle_sequence.fps > 0 else 25
+                frame_idx = int(self._master_timeline * fps) % common_frames
+                self._master_timeline += dt
+
                 if is_actively_voicing:
-                    # Voice frequency detected -> Instantly switch to dynamic speaking video and advance!
-                    surf = self.speaking_sequence.get_frame(self._speaking_playback_time)
-                    self._speaking_playback_time += dt
-                    if self.speaking_sequence.duration > 0 and self._speaking_playback_time >= self.speaking_sequence.duration:
-                        self._speaking_playback_time = self._speaking_playback_time % self.speaking_sequence.duration
+                    # Voice frequency detected -> Instantly switch to speaking sequence at current frame_idx!
+                    surf = self.speaking_sequence.get_frame_by_index(frame_idx)
                 else:
-                    # Silence / Micro-pause / Resting -> Instantly display resting idle video and advance!
-                    surf = self.idle_sequence.get_frame(self._idle_playback_time)
-                    self._idle_playback_time += dt
-                    if self.idle_sequence.duration > 0 and self._idle_playback_time >= self.idle_sequence.duration:
-                        self._idle_playback_time = self._idle_playback_time % self.idle_sequence.duration
-                    # Clean reset speaking playback time when speech completely ends
-                    if not is_speaking:
-                        self._speaking_playback_time = 0.0
+                    # Silence / Resting -> Instantly display idle sequence at current frame_idx!
+                    surf = self.idle_sequence.get_frame_by_index(frame_idx)
 
             # 3. Only Speaking sequence available
             elif self.speaking_sequence and len(self.speaking_sequence) > 0:
+                dur = self.speaking_sequence.duration if self.speaking_sequence.duration > 0 else 1.0
+                loop_time = self._master_timeline % dur
+                self._master_timeline += dt
                 if is_actively_voicing:
-                    surf = self.speaking_sequence.get_frame(self._speaking_playback_time)
-                    self._speaking_playback_time += dt
+                    surf = self.speaking_sequence.get_frame(loop_time)
                 else:
                     surf = self.speaking_sequence.get_frame(0.0)
 
             # 4. Only Idle sequence available
             elif self.idle_sequence and len(self.idle_sequence) > 0:
-                surf = self.idle_sequence.get_frame(self._idle_playback_time)
-                self._idle_playback_time += dt
+                dur = self.idle_sequence.duration if self.idle_sequence.duration > 0 else 1.0
+                loop_time = self._master_timeline % dur
+                self._master_timeline += dt
+                surf = self.idle_sequence.get_frame(loop_time)
 
             if surf:
                 self.screen.blit(surf, (0, 0))
