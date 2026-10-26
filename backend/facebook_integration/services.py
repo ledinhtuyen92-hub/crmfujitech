@@ -1910,6 +1910,9 @@ def process_fb_comment_bot_event(page_id: str, value: dict):
     rule_details = ""
     comment_lower = comment_text.lower()
     post_id_candidates = _clean_post_id(post_id) if post_id else []
+    for extra_key in ["photo_id", "video_id", "parent_id", "object_id"]:
+        if value.get(extra_key):
+            post_id_candidates.extend(_clean_post_id(value.get(extra_key)))
 
     # ── TẦNG 1: Khớp Cấu Hình Theo Bài Viết (Post Rules) ─────────────────────
     active_post_rules = FacebookPostRule.objects.filter(page_config=page_config, is_active=True)
