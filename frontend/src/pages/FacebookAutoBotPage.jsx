@@ -126,6 +126,7 @@ export default function FacebookAutoBotPage() {
     try {
       const res = await api.get(`/facebook/pages/${id}/`)
       setPageConfig(res.data)
+      setPages(prev => prev.map(p => p.id === id ? { ...p, ...res.data } : p))
       botStatusForm.setFieldsValue({
         enable_bot: res.data.enable_bot,
         enable_like_comment: res.data.enable_like_comment,
@@ -444,6 +445,8 @@ export default function FacebookAutoBotPage() {
   }
 
   const selectedPage = pages.find((p) => p.id === selectedPageId)
+  const activeAiAgentName = pageConfig?.ai_agent_name || selectedPage?.ai_agent_name
+  const hasAiAgent = !!(activeAiAgentName || pageConfig?.ai_agent || selectedPage?.ai_agent)
 
   return (
     <div style={{ padding: '0 8px 32px 8px' }}>
@@ -645,9 +648,9 @@ export default function FacebookAutoBotPage() {
                           extra={
                             <div style={{ marginTop: 4 }}>
                               <div>Sử dụng Trợ lý AI của Fanpage để trả lời thông minh và xin SĐT tự động khi không khớp từ khóa.</div>
-                              {selectedPage?.ai_agent_name ? (
+                              {hasAiAgent ? (
                                 <Tag color="blue" style={{ marginTop: 6, borderRadius: 4, padding: '2px 8px' }}>
-                                  🤖 Trợ lý AI liên kết: <strong>{selectedPage.ai_agent_name}</strong>
+                                  🤖 Trợ lý AI liên kết: <strong>{activeAiAgentName || 'CSKH Facebook & Zalo'}</strong>
                                 </Tag>
                               ) : (
                                 <Tag color="warning" style={{ marginTop: 6, borderRadius: 4, padding: '2px 8px' }}>

@@ -565,42 +565,59 @@ export default function FacebookConfigPage() {
             />
           )}
           <Divider>✅ Trạng thái & Tính năng</Divider>
-          <Row gutter={16}>
-            <Col xs={24} md={6}>
-              <Form.Item name="is_active" label="Trạng thái" valuePropName="checked">
-                <Switch checkedChildren="Hoạt động" unCheckedChildren="Tạm dừng" />
-              </Form.Item>
-            </Col>
-            <Col xs={24} md={6}>
-              <Form.Item
-                name="auto_create_customer_from_phone"
-                label="Tự tạo KH từ SĐT"
-                valuePropName="checked"
-                tooltip="Tự động tạo Khách hàng CRM khi phát hiện SĐT trong hội thoại"
-              >
-                <Switch checkedChildren="🤖 Tự động" unCheckedChildren="👆 Thủ công" />
-              </Form.Item>
-            </Col>
-            <Col xs={24} md={6}>
-              <Form.Item
-                name="auto_assign_lead_to_customer_assignee"
-                label="Tự động gán hội thoại"
-                valuePropName="checked"
-                tooltip="Tự động gán hội thoại cho nhân viên phụ trách Khách hàng đó"
-              >
-                <Switch checkedChildren="🤖 Bật" unCheckedChildren="👆 Tắt" />
-              </Form.Item>
-            </Col>
-            <Col xs={24} md={6}>
-              <Form.Item
-                name="lead_cleanup_days"
-                label="Dọn dẹp Lead rác"
-                tooltip="Hội thoại không có SĐT và không tương tác sau số ngày này sẽ tự động bị ẩn vào kho lưu trữ (3:00 sáng hàng ngày)"
-              >
-                <InputNumber min={1} max={365} addonAfter="ngày" style={{ width: '100%' }} />
-              </Form.Item>
-            </Col>
-          </Row>
+          <div style={{ background: '#f8fafc', padding: '16px 18px', borderRadius: 12, border: '1px solid #e2e8f0', marginBottom: 20 }}>
+            <Row gutter={[20, 16]}>
+              <Col xs={24} sm={12} md={6}>
+                <div style={{ display: 'flex', flexDirection: 'column', height: '100%', justifyContent: 'space-between' }}>
+                  <div style={{ minHeight: 36, display: 'flex', alignItems: 'center' }}>
+                    <Text strong style={{ fontSize: 13, color: '#334155' }}>Trạng thái hoạt động</Text>
+                  </div>
+                  <Form.Item name="is_active" valuePropName="checked" noStyle>
+                    <Switch checkedChildren="Hoạt động" unCheckedChildren="Tạm dừng" />
+                  </Form.Item>
+                </div>
+              </Col>
+              <Col xs={24} sm={12} md={6}>
+                <div style={{ display: 'flex', flexDirection: 'column', height: '100%', justifyContent: 'space-between' }}>
+                  <div style={{ minHeight: 36, display: 'flex', alignItems: 'center', gap: 4 }}>
+                    <Text strong style={{ fontSize: 13, color: '#334155' }}>Tự tạo KH từ SĐT</Text>
+                    <Tooltip title="Tự động tạo Khách hàng CRM khi phát hiện SĐT trong hội thoại">
+                      <InfoCircleOutlined style={{ color: '#94a3b8', cursor: 'pointer' }} />
+                    </Tooltip>
+                  </div>
+                  <Form.Item name="auto_create_customer_from_phone" valuePropName="checked" noStyle>
+                    <Switch checkedChildren="🤖 Tự động" unCheckedChildren="👆 Thủ công" />
+                  </Form.Item>
+                </div>
+              </Col>
+              <Col xs={24} sm={12} md={6}>
+                <div style={{ display: 'flex', flexDirection: 'column', height: '100%', justifyContent: 'space-between' }}>
+                  <div style={{ minHeight: 36, display: 'flex', alignItems: 'center', gap: 4 }}>
+                    <Text strong style={{ fontSize: 13, color: '#334155' }}>Tự động gán hội thoại</Text>
+                    <Tooltip title="Tự động gán hội thoại cho nhân viên phụ trách Khách hàng đó">
+                      <InfoCircleOutlined style={{ color: '#94a3b8', cursor: 'pointer' }} />
+                    </Tooltip>
+                  </div>
+                  <Form.Item name="auto_assign_lead_to_customer_assignee" valuePropName="checked" noStyle>
+                    <Switch checkedChildren="🤖 Bật" unCheckedChildren="👆 Tắt" />
+                  </Form.Item>
+                </div>
+              </Col>
+              <Col xs={24} sm={12} md={6}>
+                <div style={{ display: 'flex', flexDirection: 'column', height: '100%', justifyContent: 'space-between' }}>
+                  <div style={{ minHeight: 36, display: 'flex', alignItems: 'center', gap: 4 }}>
+                    <Text strong style={{ fontSize: 13, color: '#334155' }}>Dọn dẹp Lead rác</Text>
+                    <Tooltip title="Hội thoại không có SĐT và không tương tác sau số ngày này sẽ tự động bị ẩn vào kho lưu trữ (3:00 sáng hàng ngày)">
+                      <InfoCircleOutlined style={{ color: '#94a3b8', cursor: 'pointer' }} />
+                    </Tooltip>
+                  </div>
+                  <Form.Item name="lead_cleanup_days" noStyle>
+                    <InputNumber min={1} max={365} addonAfter="ngày" style={{ width: '100%' }} />
+                  </Form.Item>
+                </div>
+              </Col>
+            </Row>
+          </div>
 
           <Divider>🤖 Trợ lý AI (Giao việc tự động)</Divider>
           <Form.Item name="ai_agent" label="Chọn Trợ lý AI" help="Khi chọn một AI Agent, nó sẽ tự động nhận và trả lời tin nhắn mới của khách hàng trên trang này.">
