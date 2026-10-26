@@ -58,13 +58,15 @@ export default function FacebookAutoBotPage() {
   const [selectedPageId, setSelectedPageId] = useState(null)
   const [pageConfig, setPageConfig] = useState(null)
   const [loadingPages, setLoadingPages] = useState(false)
-  const [savingConfig, setSavingConfig] = useState(false)
+  const [savingBotStatus, setSavingBotStatus] = useState(false)
+  const [savingFallback, setSavingFallback] = useState(false)
 
   // Tab Active
   const [activeTab, setActiveTab] = useState('general')
 
   // Forms
-  const [generalForm] = Form.useForm()
+  const [botStatusForm] = Form.useForm()
+  const [fallbackForm] = Form.useForm()
 
   // Post Rules state
   const [postRules, setPostRules] = useState([])
@@ -124,20 +126,22 @@ export default function FacebookAutoBotPage() {
     try {
       const res = await api.get(`/facebook/pages/${id}/`)
       setPageConfig(res.data)
-      generalForm.setFieldsValue({
+      botStatusForm.setFieldsValue({
         enable_bot: res.data.enable_bot,
         enable_like_comment: res.data.enable_like_comment,
+        enable_keyword_reply: res.data.enable_keyword_reply,
+        enable_ai_fallback: res.data.enable_ai_fallback,
+      })
+      fallbackForm.setFieldsValue({
         enable_comment_reply: res.data.enable_comment_reply,
         default_comment_reply: res.data.default_comment_reply,
         enable_private_message: res.data.enable_private_message,
         default_private_message: res.data.default_private_message,
-        enable_keyword_reply: res.data.enable_keyword_reply,
-        enable_ai_fallback: res.data.enable_ai_fallback,
       })
     } catch {
       message.error('Lỗi khi tải cấu hình Trang.')
     }
-  }, [generalForm])
+  }, [botStatusForm, fallbackForm])
 
   useEffect(() => {
     if (selectedPageId) {
@@ -145,18 +149,45 @@ export default function FacebookAutoBotPage() {
     }
   }, [selectedPageId, fetchPageDetails])
 
-  // ── Save General Bot Config ────────────────────────────────────────────────
-  const handleSaveGeneralConfig = async (values) => {
+  // ── Save Bot Status (Card Trái) ────────────────────────────────────────────
+  const handleSaveBotStatus = async (values) => {
     if (!selectedPageId) return
-    setSavingConfig(true)
+    setSavingBotStatus(true)
     try {
-      const res = await api.patch(`/facebook/pages/${selectedPageId}/`, values)
+      const payload = {
+        enable_bot: !!values.enable_bot,
+        enable_like_comment: !!values.enable_like_comment,
+        enable_keyword_reply: !!values.enable_keyword_reply,
+        enable_ai_fallback: !!values.enable_ai_fallback,
+      }
+      const res = await api.patch(`/facebook/pages/${selectedPageId}/`, payload)
       setPageConfig(res.data)
-      message.success('Đã lưu cấu hình Auto Bot thành công!')
+      message.success('Đã lưu trạng thái Auto Bot thành công!')
     } catch {
-      message.error('Không thể lưu cấu hình. Vui lòng kiểm tra lại.')
+      message.error('Không thể lưu trạng thái Bot. Vui lòng kiểm tra lại.')
     } finally {
-      setSavingConfig(false)
+      setSavingBotStatus(false)
+    }
+  }
+
+  // ── Save Fallback Reply Config (Card Phải) ─────────────────────────────────
+  const handleSaveFallback = async (values) => {
+    if (!selectedPageId) return
+    setSavingFallback(true)
+    try {
+      const payload = {
+        enable_comment_reply: !!values.enable_comment_reply,
+        default_comment_reply: values.default_comment_reply || '',
+        enable_private_message: !!values.enable_private_message,
+        default_private_message: values.default_private_message || '',
+      }
+      const res = await api.patch(`/facebook/pages/${selectedPageId}/`, payload)
+      setPageConfig(res.data)
+      message.success('Đã lưu cấu hình phản hồi mặc định thành công!')
+    } catch {
+      message.error('Không thể lưu cấu hình mặc định. Vui lòng kiểm tra lại.')
+    } finally {
+      setSavingFallback(false)
     }
   }
 
@@ -542,45 +573,50 @@ export default function FacebookAutoBotPage() {
                       style={{ borderRadius: 14, height: '100%' }}
                     >
                       <Form
-                        form={generalForm}
+                        form={botStatusForm}
                         layout="vertical"
-                        onFinish={handleSaveGeneralConfig}
+                        onFinish={handleSaveBotStatus}
                         initialValues={{
                           enable_bot: false,
                           enable_like_comment: true,
-                          enable_comment_reply: false,
-                          enable_private_message: false,
                           enable_keyword_reply: true,
                           enable_ai_fallback: true,
                         }}
                       >
-                        <div
-                          style={{
-                            padding: 16,
-                            borderRadius: 12,
-                            background: pageConfig?.enable_bot ? '#f0fdf4' : '#f8fafc',
-                            border: `1px solid ${pageConfig?.enable_bot ? '#bbf7d0' : '#e2e8f0'}`,
-                            marginBottom: 20,
-                            textAlign: 'center',
+                        <Form.Item noStyle shouldUpdate={(prev, cur) => prev.enable_bot !== cur.enable_bot}>
+                          {() => {
+                            const isBotActive = botStatusForm.getFieldValue('enable_bot')
+                            return (
+                              <div
+                                style={{
+                                  padding: 16,
+                                  borderRadius: 12,
+                                  background: isBotActive ? '#f0fdf4' : '#f8fafc',
+                                  border: `1px solid ${isBotActive ? '#bbf7d0' : '#e2e8f0'}`,
+                                  marginBottom: 20,
+                                  textAlign: 'center',
+                                }}
+                              >
+                                <Space direction="vertical" align="center" size={8}>
+                                  <Badge
+                                    status={isBotActive ? 'processing' : 'default'}
+                                    color={isBotActive ? '#16a34a' : '#94a3b8'}
+                                  />
+                                  <Text strong style={{ fontSize: 16, color: isBotActive ? '#15803d' : '#64748b' }}>
+                                    {isBotActive ? 'BOT ĐANG HOẠT ĐỘNG' : 'BOT ĐANG TẠM DỪNG'}
+                                  </Text>
+                                  <Form.Item name="enable_bot" valuePropName="checked" style={{ margin: 0 }}>
+                                    <Switch
+                                      checkedChildren="BẬT BOT"
+                                      unCheckedChildren="TẮT BOT"
+                                      style={{ transform: 'scale(1.15)', marginTop: 8 }}
+                                    />
+                                  </Form.Item>
+                                </Space>
+                              </div>
+                            )
                           }}
-                        >
-                          <Space direction="vertical" align="center" size={8}>
-                            <Badge
-                              status={pageConfig?.enable_bot ? 'processing' : 'default'}
-                              color={pageConfig?.enable_bot ? '#16a34a' : '#94a3b8'}
-                            />
-                            <Text strong style={{ fontSize: 16, color: pageConfig?.enable_bot ? '#15803d' : '#64748b' }}>
-                              {pageConfig?.enable_bot ? 'BOT ĐANG HOẠT ĐỘNG' : 'BOT ĐANG TẠM DỪNG'}
-                            </Text>
-                            <Form.Item name="enable_bot" valuePropName="checked" style={{ margin: 0 }}>
-                              <Switch
-                                checkedChildren="BẬT BOT"
-                                unCheckedChildren="TẮT BOT"
-                                style={{ transform: 'scale(1.15)', marginTop: 8 }}
-                              />
-                            </Form.Item>
-                          </Space>
-                        </div>
+                        </Form.Item>
 
                         <Divider style={{ margin: '16px 0' }} />
 
@@ -628,7 +664,7 @@ export default function FacebookAutoBotPage() {
                           type="primary"
                           htmlType="submit"
                           icon={<SaveOutlined />}
-                          loading={savingConfig}
+                          loading={savingBotStatus}
                           block
                           style={{
                             height: 42,
@@ -662,7 +698,17 @@ export default function FacebookAutoBotPage() {
                         </Tooltip>
                       }
                     >
-                      <Form form={generalForm} layout="vertical" onFinish={handleSaveGeneralConfig}>
+                      <Form
+                        form={fallbackForm}
+                        layout="vertical"
+                        onFinish={handleSaveFallback}
+                        initialValues={{
+                          enable_comment_reply: false,
+                          default_comment_reply: '',
+                          enable_private_message: false,
+                          default_private_message: '',
+                        }}
+                      >
                         <Alert
                           message="Quy tắc trả lời mặc định (Fallback)"
                           description="Nội dung dưới đây sẽ được áp dụng khi bình luận của khách KHÔNG khớp với bất kỳ bài viết cụ thể nào (Tab 2) và KHÔNG khớp bộ từ khóa (Tab 3)."
@@ -714,7 +760,7 @@ export default function FacebookAutoBotPage() {
                             type="primary"
                             htmlType="submit"
                             icon={<SaveOutlined />}
-                            loading={savingConfig}
+                            loading={savingFallback}
                             size="large"
                             style={{ borderRadius: 8, background: FB_BLUE }}
                           >
