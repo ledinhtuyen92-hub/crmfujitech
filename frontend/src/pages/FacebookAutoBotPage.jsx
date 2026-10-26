@@ -713,11 +713,35 @@ export default function FacebookAutoBotPage() {
                         }}
                       >
                         <Alert
-                          message="Quy tắc trả lời mặc định (Fallback)"
-                          description="Nội dung dưới đây sẽ được áp dụng khi bình luận của khách KHÔNG khớp với bất kỳ bài viết cụ thể nào (Tab 2) và KHÔNG khớp bộ từ khóa (Tab 3)."
+                          message={<Text strong style={{ fontSize: 14 }}>Thứ tự ưu tiên phản hồi (Waterfall 4 Tầng)</Text>}
+                          description={
+                            <div style={{ marginTop: 6, fontSize: 13, lineHeight: 1.6 }}>
+                              <div style={{ marginBottom: 8, color: '#334155' }}>
+                                Khi có khách bình luận, hệ thống sẽ đối soát lần lượt theo thứ tự ưu tiên từ trên xuống:
+                              </div>
+                              <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                                <div>
+                                  <Tag color="cyan" style={{ borderRadius: 4, fontWeight: 600 }}>Tầng 1</Tag>
+                                  <strong>Theo Bài Viết Cụ Thể (Tab 2):</strong> Ưu tiên cao nhất. Áp dụng kịch bản riêng cho bài quảng cáo/sản phẩm cụ thể.
+                                </div>
+                                <div>
+                                  <Tag color="purple" style={{ borderRadius: 4, fontWeight: 600 }}>Tầng 2</Tag>
+                                  <strong>Theo Bộ Từ Khóa (Tab 3):</strong> Áp dụng nếu bình luận của khách khớp với các từ khóa đã thiết lập.
+                                </div>
+                                <div>
+                                  <Tag color="blue" style={{ borderRadius: 4, fontWeight: 600 }}>Tầng 3</Tag>
+                                  <strong>Trợ lý AI tư vấn:</strong> Nếu không khớp từ khóa và đang bật tính năng AI, Trợ lý AI của Page sẽ tự đọc comment để trả lời thông minh và xin SĐT.
+                                </div>
+                                <div>
+                                  <Tag color="orange" style={{ borderRadius: 4, fontWeight: 600 }}>Tầng 4</Tag>
+                                  <strong>Phản hồi Mặc định (Nội dung dưới đây):</strong> Lưới đỡ cuối cùng. Chỉ áp dụng khi bình luận không rơi vào Tầng 1 & 2, đồng thời Trợ lý AI đang tắt hoặc chưa cấu hình.
+                                </div>
+                              </div>
+                            </div>
+                          }
                           type="info"
                           showIcon
-                          style={{ marginBottom: 20 }}
+                          style={{ marginBottom: 20, borderRadius: 10, background: '#f0f9ff', border: '1px solid #bae6fd' }}
                         />
 
                         {/* Mặc định Reply Comment */}
