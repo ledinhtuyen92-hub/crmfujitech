@@ -549,3 +549,8 @@ def generate_raw_text(agent: AiAgent, prompt: str) -> str:
     # Tất cả keys đều thất bại
     raise RuntimeError(f"Tất cả API Keys từ các nền tảng đều thất bại. Lỗi cuối: {str(last_error)[:200]}")
 
+
+# Alias tiện ích cho các module khác
+ask_ai_agent = generate_raw_text
+
+

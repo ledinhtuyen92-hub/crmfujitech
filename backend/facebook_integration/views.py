@@ -857,8 +857,10 @@ class FacebookWebhookView(APIView):
                     if val.get("item") == "comment" and val.get("verb") == "add":
                         import time
                         created_time = val.get("created_time", 0)
-                        # Bỏ qua tin cũ hơn 60s
-                        if created_time and (time.time() - created_time) > 60:
+                        logger.info(f"[Facebook Webhook Feed] Received comment on page {page_id}: comment_id={val.get('comment_id')}, post_id={val.get('post_id')}")
+                        # Bỏ qua tin cũ hơn 10 phút (600s) để tránh webhook trễ/lệch giờ máy chủ
+                        if created_time and (time.time() - created_time) > 600:
+                            logger.info(f"[Facebook Webhook Feed] Bỏ qua bình luận cũ (> 600s): {created_time}")
                             continue
                         try:
                             from facebook_integration.tasks import handle_fb_comment_task

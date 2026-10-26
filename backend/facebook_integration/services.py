@@ -650,7 +650,7 @@ def subscribe_app_to_page(page_id: str, page_access_token: str) -> dict:
     url = f"{FB_GRAPH_API_BASE}/{page_id}/subscribed_apps"
     params = {
         "access_token": page_access_token,
-        "subscribed_fields": "messages,messaging_postbacks,message_echoes",
+        "subscribed_fields": "messages,messaging_postbacks,message_echoes,feed",
     }
     try:
         resp = requests.post(url, params=params, timeout=10)
@@ -1751,7 +1751,7 @@ def fb_reply_comment(page_token: str, comment_id: str, message: str) -> dict:
         resp = requests.post(
             url,
             params={"access_token": page_token},
-            json={"message": message},
+            data={"message": message},
             timeout=8
         )
         data = resp.json()
@@ -1842,17 +1842,22 @@ def process_fb_comment_bot_event(page_id: str, value: dict):
     if not comment_id or not sender_id:
         return
 
+    logger.info(f"[FB Bot Comment] Processing comment_id={comment_id}, post_id={post_id}, sender={sender_id} ({customer_name}), text='{comment_text}'")
+
     # 1. Bỏ qua nếu chính Fanpage tự comment
     if sender_id == str(page_id):
+        logger.info(f"[FB Bot Comment] Skipped because comment is from the page itself ({page_id}).")
         return
 
     # 2. Tìm cấu hình Fanpage
     page_config = FacebookPageConfig.objects.filter(page_id=page_id, is_active=True).first()
     if not page_config or not page_config.page_access_token:
+        logger.warning(f"[FB Bot Comment] No active FacebookPageConfig or token found for page_id={page_id}")
         return
 
     # Nếu Bot chưa được bật cho Page này -> dừng
     if not page_config.enable_bot:
+        logger.info(f"[FB Bot Comment] Bot is disabled (enable_bot=False) for page {page_config.page_name}")
         return
 
     page_token = page_config.page_access_token
@@ -2003,8 +2008,8 @@ def process_fb_comment_bot_event(page_id: str, value: dict):
                     f"Khách hàng tên là '{customer_name}' vừa bình luận trên bài viết Facebook với nội dung: '{comment_text}'. "
                     f"Hãy đóng vai chuyên viên tư vấn của công ty, trả lời lịch sự, thân thiện, ngắn gọn và mời khách nhắn tin hoặc để lại SĐT để được tư vấn chi tiết. Độ dài dưới 35 từ."
                 )
-                from ai_agents.services import ask_ai_agent
-                ai_answer = ask_ai_agent(ai_agent, prompt)
+                from ai_agents.services import generate_raw_text
+                ai_answer = generate_raw_text(ai_agent, prompt)
                 if ai_answer:
                     res_rep = fb_reply_comment(page_token, comment_id, ai_answer)
                     if res_rep.get("success"):
