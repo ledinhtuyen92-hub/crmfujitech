@@ -2006,16 +2006,29 @@ def process_fb_comment_bot_event(page_id: str, value: dict):
 
                 prompt = (
                     f"Khách hàng tên là '{customer_name}' vừa bình luận trên bài viết Facebook với nội dung: '{comment_text}'. "
-                    f"Hãy đóng vai chuyên viên tư vấn của công ty, trả lời lịch sự, thân thiện, ngắn gọn và mời khách nhắn tin hoặc để lại SĐT để được tư vấn chi tiết. Độ dài dưới 35 từ."
+                    f"Hãy đóng vai chuyên viên tư vấn của công ty, gửi tin nhắn chào hỏi thân thiện, giải đáp hoặc tư vấn ngắn gọn, lịch sự và mời khách để lại SĐT hoặc trao đổi thêm để nhận báo giá chi tiết. Độ dài từ 30 đến 50 từ."
                 )
                 from ai_agents.services import generate_raw_text
                 ai_answer = generate_raw_text(ai_agent, prompt)
                 if ai_answer:
-                    res_rep = fb_reply_comment(page_token, comment_id, ai_answer)
-                    if res_rep.get("success"):
-                        executed_actions.append("AI Reply cmt")
-                        rule_matched = True
-                        rule_details = f"Tầng 3: Trợ lý AI '{ai_agent.name}' tự động phản hồi"
+                    # 1. Gửi tin nhắn riêng (Private Reply) trực tiếp vào Messenger của khách
+                    res_inbox = fb_send_private_reply(page_token, comment_id, ai_answer)
+                    if res_inbox.get("success"):
+                        executed_actions.append("AI Inbox Messenger")
+                        _record_bot_private_reply(page_config, sender_id, customer_name, ai_answer, res_inbox.get("message_id"))
+                        # Đồng thời trả lời công khai 1 câu ngắn thông báo đã inbox
+                        public_notice = f"Dạ em chào anh/chị {customer_name}, bên em đã gửi thông tin tư vấn chi tiết qua tin nhắn Messenger cho mình rồi ạ. Anh/chị kiểm tra hộp thư giúp em nhé ❤️"
+                        res_rep = fb_reply_comment(page_token, comment_id, public_notice)
+                        if res_rep.get("success"):
+                            executed_actions.append("Reply cmt công khai")
+                    else:
+                        # Nếu gửi inbox riêng không thành công (hoặc bài viết không hỗ trợ), trả lời trực tiếp nội dung AI lên bình luận
+                        res_rep = fb_reply_comment(page_token, comment_id, ai_answer)
+                        if res_rep.get("success"):
+                            executed_actions.append("AI Reply cmt")
+
+                    rule_matched = True
+                    rule_details = f"Tầng 3: Trợ lý AI '{ai_agent.name}' tư vấn (Inbox Messenger + Bình luận)"
         except Exception as e:
             logger.error(f"[FB Bot] AI Fallback error: {e}")
 
