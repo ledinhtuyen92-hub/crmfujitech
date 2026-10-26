@@ -609,9 +609,9 @@ export default function FacebookAutoBotPage() {
                           extra={
                             <div style={{ marginTop: 4 }}>
                               <div>Sử dụng Trợ lý AI của Fanpage để trả lời thông minh và xin SĐT tự động khi không khớp từ khóa.</div>
-                              {selectedPageConfig?.ai_agent_name ? (
+                              {selectedPage?.ai_agent_name ? (
                                 <Tag color="blue" style={{ marginTop: 6, borderRadius: 4, padding: '2px 8px' }}>
-                                  🤖 Trợ lý AI liên kết: <strong>{selectedPageConfig.ai_agent_name}</strong>
+                                  🤖 Trợ lý AI liên kết: <strong>{selectedPage.ai_agent_name}</strong>
                                 </Tag>
                               ) : (
                                 <Tag color="warning" style={{ marginTop: 6, borderRadius: 4, padding: '2px 8px' }}>
