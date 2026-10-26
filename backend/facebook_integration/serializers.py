@@ -46,6 +46,7 @@ class FacebookPageConfigSerializer(serializers.ModelSerializer):
     is_token_near_expiry = serializers.BooleanField(read_only=True)
     resolved_app_id = serializers.CharField(source='get_app_id', read_only=True)
     assigned_to_name = serializers.CharField(source="assigned_to.full_name", read_only=True, default="")
+    ai_agent_name = serializers.CharField(source="ai_agent.name", read_only=True, default="")
     token_expires_at_display = serializers.SerializerMethodField()
 
     class Meta:
@@ -58,7 +59,7 @@ class FacebookPageConfigSerializer(serializers.ModelSerializer):
             "webhook_verify_token", "page_avatar", "is_active",
             "auto_create_customer_from_phone", "auto_assign_lead_to_customer_assignee", "lead_cleanup_days",
             "request_phone_template", "request_email_template",
-            "assigned_to", "assigned_to_name", "ai_agent", "is_ai_active",
+            "assigned_to", "assigned_to_name", "ai_agent", "ai_agent_name", "is_ai_active",
             "enable_bot", "enable_like_comment", "enable_comment_reply", "default_comment_reply",
             "enable_private_message", "default_private_message", "enable_keyword_reply", "enable_ai_fallback",
             "created_at", "updated_at",

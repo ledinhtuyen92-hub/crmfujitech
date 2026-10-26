@@ -606,7 +606,20 @@ export default function FacebookAutoBotPage() {
                           name="enable_ai_fallback"
                           valuePropName="checked"
                           label="Trợ lý AI tư vấn khi không khớp từ khóa"
-                          extra="Sử dụng Trợ lý AI của Fanpage để trả lời thông minh và xin SĐT tự động."
+                          extra={
+                            <div style={{ marginTop: 4 }}>
+                              <div>Sử dụng Trợ lý AI của Fanpage để trả lời thông minh và xin SĐT tự động khi không khớp từ khóa.</div>
+                              {selectedPageConfig?.ai_agent_name ? (
+                                <Tag color="blue" style={{ marginTop: 6, borderRadius: 4, padding: '2px 8px' }}>
+                                  🤖 Trợ lý AI liên kết: <strong>{selectedPageConfig.ai_agent_name}</strong>
+                                </Tag>
+                              ) : (
+                                <Tag color="warning" style={{ marginTop: 6, borderRadius: 4, padding: '2px 8px' }}>
+                                  ⚠️ Chưa chọn Trợ lý AI (Có thể chọn tại menu Cấu hình Fanpage)
+                                </Tag>
+                              )}
+                            </div>
+                          }
                         >
                           <Switch />
                         </Form.Item>
