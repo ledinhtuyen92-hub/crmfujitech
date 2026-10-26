@@ -237,7 +237,7 @@ function MainLayout({ children, isDarkMode, toggleTheme }) {
             }] : []),
           ],
         }] : []),
-        ...(isModuleActive('facebook') && (hasPermission('facebook.view_inbox') || hasPermission('facebook.manage_config')) ? [{
+        ...(isModuleActive('facebook') && (hasPermission('facebook.view_inbox') || hasPermission('facebook.manage_config') || hasPermission('facebook.manage_bot')) ? [{
           key: 'facebook-group',
           icon: <span style={{ color: '#1877f2', fontWeight: 900, fontSize: 14 }}>𝐟</span>,
           label: 'Facebook (Omnichannel)',
@@ -247,10 +247,15 @@ function MainLayout({ children, isDarkMode, toggleTheme }) {
               icon: <span style={{ color: '#1877f2', fontWeight: 900, fontSize: 14 }}>𝐟</span>,
               label: <Link to="/facebook/inbox">Facebook Inbox</Link>,
             }] : []),
+            ...((hasPermission('facebook.manage_config') || hasPermission('facebook.manage_bot')) ? [{
+              key: '/facebook/bot',
+              icon: <RobotOutlined style={{ color: '#10b981' }} />,
+              label: <Link to="/facebook/bot">Tự động hóa Fanpage (Bot)</Link>,
+            }] : []),
             ...(hasPermission('facebook.manage_config') ? [{
               key: '/settings/facebook',
               icon: <SettingOutlined />,
-              label: <Link to="/settings/facebook">Cấu hình Facebook</Link>,
+              label: <Link to="/settings/facebook">Cấu hình kết nối Page</Link>,
             }] : []),
           ],
         }] : []),

@@ -50,3 +50,20 @@ def cleanup_stale_facebook_leads_task():
         logger.info("[FacebookTask:CleanupLeads] ✅ Database sạch sẽ, không có FacebookLead nào cần dọn dẹp.")
 
     return {"archived_count": total_archived}
+
+
+@shared_task(name="facebook.handle_comment_event")
+def handle_fb_comment_task(page_id: str, value: dict):
+    """
+    Xử lý sự kiện bình luận Facebook bất đồng bộ qua Celery Worker:
+    - Like bình luận
+    - Trả lời bình luận
+    - Gửi tin nhắn riêng (Private Reply)
+    - Ghi log tương tác
+    """
+    try:
+        from facebook_integration.services import process_fb_comment_bot_event
+        process_fb_comment_bot_event(page_id, value)
+    except Exception as e:
+        logger.error(f"[FB Task] Error processing comment event for page {page_id}: {e}")
+

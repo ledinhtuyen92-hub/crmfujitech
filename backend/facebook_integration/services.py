@@ -1655,3 +1655,425 @@ def extract_and_process_phone_fb(lead, text: str):
     else:
         # Fallback
         return extract_and_process_phone_fb_regex(lead, text)
+
+
+# ── FACEBOOK AUTO BOT (BÌNH LUẬN & TIN NHẮN TỰ ĐỘNG) ──────────────────────────
+
+_bot_redis_client = None
+
+def get_bot_redis_client():
+    global _bot_redis_client
+    if _bot_redis_client is None:
+        try:
+            import redis, os
+            url = os.environ.get("REDIS_URL", "redis://redis:6379/0")
+            _bot_redis_client = redis.from_url(url, decode_responses=True)
+        except Exception as e:
+            logger.warning(f"[FB Bot] Redis not available: {e}")
+    return _bot_redis_client
+
+def check_and_set_bot_cooldown(page_id: str, sender_id: str, cooldown_seconds: int = 5) -> bool:
+    """
+    Kiểm tra Cooldown 5s cho mỗi khách hàng trên từng Fanpage.
+    Trả về True nếu được phép gửi (chưa có cooldown).
+    """
+    r = get_bot_redis_client()
+    if not r:
+        return True
+    try:
+        key = f"fb_bot_cd:{page_id}:{sender_id}"
+        return bool(r.set(key, "1", ex=cooldown_seconds, nx=True))
+    except Exception:
+        return True
+
+def capture_post_id_redis(page_id: str, post_id: str):
+    """Lưu Post ID bắt được vào Redis trong 60 giây."""
+    r = get_bot_redis_client()
+    if r:
+        try:
+            r.set(f"fb_captured_post:{page_id}", str(post_id), ex=60)
+            logger.info(f"[FB Bot] Captured Post ID: {post_id} for page {page_id}")
+        except Exception as e:
+            logger.error(f"[FB Bot] Error capturing post ID: {e}")
+
+def get_captured_post_id_redis(page_id: str) -> str:
+    """Đọc và xóa Post ID đã bắt."""
+    r = get_bot_redis_client()
+    if r:
+        try:
+            val = r.get(f"fb_captured_post:{page_id}")
+            if val:
+                r.delete(f"fb_captured_post:{page_id}")
+                return str(val)
+        except Exception as e:
+            logger.error(f"[FB Bot] Error getting captured post ID: {e}")
+    return ""
+
+def process_spintax(text: str) -> str:
+    """Xử lý cú pháp Spintax {A|B|C} -> chọn ngẫu nhiên một biến thể."""
+    if not text:
+        return ""
+    import random, re
+    pattern = re.compile(r'\{([^{}]+)\}')
+    while pattern.search(text):
+        text = pattern.sub(lambda m: random.choice(m.group(1).split('|')), text)
+    return text
+
+def format_bot_response_text(template: str, customer_name: str = "") -> str:
+    """Thay thế biến {name} và parse Spintax."""
+    if not template:
+        return ""
+    name = (customer_name or "").strip() or "bạn"
+    text = template.replace("{name}", name)
+    return process_spintax(text)
+
+def fb_like_comment(page_token: str, comment_id: str) -> bool:
+    """Gọi Graph API để Thích (Like) bình luận dưới danh nghĩa Fanpage."""
+    if not page_token or not comment_id:
+        return False
+    import requests
+    url = f"https://graph.facebook.com/v22.0/{comment_id}/likes"
+    try:
+        resp = requests.post(url, params={"access_token": page_token}, timeout=8)
+        data = resp.json()
+        return resp.status_code == 200 and data.get("success", False)
+    except Exception as e:
+        logger.error(f"[FB Bot] Exception like comment {comment_id}: {e}")
+        return False
+
+def fb_reply_comment(page_token: str, comment_id: str, message: str) -> dict:
+    """Gọi Graph API để Trả lời công khai bình luận dưới danh nghĩa Fanpage."""
+    if not page_token or not comment_id or not message:
+        return {"success": False, "error": "Thiếu thông tin"}
+    import requests
+    url = f"https://graph.facebook.com/v22.0/{comment_id}/comments"
+    try:
+        resp = requests.post(
+            url,
+            params={"access_token": page_token},
+            json={"message": message},
+            timeout=8
+        )
+        data = resp.json()
+        if "error" in data:
+            return {"success": False, "error": data["error"].get("message", "Lỗi reply comment")}
+        return {"success": True, "comment_id": data.get("id")}
+    except Exception as e:
+        logger.error(f"[FB Bot] Exception reply comment {comment_id}: {e}")
+        return {"success": False, "error": str(e)}
+
+def fb_send_private_reply(page_token: str, comment_id: str, message: str) -> dict:
+    """Gọi Graph API gửi tin nhắn riêng (Private Message) từ comment của khách."""
+    if not page_token or not comment_id or not message:
+        return {"success": False, "error": "Thiếu thông tin"}
+    import requests
+    url = f"https://graph.facebook.com/v22.0/me/messages"
+    try:
+        resp = requests.post(
+            url,
+            params={"access_token": page_token},
+            json={
+                "recipient": {"comment_id": comment_id},
+                "message": {"text": message}
+            },
+            timeout=8
+        )
+        data = resp.json()
+        if "error" in data:
+            return {"success": False, "error": data["error"].get("message", "Lỗi gửi Private Reply")}
+        return {"success": True, "message_id": data.get("message_id")}
+    except Exception as e:
+        logger.error(f"[FB Bot] Exception private reply for comment {comment_id}: {e}")
+        return {"success": False, "error": str(e)}
+
+def fb_get_page_published_posts(page_token: str, limit: int = 25) -> list:
+    """Lấy danh sách bài viết gần đây của Fanpage để chọn nhanh trong Post Rules."""
+    if not page_token:
+        return []
+    import requests
+    url = f"https://graph.facebook.com/v22.0/me/published_posts"
+    try:
+        resp = requests.get(
+            url,
+            params={
+                "access_token": page_token,
+                "fields": "id,message,created_time,permalink_url,full_picture",
+                "limit": limit
+            },
+            timeout=10
+        )
+        data = resp.json()
+        return data.get("data", [])
+    except Exception as e:
+        logger.error(f"[FB Bot] Exception get published posts: {e}")
+        return []
+
+def _clean_post_id(raw_post_id: str) -> list:
+    """Tách và chuẩn hóa Post ID (ví dụ: '102938_987654' -> ['102938_987654', '987654'])."""
+    raw = str(raw_post_id).strip()
+    results = [raw]
+    if "_" in raw:
+        parts = raw.split("_")
+        results.append(parts[-1])
+    return results
+
+def process_fb_comment_bot_event(page_id: str, value: dict):
+    """
+    Xử lý sự kiện bình luận Facebook (Feed Webhook).
+    Áp dụng kiến trúc phản hồi 4 Tầng:
+      Tầng 1: Post Rule (theo bài viết cụ thể)
+      Tầng 2: Keyword Rule (theo bộ từ khóa)
+      Tầng 3: AI Fallback (Trợ lý AI tư vấn và xin SĐT)
+      Tầng 4: Default Fallback (Mặc định)
+    """
+    import re
+    from facebook_integration.models import (
+        FacebookPageConfig, FacebookPostRule, FacebookKeywordRule, FacebookBotActivityLog,
+        FacebookLead, FacebookMessage
+    )
+
+    comment_id = value.get("comment_id") or value.get("id")
+    post_id = value.get("post_id")
+    sender_info = value.get("from", {})
+    sender_id = str(sender_info.get("id", ""))
+    customer_name = sender_info.get("name", "Khách hàng")
+    comment_text = (value.get("message") or "").strip()
+
+    if not comment_id or not sender_id:
+        return
+
+    # 1. Bỏ qua nếu chính Fanpage tự comment
+    if sender_id == str(page_id):
+        return
+
+    # 2. Tìm cấu hình Fanpage
+    page_config = FacebookPageConfig.objects.filter(page_id=page_id, is_active=True).first()
+    if not page_config or not page_config.page_access_token:
+        return
+
+    # Nếu Bot chưa được bật cho Page này -> dừng
+    if not page_config.enable_bot:
+        return
+
+    page_token = page_config.page_access_token
+    company = page_config.company
+
+    # 3. Tính năng Bắt ID Bài Viết Tự Động (POSTID)
+    if comment_text.upper() == "POSTID":
+        clean_pid = _clean_post_id(post_id)[-1] if post_id else ""
+        capture_post_id_redis(page_id, clean_pid or post_id)
+        # Thả Like để báo hiệu cho Admin biết đã nhận diện thành công
+        fb_like_comment(page_token, comment_id)
+        FacebookBotActivityLog.objects.create(
+            company=company,
+            page_config=page_config,
+            post_id=post_id,
+            fb_sender_id=sender_id,
+            customer_name=customer_name,
+            event_type=FacebookBotActivityLog.EVENT_COMMENT,
+            trigger_content=comment_text,
+            action_taken="Thả Like (Bắt Post ID tự động)",
+            status=FacebookBotActivityLog.STATUS_SUCCESS,
+            details=f"Đã bắt thành công Post ID: {clean_pid or post_id}",
+            fb_item_id=comment_id,
+        )
+        return
+
+    # 4. Chống trùng lặp (De-duplication)
+    if FacebookBotActivityLog.objects.filter(fb_item_id=comment_id).exists():
+        return
+
+    # 5. Kiểm tra Cooldown 5s cho sender_id
+    if not check_and_set_bot_cooldown(page_id, sender_id, cooldown_seconds=5):
+        FacebookBotActivityLog.objects.create(
+            company=company,
+            page_config=page_config,
+            post_id=post_id,
+            fb_sender_id=sender_id,
+            customer_name=customer_name,
+            event_type=FacebookBotActivityLog.EVENT_COMMENT,
+            trigger_content=comment_text,
+            action_taken="Bỏ qua (Cooldown 5s)",
+            status=FacebookBotActivityLog.STATUS_SKIPPED_COOLDOWN,
+            details="Khách tương tác dồn dập trong 5 giây",
+            fb_item_id=comment_id,
+        )
+        return
+
+    executed_actions = []
+    rule_matched = False
+    rule_details = ""
+    comment_lower = comment_text.lower()
+    post_id_candidates = _clean_post_id(post_id) if post_id else []
+
+    # ── TẦNG 1: Khớp Cấu Hình Theo Bài Viết (Post Rules) ─────────────────────
+    active_post_rules = FacebookPostRule.objects.filter(page_config=page_config, is_active=True)
+    matched_post_rule = None
+    for p_rule in active_post_rules:
+        target_ids = [pid.strip() for pid in re.split(r'[, \n]+', p_rule.post_id_list) if pid.strip()]
+        if any(cand in target_ids for cand in post_id_candidates):
+            # Nếu có từ khóa lọc trong bài viết
+            if p_rule.keywords and p_rule.keywords.strip():
+                kws = [k.strip().lower() for k in p_rule.keywords.split(",") if k.strip()]
+                if any(kw in comment_lower for kw in kws):
+                    matched_post_rule = p_rule
+                    break
+            else:
+                matched_post_rule = p_rule
+                break
+
+    if matched_post_rule:
+        rule_matched = True
+        rule_details = f"Tầng 1: PostRule #{matched_post_rule.id} ({matched_post_rule.post_note or 'Bài viết'})"
+
+        # Like
+        if matched_post_rule.enable_like:
+            if fb_like_comment(page_token, comment_id):
+                executed_actions.append("Like cmt")
+
+        # Reply Comment
+        if matched_post_rule.comment_reply:
+            reply_body = format_bot_response_text(matched_post_rule.comment_reply, customer_name)
+            res_rep = fb_reply_comment(page_token, comment_id, reply_body)
+            if res_rep.get("success"):
+                executed_actions.append("Reply cmt")
+
+        # Private Reply
+        if matched_post_rule.private_message:
+            inbox_body = format_bot_response_text(matched_post_rule.private_message, customer_name)
+            res_inbox = fb_send_private_reply(page_token, comment_id, inbox_body)
+            if res_inbox.get("success"):
+                executed_actions.append("Gửi Inbox riêng")
+                _record_bot_private_reply(page_config, sender_id, customer_name, inbox_body, res_inbox.get("message_id"))
+
+    # ── TẦNG 2: Khớp Theo Bộ Từ Khóa (Keyword Rules) ─────────────────────────
+    if not rule_matched and page_config.enable_keyword_reply:
+        active_kw_rules = FacebookKeywordRule.objects.filter(page_config=page_config, is_active=True)
+        for kw_rule in active_kw_rules:
+            kw_list = kw_rule.keywords if isinstance(kw_rule.keywords, list) else [str(kw_rule.keywords)]
+            is_match = False
+            matched_kw = ""
+            for kw in kw_list:
+                kw_str = str(kw).strip().lower()
+                if not kw_str:
+                    continue
+                if kw_rule.match_type == FacebookKeywordRule.MATCH_EXACT:
+                    if comment_lower == kw_str:
+                        is_match = True
+                        matched_kw = kw_str
+                        break
+                else:
+                    if kw_str in comment_lower:
+                        is_match = True
+                        matched_kw = kw_str
+                        break
+
+            if is_match:
+                rule_matched = True
+                rule_details = f"Tầng 2: KeywordRule #{kw_rule.id} (Khớp '{matched_kw}')"
+
+                if page_config.enable_like_comment:
+                    if fb_like_comment(page_token, comment_id):
+                        executed_actions.append("Like cmt")
+
+                if kw_rule.comment_reply:
+                    reply_body = format_bot_response_text(kw_rule.comment_reply, customer_name)
+                    res_rep = fb_reply_comment(page_token, comment_id, reply_body)
+                    if res_rep.get("success"):
+                        executed_actions.append("Reply cmt")
+
+                if kw_rule.private_message:
+                    inbox_body = format_bot_response_text(kw_rule.private_message, customer_name)
+                    res_inbox = fb_send_private_reply(page_token, comment_id, inbox_body)
+                    if res_inbox.get("success"):
+                        executed_actions.append("Gửi Inbox riêng")
+                        _record_bot_private_reply(page_config, sender_id, customer_name, inbox_body, res_inbox.get("message_id"))
+                break
+
+    # ── TẦNG 3: AI Agent Fallback ────────────────────────────────────────────
+    if not rule_matched and page_config.enable_ai_fallback and page_config.ai_agent_id:
+        try:
+            ai_agent = page_config.ai_agent
+            if ai_agent and ai_agent.is_active:
+                if page_config.enable_like_comment:
+                    if fb_like_comment(page_token, comment_id):
+                        executed_actions.append("Like cmt")
+
+                prompt = (
+                    f"Khách hàng tên là '{customer_name}' vừa bình luận trên bài viết Facebook với nội dung: '{comment_text}'. "
+                    f"Hãy đóng vai chuyên viên tư vấn của công ty, trả lời lịch sự, thân thiện, ngắn gọn và mời khách nhắn tin hoặc để lại SĐT để được tư vấn chi tiết. Độ dài dưới 35 từ."
+                )
+                from ai_agents.services import ask_ai_agent
+                ai_answer = ask_ai_agent(ai_agent, prompt)
+                if ai_answer:
+                    res_rep = fb_reply_comment(page_token, comment_id, ai_answer)
+                    if res_rep.get("success"):
+                        executed_actions.append("AI Reply cmt")
+                        rule_matched = True
+                        rule_details = f"Tầng 3: Trợ lý AI '{ai_agent.name}' tự động phản hồi"
+        except Exception as e:
+            logger.error(f"[FB Bot] AI Fallback error: {e}")
+
+    # ── TẦNG 4: Phản Hồi Mặc Định (Default Fallback) ──────────────────────────
+    if not rule_matched:
+        rule_details = "Tầng 4: Cấu hình mặc định"
+        if page_config.enable_like_comment:
+            if fb_like_comment(page_token, comment_id):
+                executed_actions.append("Like cmt")
+
+        if page_config.enable_comment_reply and page_config.default_comment_reply:
+            reply_body = format_bot_response_text(page_config.default_comment_reply, customer_name)
+            res_rep = fb_reply_comment(page_token, comment_id, reply_body)
+            if res_rep.get("success"):
+                executed_actions.append("Reply cmt mặc định")
+
+        if page_config.enable_private_message and page_config.default_private_message:
+            inbox_body = format_bot_response_text(page_config.default_private_message, customer_name)
+            res_inbox = fb_send_private_reply(page_token, comment_id, inbox_body)
+            if res_inbox.get("success"):
+                executed_actions.append("Gửi Inbox mặc định")
+                _record_bot_private_reply(page_config, sender_id, customer_name, inbox_body, res_inbox.get("message_id"))
+
+    # 6. Ghi Nhật Ký Hoạt Động
+    action_str = " + ".join(executed_actions) if executed_actions else "Không có hành động cấu hình"
+    FacebookBotActivityLog.objects.create(
+        company=company,
+        page_config=page_config,
+        post_id=post_id,
+        fb_sender_id=sender_id,
+        customer_name=customer_name,
+        event_type=FacebookBotActivityLog.EVENT_COMMENT,
+        trigger_content=comment_text,
+        action_taken=action_str,
+        status=FacebookBotActivityLog.STATUS_SUCCESS,
+        details=rule_details,
+        fb_item_id=comment_id,
+    )
+
+def _record_bot_private_reply(page_config, sender_id: str, customer_name: str, message_text: str, fb_mid: str = None):
+    """Lưu tin nhắn Private Reply vào FacebookLead và FacebookMessage để đồng bộ với Inbox CRM."""
+    from facebook_integration.models import FacebookLead, FacebookMessage
+    try:
+        lead, _ = FacebookLead.objects.get_or_create(
+            page_config=page_config,
+            fb_user_id=sender_id,
+            defaults={
+                "company": page_config.company,
+                "fb_user_name": customer_name,
+                "assigned_to": page_config.assigned_to,
+            }
+        )
+        FacebookMessage.objects.create(
+            lead=lead,
+            fb_message_id=fb_mid or f"bot_pr_{timezone.now().timestamp()}",
+            sender_type="page",
+            sender_role="system",
+            sender_name="Bot Fanpage (Private Reply)",
+            text=message_text,
+        )
+        lead.last_message_at = timezone.now()
+        lead.last_message_preview = f"[Bot gửi tin]: {message_text[:40]}"
+        lead.save(update_fields=["last_message_at", "last_message_preview"])
+    except Exception as e:
+        logger.error(f"[FB Bot] Error recording private reply message to DB: {e}")
+
