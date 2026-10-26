@@ -267,7 +267,7 @@ function App() {
 
               <Route path="/facebook/bot" element={
                 <ModuleRoute moduleCode="facebook">
-                  <PermissionRoute permissionCode={['facebook.manage_config', 'facebook.manage_bot']}>
+                  <PermissionRoute permissionCode="facebook.manage_bot">
                     <FacebookAutoBotPage />
                   </PermissionRoute>
                 </ModuleRoute>

@@ -69,10 +69,22 @@ def check_facebook_module(company):
 class FacebookPageConfigViewSet(viewsets.ModelViewSet):
     """
     CRUD cấu hình Trang Facebook (Multi-Page).
-    Yêu cầu quyền: facebook.manage_config
     """
     serializer_class = FacebookPageConfigSerializer
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, ActionBasedPermission]
+    action_permissions = {
+        "list": ["facebook.manage_config", "facebook.manage_bot", "facebook.view_inbox"],
+        "retrieve": ["facebook.manage_config", "facebook.manage_bot", "facebook.view_inbox"],
+        "create": "facebook.manage_config",
+        "update": ["facebook.manage_config", "facebook.manage_bot"],
+        "partial_update": ["facebook.manage_config", "facebook.manage_bot"],
+        "destroy": "facebook.manage_config",
+        "verify_token": "facebook.manage_config",
+        "exchange_oauth_code": "facebook.manage_config",
+        "subscribe_webhook": "facebook.manage_config",
+        "published_posts": ["facebook.manage_bot", "facebook.manage_config"],
+        "check_captured_post_id": ["facebook.manage_bot", "facebook.manage_config"],
+    }
 
     def get_queryset(self):
         return FacebookPageConfig.objects.filter(company=self.request.user.company)
@@ -955,9 +967,18 @@ class FacebookQuickReplyViewSet(viewsets.ModelViewSet):
 class FacebookPostRuleViewSet(viewsets.ModelViewSet):
     """
     CRUD Cấu hình bài viết cụ thể (Post Rules - Tầng 1).
+    Yêu cầu quyền: facebook.manage_bot
     """
     serializer_class = FacebookPostRuleSerializer
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, ActionBasedPermission]
+    action_permissions = {
+        "list": "facebook.manage_bot",
+        "retrieve": "facebook.manage_bot",
+        "create": "facebook.manage_bot",
+        "update": "facebook.manage_bot",
+        "partial_update": "facebook.manage_bot",
+        "destroy": "facebook.manage_bot",
+    }
 
     def get_queryset(self):
         qs = FacebookPostRule.objects.filter(company=self.request.user.company).select_related("page_config")
@@ -975,9 +996,18 @@ class FacebookPostRuleViewSet(viewsets.ModelViewSet):
 class FacebookKeywordRuleViewSet(viewsets.ModelViewSet):
     """
     CRUD Cấu hình quy tắc từ khóa (Keyword Rules - Tầng 2).
+    Yêu cầu quyền: facebook.manage_bot
     """
     serializer_class = FacebookKeywordRuleSerializer
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, ActionBasedPermission]
+    action_permissions = {
+        "list": "facebook.manage_bot",
+        "retrieve": "facebook.manage_bot",
+        "create": "facebook.manage_bot",
+        "update": "facebook.manage_bot",
+        "partial_update": "facebook.manage_bot",
+        "destroy": "facebook.manage_bot",
+    }
 
     def get_queryset(self):
         qs = FacebookKeywordRule.objects.filter(company=self.request.user.company).select_related("page_config")
@@ -995,9 +1025,15 @@ class FacebookKeywordRuleViewSet(viewsets.ModelViewSet):
 class FacebookBotActivityLogViewSet(viewsets.ReadOnlyModelViewSet):
     """
     Xem nhật ký tương tác của Bot Facebook.
+    Yêu cầu quyền: facebook.manage_bot
     """
     serializer_class = FacebookBotActivityLogSerializer
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, ActionBasedPermission]
+    action_permissions = {
+        "list": "facebook.manage_bot",
+        "retrieve": "facebook.manage_bot",
+        "clear_history": "facebook.manage_bot",
+    }
 
     def get_queryset(self):
         qs = FacebookBotActivityLog.objects.filter(company=self.request.user.company).select_related("page_config")

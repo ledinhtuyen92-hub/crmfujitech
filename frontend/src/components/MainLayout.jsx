@@ -247,7 +247,7 @@ function MainLayout({ children, isDarkMode, toggleTheme }) {
               icon: <span style={{ color: '#1877f2', fontWeight: 900, fontSize: 14 }}>𝐟</span>,
               label: <Link to="/facebook/inbox">Facebook Inbox</Link>,
             }] : []),
-            ...((hasPermission('facebook.manage_config') || hasPermission('facebook.manage_bot')) ? [{
+            ...(hasPermission('facebook.manage_bot') ? [{
               key: '/facebook/bot',
               icon: <RobotOutlined style={{ color: '#10b981' }} />,
               label: <Link to="/facebook/bot">Tự động hóa Fanpage (Bot)</Link>,
