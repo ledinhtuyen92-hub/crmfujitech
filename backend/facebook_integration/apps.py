@@ -11,7 +11,7 @@ class FacebookIntegrationConfig(AppConfig):
     verbose_name = "Tích hợp Facebook"
 
     crm_modules = [
-        {"code": "facebook", "name": "Facebook Multi-Page Inbox"}
+        {"code": "facebook", "name": "Facebook (Omnichannel)"}
     ]
 
     def ready(self):

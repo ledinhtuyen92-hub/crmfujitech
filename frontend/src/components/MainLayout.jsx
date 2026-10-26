@@ -250,12 +250,12 @@ function MainLayout({ children, isDarkMode, toggleTheme }) {
             ...(hasPermission('facebook.manage_bot') ? [{
               key: '/facebook/bot',
               icon: <RobotOutlined style={{ color: '#10b981' }} />,
-              label: <Link to="/facebook/bot">Tự động hóa Fanpage (Bot)</Link>,
+              label: <Link to="/facebook/bot" title="Tự động hóa Fanpage (Facebook Auto Bot)">Auto Bot Fanpage</Link>,
             }] : []),
             ...(hasPermission('facebook.manage_config') ? [{
               key: '/settings/facebook',
               icon: <SettingOutlined />,
-              label: <Link to="/settings/facebook">Cấu hình kết nối Page</Link>,
+              label: <Link to="/settings/facebook" title="Cấu hình kết nối Trang Fanpage">Cấu hình Fanpage</Link>,
             }] : []),
           ],
         }] : []),
@@ -529,9 +529,10 @@ function MainLayout({ children, isDarkMode, toggleTheme }) {
         selectedKeys={[location.pathname]}
         defaultOpenKeys={[]}
         items={menuItems}
+        inlineIndent={16}
         style={{
           borderRight: 0,
-          padding: '12px 12px',
+          padding: '12px 10px',
           background: 'transparent',
           fontWeight: 600,
         }}
@@ -561,7 +562,7 @@ function MainLayout({ children, isDarkMode, toggleTheme }) {
             collapsible
             collapsed={collapsed}
             trigger={null}
-            width={260}
+            width={270}
             theme="dark"
             className="custom-sider-scrollbar"
             style={{
@@ -584,7 +585,7 @@ function MainLayout({ children, isDarkMode, toggleTheme }) {
             style={{
               position: 'fixed',
               top: '50%',
-              left: collapsed ? 80 : 260,
+              left: collapsed ? 80 : 270,
               transform: 'translate(0, -50%)',
               zIndex: 101,
               width: 14,
@@ -616,7 +617,7 @@ function MainLayout({ children, isDarkMode, toggleTheme }) {
       )}
 
       {/* ── Main content area (offset by sider width) ────────────── */}
-      <Layout style={{ minWidth: 0, background: token.colorBgLayout, marginLeft: isMobile ? 0 : (collapsed ? 80 : 260), transition: 'all 0.2s', position: 'relative' }}>
+      <Layout style={{ minWidth: 0, background: token.colorBgLayout, marginLeft: isMobile ? 0 : (collapsed ? 80 : 270), transition: 'all 0.2s', position: 'relative' }}>
         
         {/* Toggle Header Button */}
         {true && (
