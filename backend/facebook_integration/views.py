@@ -863,10 +863,12 @@ class FacebookWebhookView(APIView):
                             logger.info(f"[Facebook Webhook Feed] Bỏ qua bình luận cũ (> 600s): {created_time}")
                             continue
                         try:
-                            from facebook_integration.tasks import handle_fb_comment_task
-                            handle_fb_comment_task.delay(page_id, val)
+                            # Chạy ngay lập tức bằng daemon thread để xử lý thời gian thực, không bị nghẽn hay phụ thuộc Celery worker
+                            import threading
+                            from facebook_integration.services import process_fb_comment_bot_event
+                            threading.Thread(target=process_fb_comment_bot_event, args=(page_id, val), daemon=True).start()
                         except Exception as e:
-                            logger.error(f"[Facebook Webhook] Error enqueuing comment task: {e}")
+                            logger.error(f"[Facebook Webhook] Error starting comment thread: {e}")
 
             # 2. Xử lý sự kiện Messaging (Tin nhắn Messenger)
             if "messaging" in entry:

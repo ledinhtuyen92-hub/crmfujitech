@@ -1809,12 +1809,15 @@ def fb_get_page_published_posts(page_token: str, limit: int = 25) -> list:
         return []
 
 def _clean_post_id(raw_post_id: str) -> list:
-    """Tách và chuẩn hóa Post ID (ví dụ: '102938_987654' -> ['102938_987654', '987654'])."""
-    raw = str(raw_post_id).strip()
+    """Tách và chuẩn hóa Post ID (ví dụ: '102938_987654', '#987654' -> ['102938_987654', '987654'])."""
+    raw = str(raw_post_id).strip().lstrip('#')
     results = [raw]
     if "_" in raw:
         parts = raw.split("_")
-        results.append(parts[-1])
+        for p in parts:
+            p_clean = p.strip().lstrip('#')
+            if p_clean and p_clean not in results:
+                results.append(p_clean)
     return results
 
 def process_fb_comment_bot_event(page_id: str, value: dict):
@@ -1918,7 +1921,12 @@ def process_fb_comment_bot_event(page_id: str, value: dict):
     active_post_rules = FacebookPostRule.objects.filter(page_config=page_config, is_active=True)
     matched_post_rule = None
     for p_rule in active_post_rules:
-        target_ids = [pid.strip() for pid in re.split(r'[, \n]+', p_rule.post_id_list) if pid.strip()]
+        target_ids = []
+        for raw_pid in re.split(r'[, \n]+', p_rule.post_id_list):
+            for cleaned in _clean_post_id(raw_pid):
+                if cleaned not in target_ids:
+                    target_ids.append(cleaned)
+
         if any(cand in target_ids for cand in post_id_candidates):
             # Nếu có từ khóa lọc trong bài viết
             if p_rule.keywords and p_rule.keywords.strip():
@@ -1958,13 +1966,17 @@ def process_fb_comment_bot_event(page_id: str, value: dict):
     if not rule_matched and page_config.enable_keyword_reply:
         active_kw_rules = FacebookKeywordRule.objects.filter(page_config=page_config, is_active=True)
         for kw_rule in active_kw_rules:
-            kw_list = kw_rule.keywords if isinstance(kw_rule.keywords, list) else [str(kw_rule.keywords)]
+            raw_kws = kw_rule.keywords if isinstance(kw_rule.keywords, list) else [str(kw_rule.keywords)]
+            kw_list = []
+            for item in raw_kws:
+                for sub in str(item).split(','):
+                    sub_clean = sub.strip().lower()
+                    if sub_clean and sub_clean not in kw_list:
+                        kw_list.append(sub_clean)
+
             is_match = False
             matched_kw = ""
-            for kw in kw_list:
-                kw_str = str(kw).strip().lower()
-                if not kw_str:
-                    continue
+            for kw_str in kw_list:
                 if kw_rule.match_type == FacebookKeywordRule.MATCH_EXACT:
                     if comment_lower == kw_str:
                         is_match = True
