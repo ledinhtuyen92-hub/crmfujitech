@@ -19,6 +19,7 @@ from users.permissions import ActionBasedPermission
 from .models import (
     FacebookLead, FacebookMessage, FacebookPageConfig, QuickMediaAsset,
     FacebookLeadTag, FacebookLeadNote, FacebookQuickReply,
+    FacebookPostRule, FacebookKeywordRule, FacebookBotActivityLog,
 )
 from core.pagination import InboxPagination
 from .serializers import (
@@ -31,6 +32,9 @@ from .serializers import (
     FacebookLeadTagSerializer,
     FacebookLeadNoteSerializer,
     FacebookQuickReplySerializer,
+    FacebookPostRuleSerializer,
+    FacebookKeywordRuleSerializer,
+    FacebookBotActivityLogSerializer,
 )
 from .services import (
     convert_facebook_lead,
@@ -46,6 +50,8 @@ from .services import (
     sync_lead_messages,
     sync_page_conversations_history,
     verify_facebook_webhook_signature,
+    fb_get_page_published_posts,
+    get_captured_post_id_redis,
 )
 
 logger = logging.getLogger(__name__)
@@ -63,10 +69,22 @@ def check_facebook_module(company):
 class FacebookPageConfigViewSet(viewsets.ModelViewSet):
     """
     CRUD cấu hình Trang Facebook (Multi-Page).
-    Yêu cầu quyền: facebook.manage_config
     """
     serializer_class = FacebookPageConfigSerializer
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, ActionBasedPermission]
+    action_permissions = {
+        "list": ["facebook.manage_config", "facebook.manage_bot", "facebook.view_inbox"],
+        "retrieve": ["facebook.manage_config", "facebook.manage_bot", "facebook.view_inbox"],
+        "create": "facebook.manage_config",
+        "update": ["facebook.manage_config", "facebook.manage_bot"],
+        "partial_update": ["facebook.manage_config", "facebook.manage_bot"],
+        "destroy": "facebook.manage_config",
+        "verify_token": "facebook.manage_config",
+        "exchange_oauth_code": "facebook.manage_config",
+        "subscribe_webhook": "facebook.manage_config",
+        "published_posts": ["facebook.manage_bot", "facebook.manage_config"],
+        "check_captured_post_id": ["facebook.manage_bot", "facebook.manage_config"],
+    }
 
     def get_queryset(self):
         return FacebookPageConfig.objects.filter(company=self.request.user.company)
@@ -150,6 +168,38 @@ class FacebookPageConfigViewSet(viewsets.ModelViewSet):
             "app_id": result["app_id"],
             "is_token_near_expiry": config.is_token_near_expiry,
         })
+
+    @action(detail=True, methods=["get"], url_path="published-posts")
+    def published_posts(self, request, pk=None):
+        """Lấy danh sách bài viết gần đây của Fanpage để chọn nhanh."""
+        config = self.get_object()
+        if not config.page_access_token:
+            return Response({"error": "Chưa có Page Access Token."}, status=status.HTTP_400_BAD_REQUEST)
+        posts = fb_get_page_published_posts(config.page_access_token, limit=30)
+        return Response({"posts": posts})
+
+    @action(detail=True, methods=["post"], url_path="scan-comments")
+    def scan_comments(self, request, pk=None):
+        """Quét và tự động phản hồi các bình luận mới cho Trang này."""
+        config = self.get_object()
+        from facebook_integration.services import scan_and_reply_page_comments
+        res = scan_and_reply_page_comments(config)
+        return Response({
+            "status": "success",
+            "message": f"Quét hoàn tất: Đã trả lời {res.get('processed', 0)} bình luận mới, bỏ qua {res.get('skipped', 0)} bình luận đã xử lý.",
+            "data": res
+        })
+
+    @action(detail=True, methods=["get"], url_path="check-captured-post-id")
+    def check_captured_post_id(self, request, pk=None):
+        """Kiểm tra xem có Post ID nào vừa bắt được từ comment 'POSTID' không."""
+        config = self.get_object()
+        if not config.page_id:
+            return Response({"success": False, "id": None})
+        captured_id = get_captured_post_id_redis(config.page_id)
+        if captured_id:
+            return Response({"success": True, "id": captured_id})
+        return Response({"success": False, "id": None})
 
     @action(detail=False, methods=["post"], url_path="exchange-oauth-code")
     def exchange_oauth_code(self, request):
@@ -808,10 +858,36 @@ class FacebookWebhookView(APIView):
 
         entries = data.get("entry", [])
         for entry in entries:
-            try:
-                process_fb_webhook_message(entry)
-            except Exception as e:
-                logger.error(f"[Facebook Webhook] Error processing entry: {e}")
+            page_id = str(entry.get("id", ""))
+
+            # 1. Xử lý sự kiện Feed (Bình luận bài viết)
+            changes = entry.get("changes", [])
+            for change in changes:
+                if change.get("field") == "feed":
+                    val = change.get("value", {})
+                    # Chỉ bắt sự kiện có bình luận mới
+                    if val.get("item") == "comment" and val.get("verb") == "add":
+                        import time
+                        created_time = val.get("created_time", 0)
+                        logger.info(f"[Facebook Webhook Feed] Received comment on page {page_id}: comment_id={val.get('comment_id')}, post_id={val.get('post_id')}")
+                        # Bỏ qua tin cũ hơn 10 phút (600s) để tránh webhook trễ/lệch giờ máy chủ
+                        if created_time and (time.time() - created_time) > 600:
+                            logger.info(f"[Facebook Webhook Feed] Bỏ qua bình luận cũ (> 600s): {created_time}")
+                            continue
+                        try:
+                            # Chạy ngay lập tức bằng daemon thread để xử lý thời gian thực, không bị nghẽn hay phụ thuộc Celery worker
+                            import threading
+                            from facebook_integration.services import process_fb_comment_bot_event
+                            threading.Thread(target=process_fb_comment_bot_event, args=(page_id, val), daemon=True).start()
+                        except Exception as e:
+                            logger.error(f"[Facebook Webhook] Error starting comment thread: {e}")
+
+            # 2. Xử lý sự kiện Messaging (Tin nhắn Messenger)
+            if "messaging" in entry:
+                try:
+                    process_fb_webhook_message(entry)
+                except Exception as e:
+                    logger.error(f"[Facebook Webhook] Error processing entry: {e}")
 
         return Response({"status": "EVENT_RECEIVED"})
 
@@ -900,5 +976,114 @@ class FacebookQuickReplyViewSet(viewsets.ModelViewSet):
 
     def perform_create(self, serializer):
         serializer.save(company=self.request.user.company, created_by=self.request.user)
+
+
+# ── ViewSet: FacebookPostRule ─────────────────────────────────────────────────
+
+class FacebookPostRuleViewSet(viewsets.ModelViewSet):
+    """
+    CRUD Cấu hình bài viết cụ thể (Post Rules - Tầng 1).
+    Yêu cầu quyền: facebook.manage_bot
+    """
+    serializer_class = FacebookPostRuleSerializer
+    permission_classes = [IsAuthenticated, ActionBasedPermission]
+    action_permissions = {
+        "list": "facebook.manage_bot",
+        "retrieve": "facebook.manage_bot",
+        "create": "facebook.manage_bot",
+        "update": "facebook.manage_bot",
+        "partial_update": "facebook.manage_bot",
+        "destroy": "facebook.manage_bot",
+    }
+
+    def get_queryset(self):
+        qs = FacebookPostRule.objects.filter(company=self.request.user.company).select_related("page_config")
+        page_config_id = self.request.query_params.get("page_config")
+        if page_config_id:
+            qs = qs.filter(page_config_id=page_config_id)
+        return qs.order_by("-created_at")
+
+    def perform_create(self, serializer):
+        serializer.save(company=self.request.user.company)
+
+
+# ── ViewSet: FacebookKeywordRule ──────────────────────────────────────────────
+
+class FacebookKeywordRuleViewSet(viewsets.ModelViewSet):
+    """
+    CRUD Cấu hình quy tắc từ khóa (Keyword Rules - Tầng 2).
+    Yêu cầu quyền: facebook.manage_bot
+    """
+    serializer_class = FacebookKeywordRuleSerializer
+    permission_classes = [IsAuthenticated, ActionBasedPermission]
+    action_permissions = {
+        "list": "facebook.manage_bot",
+        "retrieve": "facebook.manage_bot",
+        "create": "facebook.manage_bot",
+        "update": "facebook.manage_bot",
+        "partial_update": "facebook.manage_bot",
+        "destroy": "facebook.manage_bot",
+    }
+
+    def get_queryset(self):
+        qs = FacebookKeywordRule.objects.filter(company=self.request.user.company).select_related("page_config")
+        page_config_id = self.request.query_params.get("page_config")
+        if page_config_id:
+            qs = qs.filter(page_config_id=page_config_id)
+        return qs.order_by("-created_at")
+
+    def perform_create(self, serializer):
+        serializer.save(company=self.request.user.company)
+
+
+# ── ViewSet: FacebookBotActivityLog ───────────────────────────────────────────
+
+class FacebookBotActivityLogViewSet(viewsets.ReadOnlyModelViewSet):
+    """
+    Xem nhật ký tương tác của Bot Facebook.
+    Yêu cầu quyền: facebook.manage_bot
+    """
+    serializer_class = FacebookBotActivityLogSerializer
+    permission_classes = [IsAuthenticated, ActionBasedPermission]
+    action_permissions = {
+        "list": "facebook.manage_bot",
+        "retrieve": "facebook.manage_bot",
+        "clear_history": "facebook.manage_bot",
+    }
+
+    def get_queryset(self):
+        qs = FacebookBotActivityLog.objects.filter(company=self.request.user.company).select_related("page_config")
+        page_config_id = self.request.query_params.get("page_config")
+        if page_config_id:
+            qs = qs.filter(page_config_id=page_config_id)
+        event_type = self.request.query_params.get("event_type")
+        if event_type:
+            qs = qs.filter(event_type=event_type)
+        status_filter = self.request.query_params.get("status")
+        if status_filter:
+            qs = qs.filter(status=status_filter)
+        search = self.request.query_params.get("search")
+        if search:
+            from django.db.models import Q
+            qs = qs.filter(
+                Q(customer_name__icontains=search) |
+                Q(trigger_content__icontains=search) |
+                Q(post_id__icontains=search) |
+                Q(details__icontains=search) |
+                Q(action_taken__icontains=search)
+            )
+        return qs.order_by("-created_at")
+
+    @action(detail=False, methods=["delete"], url_path="clear-history")
+    def clear_history(self, request):
+        """Xóa nhật ký hoạt động của Bot."""
+        page_config_id = request.query_params.get("page_config")
+        qs = FacebookBotActivityLog.objects.filter(company=request.user.company)
+        if page_config_id:
+            qs = qs.filter(page_config_id=page_config_id)
+        count = qs.count()
+        qs.delete()
+        return Response({"detail": f"Đã xóa {count} bản ghi nhật ký hoạt động của Bot."})
+
 
 

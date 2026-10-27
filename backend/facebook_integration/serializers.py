@@ -3,6 +3,7 @@ from rest_framework import serializers
 from .models import (
     FacebookPageConfig, FacebookLead, FacebookMessage, QuickMediaAsset,
     FacebookLeadTag, FacebookLeadNote, FacebookQuickReply,
+    FacebookPostRule, FacebookKeywordRule, FacebookBotActivityLog,
 )
 
 
@@ -45,6 +46,7 @@ class FacebookPageConfigSerializer(serializers.ModelSerializer):
     is_token_near_expiry = serializers.BooleanField(read_only=True)
     resolved_app_id = serializers.CharField(source='get_app_id', read_only=True)
     assigned_to_name = serializers.CharField(source="assigned_to.full_name", read_only=True, default="")
+    ai_agent_name = serializers.CharField(source="ai_agent.name", read_only=True, default="")
     token_expires_at_display = serializers.SerializerMethodField()
 
     class Meta:
@@ -57,7 +59,9 @@ class FacebookPageConfigSerializer(serializers.ModelSerializer):
             "webhook_verify_token", "page_avatar", "is_active",
             "auto_create_customer_from_phone", "auto_assign_lead_to_customer_assignee", "lead_cleanup_days",
             "request_phone_template", "request_email_template",
-            "assigned_to", "assigned_to_name", "ai_agent", "is_ai_active",
+            "assigned_to", "assigned_to_name", "ai_agent", "ai_agent_name", "is_ai_active",
+            "enable_bot", "enable_like_comment", "enable_comment_reply", "default_comment_reply",
+            "enable_private_message", "default_private_message", "enable_keyword_reply", "enable_ai_fallback",
             "created_at", "updated_at",
         ]
         read_only_fields = ["id", "created_at", "updated_at", "is_token_valid", "is_token_near_expiry"]
@@ -247,4 +251,66 @@ class QuickMediaAssetSerializer(serializers.ModelSerializer):
 
     def get_file_url(self, obj):
         return obj.file_url or ""
+
+
+# ── FacebookPostRule ─────────────────────────────────────────────────────────
+
+class FacebookPostRuleSerializer(serializers.ModelSerializer):
+    page_name = serializers.CharField(source="page_config.page_name", read_only=True)
+
+    class Meta:
+        model = FacebookPostRule
+        fields = [
+            "id", "company", "page_config", "page_name",
+            "post_id_list", "keywords", "post_note",
+            "comment_reply", "private_message",
+            "enable_like", "is_active",
+            "created_at", "updated_at",
+        ]
+        read_only_fields = ["id", "company", "created_at", "updated_at"]
+
+
+# ── FacebookKeywordRule ──────────────────────────────────────────────────────
+
+class FacebookKeywordRuleSerializer(serializers.ModelSerializer):
+    page_name = serializers.CharField(source="page_config.page_name", read_only=True)
+
+    class Meta:
+        model = FacebookKeywordRule
+        fields = [
+            "id", "company", "page_config", "page_name",
+            "keywords", "match_type",
+            "comment_reply", "private_message",
+            "use_for_inbox", "is_active",
+            "created_at", "updated_at",
+        ]
+        read_only_fields = ["id", "company", "created_at", "updated_at"]
+
+
+# ── FacebookBotActivityLog ───────────────────────────────────────────────────
+
+class FacebookBotActivityLogSerializer(serializers.ModelSerializer):
+    page_name = serializers.CharField(source="page_config.page_name", read_only=True)
+    status_display = serializers.CharField(source="get_status_display", read_only=True)
+    event_type_display = serializers.CharField(source="get_event_type_display", read_only=True)
+
+    class Meta:
+        model = FacebookBotActivityLog
+        fields = [
+            "id", "company", "page_config", "page_name",
+            "post_id", "fb_sender_id", "customer_name",
+            "event_type", "event_type_display",
+            "trigger_content", "action_taken",
+            "status", "status_display", "details",
+            "fb_item_id", "created_at",
+        ]
+        read_only_fields = [
+            "id", "company", "page_config", "page_name",
+            "post_id", "fb_sender_id", "customer_name",
+            "event_type", "event_type_display",
+            "trigger_content", "action_taken",
+            "status", "status_display", "details",
+            "fb_item_id", "created_at",
+        ]
+
 

@@ -759,15 +759,31 @@ export default function QuotationList() {
   const openModal = (quotation = null, prefillCustomerId = null, prefillCustomerData = null) => {
     if (checkMaintenance()) return
     setEditingQuotation(quotation)
-    if (quotation && quotation.customer && quotation.customer_info?.name) {
-      const injected = { id: quotation.customer, name: quotation.customer_info.name, phone: quotation.customer_info.phone || '' }
-      injectedCustomerRef.current = injected
-      setCustomers(prev => {
-        if (!prev.find(c => c.id === quotation.customer)) {
-          return [...prev, injected]
+    if (quotation && quotation.customer) {
+      if (quotation.customer_info?.name) {
+        const injected = { id: quotation.customer, name: quotation.customer_info.name, phone: quotation.customer_info.phone || '' }
+        injectedCustomerRef.current = injected
+        setCustomers(prev => {
+          if (!prev.find(c => c.id === quotation.customer)) {
+            return [...prev, injected]
+          }
+          return prev
+        })
+      }
+      // Đồng bộ thông tin mới nhất của khách hàng từ CRM
+      api.get(`/crm/customers/${quotation.customer}/`).then(res => {
+        if (res.data?.id) {
+          const fresh = { id: res.data.id, name: res.data.name, phone: res.data.phone || '' }
+          injectedCustomerRef.current = fresh
+          setCustomers(prev => {
+            const exists = prev.some(c => c.id === fresh.id)
+            if (exists) {
+              return prev.map(c => c.id === fresh.id ? fresh : c)
+            }
+            return [fresh, ...prev]
+          })
         }
-        return prev
-      })
+      }).catch(() => {})
     } else if (prefillCustomerId && prefillCustomerData) {
       injectedCustomerRef.current = prefillCustomerData
       setCustomers(prev => {

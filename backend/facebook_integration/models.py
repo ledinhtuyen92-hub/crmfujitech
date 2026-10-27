@@ -125,6 +125,49 @@ class FacebookPageConfig(models.Model):
         verbose_name="Bật/Tắt AI toàn cục",
         help_text="Cờ bật/tắt AI cho toàn bộ trang Facebook này."
     )
+    # ── Cấu hình Tự động hóa Fanpage (Auto Bot) ──────────────────────────
+    enable_bot = models.BooleanField(
+        default=False,
+        verbose_name="Bật Auto Bot Fanpage",
+        help_text="Bật/tắt toàn bộ tính năng tự động like, reply comment và inbox của Bot cho Trang này."
+    )
+    enable_like_comment = models.BooleanField(
+        default=True,
+        verbose_name="Tự động Like bình luận",
+        help_text="Tự động thả Like khi có khách hàng bình luận bài viết."
+    )
+    enable_comment_reply = models.BooleanField(
+        default=False,
+        verbose_name="Tự động trả lời bình luận mặc định",
+        help_text="Trả lời bình luận theo mẫu mặc định khi không khớp Post/Keyword rules."
+    )
+    default_comment_reply = models.TextField(
+        blank=True,
+        default="",
+        verbose_name="Nội dung trả lời bình luận mặc định",
+        help_text="Hỗ trợ cú pháp Spintax {A|B|C} và biến {name}."
+    )
+    enable_private_message = models.BooleanField(
+        default=False,
+        verbose_name="Tự động gửi tin nhắn riêng khi có bình luận",
+        help_text="Tự động gửi Private Message vào Messenger của khách khi khách bình luận."
+    )
+    default_private_message = models.TextField(
+        blank=True,
+        default="",
+        verbose_name="Nội dung tin nhắn riêng mặc định",
+        help_text="Hỗ trợ cú pháp Spintax {A|B|C} và biến {name}."
+    )
+    enable_keyword_reply = models.BooleanField(
+        default=True,
+        verbose_name="Bật trả lời theo từ khóa",
+        help_text="Ưu tiên quét bộ từ khóa (Keyword Rules) trước khi fallback về mặc định."
+    )
+    enable_ai_fallback = models.BooleanField(
+        default=True,
+        verbose_name="Sử dụng AI Agent khi không khớp từ khóa",
+        help_text="Nếu bật và Trang có gán Trợ lý AI, AI sẽ tự động tư vấn khi khách hỏi ngoài bộ từ khóa."
+    )
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -546,5 +589,237 @@ class FacebookQuickReply(models.Model):
 
     def __str__(self):
         return f"{self.shortcut or ''} - {self.title}"
+
+
+# ── Model 7: Cấu hình bài viết cụ thể (FacebookPostRule) ─────────────────────
+
+class FacebookPostRule(models.Model):
+    """
+    Tầng 1 (Ưu tiên cao nhất):
+    Cấu hình trả lời tự động cho các bài viết Facebook cụ thể (chạy Ads, khuyến mãi...).
+    """
+
+    company = models.ForeignKey(
+        "users.Company",
+        on_delete=models.CASCADE,
+        related_name="fb_post_rules",
+        verbose_name="Công ty",
+    )
+    page_config = models.ForeignKey(
+        FacebookPageConfig,
+        on_delete=models.CASCADE,
+        related_name="post_rules",
+        verbose_name="Trang Facebook",
+    )
+    post_id_list = models.TextField(
+        verbose_name="Danh sách ID bài viết",
+        help_text="Các Post ID cách nhau bởi dấu phẩy, khoảng trắng hoặc xuống dòng (VD: 123456, 789101).",
+    )
+    keywords = models.TextField(
+        blank=True,
+        null=True,
+        verbose_name="Từ khóa lọc trong bài viết",
+        help_text="Để trống = áp dụng cho mọi bình luận trong bài viết. Nhiều từ khóa cách nhau bằng dấu phẩy.",
+    )
+    post_note = models.CharField(
+        max_length=255,
+        blank=True,
+        verbose_name="Ghi chú mô tả bài viết / chiến dịch",
+    )
+    comment_reply = models.TextField(
+        blank=True,
+        verbose_name="Nội dung trả lời bình luận",
+        help_text="Hỗ trợ Spintax {A|B|C} và biến {name}.",
+    )
+    private_message = models.TextField(
+        blank=True,
+        verbose_name="Nội dung tin nhắn riêng gửi khách",
+        help_text="Hỗ trợ Spintax {A|B|C} và biến {name}.",
+    )
+    enable_like = models.BooleanField(
+        default=True,
+        verbose_name="Tự động Like bình luận bài viết này",
+    )
+    is_active = models.BooleanField(
+        default=True,
+        verbose_name="Đang hoạt động",
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = "Cấu hình bài viết Facebook"
+        verbose_name_plural = "Cấu hình bài viết Facebook"
+        ordering = ["-created_at"]
+
+    def __str__(self):
+        return f"PostRule #{self.id} ({self.post_note or self.post_id_list[:30]})"
+
+
+# ── Model 8: Cấu hình theo bộ từ khóa (FacebookKeywordRule) ──────────────────
+
+class FacebookKeywordRule(models.Model):
+    """
+    Tầng 2:
+    Cấu hình trả lời tự động theo từ khóa cho Fanpage (khớp có chứa hoặc chính xác).
+    """
+
+    MATCH_CONTAINS = "contains"
+    MATCH_EXACT = "exact"
+    MATCH_CHOICES = [
+        (MATCH_CONTAINS, "Có chứa từ khóa"),
+        (MATCH_EXACT, "Khớp chính xác 100%"),
+    ]
+
+    company = models.ForeignKey(
+        "users.Company",
+        on_delete=models.CASCADE,
+        related_name="fb_keyword_rules",
+        verbose_name="Công ty",
+    )
+    page_config = models.ForeignKey(
+        FacebookPageConfig,
+        on_delete=models.CASCADE,
+        related_name="keyword_rules",
+        verbose_name="Trang Facebook",
+    )
+    keywords = models.JSONField(
+        default=list,
+        verbose_name="Danh sách từ khóa",
+        help_text='Mảng các từ khóa (VD: ["giá", "báo giá", "tư vấn", "bao nhiêu"])',
+    )
+    match_type = models.CharField(
+        max_length=20,
+        choices=MATCH_CHOICES,
+        default=MATCH_CONTAINS,
+        verbose_name="Kiểu so khớp",
+    )
+    comment_reply = models.TextField(
+        blank=True,
+        verbose_name="Nội dung trả lời bình luận",
+        help_text="Hỗ trợ Spintax {A|B|C} và biến {name}.",
+    )
+    private_message = models.TextField(
+        blank=True,
+        verbose_name="Nội dung tin nhắn riêng gửi khách",
+        help_text="Hỗ trợ Spintax {A|B|C} và biến {name}.",
+    )
+    use_for_inbox = models.BooleanField(
+        default=False,
+        verbose_name="Áp dụng cả khi khách nhắn tin trực tiếp vào Messenger",
+    )
+    is_active = models.BooleanField(
+        default=True,
+        verbose_name="Đang hoạt động",
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = "Quy tắc từ khóa Facebook"
+        verbose_name_plural = "Quy tắc từ khóa Facebook"
+        ordering = ["-created_at"]
+
+    def __str__(self):
+        kw_str = ", ".join(self.keywords[:3]) if isinstance(self.keywords, list) else str(self.keywords)
+        return f"KeywordRule #{self.id} [{kw_str}]"
+
+
+# ── Model 9: Nhật ký tương tác Bot (FacebookBotActivityLog) ──────────────────
+
+class FacebookBotActivityLog(models.Model):
+    """
+    Ghi nhận toàn bộ lịch sử tương tác của Bot Facebook (Like, Reply, Inbox, Bỏ qua...).
+    """
+
+    EVENT_COMMENT = "comment"
+    EVENT_MESSAGE = "message"
+    EVENT_CHOICES = [
+        (EVENT_COMMENT, "Bình luận (Comment)"),
+        (EVENT_MESSAGE, "Tin nhắn (Message)"),
+    ]
+
+    STATUS_SUCCESS = "success"
+    STATUS_SKIPPED_COOLDOWN = "skipped_cooldown"
+    STATUS_SKIPPED_OLD = "skipped_old"
+    STATUS_ERROR = "error"
+    STATUS_CHOICES = [
+        (STATUS_SUCCESS, "Thành công"),
+        (STATUS_SKIPPED_COOLDOWN, "Bỏ qua (Cooldown 5s)"),
+        (STATUS_SKIPPED_OLD, "Bỏ qua (Tin cũ >60s)"),
+        (STATUS_ERROR, "Lỗi"),
+    ]
+
+    company = models.ForeignKey(
+        "users.Company",
+        on_delete=models.CASCADE,
+        related_name="fb_bot_activity_logs",
+        verbose_name="Công ty",
+    )
+    page_config = models.ForeignKey(
+        FacebookPageConfig,
+        on_delete=models.CASCADE,
+        related_name="bot_activity_logs",
+        verbose_name="Trang Facebook",
+    )
+    post_id = models.CharField(
+        max_length=100,
+        blank=True,
+        null=True,
+        verbose_name="ID Bài viết",
+    )
+    fb_sender_id = models.CharField(
+        max_length=100,
+        verbose_name="Facebook Sender ID",
+    )
+    customer_name = models.CharField(
+        max_length=255,
+        blank=True,
+        verbose_name="Tên khách hàng",
+    )
+    event_type = models.CharField(
+        max_length=30,
+        choices=EVENT_CHOICES,
+        default=EVENT_COMMENT,
+        verbose_name="Loại tương tác",
+    )
+    trigger_content = models.TextField(
+        blank=True,
+        verbose_name="Nội dung khách gửi",
+    )
+    action_taken = models.CharField(
+        max_length=255,
+        verbose_name="Hành động đã thực hiện",
+        help_text="VD: Like cmt, Reply cmt, Gửi inbox riêng, AI tư vấn...",
+    )
+    status = models.CharField(
+        max_length=30,
+        choices=STATUS_CHOICES,
+        default=STATUS_SUCCESS,
+        verbose_name="Trạng thái",
+    )
+    details = models.TextField(
+        blank=True,
+        verbose_name="Chi tiết quy tắc / Lỗi",
+    )
+    fb_item_id = models.CharField(
+        max_length=150,
+        db_index=True,
+        verbose_name="ID bình luận / tin nhắn để chống lặp",
+    )
+    created_at = models.DateTimeField(
+        auto_now_add=True,
+        db_index=True,
+        verbose_name="Thời gian",
+    )
+
+    class Meta:
+        verbose_name = "Nhật ký tương tác Bot Facebook"
+        verbose_name_plural = "Nhật ký tương tác Bot Facebook"
+        ordering = ["-created_at"]
+
+    def __str__(self):
+        return f"[{self.event_type}] {self.customer_name}: {self.action_taken} ({self.status})"
+
 
 

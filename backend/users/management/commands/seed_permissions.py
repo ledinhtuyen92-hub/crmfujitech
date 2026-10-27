@@ -135,6 +135,7 @@ PERMISSIONS = [
     {"code": "facebook.chat", "name": "Chat trực tiếp với khách hàng trên Facebook", "module": "facebook"},
     {"code": "facebook.create_customer", "name": "Tạo khách hàng từ hội thoại Facebook", "module": "facebook"},
     {"code": "facebook.manage_config", "name": "Quản lý kết nối Trang Facebook & Cấu hình tự động quét SĐT", "module": "facebook"},
+    {"code": "facebook.manage_bot", "name": "Quản lý Tự động hóa Fanpage (Facebook Auto Bot)", "module": "facebook"},
     {"code": "facebook.delete_conversation", "name": "Xóa hội thoại Facebook", "module": "facebook"},
     {"code": "facebook.assign", "name": "Phân công hội thoại Facebook", "module": "facebook"},
     {"code": "facebook.sync_history", "name": "Đồng bộ lịch sử hội thoại Facebook", "module": "facebook"},

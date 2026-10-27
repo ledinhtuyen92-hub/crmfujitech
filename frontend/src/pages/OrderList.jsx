@@ -2727,15 +2727,31 @@ export default function OrderList() {
   const openModal = (order = null, prefillCustomerId = null, prefillCustomerData = null) => {
     if (checkMaintenance()) return
     setEditingOrder(order)
-    if (order && order.customer && order.customer_info?.name) {
-      const injected = { id: order.customer, name: order.customer_info.name, phone: order.customer_info.phone || '' }
-      injectedCustomerRef.current = injected
-      setCustomers(prev => {
-        if (!prev.find(c => c.id === order.customer)) {
-          return [...prev, injected]
+    if (order && order.customer) {
+      if (order.customer_info?.name) {
+        const injected = { id: order.customer, name: order.customer_info.name, phone: order.customer_info.phone || '' }
+        injectedCustomerRef.current = injected
+        setCustomers(prev => {
+          if (!prev.find(c => c.id === order.customer)) {
+            return [...prev, injected]
+          }
+          return prev
+        })
+      }
+      // Đồng bộ thông tin mới nhất của khách hàng từ CRM
+      api.get(`/crm/customers/${order.customer}/`).then(res => {
+        if (res.data?.id) {
+          const fresh = { id: res.data.id, name: res.data.name, phone: res.data.phone || '' }
+          injectedCustomerRef.current = fresh
+          setCustomers(prev => {
+            const exists = prev.some(c => c.id === fresh.id)
+            if (exists) {
+              return prev.map(c => c.id === fresh.id ? fresh : c)
+            }
+            return [fresh, ...prev]
+          })
         }
-        return prev
-      })
+      }).catch(() => {})
     } else if (prefillCustomerId && prefillCustomerData) {
       injectedCustomerRef.current = prefillCustomerData
       setCustomers(prev => {

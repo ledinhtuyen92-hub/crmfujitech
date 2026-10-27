@@ -47,6 +47,7 @@ const ZaloTemplatePage = lazy(() => import('./pages/settings/ZaloTemplatePage'))
 const ZnsCampaignPage = lazy(() => import('./pages/settings/ZnsCampaignPage'))
 const FacebookInboxPage = lazy(() => import('./pages/FacebookInboxPage'))
 const FacebookConfigPage = lazy(() => import('./pages/settings/FacebookConfigPage'))
+const FacebookAutoBotPage = lazy(() => import('./pages/FacebookAutoBotPage'))
 const WebsiteIntegration = lazy(() => import('./pages/settings/WebsiteIntegration'))
 const AiAgentSettings = lazy(() => import('./pages/settings/AiAgentSettings'))
 const AiKnowledgeBase = lazy(() => import('./pages/settings/AiKnowledgeBase'))
@@ -89,6 +90,7 @@ function DynamicTitle() {
     else if (path.startsWith('/zalo/inbox')) title = 'Zalo Inbox | Fujitech Group CRM';
     else if (path.startsWith('/zalo/campaigns')) title = 'Chiến dịch ZNS | Fujitech Group CRM';
     else if (path.startsWith('/facebook/inbox')) title = 'Facebook Inbox | Fujitech Group CRM';
+    else if (path.startsWith('/facebook/bot')) title = 'Tự động hóa Fanpage (Bot) | Fujitech Group CRM';
     else if (path.startsWith('/settings')) title = 'Cấu hình | Fujitech Group CRM';
     else if (path.startsWith('/admin')) title = 'Quản trị hệ thống | Fujitech Group CRM';
     else if (path.startsWith('/login')) title = 'Đăng nhập | Fujitech Group CRM';
@@ -317,6 +319,14 @@ function App() {
                 <ModuleRoute moduleCode="facebook">
                   <PermissionRoute permissionCode="facebook.view_inbox">
                     <FacebookInboxPage />
+                  </PermissionRoute>
+                </ModuleRoute>
+              } />
+
+              <Route path="/facebook/bot" element={
+                <ModuleRoute moduleCode="facebook">
+                  <PermissionRoute permissionCode="facebook.manage_bot">
+                    <FacebookAutoBotPage />
                   </PermissionRoute>
                 </ModuleRoute>
               } />
