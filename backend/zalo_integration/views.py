@@ -1050,7 +1050,15 @@ class ZaloMessageTemplateViewSet(viewsets.ModelViewSet):
         "send_zns": "zalo.send_zns",
         "bulk_send": "zalo.send_zns",
         "sync": "zalo.manage_templates",
+        "oa_list": ["zalo.manage_templates", "zalo.send_zns", "zalo.config"],
+        "mapping_variables": ["zalo.manage_templates", "zalo.send_zns", "zalo.config"],
     }
+
+    @action(detail=False, methods=["get"], url_path="mapping-variables")
+    def mapping_variables(self, request):
+        """Trả về danh mục toàn bộ biến mapping chuẩn của hệ thống CRM."""
+        from .zns_mapping import SYSTEM_MAPPING_VARIABLES
+        return Response(SYSTEM_MAPPING_VARIABLES)
 
     def get_queryset(self):
         qs = ZaloMessageTemplate.objects.filter(
@@ -1340,6 +1348,7 @@ class ZnsCampaignViewSet(viewsets.ModelViewSet):
         "logs": ["zalo.campaigns"],
         "stats": ["zalo.campaigns"],
         "report": ["zalo.campaigns"],
+        "mapping_variables": ["zalo.campaigns"],
     }
 
     def get_serializer_class(self):
@@ -1348,17 +1357,22 @@ class ZnsCampaignViewSet(viewsets.ModelViewSet):
 
         class ZnsCampaignSerializer(S.ModelSerializer):
             template_name = S.SerializerMethodField()
+            template_params_schema = S.SerializerMethodField()
 
             class Meta:
                 model = ZnsCampaign
                 fields = [
                     "id", "name", "campaign_type", "template", "template_name",
+                    "template_params_schema",
                     "is_active", "config_json", "created_at", "updated_at",
                 ]
                 read_only_fields = ["id", "created_at", "updated_at"]
 
             def get_template_name(self, obj):
                 return obj.template.name if obj.template else None
+
+            def get_template_params_schema(self, obj):
+                return obj.template.params_schema if obj.template else {}
 
         return ZnsCampaignSerializer
 
@@ -1370,6 +1384,12 @@ class ZnsCampaignViewSet(viewsets.ModelViewSet):
 
     def perform_create(self, serializer):
         serializer.save(company=self.request.user.company)
+
+    @action(detail=False, methods=["get"], url_path="mapping-variables")
+    def mapping_variables(self, request):
+        """Trả về danh mục toàn bộ biến mapping chuẩn của hệ thống CRM."""
+        from .zns_mapping import SYSTEM_MAPPING_VARIABLES
+        return Response(SYSTEM_MAPPING_VARIABLES)
 
     @action(detail=True, methods=["post"])
     def toggle(self, request, pk=None):
@@ -1384,19 +1404,57 @@ class ZnsCampaignViewSet(viewsets.ModelViewSet):
     def test(self, request, pk=None):
         """Gui ZNS test den so dien thoai chi dinh."""
         from .models import ZaloMessageLog
+        from .zns_mapping import build_zns_context
         campaign = self.get_object()
         phone = request.data.get("phone", "")
         if not phone:
             return Response({"error": "Thieu so dien thoai"}, status=400)
         if not campaign.template:
             return Response({"error": "Chien dich chua co mau ZNS"}, status=400)
+
+        # Mock objects phong phú để khớp với bất kỳ biến nào của template
+        class MockObj:
+            def __init__(self, **kwargs):
+                self.__dict__.update(kwargs)
+
+        mock_cust = MockObj(
+            name="Khách hàng Test", phone=phone, address="123 Cầu Giấy, Hà Nội",
+            city="Hà Nội", birthday=timezone.localdate(), company_name="Công ty Test ZNS"
+        )
+        mock_order = MockObj(
+            order_number="TEST-DH-001", total_amount=1500000, created_at=timezone.now(),
+            status="approved", get_status_display=lambda: "Đã xác nhận",
+            delivery_address="123 Cầu Giấy, Hà Nội", delivery_time="Trong giờ hành chính",
+            warranty_months=12, notes="Đơn hàng gửi test ZNS"
+        )
+        mock_receipt = MockObj(
+            receipt_code="PT-TEST-001", amount=500000, payment_date=timezone.localdate(),
+            get_payment_method_display=lambda: "Chuyển khoản", reference_code="REF-TEST-999",
+            milestone=MockObj(title="Kỳ 1: Đặt cọc 30%")
+        )
+
+        test_params = build_zns_context(
+            customer=mock_cust,
+            order=mock_order,
+            receipt=mock_receipt,
+            company=request.user.company,
+            extra={
+                "tracking_code": "VNPOST-TEST-888",
+                "carrier_name": "Viettel Post Test",
+                "appointment_time": "09:30 ngày mai",
+                "service_name": "Tư vấn thiết bị Fujitech",
+                "staff_name": request.user.get_full_name() or "Kỹ thuật viên Fujitech",
+                "voucher_code": "TESTZNS2026",
+            },
+            template=campaign.template,
+        )
+
         log = ZaloMessageLog.objects.create(
             company=request.user.company,
             campaign=campaign,
             template=campaign.template,
             recipient_phone=phone,
-            recipient_name="Test",
-            params_sent={"customer_name": "Test", "order_number": "TEST-001"},
+            params_sent=test_params,
             trigger_object="test",
             status=ZaloMessageLog.STATUS_PENDING,
         )
@@ -1411,9 +1469,10 @@ class ZnsCampaignViewSet(viewsets.ModelViewSet):
         """Lich su gui ZNS cua chien dich nay. Ho tro filter theo status, date_from, date_to."""
         from .models import ZaloMessageLog
         from rest_framework import serializers as S
+        from django.db.models import Q
 
         campaign = self.get_object()
-        qs = ZaloMessageLog.objects.filter(campaign=campaign).order_by("-sent_at")
+        qs = ZaloMessageLog.objects.filter(campaign=campaign).select_related("customer").order_by("-sent_at")
 
         # Filter theo status
         status_filter = request.query_params.get("status")
@@ -1428,19 +1487,31 @@ class ZnsCampaignViewSet(viewsets.ModelViewSet):
         if date_to:
             qs = qs.filter(sent_at__date__lte=date_to)
 
-        # Filter theo ten khach hang
+        # Filter theo ten khach hang hoac so dien thoai
         search = request.query_params.get("search")
         if search:
-            qs = qs.filter(recipient_name__icontains=search) | qs.filter(recipient_phone__icontains=search)
+            qs = qs.filter(
+                Q(recipient_phone__icontains=search) |
+                Q(customer__name__icontains=search) |
+                Q(trigger_object__icontains=search)
+            )
 
         page_size = int(request.query_params.get("page_size", 200))
         qs = qs[:page_size]
 
         class LogSerializer(S.ModelSerializer):
+            recipient_name = S.SerializerMethodField()
+
             class Meta:
                 model = ZaloMessageLog
                 fields = ["id", "recipient_phone", "recipient_name", "trigger_object",
                           "status", "error_code", "error_message", "zalo_msg_id", "sent_at"]
+
+            def get_recipient_name(self, obj):
+                if obj.customer and getattr(obj.customer, "name", None):
+                    return obj.customer.name
+                params = obj.params_sent or {}
+                return params.get("customer_name") or params.get("ten_khach_hang") or ""
 
         return Response(LogSerializer(qs, many=True).data)
 

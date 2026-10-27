@@ -630,6 +630,12 @@ def send_zns_message(log_id: int) -> bool:
         refresh_zalo_access_token(oa_config)
         oa_config.refresh_from_db()
 
+    # Tự động ánh xạ Smart Mapping nếu template có params_schema
+    params_to_send = dict(log.params_sent or {})
+    if log.template and getattr(log.template, "params_schema", None):
+        from .zns_mapping import resolve_zns_params
+        params_to_send = resolve_zns_params(log.template.params_schema, params_to_send)
+
     try:
         response = requests.post(
             ZALO_SEND_ZNS_URL,
@@ -640,7 +646,7 @@ def send_zns_message(log_id: int) -> bool:
             json={
                 "phone": log.recipient_phone,
                 "template_id": log.template.zalo_template_id if log.template else "",
-                "template_data": log.params_sent,
+                "template_data": params_to_send,
                 "tracking_id": f"crm-log-{log.id}",
             },
             timeout=20,

@@ -412,10 +412,15 @@ def send_birthday_zns_campaign(self):
             if already:
                 continue
 
-            params = {
-                "customer_name": customer.name,
-                "birthday": customer.birthday.strftime("%d/%m/%Y") if customer.birthday else "",
-            }
+            from zalo_integration.zns_mapping import build_zns_context
+            params = build_zns_context(
+                customer=customer,
+                company=campaign.company,
+                template=campaign.template,
+                extra={
+                    "birthday": customer.birthday.strftime("%d/%m/%Y") if customer.birthday else "",
+                },
+            )
             ZnsSendQueue.objects.create(
                 campaign=campaign,
                 recipient_phone=customer.phone,
@@ -427,4 +432,77 @@ def send_birthday_zns_campaign(self):
             sent_count += 1
 
     logger.info(f"[ZNS Birthday Campaign] Da day vao queue {sent_count} tin sinh nhat.")
+    return {"success": True, "queued": sent_count}
+
+
+# Task: Gui ZNS nhac lich hen qua Campaign Engine (moi 15 phut)
+
+@shared_task(name="zalo.send_appointment_zns_campaign", bind=True, max_retries=0)
+def send_appointment_zns_campaign(self):
+    """
+    Quet cac ZnsCampaign type=appointment dang active.
+    Tim khach hang co follow_up_time sap toi (theo minutes_before cau hinh),
+    day vao ZnsSendQueue de gui ZNS nhac lich hen.
+    """
+    from zalo_integration.models import ZnsCampaign, ZnsSendQueue
+    from crm.models import Customer
+
+    now = timezone.now()
+    sent_count = 0
+
+    campaigns = ZnsCampaign.objects.filter(
+        campaign_type=ZnsCampaign.TYPE_APPOINTMENT,
+        is_active=True,
+    ).select_related("template", "company")
+
+    for campaign in campaigns:
+        if not campaign.template:
+            continue
+
+        mins_before = campaign.config_json.get("minutes_before", 120)
+        target_window = now + timezone.timedelta(minutes=mins_before)
+
+        # Quet khach hang co lich hen trong khoang [now, target_window]
+        customers = Customer.objects.filter(
+            company=campaign.company,
+            follow_up_time__isnull=False,
+            follow_up_time__gte=now,
+            follow_up_time__lte=target_window,
+        ).exclude(phone="").exclude(phone__isnull=True).select_related("assigned_to")
+
+        for customer in customers:
+            trigger_key = f"appointment:{customer.id}:{customer.follow_up_time.strftime('%Y%m%d%H%M')}"
+            already = ZnsSendQueue.objects.filter(
+                campaign=campaign,
+                trigger_object=trigger_key,
+            ).exists()
+            if already:
+                continue
+
+            from zalo_integration.zns_mapping import build_zns_context
+            staff_name = ""
+            if customer.assigned_to:
+                staff_name = customer.assigned_to.get_full_name() or customer.assigned_to.username
+
+            params = build_zns_context(
+                customer=customer,
+                company=campaign.company,
+                template=campaign.template,
+                extra={
+                    "appointment_time": customer.follow_up_time.strftime("%H:%M %d/%m/%Y"),
+                    "staff_name": staff_name,
+                    "service_name": "Lịch hẹn chăm sóc / tư vấn",
+                },
+            )
+            ZnsSendQueue.objects.create(
+                campaign=campaign,
+                recipient_phone=customer.phone,
+                recipient_name=customer.name,
+                template_data=params,
+                trigger_object=trigger_key,
+                scheduled_at=now,
+            )
+            sent_count += 1
+
+    logger.info(f"[ZNS Appointment Campaign] Da day vao queue {sent_count} tin nhac hen.")
     return {"success": True, "queued": sent_count}

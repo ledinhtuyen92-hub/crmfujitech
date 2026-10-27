@@ -1,4 +1,4 @@
-﻿import logging
+import logging
 from datetime import timedelta
 
 from django.db.models.signals import post_save, post_delete
@@ -64,14 +64,21 @@ def trigger_zns_on_payment_receipt(sender, instance, created, **kwargs):
         company=company, campaign_type=ZnsCampaign.TYPE_PAYMENT, is_active=True,
     ).select_related("template").first()
     if campaign and campaign.template:
-        already = ZnsSendQueue.objects.filter(
-            campaign=campaign, trigger_object=f"receipt:{instance.id}",
-        ).exclude(status=ZnsSendQueue.STATUS_FAILED).exists()
-        if already:
+        trigger_key = f"receipt:{instance.id}"
+        if ZnsSendQueue.objects.filter(campaign=campaign, trigger_object=trigger_key).exists() or \
+           ZaloMessageLog.objects.filter(campaign=campaign, trigger_object=trigger_key).exists():
             return
-        params = {"customer_name": customer.name, "amount": str(instance.amount), "receipt_code": receipt_code}
+        from .zns_mapping import build_zns_context
+        order = getattr(instance, "order", None)
+        params = build_zns_context(
+            customer=customer,
+            order=order,
+            receipt=instance,
+            company=company,
+            template=campaign.template,
+        )
         _enqueue_zns(campaign=campaign, recipient_phone=customer.phone, recipient_name=customer.name,
-                     template_data=params, trigger_object=f"receipt:{instance.id}")
+                     template_data=params, trigger_object=trigger_key)
         return
     # Fallback toggle cu
     config = ZaloOaConfig.objects.filter(company=company, is_active=True).first()
@@ -87,10 +94,19 @@ def trigger_zns_on_payment_receipt(sender, instance, created, **kwargs):
     if not template:
         logger.warning(f"[Zalo Signal] Khong tim thay mau ZNS cho PaymentReceipt (Company: {company.name})")
         return
+    from .zns_mapping import build_zns_context
+    order = getattr(instance, "order", None)
+    fallback_params = build_zns_context(
+        customer=customer,
+        order=order,
+        receipt=instance,
+        company=company,
+        template=template,
+    )
     from .tasks import send_zns_task
     log = ZaloMessageLog.objects.create(
         company=company, template=template, customer=customer, recipient_phone=customer.phone,
-        params_sent={"customer_name": customer.name, "amount": str(instance.amount), "receipt_code": receipt_code},
+        params_sent=fallback_params,
         trigger_object=f"receipt:{instance.id}", status=ZaloMessageLog.STATUS_PENDING,
     )
     send_zns_task.delay(log.id)
@@ -115,14 +131,36 @@ def trigger_zns_on_order_created(sender, instance, created, **kwargs):
     ).select_related("template").first()
     if not campaign or not campaign.template:
         return
-    already = ZnsSendQueue.objects.filter(
-        campaign=campaign, trigger_object=f"order:{instance.id}",
-    ).exclude(status=ZnsSendQueue.STATUS_FAILED).exists()
-    if already:
+    trigger_key = f"order:{instance.id}"
+    if ZnsSendQueue.objects.filter(campaign=campaign, trigger_object=trigger_key).exists() or \
+       ZaloMessageLog.objects.filter(campaign=campaign, trigger_object=trigger_key).exists():
         return
-    params = {"customer_name": customer.name, "order_number": instance.order_number}
+    from .zns_mapping import build_zns_context
+    params = build_zns_context(
+        customer=customer,
+        order=instance,
+        company=company,
+        template=campaign.template,
+    )
     _enqueue_zns(campaign=campaign, recipient_phone=customer.phone, recipient_name=customer.name,
-                 template_data=params, trigger_object=f"order:{instance.id}")
+                 template_data=params, trigger_object=trigger_key)
+
+
+def _match_delivery_status(current_status, trigger_statuses):
+    if not trigger_statuses:
+        return False
+    if current_status in trigger_statuses:
+        return True
+    alias_map = {
+        "completed": ["delivered", "hoan_thanh", "da_giao"],
+        "delivered": ["completed", "hoan_thanh", "da_giao"],
+        "in_transit": ["shipping", "dang_giao"],
+        "shipping": ["in_transit", "dang_giao"],
+    }
+    for al in alias_map.get(current_status, []):
+        if al in trigger_statuses:
+            return True
+    return False
 
 
 # Signal 3: Giao hang / Bao hanh - Khi trang thai don thay doi
@@ -141,21 +179,28 @@ def trigger_zns_on_delivery_status(sender, instance, created, **kwargs):
     campaigns = ZnsCampaign.objects.filter(
         company=company, campaign_type=ZnsCampaign.TYPE_DELIVERY, is_active=True,
     ).select_related("template")
-    for campaign in campaigns:
-        if not campaign.template:
-            continue
-        trigger_statuses = campaign.config_json.get("trigger_statuses", [])
-        if not trigger_statuses or instance.status not in trigger_statuses:
-            continue
-        trigger_key = f"order:{instance.id}:status:{instance.status}"
-        already = ZnsSendQueue.objects.filter(
-            campaign=campaign, trigger_object=trigger_key,
-        ).exclude(status=ZnsSendQueue.STATUS_FAILED).exists()
-        if already:
-            continue
-        params = {"customer_name": customer.name, "order_number": instance.order_number, "status": instance.get_status_display()}
-        _enqueue_zns(campaign=campaign, recipient_phone=customer.phone, recipient_name=customer.name,
-                     template_data=params, trigger_object=trigger_key)
+    if campaigns.exists():
+        for campaign in campaigns:
+            if not campaign.template:
+                continue
+            trigger_statuses = campaign.config_json.get("trigger_statuses", [])
+            if not _match_delivery_status(instance.status, trigger_statuses):
+                continue
+            trigger_key = f"order:{instance.id}:status:{instance.status}"
+            if ZnsSendQueue.objects.filter(campaign=campaign, trigger_object=trigger_key).exists() or \
+               ZaloMessageLog.objects.filter(campaign=campaign, trigger_object=trigger_key).exists():
+                continue
+            from .zns_mapping import build_zns_context
+            params = build_zns_context(
+                customer=customer,
+                order=instance,
+                company=company,
+                extra={"status": instance.get_status_display()},
+                template=campaign.template,
+            )
+            _enqueue_zns(campaign=campaign, recipient_phone=customer.phone, recipient_name=customer.name,
+                         template_data=params, trigger_object=trigger_key)
+        return
     # Fallback toggle cu hoan thanh don
     if instance.status == Order.STATUS_COMPLETED:
         config = ZaloOaConfig.objects.filter(company=company, is_active=True).first()
@@ -178,6 +223,89 @@ def trigger_zns_on_delivery_status(sender, instance, created, **kwargs):
         )
         send_zns_task.delay(log.id)
         logger.info(f"[Zalo Signal][Fallback] ZNS Order Completed #{instance.id}")
+
+
+# Signal 4: Giao hang qua module Delivery (Lệnh giao hàng)
+
+try:
+    from delivery.models import DeliveryOrder, WarrantyCard
+
+    @receiver(post_save, sender=DeliveryOrder)
+    def trigger_zns_on_delivery_order(sender, instance, created, **kwargs):
+        order = instance.order
+        if not order:
+            return
+        company = instance.company
+        if not _guard_company(company):
+            return
+        customer = getattr(order, "customer", None)
+        if not customer or not customer.phone:
+            return
+        campaigns = ZnsCampaign.objects.filter(
+            company=company, campaign_type=ZnsCampaign.TYPE_DELIVERY, is_active=True,
+        ).select_related("template")
+        for campaign in campaigns:
+            if not campaign.template:
+                continue
+            trigger_statuses = campaign.config_json.get("trigger_statuses", [])
+            if not _match_delivery_status(instance.status, trigger_statuses):
+                continue
+            trigger_key = f"delivery_order:{instance.id}:status:{instance.status}"
+            if ZnsSendQueue.objects.filter(campaign=campaign, trigger_object=trigger_key).exists() or \
+               ZaloMessageLog.objects.filter(campaign=campaign, trigger_object=trigger_key).exists():
+                continue
+            from .zns_mapping import build_zns_context
+            params = build_zns_context(
+                customer=customer,
+                order=order,
+                company=company,
+                extra={
+                    "status": instance.get_status_display(),
+                    "tracking_code": instance.delivery_code or "",
+                    "carrier_name": instance.shipper_name or "",
+                    "delivery_address": instance.shipping_address or getattr(order, "delivery_address", ""),
+                },
+                template=campaign.template,
+            )
+            _enqueue_zns(campaign=campaign, recipient_phone=customer.phone, recipient_name=customer.name,
+                         template_data=params, trigger_object=trigger_key)
+
+    @receiver(post_save, sender=WarrantyCard)
+    def trigger_zns_on_warranty_card(sender, instance, created, **kwargs):
+        company = instance.company
+        if not _guard_company(company):
+            return
+        customer = instance.customer
+        if not customer or not customer.phone:
+            return
+        campaigns = ZnsCampaign.objects.filter(
+            company=company, campaign_type=ZnsCampaign.TYPE_DELIVERY, is_active=True,
+        ).select_related("template")
+        for campaign in campaigns:
+            if not campaign.template:
+                continue
+            trigger_statuses = campaign.config_json.get("trigger_statuses", [])
+            if "warranty_done" not in trigger_statuses and "warranty" not in trigger_statuses:
+                continue
+            trigger_key = f"warranty:{instance.id}"
+            if ZnsSendQueue.objects.filter(campaign=campaign, trigger_object=trigger_key).exists() or \
+               ZaloMessageLog.objects.filter(campaign=campaign, trigger_object=trigger_key).exists():
+                continue
+            from .zns_mapping import build_zns_context
+            params = build_zns_context(
+                customer=customer,
+                order=instance.order,
+                company=company,
+                extra={
+                    "warranty_code": instance.warranty_code or "",
+                    "status": "Hoàn thành bảo hành",
+                },
+                template=campaign.template,
+            )
+            _enqueue_zns(campaign=campaign, recipient_phone=customer.phone, recipient_name=customer.name,
+                         template_data=params, trigger_object=trigger_key)
+except ImportError:
+    pass
 
 
 # Sync Customer <-> SocialLead

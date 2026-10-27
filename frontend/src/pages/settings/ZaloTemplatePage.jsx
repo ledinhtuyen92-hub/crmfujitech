@@ -4,12 +4,13 @@ import {
   message, Modal, Row, Select, Space, Switch, Table, Tag, Typography, Tooltip, List
 } from 'antd'
 import {
-  FileTextOutlined, PlusOutlined, EditOutlined, DeleteOutlined, InfoCircleOutlined, CloudSyncOutlined
+  FileTextOutlined, PlusOutlined, EditOutlined, DeleteOutlined, InfoCircleOutlined, CloudSyncOutlined, BookOutlined
 } from '@ant-design/icons'
 import dayjs from 'dayjs'
 import api from '../../utils/api'
 import { useAuth } from '../../contexts/AuthContext'
 import { useResponsive } from '../../hooks/useResponsive'
+import ZnsMappingCheatSheetModal from '../../components/ZnsMappingCheatSheetModal'
 
 const { Title, Text } = Typography
 const { Option } = Select
@@ -22,6 +23,7 @@ export default function ZaloTemplatePage() {
   const [oaList, setOaList] = useState([])
   const [loading, setLoading] = useState(false)
   const [modalVisible, setModalVisible] = useState(false)
+  const [cheatSheetOpen, setCheatSheetOpen] = useState(false)
   const [saving, setSaving] = useState(false)
   const [syncing, setSyncing] = useState(false)
   const [editingTemplate, setEditingTemplate] = useState(null)
@@ -102,6 +104,20 @@ export default function ZaloTemplatePage() {
       message.error(err.response?.data?.detail || 'Lỗi khi đồng bộ từ Zalo.')
     } finally {
       setSyncing(false)
+    }
+  }
+
+  const handleInsertParam = (key, label) => {
+    try {
+      const current = form.getFieldValue('params_schema')
+      let obj = {}
+      if (current && current.trim()) {
+        try { obj = JSON.parse(current) } catch { obj = {} }
+      }
+      obj[key] = label || key
+      form.setFieldsValue({ params_schema: JSON.stringify(obj, null, 2) })
+    } catch (e) {
+      console.error(e)
     }
   }
 
@@ -224,25 +240,33 @@ export default function ZaloTemplatePage() {
           </Title>
           <Text type="secondary">Đồng bộ các mẫu tin nhắn ZNS đã được Zalo OA xét duyệt để gửi cho khách hàng</Text>
         </div>
-        {canManageTemplates && (
-          <Space>
-            <Button
-              icon={<CloudSyncOutlined />}
-              onClick={handleSyncTemplates}
-              loading={syncing}
-            >
-              Đồng bộ từ Zalo
-            </Button>
-            <Button
-              type="primary"
-              icon={<PlusOutlined />}
-              onClick={() => handleOpenModal()}
-              style={{ background: '#0068ff', borderColor: '#0068ff' }}
-            >
-              Thêm Mẫu ZNS
-            </Button>
-          </Space>
-        )}
+        <Space>
+          <Button
+            icon={<BookOutlined />}
+            onClick={() => setCheatSheetOpen(true)}
+          >
+            📋 Danh mục biến hệ thống
+          </Button>
+          {canManageTemplates && (
+            <>
+              <Button
+                icon={<CloudSyncOutlined />}
+                onClick={handleSyncTemplates}
+                loading={syncing}
+              >
+                Đồng bộ từ Zalo
+              </Button>
+              <Button
+                type="primary"
+                icon={<PlusOutlined />}
+                onClick={() => handleOpenModal()}
+                style={{ background: '#0068ff', borderColor: '#0068ff' }}
+              >
+                Thêm Mẫu ZNS
+              </Button>
+            </>
+          )}
+        </Space>
       </div>
 
       <Card style={{ borderRadius: 12 }} bodyStyle={{ padding: 0 }}>
@@ -363,14 +387,26 @@ export default function ZaloTemplatePage() {
           <Form.Item 
             name="params_schema" 
             label={
-              <span>
-                Cấu trúc Tham số (JSON)
-                <Tooltip title="Các tham số (biến) mà Zalo yêu cầu truyền vào mẫu này. Định dạng JSON mapping giữa key tham số và mô tả.">
-                  <InfoCircleOutlined style={{ marginLeft: 6, color: '#9ca3af' }} />
-                </Tooltip>
-              </span>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%' }}>
+                <span>
+                  Cấu trúc Tham số (JSON)
+                  <Tooltip title="Các tham số (biến) mà Zalo yêu cầu truyền vào mẫu này. Định dạng JSON mapping giữa key tham số và mô tả.">
+                    <InfoCircleOutlined style={{ marginLeft: 6, color: '#9ca3af' }} />
+                  </Tooltip>
+                </span>
+                <Button
+                  type="link"
+                  size="small"
+                  icon={<BookOutlined />}
+                  onClick={() => setCheatSheetOpen(true)}
+                  style={{ padding: 0, fontSize: 12, height: 'auto', fontWeight: 600, color: '#2563eb' }}
+                >
+                  📋 Tra cứu & Chèn nhanh
+                </Button>
+              </div>
             }
             rules={[{ required: true, message: 'Vui lòng nhập cấu trúc JSON' }]}
+            extra="Nhấn 'Tra cứu & Chèn nhanh' để xem toàn bộ biến CRM hỗ trợ và chèn trực tiếp vào đây."
           >
             <Input.TextArea rows={4} style={{ fontFamily: 'monospace' }} />
           </Form.Item>
@@ -380,6 +416,12 @@ export default function ZaloTemplatePage() {
           </Form.Item>
         </Form>
       </Modal>
+
+      <ZnsMappingCheatSheetModal
+        open={cheatSheetOpen}
+        onCancel={() => setCheatSheetOpen(false)}
+        onInsertParam={handleInsertParam}
+      />
     </div>
   )
 }
