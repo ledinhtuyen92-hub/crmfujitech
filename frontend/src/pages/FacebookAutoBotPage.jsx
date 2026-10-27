@@ -1090,8 +1090,11 @@ export default function FacebookAutoBotPage() {
                     <Row gutter={[16, 16]} align="middle" style={{ width: '100%' }}>
                       <Col xs={24} md={6}>
                         <Space>
-                          <span>Nhật ký tương tác Bot</span>
+                          <span style={{ fontWeight: 600 }}>Nhật ký tương tác Bot</span>
                           <Tag color="blue">{totalLogs} bản ghi</Tag>
+                          <Tooltip title="Hệ thống tự động xóa các log cũ hơn 90 ngày vào 03:30 sáng hàng ngày để database luôn tinh gọn và nhanh chóng.">
+                            <Tag color="cyan" style={{ cursor: 'pointer' }}>Lưu 90 ngày</Tag>
+                          </Tooltip>
                         </Space>
                       </Col>
                       <Col xs={24} md={18} style={{ display: 'flex', justifyContent: 'flex-end' }}>
@@ -1153,6 +1156,21 @@ export default function FacebookAutoBotPage() {
                   }
                   style={{ borderRadius: 14 }}
                 >
+                  <Alert
+                    type="info"
+                    showIcon
+                    style={{
+                      marginBottom: 16,
+                      borderRadius: 8,
+                      background: '#f0f9ff',
+                      border: '1px solid #bae6fd',
+                    }}
+                    message={
+                      <span>
+                        <strong>Chính sách lưu trữ:</strong> Hệ thống tự động ghi nhận toàn bộ hoạt động của Bot để đối soát và chống phản hồi trùng lặp. Các bản ghi <strong>cũ hơn 90 ngày</strong> sẽ được tự động xóa định kỳ vào <strong>03:30 sáng hàng ngày</strong> nhằm giữ cơ sở dữ liệu luôn tinh gọn và vận hành mượt mà.
+                      </span>
+                    }
+                  />
                   <Table
                     dataSource={logs}
                     rowKey="id"

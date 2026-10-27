@@ -89,3 +89,18 @@ def poll_recent_comments_task():
 
     return {"total_replied": total_processed}
 
+
+@shared_task(name="facebook.cleanup_stale_bot_logs")
+def cleanup_stale_bot_logs_task(days: int = 90):
+    """
+    Tác vụ định kỳ (mỗi ngày lúc 3:30 sáng):
+    Tự động xóa các bản ghi nhật ký hoạt động của Bot cũ hơn 90 ngày
+    để giữ cho cơ sở dữ liệu luôn tinh gọn, tối ưu hiệu năng.
+    """
+    from facebook_integration.models import FacebookBotActivityLog
+    cutoff_date = timezone.now() - timedelta(days=days)
+    deleted_count, _ = FacebookBotActivityLog.objects.filter(created_at__lt=cutoff_date).delete()
+    if deleted_count > 0:
+        logger.info(f"[FacebookTask:CleanupBotLogs] Đã tự động xóa {deleted_count} bản ghi nhật ký Bot cũ hơn {days} ngày.")
+    return {"deleted_count": deleted_count}
+
