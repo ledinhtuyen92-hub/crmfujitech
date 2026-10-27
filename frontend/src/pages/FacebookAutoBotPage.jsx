@@ -160,7 +160,7 @@ export default function FacebookAutoBotPage() {
       const payload = {
         enable_bot: !!values.enable_bot,
         enable_like_comment: !!values.enable_like_comment,
-        enable_keyword_reply: !!values.enable_keyword_reply,
+        enable_keyword_reply: true,
         enable_ai_fallback: !!values.enable_ai_fallback,
       }
       const res = await api.patch(`/facebook/pages/${selectedPageId}/`, payload)
@@ -652,14 +652,6 @@ export default function FacebookAutoBotPage() {
                           <Switch />
                         </Form.Item>
 
-                        <Form.Item
-                          name="enable_keyword_reply"
-                          valuePropName="checked"
-                          label="Bật phản hồi theo Bộ Từ Khóa"
-                          extra="Quét bộ từ khóa (Tab 3) trước khi áp dụng câu trả lời mặc định."
-                        >
-                          <Switch />
-                        </Form.Item>
 
                         <Form.Item
                           name="enable_ai_fallback"

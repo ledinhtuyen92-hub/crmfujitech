@@ -1963,8 +1963,10 @@ def process_fb_comment_bot_event(page_id: str, value: dict):
                 _record_bot_private_reply(page_config, sender_id, customer_name, inbox_body, res_inbox.get("message_id"))
 
     # ── TẦNG 2: Khớp Theo Bộ Từ Khóa (Keyword Rules) ─────────────────────────
-    if not rule_matched and page_config.enable_keyword_reply:
+    # Tự động quét Tab 3 nếu có quy tắc đang Bật, không bắt người dùng phải bật thêm công tắc phụ
+    if not rule_matched:
         active_kw_rules = FacebookKeywordRule.objects.filter(page_config=page_config, is_active=True)
+        comment_clean = comment_lower.strip(".,!?:; \t\n")
         for kw_rule in active_kw_rules:
             raw_kws = kw_rule.keywords if isinstance(kw_rule.keywords, list) else [str(kw_rule.keywords)]
             kw_list = []
@@ -1978,7 +1980,7 @@ def process_fb_comment_bot_event(page_id: str, value: dict):
             matched_kw = ""
             for kw_str in kw_list:
                 if kw_rule.match_type == FacebookKeywordRule.MATCH_EXACT:
-                    if comment_lower == kw_str:
+                    if comment_lower == kw_str or comment_clean == kw_str:
                         is_match = True
                         matched_kw = kw_str
                         break
