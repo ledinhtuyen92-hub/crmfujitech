@@ -326,6 +326,11 @@ try:
             "task": "zalo.send_birthday_zns_campaign",
             "schedule": crontab(minute=0, hour=8),
         },
+        # [Campaign] Quét và gửi ZNS nhắc lịch hẹn khách hàng (mỗi 15 phút)
+        "zalo-send-appointment-zns-campaign": {
+            "task": "zalo.send_appointment_zns_campaign",
+            "schedule": crontab(minute="*/15"),
+        },
         # [Campaign] Quét hàng đợi ZNS và gửi tin theo lịch (mỗi 1 phút)
         "zalo-process-zns-send-queue": {
             "task": "zalo.process_zns_send_queue",

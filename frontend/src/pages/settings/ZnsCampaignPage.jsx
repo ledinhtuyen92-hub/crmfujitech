@@ -11,7 +11,7 @@ import {
   CheckCircleOutlined, CloseCircleOutlined, ClockCircleOutlined,
   BarChartOutlined, ExperimentOutlined, ReloadOutlined,
   RocketOutlined, BellOutlined, CalendarOutlined, GiftOutlined,
-  CarOutlined, SettingOutlined, InfoCircleOutlined, EyeOutlined
+  CarOutlined, SettingOutlined, InfoCircleOutlined, EyeOutlined, BookOutlined
 } from '@ant-design/icons'
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RTooltip,
@@ -19,6 +19,7 @@ import {
 } from 'recharts'
 import dayjs from 'dayjs'
 import api from '../../utils/api'
+import ZnsMappingCheatSheetModal from '../../components/ZnsMappingCheatSheetModal'
 
 const { RangePicker } = DatePicker
 
@@ -117,9 +118,12 @@ export default function ZnsCampaignPage() {
   const [testLoading, setTestLoading] = useState(false)
   const [testCampaignId, setTestCampaignId] = useState(null)
   const [testModalOpen, setTestModalOpen] = useState(false)
+  const [cheatSheetOpen, setCheatSheetOpen] = useState(false)
 
   const [form] = Form.useForm()
   const watchType = Form.useWatch('campaign_type', form)
+  const watchTemplate = Form.useWatch('template', form)
+  const selectedTemplateObj = templates.find(t => t.id === watchTemplate)
 
   // ── Fetch ─────────────────────────────────────────────────────────────────
   const fetchCampaigns = useCallback(async () => {
@@ -505,6 +509,7 @@ export default function ZnsCampaignPage() {
           </Text>
         </div>
         <Space>
+          <Button icon={<BookOutlined />} onClick={() => setCheatSheetOpen(true)}>📋 Danh mục biến mapping</Button>
           <Button icon={<ReloadOutlined />} onClick={fetchCampaigns} loading={loading}>Làm mới</Button>
           <Button type="primary" icon={<PlusOutlined />} onClick={openCreate}
             style={{ background: '#2563eb' }}>
@@ -614,6 +619,45 @@ export default function ZnsCampaignPage() {
               }))}
             />
           </Form.Item>
+
+          {selectedTemplateObj && (
+            <div style={{ marginTop: -8, marginBottom: 16, background: '#f8fafc', padding: '12px 14px', borderRadius: 8, border: '1px solid #e2e8f0' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+                <Text strong style={{ fontSize: 12, color: '#334155' }}>
+                  📋 Tham số yêu cầu bởi mẫu này:
+                </Text>
+                <Button
+                  type="link"
+                  size="small"
+                  icon={<BookOutlined />}
+                  onClick={() => setCheatSheetOpen(true)}
+                  style={{ padding: 0, fontSize: 12, height: 'auto', color: '#2563eb', fontWeight: 600 }}
+                >
+                  Tra cứu biến
+                </Button>
+              </div>
+
+              {selectedTemplateObj.params_schema && Object.keys(selectedTemplateObj.params_schema).length > 0 ? (
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                  {Object.entries(selectedTemplateObj.params_schema).map(([paramKey, paramDesc]) => (
+                    <Tooltip key={paramKey} title={`${paramDesc} • CRM tự động khớp qua Smart Alias Mapping`}>
+                      <Tag color="cyan" style={{ borderRadius: 4, fontFamily: 'monospace', fontSize: 12 }}>
+                        <CheckCircleOutlined style={{ marginRight: 4, color: '#0891b2' }} />
+                        {paramKey}
+                      </Tag>
+                    </Tooltip>
+                  ))}
+                </div>
+              ) : (
+                <Text type="secondary" style={{ fontSize: 12 }}>
+                  Mẫu không yêu cầu tham số biến động hoặc chưa có schema.
+                </Text>
+              )}
+              <div style={{ fontSize: 11, color: '#059669', marginTop: 8, display: 'flex', alignItems: 'center', gap: 4 }}>
+                <ThunderboltOutlined /> Hệ thống CRM tự động nhận diện và gán đúng dữ liệu khi gửi qua Smart Alias Mapping.
+              </div>
+            </div>
+          )}
 
           <Divider style={{ margin: '12px 0' }}>Cấu hình chiến dịch</Divider>
           {renderConfigFields()}
@@ -745,6 +789,11 @@ export default function ZnsCampaignPage() {
           </div>
         )}
       </Modal>
+
+      <ZnsMappingCheatSheetModal
+        open={cheatSheetOpen}
+        onCancel={() => setCheatSheetOpen(false)}
+      />
     </div>
   )
 }
