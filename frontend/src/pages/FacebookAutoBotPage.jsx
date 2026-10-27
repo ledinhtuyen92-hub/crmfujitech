@@ -13,6 +13,7 @@ import {
   RobotOutlined,
   SaveOutlined,
   SearchOutlined,
+  SyncOutlined,
   ThunderboltOutlined,
 } from '@ant-design/icons'
 import {
@@ -60,6 +61,7 @@ export default function FacebookAutoBotPage() {
   const [loadingPages, setLoadingPages] = useState(false)
   const [savingBotStatus, setSavingBotStatus] = useState(false)
   const [savingFallback, setSavingFallback] = useState(false)
+  const [scanningComments, setScanningComments] = useState(false)
 
   // Tab Active
   const [activeTab, setActiveTab] = useState('general')
@@ -340,6 +342,24 @@ export default function FacebookAutoBotPage() {
     message.success(`Đã thêm Post ID: ${shortId}`)
   }
 
+  // ── Quét & Phản hồi bình luận thủ công ──────────────────────────────────────
+  const handleScanComments = async () => {
+    if (!selectedPageId) {
+      message.warning('Vui lòng chọn Fanpage trước.')
+      return
+    }
+    setScanningComments(true)
+    try {
+      const res = await api.post(`/facebook/pages/${selectedPageId}/scan-comments/`)
+      message.success(res.data?.message || 'Quét bình luận thành công!')
+      fetchLogs()
+    } catch (err) {
+      message.error(err.response?.data?.error || 'Lỗi khi quét bình luận.')
+    } finally {
+      setScanningComments(false)
+    }
+  }
+
   // ── Radar Auto Capture Post ID ─────────────────────────────────────────────
   const startRadarCapture = () => {
     setRadarModalVisible(true)
@@ -495,34 +515,47 @@ export default function FacebookAutoBotPage() {
               <Text strong style={{ fontSize: 13, color: '#475569' }}>
                 Chọn Fanpage cấu hình:
               </Text>
-              <Select
-                value={selectedPageId}
-                onChange={(val) => setSelectedPageId(val)}
-                loading={loadingPages}
-                style={{ width: '100%' }}
-                size="large"
-                placeholder="Chọn Trang Facebook..."
-              >
-                {pages.map((p) => (
-                  <Option key={p.id} value={p.id}>
-                    <Space>
-                      <Avatar src={p.page_avatar} size="small" icon={<RobotOutlined />}>
-                        {p.page_name?.[0]}
-                      </Avatar>
-                      <Text strong>{p.page_name}</Text>
-                      {p.enable_bot ? (
-                        <Tag color="success" style={{ marginLeft: 6 }}>
-                          Bot BẬT
-                        </Tag>
-                      ) : (
-                        <Tag color="default" style={{ marginLeft: 6 }}>
-                          Bot TẮT
-                        </Tag>
-                      )}
-                    </Space>
-                  </Option>
-                ))}
-              </Select>
+              <div style={{ display: 'flex', gap: 8, width: '100%' }}>
+                <Select
+                  value={selectedPageId}
+                  onChange={(val) => setSelectedPageId(val)}
+                  loading={loadingPages}
+                  style={{ flex: 1 }}
+                  size="large"
+                  placeholder="Chọn Trang Facebook..."
+                >
+                  {pages.map((p) => (
+                    <Option key={p.id} value={p.id}>
+                      <Space>
+                        <Avatar src={p.page_avatar} size="small" icon={<RobotOutlined />}>
+                          {p.page_name?.[0]}
+                        </Avatar>
+                        <Text strong>{p.page_name}</Text>
+                        {p.enable_bot ? (
+                          <Tag color="success" style={{ marginLeft: 6 }}>
+                            Bot BẬT
+                          </Tag>
+                        ) : (
+                          <Tag color="default" style={{ marginLeft: 6 }}>
+                            Bot TẮT
+                          </Tag>
+                        )}
+                      </Space>
+                    </Option>
+                  ))}
+                </Select>
+                <Tooltip title="Quét ngay các bình luận mới trên bài viết và tự động phản hồi (dự phòng khi Facebook chưa bắn Webhook)">
+                  <Button
+                    size="large"
+                    icon={<SyncOutlined spin={scanningComments} />}
+                    loading={scanningComments}
+                    onClick={handleScanComments}
+                    style={{ borderRadius: 8, borderColor: '#10b981', color: '#10b981', fontWeight: 600 }}
+                  >
+                    Quét ngay
+                  </Button>
+                </Tooltip>
+              </div>
             </Space>
           </Col>
         </Row>
@@ -821,14 +854,26 @@ export default function FacebookAutoBotPage() {
                   }
                   style={{ borderRadius: 14 }}
                   extra={
-                    <Button
-                      type="primary"
-                      icon={<PlusOutlined />}
-                      onClick={() => openPostRuleModal()}
-                      style={{ borderRadius: 8, background: FB_BLUE }}
-                    >
-                      Thêm Cấu Hình Bài Viết
-                    </Button>
+                    <Space>
+                      <Tooltip title="Quét các bình luận mới trên các bài viết đã cài đặt và áp dụng trả lời ngay lập tức">
+                        <Button
+                          icon={<SyncOutlined spin={scanningComments} />}
+                          loading={scanningComments}
+                          onClick={handleScanComments}
+                          style={{ borderRadius: 8 }}
+                        >
+                          Quét & Phản hồi ngay
+                        </Button>
+                      </Tooltip>
+                      <Button
+                        type="primary"
+                        icon={<PlusOutlined />}
+                        onClick={() => openPostRuleModal()}
+                        style={{ borderRadius: 8, background: FB_BLUE }}
+                      >
+                        Thêm Cấu Hình Bài Viết
+                      </Button>
+                    </Space>
                   }
                 >
                   <Table
@@ -1101,6 +1146,14 @@ export default function FacebookAutoBotPage() {
                             onPressEnter={fetchLogs}
                             style={{ width: 200 }}
                           />
+                          <Button
+                            icon={<SyncOutlined spin={scanningComments} />}
+                            onClick={handleScanComments}
+                            loading={scanningComments}
+                            style={{ borderColor: '#10b981', color: '#10b981' }}
+                          >
+                            Quét bình luận mới
+                          </Button>
                           <Button icon={<ReloadOutlined />} onClick={fetchLogs} loading={loadingLogs}>
                             Làm mới
                           </Button>

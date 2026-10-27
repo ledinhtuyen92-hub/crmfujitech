@@ -274,6 +274,11 @@ try:
             "task": "facebook.cleanup_stale_leads",
             "schedule": crontab(minute=0, hour=3),
         },
+        # Quét và phản hồi bình luận Auto Bot Facebook tự động (chạy mỗi 30 giây dự phòng khi Webhook trễ)
+        "facebook-poll-bot-comments": {
+            "task": "facebook.poll_recent_comments",
+            "schedule": 30.0,
+        },
         # Tự động gửi ZNS chúc mừng sinh nhật mỗi ngày lúc 8h sáng (legacy)
         "zalo-send-birthday-zns": {
             "task": "zalo.send_birthday_zns",

@@ -178,6 +178,18 @@ class FacebookPageConfigViewSet(viewsets.ModelViewSet):
         posts = fb_get_page_published_posts(config.page_access_token, limit=30)
         return Response({"posts": posts})
 
+    @action(detail=True, methods=["post"], url_path="scan-comments")
+    def scan_comments(self, request, pk=None):
+        """Quét và tự động phản hồi các bình luận mới cho Trang này."""
+        config = self.get_object()
+        from facebook_integration.services import scan_and_reply_page_comments
+        res = scan_and_reply_page_comments(config)
+        return Response({
+            "status": "success",
+            "message": f"Quét hoàn tất: Đã trả lời {res.get('processed', 0)} bình luận mới, bỏ qua {res.get('skipped', 0)} bình luận đã xử lý.",
+            "data": res
+        })
+
     @action(detail=True, methods=["get"], url_path="check-captured-post-id")
     def check_captured_post_id(self, request, pk=None):
         """Kiểm tra xem có Post ID nào vừa bắt được từ comment 'POSTID' không."""

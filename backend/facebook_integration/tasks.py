@@ -67,3 +67,25 @@ def handle_fb_comment_task(page_id: str, value: dict):
     except Exception as e:
         logger.error(f"[FB Task] Error processing comment event for page {page_id}: {e}")
 
+
+@shared_task(name="facebook.poll_recent_comments")
+def poll_recent_comments_task():
+    """
+    Tác vụ định kỳ quét và phản hồi bình luận mới cho các trang đang bật Auto Bot.
+    Chạy dự phòng để đảm bảo 100% bình luận được phản hồi ngay cả khi Meta Webhook bị trễ/lỗi.
+    """
+    from facebook_integration.models import FacebookPageConfig
+    from facebook_integration.services import scan_and_reply_page_comments
+
+    active_pages = FacebookPageConfig.objects.filter(is_active=True, enable_bot=True)
+    total_processed = 0
+
+    for page in active_pages:
+        try:
+            res = scan_and_reply_page_comments(page)
+            total_processed += res.get("processed", 0)
+        except Exception as e:
+            logger.error(f"[FB Poll Task] Error polling comments for page {page.page_id}: {e}")
+
+    return {"total_replied": total_processed}
+

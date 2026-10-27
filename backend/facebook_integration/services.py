@@ -2110,3 +2110,98 @@ def _record_bot_private_reply(page_config, sender_id: str, customer_name: str, m
     except Exception as e:
         logger.error(f"[FB Bot] Error recording private reply message to DB: {e}")
 
+
+def scan_and_reply_page_comments(page_config) -> dict:
+    """
+    Quét và tự động phản hồi các bình luận mới trên các bài viết có cài đặt Post Rule
+    hoặc các bài viết gần đây của Fanpage (Dự phòng và bù đắp khi Webhook Meta chưa kịp gửi).
+    """
+    if not page_config.enable_bot or not page_config.page_access_token:
+        return {"processed": 0, "skipped": 0, "message": "Bot chưa bật hoặc thiếu Access Token"}
+
+    import re
+    import requests
+    from facebook_integration.models import FacebookPostRule, FacebookBotActivityLog
+
+    page_token = page_config.page_access_token
+    page_id = str(page_config.page_id)
+
+    # 1. Tìm các bài viết từ Post Rules đang bật
+    active_post_rules = FacebookPostRule.objects.filter(page_config=page_config, is_active=True)
+    post_ids = []
+    for r in active_post_rules:
+        for raw in re.split(r'[, \n]+', r.post_id_list or ''):
+            cleaned = _clean_post_id(raw)
+            for c in cleaned:
+                if c and c not in post_ids:
+                    post_ids.append(c)
+
+    # Nếu không có Post Rule nào, quét 3 bài viết mới nhất của Trang
+    if not post_ids:
+        recent = fb_get_page_published_posts(page_token, limit=3)
+        for p in recent:
+            pid = p.get("id")
+            if pid and pid not in post_ids:
+                post_ids.append(pid)
+
+    processed_count = 0
+    skipped_count = 0
+
+    for pid in post_ids:
+        target_ids = [pid]
+        if "_" not in pid:
+            target_ids.append(f"{page_id}_{pid}")
+
+        comments_data = []
+        for tid in target_ids:
+            try:
+                resp = requests.get(
+                    f"https://graph.facebook.com/v19.0/{tid}/comments",
+                    params={
+                        "access_token": page_token,
+                        "fields": "id,message,created_time,from",
+                        "limit": 20,
+                        "order": "reverse_chronological"
+                    },
+                    timeout=10
+                )
+                data = resp.json()
+                if "data" in data and data["data"]:
+                    comments_data = data["data"]
+                    break
+            except Exception as e:
+                logger.error(f"[FB Bot Scan] Exception fetching comments for {tid}: {e}")
+
+        for cmt in comments_data:
+            cmt_id = cmt.get("id")
+            sender = cmt.get("from", {})
+            sender_id = str(sender.get("id", ""))
+
+            # Bỏ qua nếu chính Fanpage comment
+            if not cmt_id or sender_id == page_id:
+                continue
+
+            # Bỏ qua nếu đã xử lý trong Activity Log
+            if FacebookBotActivityLog.objects.filter(fb_item_id=cmt_id).exists():
+                skipped_count += 1
+                continue
+
+            val = {
+                "comment_id": cmt_id,
+                "post_id": pid,
+                "from": sender,
+                "message": cmt.get("message", ""),
+                "created_time": cmt.get("created_time")
+            }
+            try:
+                process_fb_comment_bot_event(page_id, val)
+                processed_count += 1
+            except Exception as e:
+                logger.error(f"[FB Bot Scan] Error running bot for comment {cmt_id}: {e}")
+
+    return {
+        "processed": processed_count,
+        "skipped": skipped_count,
+        "post_count": len(post_ids)
+    }
+
