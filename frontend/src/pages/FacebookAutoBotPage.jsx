@@ -510,8 +510,8 @@ export default function FacebookAutoBotPage() {
           </Col>
 
           {/* Chọn Fanpage */}
-          <Col xs={24} md={10} style={{ textAlign: 'right' }}>
-            <Space direction="vertical" size={4} style={{ width: '100%', maxWidth: 360, textAlign: 'left' }}>
+          <Col xs={24} md={10} style={{ display: 'flex', justifyContent: 'flex-end' }}>
+            <Space direction="vertical" size={4} style={{ width: '100%', maxWidth: 360 }}>
               <Text strong style={{ fontSize: 13, color: '#475569' }}>
                 Chọn Fanpage cấu hình:
               </Text>
@@ -1102,14 +1102,14 @@ export default function FacebookAutoBotPage() {
                           <Tag color="blue">{totalLogs} bản ghi</Tag>
                         </Space>
                       </Col>
-                      <Col xs={24} md={18} style={{ textAlign: 'right' }}>
-                        <Space wrap>
+                      <Col xs={24} md={18} style={{ display: 'flex', justifyContent: 'flex-end' }}>
+                        <Space wrap style={{ textAlign: 'left' }}>
                           <Select
                             placeholder="Loại tương tác"
                             allowClear
                             value={logFilterEventType || undefined}
                             onChange={(val) => setLogFilterEventType(val || '')}
-                            style={{ width: 140 }}
+                            style={{ width: 140, textAlign: 'left' }}
                           >
                             <Option value="comment">Bình luận</Option>
                             <Option value="message">Tin nhắn</Option>
@@ -1119,7 +1119,7 @@ export default function FacebookAutoBotPage() {
                             allowClear
                             value={logFilterStatus || undefined}
                             onChange={(val) => setLogFilterStatus(val || '')}
-                            style={{ width: 160 }}
+                            style={{ width: 160, textAlign: 'left' }}
                           >
                             <Option value="success">Thành công</Option>
                             <Option value="skipped_cooldown">Bỏ qua (Cooldown)</Option>
@@ -1131,7 +1131,7 @@ export default function FacebookAutoBotPage() {
                             value={logSearchQuery}
                             onChange={(e) => setLogSearchQuery(e.target.value)}
                             onPressEnter={fetchLogs}
-                            style={{ width: 200 }}
+                            style={{ width: 200, textAlign: 'left' }}
                           />
                           <Button
                             icon={<SyncOutlined spin={scanningComments} />}
