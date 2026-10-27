@@ -1081,7 +1081,7 @@ export default function FacebookAutoBotPage() {
               label: (
                 <Space>
                   <ClockCircleOutlined />
-                  <span>4. Nhật Ký Hoạt Động (Activity Logs)</span>
+                  <span>4. Nhật Ký Hoạt Động (Lưu 90 ngày)</span>
                 </Space>
               ),
               children: (
