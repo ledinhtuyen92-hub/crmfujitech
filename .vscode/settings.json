@@ -1,0 +1,13 @@
+{
+  "python.defaultInterpreterPath": "${workspaceFolder}/venv_backend/Scripts/python.exe",
+  "python.analysis.extraPaths": [
+    "${workspaceFolder}/backend"
+  ],
+  "python.autoComplete.extraPaths": [
+    "${workspaceFolder}/backend"
+  ],
+  "python.pyrefly.configPath": "${workspaceFolder}/pyrefly.toml",
+  "python.pyrefly.typeCheckingMode": "off",
+  "pyrefly.enable": false,
+  "python.analysis.typeCheckingMode": "off"
+}

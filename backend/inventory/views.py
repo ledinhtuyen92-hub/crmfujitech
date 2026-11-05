@@ -758,8 +758,10 @@ class InventoryTransactionViewSet(TenantQuerySetMixin, viewsets.ModelViewSet):
         """Duyệt lệnh xuất kho và trừ tồn kho"""
         txn = self.get_object()
         
-        # Check permissions
-        if not request.user.is_company_admin and not request.user.role.permissions.filter(code="inventory.approve_export").exists():
+        # Check permissions — chỉ user có quyền inventory.approve_export mới được duyệt, kể cả admin
+        user = request.user
+        has_approve_perm = user.role and user.role.permissions.filter(code="inventory.approve_export").exists()
+        if not has_approve_perm:
             return Response({"detail": "Bạn không có quyền duyệt lệnh xuất kho."}, status=status.HTTP_403_FORBIDDEN)
 
         if txn.type != "export" or txn.status != txn.STATUS_PENDING:
@@ -805,6 +807,10 @@ class InventoryTransactionViewSet(TenantQuerySetMixin, viewsets.ModelViewSet):
         if factory_id:
             from production.models import Factory
             factory_obj = Factory.objects.filter(id=factory_id).first()
+        elif txn.factory:
+            factory_obj = txn.factory
+        elif txn.reference_order and getattr(txn.reference_order, 'factory', None):
+            factory_obj = txn.reference_order.factory
         
         txn.warehouse = warehouse
         txn.status = txn.STATUS_COMPLETED
@@ -827,8 +833,10 @@ class InventoryTransactionViewSet(TenantQuerySetMixin, viewsets.ModelViewSet):
         """Từ chối/hủy lệnh xuất kho"""
         txn = self.get_object()
         
-        # Check permissions
-        if not request.user.is_company_admin and not request.user.role.permissions.filter(code="inventory.approve_export").exists():
+        # Check permissions — chỉ user có quyền inventory.approve_export mới được từ chối, kể cả admin
+        user = request.user
+        has_approve_perm = user.role and user.role.permissions.filter(code="inventory.approve_export").exists()
+        if not has_approve_perm:
             return Response({"detail": "Bạn không có quyền từ chối lệnh xuất kho."}, status=status.HTTP_403_FORBIDDEN)
 
         if txn.type != "export" or txn.status != txn.STATUS_PENDING:

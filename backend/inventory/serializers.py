@@ -172,6 +172,7 @@ class InventoryTransactionSerializer(serializers.ModelSerializer):
             "created_by_name",
             "created_at",
             "company_info",
+            "factory",
             "factory_name",
             "has_production_order",
             "production_order_code",

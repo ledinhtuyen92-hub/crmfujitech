@@ -61,6 +61,7 @@ PERMISSIONS = [
     {"code": "inventory.import", "name": "Nhập hàng vào kho (tạo phiếu nhập)", "module": "inventory"},
     {"code": "inventory.adjust", "name": "Điều chỉnh tồn kho", "module": "inventory"},
     {"code": "inventory.approve_export", "name": "Duyệt lệnh xuất kho", "module": "inventory"},
+    {"code": "inventory.skip_export_approval", "name": "Bỏ qua duyệt xuất kho (Chỉ tự động xuất khi chọn nhà máy có kho liên kết và đủ hàng)", "module": "inventory"},
     {"code": "inventory.manual_export", "name": "Tạo phiếu xuất kho thủ công", "module": "inventory"},
     {"code": "inventory.manage_warehouse", "name": "Quản lý kho hàng", "module": "inventory"},
     {"code": "inventory.transfer", "name": "Tạo phiếu điều chuyển kho", "module": "inventory"},
