@@ -209,16 +209,20 @@ def _create_production_order(order, factory_id=None):
 
 def _create_pending_inventory_export(order):
     """
-    Tạo hoặc tái tạo lệnh xuất kho ở trạng thái chờ duyệt (pending).
+    Tạo lệnh xuất kho cho đơn hàng vừa được duyệt.
 
-    Logic mã phiếu:
-    - Thừa kế hậu tố từ mã đơn hàng (DH-21072026-001 → EXP-21072026-001).
-    - Xóa các dòng rejected cũ trước khi tạo mới để tránh trùng sản phẩm.
-    - Đảm bảo hậu tố phiếu xuất luôn khớp với đơn hàng tương ứng.
+    Logic:
+    - Nếu người tạo đơn có quyền 'inventory.skip_export_approval':
+        + Thử tự động xuất kho ngay (không cần chờ duyệt).
+        + Nếu kho đủ hàng → duyệt luôn, trừ tồn, kích hoạt bước tiếp theo.
+        + Nếu kho thiếu bất kỳ sản phẩm nào → tạo phiếu pending và thông báo thủ kho.
+    - Nếu không có quyền skip: tạo phiếu pending như bình thường.
+
+    Mã phiếu: thừa kế hậu tố từ mã đơn hàng (DH-21072026-001 → EXP-21072026-001).
     """
     try:
         from core.numbering import derive_code_from_order
-        from inventory.models import InventoryTransaction
+        from inventory.models import InventoryTransaction, StockLevel
 
         # Xóa toàn bộ dòng rejected cũ của đơn hàng này để tạo phiếu mới sạch
         InventoryTransaction.objects.filter(
@@ -237,17 +241,27 @@ def _create_pending_inventory_export(order):
             # Đã có phiếu đang chờ duyệt hoặc hoàn thành → không tạo thêm
             return
 
+        # Kiểm tra quyền bỏ qua duyệt xuất kho của người tạo đơn
+        creator = order.created_by
+        can_skip = (
+            creator is not None and
+            creator.role is not None and
+            creator.role.permissions.filter(code="inventory.skip_export_approval").exists()
+        )
+
         # Sinh mã phiếu: thừa kế hậu tố từ mã đơn hàng
         # VD: FUJI-DH-21072026-001 → FUJI-EXP-21072026-001
         txn_code = derive_code_from_order(order.order_number, order.company, "export")
 
+        # Thu thập danh sách sản phẩm cần xuất
+        export_items = []
         for item in order.items.select_related("product", "product__category").all():
             # Skip services as they don't require physical stock outward
             if item.item_type == 'service' or (item.product and item.product.product_type == 'service'):
                 continue
-            
+
             actual_product_id = item.custom_data.get('actual_product_id') if isinstance(item.custom_data, dict) else None
-            
+
             if actual_product_id:
                 from inventory.models import Product
                 real_product = Product.objects.select_related('category').filter(id=actual_product_id).first()
@@ -262,38 +276,221 @@ def _create_pending_inventory_export(order):
                 continue
 
             dims = []
-            
+
             def format_dim(val):
                 f_val = float(val)
                 return f"{int(f_val)}" if f_val.is_integer() else f"{f_val}"
-                
+
             if not actual_product_id:
                 if hasattr(item, 'length') and item.length and float(item.length) > 0: dims.append(format_dim(item.length))
                 if hasattr(item, 'height') and item.height and float(item.height) > 0: dims.append(format_dim(item.height))
                 if hasattr(item, 'width') and item.width and float(item.width) > 0: dims.append(format_dim(item.width))
                 if hasattr(item, 'thickness') and item.thickness and float(item.thickness) > 0: dims.append(format_dim(item.thickness))
-                
+
                 if dims:
                     custom_name += f" ({' x '.join(dims)})"
 
-            from inventory.models import InventoryTransaction
+            export_items.append({
+                "product": txn_product,
+                "custom_name": custom_name,
+                "quantity": item.quantity,
+            })
+
+        if not export_items:
+            # Không có sản phẩm nào cần xuất kho (toàn dịch vụ)
+            logger.info("No inventory-tracked items for order %s, skipping export creation.", order.order_number)
+            return
+
+        # ─── Xác định nhà máy & kho liên kết bắt buộc từ đơn hàng ───
+        order_factory = getattr(order, 'factory', None)
+        target_warehouse = None
+        if order_factory and order_factory.linked_warehouse:
+            target_warehouse = order_factory.linked_warehouse
+
+        # ─── Nếu người tạo có quyền bỏ qua duyệt: thử auto-approve ───
+        if can_skip:
+            logger.info(
+                "Order %s: creator %s has skip_export_approval perm. Attempting auto-approve.",
+                order.order_number, creator.username if creator else "N/A"
+            )
+
+            # NGUYÊN TẮC BẮT BUỘC:
+            # 1. Nếu đơn hàng có kho liên kết từ nhà máy: TUYỆT ĐỐI chỉ kiểm tra tồn kho tại kho liên kết đó.
+            #    Nếu thiếu bất kỳ sản phẩm nào -> chuyển về lệnh duyệt tay, KHÔNG ĐƯỢC lấy từ kho khác!
+            # 2. Nếu đơn hàng không có kho liên kết: không tự ý duyệt mà chuyển về duyệt tay để thủ kho chọn kho.
+            auto_approve_allowed = False
+            insufficient_products = []
+
+            if target_warehouse is not None:
+                all_sufficient = True
+                for ei in export_items:
+                    stock = StockLevel.objects.filter(
+                        product=ei["product"], warehouse=target_warehouse
+                    ).first()
+                    qty = stock.quantity if stock else 0
+                    if qty < ei["quantity"]:
+                        all_sufficient = False
+                        insufficient_products.append(ei["product"].name if ei["product"] else ei["custom_name"])
+
+                if all_sufficient:
+                    auto_approve_allowed = True
+                else:
+                    logger.info(
+                        "Order %s: target linked warehouse '%s' (factory: %s) lacks stock for: %s. Falling back to manual approval.",
+                        order.order_number, target_warehouse.name, order_factory.name if order_factory else "N/A", insufficient_products
+                    )
+            else:
+                logger.info(
+                    "Order %s: no linked warehouse found for factory %s. Falling back to manual approval.",
+                    order.order_number, order_factory.name if order_factory else "None"
+                )
+
+            if auto_approve_allowed and target_warehouse is not None:
+                # Kho liên kết đủ hàng → tạo phiếu completed và trừ tồn kho luôn
+                from django.db import transaction as db_transaction
+                with db_transaction.atomic():
+                    for ei in export_items:
+                        stock, _ = StockLevel.objects.select_for_update().get_or_create(
+                            product=ei["product"],
+                            warehouse=target_warehouse,
+                            defaults={"quantity": 0}
+                        )
+                        stock.quantity -= ei["quantity"]
+                        stock.save(update_fields=["quantity"])
+
+                        txn = InventoryTransaction.objects.create(
+                            company=order.company,
+                            transaction_code=txn_code,
+                            type=InventoryTransaction.TYPE_EXPORT,
+                            status=InventoryTransaction.STATUS_COMPLETED,
+                            product=ei["product"],
+                            custom_product_name=ei["custom_name"],
+                            warehouse=target_warehouse,
+                            factory=order_factory,
+                            quantity=ei["quantity"],
+                            unit_cost=0,
+                            reference_order=order,
+                            note=f"Tự động xuất kho (bỏ qua duyệt) cho đơn hàng {order.order_number}",
+                            created_by=creator,
+                        )
+
+                        # Cảnh báo tồn kho thấp nếu cần
+                        if stock.is_low_stock and stock.min_quantity > 0:
+                            try:
+                                from notifications.utils import notify_inventory_low
+                                notify_inventory_low(stock)
+                            except Exception:
+                                pass
+
+                logger.info(
+                    "Auto-approved inventory export for order %s (warehouse: %s, factory: %s).",
+                    order.order_number, target_warehouse.name, order_factory.name if order_factory else "N/A"
+                )
+
+                # Kích hoạt bước tiếp theo ngay
+                try:
+                    from orders.workflow import OrderWorkflowEngine
+                    OrderWorkflowEngine.trigger_next_step(
+                        order, current_step="inventory", factory_id=order_factory.id if order_factory else None
+                    )
+                except Exception as e:
+                    logger.error("Error triggering next step after auto-approve for order %s: %s", order.order_number, e)
+                return
+
+            else:
+                # Kho liên kết thiếu hàng hoặc không có kho liên kết → thông báo cho người có quyền duyệt
+                _notify_export_pending_insufficient_stock(
+                    order, export_items, warehouse=target_warehouse, missing_items=insufficient_products
+                )
+                # Tiếp tục tạo phiếu pending bên dưới với warehouse=target_warehouse và factory=order_factory
+
+        # ─── Tạo phiếu xuất kho ở trạng thái PENDING (chuyển về duyệt tay) ───
+        pending_note = (
+            f"Lệnh xuất kho chờ duyệt cho đơn hàng {order.order_number}"
+            if target_warehouse else
+            f"Lệnh xuất kho chờ duyệt cho đơn hàng {order.order_number} (Chưa chỉ định nhà máy/kho liên kết)"
+        )
+        for ei in export_items:
             InventoryTransaction.objects.create(
                 company=order.company,
                 transaction_code=txn_code,
                 type=InventoryTransaction.TYPE_EXPORT,
                 status=InventoryTransaction.STATUS_PENDING,
-                product=txn_product,
-                custom_product_name=custom_name,
-                warehouse=None,
-                quantity=item.quantity,
+                product=ei["product"],
+                custom_product_name=ei["custom_name"],
+                warehouse=target_warehouse,
+                factory=order_factory,
+                quantity=ei["quantity"],
                 unit_cost=0,
                 reference_order=order,
-                note=f"Lệnh xuất kho chờ duyệt cho đơn hàng {order.order_number}",
-                created_by=order.approved_by,
+                note=pending_note,
+                created_by=order.approved_by or creator,
             )
-        logger.info("Auto-created pending InventoryTransaction(s) for order %s with code %s", order.order_number, txn_code)
+        logger.info(
+            "Created pending InventoryTransaction(s) for order %s with code %s (warehouse: %s, factory: %s)",
+            order.order_number, txn_code, target_warehouse.name if target_warehouse else "None", order_factory.name if order_factory else "None"
+        )
     except Exception as exc:
         logger.error("Failed to create/update pending InventoryTransaction for order %s: %s", order.order_number, exc)
+
+
+def _notify_export_pending_insufficient_stock(order, export_items, warehouse=None, missing_items=None):
+    """
+    Thông báo cho những người có quyền duyệt xuất kho khi kho thiếu hàng
+    hoặc khi đơn hàng chưa xác định được nhà máy/kho liên kết,
+    ngay cả khi người tạo đơn có quyền bỏ qua duyệt.
+    """
+    try:
+        from users.models import User
+        from notifications.utils import create_notification
+        from notifications.models import Notification
+
+        if missing_items:
+            short_items_str = ", ".join(missing_items)
+        else:
+            short_items_str = ", ".join(
+                ei["product"].name if ei["product"] else ei["custom_name"]
+                for ei in export_items
+            )
+
+        factory_info = f" (Nhà máy {order.factory.name})" if getattr(order, 'factory', None) else ""
+
+        if warehouse is None:
+            notif_title = "Xuất kho cần duyệt - Chưa chọn nhà máy/kho"
+            notif_message = (
+                f"Đơn hàng {order.order_number} chưa có kho liên kết (chưa chọn nhà máy hoặc nhà máy chưa gắn kho) "
+                f"nên không thể tự động xuất kho. Vui lòng chọn kho và duyệt lệnh xuất kho thủ công."
+            )
+        else:
+            notif_title = "Xuất kho cần duyệt - Thiếu hàng"
+            notif_message = (
+                f"Đơn hàng {order.order_number}{factory_info} không thể tự động xuất do kho '{warehouse.name}' "
+                f"không đủ hàng cho: {short_items_str}. "
+                f"Vui lòng bổ sung hàng vào kho và duyệt lệnh xuất kho."
+            )
+
+        recipients = User.objects.filter(
+            company=order.company,
+            is_active=True,
+            role__permissions__code="inventory.approve_export",
+        ).distinct()
+
+        for recipient in recipients:
+            create_notification(
+                company=order.company,
+                recipient=recipient,
+                notif_type=Notification.TYPE_INVENTORY_LOW,
+                title=notif_title,
+                message=notif_message,
+                link=f"/inventory?tab=export&order={order.id}",
+                sender=None,
+            )
+        logger.info(
+            "Notified %d approvers about pending export for order %s.",
+            recipients.count(), order.order_number
+        )
+    except Exception as exc:
+        logger.error("Failed to notify approvers about pending export for order %s: %s", order.order_number, exc)
 
 
 
