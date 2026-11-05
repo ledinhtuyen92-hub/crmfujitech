@@ -1,0 +1,3 @@
+preset = "off"
+python-interpreter-path = "D:/LẬP TRÌNH/fujitech/venv_backend/Scripts/python.exe"
+search-path = ["backend"]
