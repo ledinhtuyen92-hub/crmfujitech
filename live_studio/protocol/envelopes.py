@@ -60,3 +60,13 @@ class StreamStopPayload:
     command_id: str
     correlation_id: Optional[str] = None
     reason: Optional[str] = None
+
+@dataclass
+class ProductPinnedPayload:
+    product_id: str
+    item_index: int
+    name: str
+    live_price: Optional[str] = None
+    original_price: Optional[str] = None
+    image_url: Optional[str] = None
+    selling_points: Optional[str] = None

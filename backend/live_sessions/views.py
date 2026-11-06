@@ -712,3 +712,286 @@ class LiveMediaAssetViewSet(viewsets.ModelViewSet):
 
     def perform_create(self, serializer):
         serializer.save(company=self.request.user.company)
+
+
+from .models import LiveSessionProduct, LiveSessionVoucher
+from .serializers import (
+    LiveSessionProductSerializer,
+    LiveSessionProductBatchCreateSerializer,
+    LiveSessionVoucherSerializer,
+)
+
+class LiveSessionProductViewSet(viewsets.ModelViewSet):
+    serializer_class = LiveSessionProductSerializer
+    permission_classes = [permissions.IsAuthenticated, ActionBasedPermission]
+    action_permissions = {
+        'list': 'ai_agent.manage_agents',
+        'retrieve': 'ai_agent.manage_agents',
+        'create': 'ai_agent.manage_agents',
+        'update': 'ai_agent.manage_agents',
+        'partial_update': 'ai_agent.manage_agents',
+        'destroy': 'ai_agent.manage_agents',
+        'pin': 'ai_agent.manage_agents',
+        'unpin': 'ai_agent.manage_agents',
+        'batch_create': 'ai_agent.manage_agents',
+    }
+
+    def get_queryset(self):
+        qs = LiveSessionProduct.objects.filter(session__company=self.request.user.company)
+        session_id = self.request.query_params.get('session') or self.request.query_params.get('session_id')
+        if session_id:
+            qs = qs.filter(session_id=session_id)
+        return qs.order_by('item_index', 'created_at')
+
+    def perform_create(self, serializer):
+        session = serializer.validated_data['session']
+        if session.company != self.request.user.company:
+            from rest_framework.exceptions import PermissionDenied
+            raise PermissionDenied("Phiên Live không thuộc công ty của bạn.")
+        
+        # Auto-compute item_index if not supplied or already taken
+        item_index = serializer.validated_data.get('item_index')
+        if not item_index or LiveSessionProduct.objects.filter(session=session, item_index=item_index).exists():
+            from django.db.models import Max
+            max_index = LiveSessionProduct.objects.filter(session=session).aggregate(Max('item_index'))['item_index__max'] or 0
+            serializer.save(item_index=max_index + 1)
+        else:
+            serializer.save()
+
+    @action(detail=True, methods=['post'])
+    def pin(self, request, pk=None):
+        product = self.get_object()
+        session = product.session
+        product.pin()
+
+        # If live on Shopee with API mode, call Shopee API to highlight item
+        if (
+            session.status == LiveSession.STATUS_RUNNING
+            and session.platform == LivePlatformProduct.PLATFORM_SHOPEE
+            and getattr(session, 'shopee_connection_mode', None) == LiveSession.SHOPEE_CONNECTION_API
+            and product.platform_item_id
+        ):
+            try:
+                from .platforms.shopee import ShopeeAdapter
+                adapter = ShopeeAdapter(company_id=request.user.company_id)
+                adapter.set_highlighted_product(str(session.id), product.platform_item_id)
+            except Exception as e:
+                import logging
+                logging.getLogger(__name__).warning(f"Shopee API set_highlighted_product failed: {e}")
+
+        # Emit websocket console event to Studio Web UI
+        try:
+            from .console_events import LiveConsoleEventService
+            LiveConsoleEventService.emit(
+                session_id=str(session.id),
+                event_type="live.product.pinned",
+                payload={
+                    "product_id": str(product.id),
+                    "item_index": product.item_index,
+                    "name": product.name,
+                    "live_price": str(product.live_price) if product.live_price is not None else None,
+                    "original_price": str(product.original_price) if product.original_price is not None else None,
+                    "image_url": product.effective_image_url,
+                }
+            )
+        except Exception:
+            pass
+
+        # Send command / event to device channel for desktop overlay update
+        try:
+            from channels.layers import get_channel_layer
+            from asgiref.sync import async_to_sync
+            channel_layer = get_channel_layer()
+            session_group_name = f"live_session_{session.id}_device"
+            async_to_sync(channel_layer.group_send)(
+                session_group_name,
+                {
+                    "type": "send.command",
+                    "envelope": {
+                        "protocol_version": "1.0",
+                        "type": "event",
+                        "name": "overlay.product_pinned",
+                        "session_id": str(session.id),
+                        "payload": {
+                            "product_id": str(product.id),
+                            "item_index": product.item_index,
+                            "name": product.name,
+                            "original_price": str(product.original_price) if product.original_price is not None else None,
+                            "live_price": str(product.live_price) if product.live_price is not None else None,
+                            "image_url": product.effective_image_url,
+                            "selling_points": product.selling_points or "",
+                        }
+                    }
+                }
+            )
+        except Exception:
+            pass
+
+        return Response(LiveSessionProductSerializer(product, context={'request': request}).data)
+
+    @action(detail=True, methods=['post'])
+    def unpin(self, request, pk=None):
+        product = self.get_object()
+        session = product.session
+        product.unpin()
+
+        if (
+            session.status == LiveSession.STATUS_RUNNING
+            and session.platform == LivePlatformProduct.PLATFORM_SHOPEE
+            and getattr(session, 'shopee_connection_mode', None) == LiveSession.SHOPEE_CONNECTION_API
+        ):
+            try:
+                from .platforms.shopee import ShopeeAdapter
+                adapter = ShopeeAdapter(company_id=request.user.company_id)
+                adapter.unpin_product(str(session.id))
+            except Exception as e:
+                import logging
+                logging.getLogger(__name__).warning(f"Shopee API unpin_product failed: {e}")
+
+        try:
+            from .console_events import LiveConsoleEventService
+            LiveConsoleEventService.emit(
+                session_id=str(session.id),
+                event_type="live.product.unpinned",
+                payload={"product_id": str(product.id), "item_index": product.item_index}
+            )
+        except Exception:
+            pass
+
+        try:
+            from channels.layers import get_channel_layer
+            from asgiref.sync import async_to_sync
+            channel_layer = get_channel_layer()
+            session_group_name = f"live_session_{session.id}_device"
+            async_to_sync(channel_layer.group_send)(
+                session_group_name,
+                {
+                    "type": "send.command",
+                    "envelope": {
+                        "protocol_version": "1.0",
+                        "type": "event",
+                        "name": "overlay.product_unpinned",
+                        "session_id": str(session.id),
+                        "payload": {"product_id": str(product.id)}
+                    }
+                }
+            )
+        except Exception:
+            pass
+
+        return Response(LiveSessionProductSerializer(product, context={'request': request}).data)
+
+    @action(detail=False, methods=['post'])
+    def batch_create(self, request):
+        serializer = LiveSessionProductBatchCreateSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        session_id = serializer.validated_data['session_id']
+        try:
+            session = LiveSession.objects.get(id=session_id, company=request.user.company)
+        except LiveSession.DoesNotExist:
+            return Response({"detail": "Phiên Live không tồn tại hoặc không thuộc công ty của bạn."}, status=status.HTTP_404_NOT_FOUND)
+
+        from django.db.models import Max
+        current_max = LiveSessionProduct.objects.filter(session=session).aggregate(Max('item_index'))['item_index__max'] or 0
+
+        created_instances = []
+        for item in serializer.validated_data['products']:
+            idx = item.get('item_index')
+            if not idx:
+                current_max += 1
+                idx = current_max
+            else:
+                if idx > current_max:
+                    current_max = idx
+
+            obj = LiveSessionProduct.objects.create(
+                session=session,
+                item_index=idx,
+                platform_item_id=item.get('platform_item_id'),
+                name=item['name'],
+                sku=item.get('sku'),
+                original_price=item.get('original_price'),
+                live_price=item.get('live_price'),
+                stock=item.get('stock', 100),
+                product_url=item.get('product_url'),
+                image_url=item.get('image_url'),
+                selling_points=item.get('selling_points'),
+                duration_minutes=item.get('duration_minutes', 2),
+            )
+            created_instances.append(obj)
+
+        return Response(
+            LiveSessionProductSerializer(created_instances, many=True, context={'request': request}).data,
+            status=status.HTTP_201_CREATED
+        )
+
+
+class LiveSessionVoucherViewSet(viewsets.ModelViewSet):
+    serializer_class = LiveSessionVoucherSerializer
+    permission_classes = [permissions.IsAuthenticated, ActionBasedPermission]
+    action_permissions = {
+        'list': 'ai_agent.manage_agents',
+        'retrieve': 'ai_agent.manage_agents',
+        'create': 'ai_agent.manage_agents',
+        'update': 'ai_agent.manage_agents',
+        'partial_update': 'ai_agent.manage_agents',
+        'destroy': 'ai_agent.manage_agents',
+        'pin': 'ai_agent.manage_agents',
+        'unpin': 'ai_agent.manage_agents',
+    }
+
+    def get_queryset(self):
+        qs = LiveSessionVoucher.objects.filter(session__company=self.request.user.company)
+        session_id = self.request.query_params.get('session') or self.request.query_params.get('session_id')
+        if session_id:
+            qs = qs.filter(session_id=session_id)
+        return qs.order_by('-is_pinned', '-created_at')
+
+    def perform_create(self, serializer):
+        session = serializer.validated_data['session']
+        if session.company != self.request.user.company:
+            from rest_framework.exceptions import PermissionDenied
+            raise PermissionDenied("Phiên Live không thuộc công ty của bạn.")
+        serializer.save()
+
+    @action(detail=True, methods=['post'])
+    def pin(self, request, pk=None):
+        voucher = self.get_object()
+        session = voucher.session
+        voucher.pin()
+
+        try:
+            from .console_events import LiveConsoleEventService
+            LiveConsoleEventService.emit(
+                session_id=str(session.id),
+                event_type="live.voucher.pinned",
+                payload={
+                    "voucher_id": str(voucher.id),
+                    "voucher_code": voucher.voucher_code,
+                    "discount_text": voucher.discount_text,
+                    "min_order_value": str(voucher.min_order_value) if voucher.min_order_value is not None else None,
+                }
+            )
+        except Exception:
+            pass
+
+        return Response(LiveSessionVoucherSerializer(voucher, context={'request': request}).data)
+
+    @action(detail=True, methods=['post'])
+    def unpin(self, request, pk=None):
+        voucher = self.get_object()
+        session = voucher.session
+        voucher.unpin()
+
+        try:
+            from .console_events import LiveConsoleEventService
+            LiveConsoleEventService.emit(
+                session_id=str(session.id),
+                event_type="live.voucher.unpinned",
+                payload={"voucher_id": str(voucher.id), "voucher_code": voucher.voucher_code}
+            )
+        except Exception:
+            pass
+
+        return Response(LiveSessionVoucherSerializer(voucher, context={'request': request}).data)

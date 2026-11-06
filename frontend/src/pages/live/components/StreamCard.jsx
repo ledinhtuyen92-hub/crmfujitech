@@ -1,12 +1,12 @@
 import React, { useState } from 'react'
-import { Card, Typography, Space, Button, Divider, Tooltip, Row, Col, Dropdown, Modal } from 'antd'
-import { PlayCircleOutlined, StopOutlined, RobotOutlined, DesktopOutlined, ShopOutlined, ApiOutlined, MoreOutlined, DeleteOutlined, ExclamationCircleOutlined } from '@ant-design/icons'
+import { Card, Typography, Space, Button, Divider, Tooltip, Row, Col, Dropdown, Modal, Tag } from 'antd'
+import { PlayCircleOutlined, StopOutlined, RobotOutlined, DesktopOutlined, ShopOutlined, ApiOutlined, MoreOutlined, DeleteOutlined, ExclamationCircleOutlined, ShoppingOutlined, TagOutlined } from '@ant-design/icons'
 import { useNavigate } from 'react-router-dom'
 import LiveStatusBadge from './LiveStatusBadge'
 
 const { Text, Title } = Typography
 
-export default function StreamCard({ session, onStart, onStop, onDelete, onEdit, onClick }) {
+export default function StreamCard({ session, onStart, onStop, onDelete, onEdit, onOpenBag, onClick }) {
   const navigate = useNavigate()
   const [isDeleting, setIsDeleting] = useState(false)
   
@@ -46,6 +46,15 @@ export default function StreamCard({ session, onStart, onStop, onDelete, onEdit,
   }
 
   const menuItems = [
+    {
+      key: 'bag',
+      label: `Túi hàng Live (${session.session_products?.length || 0})`,
+      icon: <ShoppingOutlined style={{ color: '#ee4d2d' }} />,
+      onClick: (e) => {
+        if (e.domEvent) e.domEvent.stopPropagation()
+        if (onOpenBag) onOpenBag(session)
+      }
+    },
     {
       key: 'edit',
       label: 'Chỉnh sửa',
@@ -119,13 +128,33 @@ export default function StreamCard({ session, onStart, onStop, onDelete, onEdit,
 
       {/* Body */}
       <div style={{ padding: '20px' }}>
-        <Space orientation="vertical" size="middle" style={{ width: '100%' }}>
+        <Space direction="vertical" size="middle" style={{ width: '100%' }}>
           
           <div>
-            <Text type="secondary" style={{ fontSize: 12 }}>Sản phẩm trung tâm</Text>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <Text type="secondary" style={{ fontSize: 12 }}>
+                {session.session_products?.length > 0 ? 'Túi hàng Live' : 'Sản phẩm trung tâm'}
+              </Text>
+              {session.session_products?.length > 0 && (
+                <Tag color="orange" style={{ margin: 0, fontSize: 11, padding: '0 6px', borderRadius: 10 }}>
+                  {session.session_products.length} SP
+                </Tag>
+              )}
+            </div>
             <div style={{ display: 'flex', alignItems: 'center', marginTop: 4 }}>
-              <ShopOutlined style={{ marginRight: 8, color: '#1649c9' }} />
-              <Text strong ellipsis>{product_name || 'Chưa thiết lập'}</Text>
+              {session.session_products?.length > 0 ? (
+                <>
+                  <ShoppingOutlined style={{ marginRight: 8, color: '#ee4d2d' }} />
+                  <Text strong ellipsis style={{ color: '#ee4d2d' }}>
+                    {session.pinned_product ? `Đang ghim: #${session.pinned_product.item_index} - ${session.pinned_product.name}` : `${session.session_products.length} sản phẩm trong túi live`}
+                  </Text>
+                </>
+              ) : (
+                <>
+                  <ShopOutlined style={{ marginRight: 8, color: '#1649c9' }} />
+                  <Text strong ellipsis>{product_name || 'Chưa thiết lập'}</Text>
+                </>
+              )}
             </div>
           </div>
 
@@ -150,7 +179,15 @@ export default function StreamCard({ session, onStart, onStop, onDelete, onEdit,
       </div>
 
       {/* Footer Actions */}
-      <div style={{ padding: '12px 20px', borderTop: '1px solid #f0f0f0', display: 'flex', justifyContent: 'flex-end' }}>
+      <div style={{ padding: '12px 20px', borderTop: '1px solid #f0f0f0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <Button 
+          size="small"
+          icon={<ShoppingOutlined />}
+          onClick={(e) => { e.stopPropagation(); onOpenBag && onOpenBag(session); }}
+          style={{ borderRadius: 6, borderColor: '#ffbb96', color: '#d4380d' }}
+        >
+          Túi hàng {session.session_products?.length > 0 ? `(${session.session_products.length})` : ''}
+        </Button>
         <Space>
           <Button 
             type="primary" 

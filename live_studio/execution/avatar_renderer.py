@@ -22,6 +22,12 @@ class BaseAvatarRenderer:
     def shutdown(self):
         raise NotImplementedError
 
+    def set_pinned_product(self, product_data: dict):
+        pass
+
+    def clear_pinned_product(self):
+        pass
+
 
 class DummyAvatarRenderer(BaseAvatarRenderer):
     """
@@ -44,6 +50,12 @@ class DummyAvatarRenderer(BaseAvatarRenderer):
     def play_action(self, action_id: str) -> bool:
         self.last_action = action_id
         return True
+
+    def set_pinned_product(self, product_data: dict):
+        self.pinned_product = product_data
+
+    def clear_pinned_product(self):
+        self.pinned_product = None
 
     def notify_speech_start(self):
         pass
@@ -223,6 +235,11 @@ class PygameAvatarRenderer(BaseAvatarRenderer):
         self.speaking_sequence: Optional[VideoFrameSequence] = None
         self.action_sequences: dict = {}
         
+        # Pinned Product Overlay
+        self._pinned_product: Optional[dict] = None
+        self._pinned_product_image_surf = None
+        self._last_pinned_product_id: Optional[str] = None
+        
         # Resume Playback time accumulators
         self._idle_playback_time = 0.0
         self._speaking_playback_time = 0.0
@@ -257,10 +274,18 @@ class PygameAvatarRenderer(BaseAvatarRenderer):
             self.font_title = self.pygame.font.SysFont("Arial", 40, bold=True)
             self.font_subtitle = self.pygame.font.SysFont("Arial", 32)
             self.font_cta = self.pygame.font.SysFont("Arial", 48, bold=True)
+            self.font_overlay_title = self.pygame.font.SysFont("Arial", 22, bold=True)
+            self.font_overlay_price = self.pygame.font.SysFont("Arial", 26, bold=True)
+            self.font_overlay_sub = self.pygame.font.SysFont("Arial", 16)
+            self.font_overlay_badge = self.pygame.font.SysFont("Arial", 16, bold=True)
         except Exception:
             self.font_title = None
             self.font_subtitle = None
             self.font_cta = None
+            self.font_overlay_title = None
+            self.font_overlay_price = None
+            self.font_overlay_sub = None
+            self.font_overlay_badge = None
             
         # Use an off-screen surface for internal frame extraction (rendering without a window)
         self.screen = self.pygame.Surface((self.width, self.height))
@@ -308,6 +333,124 @@ class PygameAvatarRenderer(BaseAvatarRenderer):
         self._current_action_time = 0.0
         logger.info(f"[PygameAvatarRenderer] Started action '{action_id}' (duration={self._current_action_seq.duration:.1f}s)")
         return True
+
+    def set_pinned_product(self, product_data: dict):
+        self._pinned_product = product_data
+        pid = product_data.get('product_id')
+        if pid != getattr(self, '_last_pinned_product_id', None):
+            self._last_pinned_product_id = pid
+            self._pinned_product_image_surf = None
+            img_url = product_data.get('image_url')
+            if img_url:
+                import threading
+                threading.Thread(target=self._load_pinned_image, args=(img_url,), daemon=True).start()
+
+    def clear_pinned_product(self):
+        self._pinned_product = None
+        self._pinned_product_image_surf = None
+        self._last_pinned_product_id = None
+
+    def _load_pinned_image(self, url: str):
+        try:
+            import urllib.request
+            import io
+            req = urllib.request.Request(url, headers={'User-Agent': 'LiveStudio/1.0'})
+            with urllib.request.urlopen(req, timeout=3) as resp:
+                data = resp.read()
+            surf = self.pygame.image.load(io.BytesIO(data))
+            surf = self.pygame.transform.smoothscale(surf, (76, 76))
+            self._pinned_product_image_surf = surf
+        except Exception as e:
+            logger.warning(f"Could not load pinned product image from {url}: {e}")
+
+    def _render_pinned_product_overlay(self):
+        if not self._pinned_product or not self.available or not self.screen:
+            return
+
+        p = self._pinned_product
+        card_w, card_h = 660, 130
+        card_x, card_y = 30, 90
+
+        # Semi-transparent sleek card surface
+        card_surf = self.pygame.Surface((card_w, card_h), self.pygame.SRCALPHA)
+        # Background: Dark glass with alpha
+        self.pygame.draw.rect(card_surf, (20, 24, 33, 235), (0, 0, card_w, card_h), border_radius=14)
+        # Shopee vibrant border
+        self.pygame.draw.rect(card_surf, (238, 77, 45, 255), (0, 0, card_w, card_h), width=2, border_radius=14)
+
+        # Badge index: MÃ 01
+        idx = p.get('item_index', 1)
+        idx_str = f"MÃ {idx:02d}" if isinstance(idx, int) else f"MÃ {idx}"
+        badge_w, badge_h = 75, 24
+        self.pygame.draw.rect(card_surf, (238, 77, 45), (12, 12, badge_w, badge_h), border_radius=6)
+        if hasattr(self, 'font_overlay_badge') and self.font_overlay_badge:
+            b_txt = self.font_overlay_badge.render(idx_str, True, (255, 255, 255))
+            card_surf.blit(b_txt, (18, 15))
+
+        # Thumbnail
+        thumb_x, thumb_y, thumb_size = 12, 42, 76
+        if getattr(self, '_pinned_product_image_surf', None):
+            card_surf.blit(self._pinned_product_image_surf, (thumb_x, thumb_y))
+        else:
+            self.pygame.draw.rect(card_surf, (45, 52, 68), (thumb_x, thumb_y, thumb_size, thumb_size), border_radius=8)
+            if hasattr(self, 'font_overlay_badge') and self.font_overlay_badge:
+                p_txt = self.font_overlay_badge.render(f"#{idx}", True, (238, 77, 45))
+                card_surf.blit(p_txt, (thumb_x + 22, thumb_y + 28))
+
+        # Text column (X = 100)
+        text_x = 100
+        # Product Name
+        name = p.get('name', 'Sản phẩm đang ghim')
+        if len(name) > 36:
+            name = name[:34] + "..."
+        if hasattr(self, 'font_overlay_title') and self.font_overlay_title:
+            name_txt = self.font_overlay_title.render(name, True, (255, 255, 255))
+            card_surf.blit(name_txt, (text_x, 14))
+
+        # Prices
+        live_price = p.get('live_price')
+        orig_price = p.get('original_price')
+        price_y = 48
+        price_offset = 0
+        if live_price:
+            try:
+                lp_val = f"{int(float(live_price)):,}đ".replace(',', '.')
+            except Exception:
+                lp_val = str(live_price)
+            if hasattr(self, 'font_overlay_price') and self.font_overlay_price:
+                lp_txt = self.font_overlay_price.render(lp_val, True, (255, 77, 79))
+                card_surf.blit(lp_txt, (text_x, price_y))
+                price_offset = lp_txt.get_width() + 12
+            else:
+                price_offset = 120
+
+        if orig_price:
+            try:
+                op_val = f"{int(float(orig_price)):,}đ".replace(',', '.')
+            except Exception:
+                op_val = str(orig_price)
+            if hasattr(self, 'font_overlay_sub') and self.font_overlay_sub:
+                op_txt = self.font_overlay_sub.render(op_val, True, (160, 160, 160))
+                card_surf.blit(op_txt, (text_x + price_offset, price_y + 6))
+                # Strikethrough line
+                strike_y = price_y + 6 + op_txt.get_height() // 2
+                self.pygame.draw.line(card_surf, (160, 160, 160), (text_x + price_offset, strike_y), (text_x + price_offset + op_txt.get_width(), strike_y), 1)
+
+        # Selling points or CTA
+        usp = p.get('selling_points')
+        if usp:
+            if len(usp) > 42:
+                usp = usp[:40] + "..."
+            footer_str = f"⭐ {usp}"
+        else:
+            footer_str = "🔥 Đang ghim trên live • Bấm giỏ hàng góc trái!"
+
+        if hasattr(self, 'font_overlay_sub') and self.font_overlay_sub:
+            usp_txt = self.font_overlay_sub.render(footer_str, True, (82, 196, 26))
+            card_surf.blit(usp_txt, (text_x, 88))
+
+        # Blit overlay card onto screen
+        self.screen.blit(card_surf, (card_x, card_y))
 
     def notify_speech_start(self):
         self._is_speaking_state = True
@@ -412,6 +555,8 @@ class PygameAvatarRenderer(BaseAvatarRenderer):
 
             if surf:
                 self.screen.blit(surf, (0, 0))
+                if self._pinned_product:
+                    self._render_pinned_product_overlay()
                 return
 
         # Fallback 2D Cartoon Scene (used for tests or when no video asset is selected)
@@ -472,6 +617,9 @@ class PygameAvatarRenderer(BaseAvatarRenderer):
             cta_surf = self.font_cta.render("MUA NGAY TẠI GIỎ HÀNG!", True, (255, 255, 255))
             cta_rect = cta_surf.get_rect(center=(360, cta_y + 50))
             self.screen.blit(cta_surf, cta_rect)
+
+        if self._pinned_product:
+            self._render_pinned_product_overlay()
 
     def shutdown(self):
         if self.idle_sequence:

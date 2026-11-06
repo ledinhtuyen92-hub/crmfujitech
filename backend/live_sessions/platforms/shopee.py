@@ -591,6 +591,32 @@ class ShopeeAdapter(BasePlatformAdapter):
         self._client.request_livestream("POST", "/api/v2/livestream/update_show_item", json=payload)
         return True
 
+    def unpin_product(self, session_id: str) -> bool:
+        """
+        Delete/Stop showing the currently pinned product on Shopee Live.
+        Shopee API: /api/v2/livestream/delete_show_item
+        """
+        self._check_capability(Capability.PRODUCT_ATTACH)
+        session = self._get_live_session(session_id)
+
+        if not session.external_session_id:
+            raise PlatformAPIError("Cannot unpin product: external_session_id is missing")
+
+        self._init_client()
+
+        payload = {
+            "session_id": session.external_session_id,
+        }
+
+        try:
+            self._client.request_livestream("POST", "/api/v2/livestream/delete_show_item", json=payload)
+            return True
+        except Exception as e:
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.warning(f"[ShopeeAdapter] delete_show_item failed: {e}")
+            return False
+
     # ─────────────────────────────────────────────────────────────────────────
     # Phase 1E-8: Comments with cursor tracking
     # ─────────────────────────────────────────────────────────────────────────

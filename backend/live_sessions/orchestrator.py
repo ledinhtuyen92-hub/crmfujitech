@@ -321,35 +321,76 @@ class LiveOrchestrator:
             logger.error(f"[Session: {session_id}][Corr: {correlation_id}] No AI Agent assigned to session.")
             return {"status": "error", "reason": "missing_agent"}
 
-        # 4. Search Product-scoped RAG
+        # 4. Smart Matching: Match product from Live Shopping Bag (session_products) or vouchers
+        from live_sessions.services import LiveProductMatchingService, LiveVoucherMatchingService
+        
+        matched_session_product = LiveProductMatchingService.match_product(session, user_message)
+        pinned_voucher = LiveVoucherMatchingService.match_and_pin_voucher(session, user_message)
+
+        if matched_session_product:
+            logger.info(f"[Session: {session_id}][Corr: {correlation_id}] Comment matched session product #{matched_session_product.item_index} '{matched_session_product.name}'. Instant pinning.")
+            LiveProductMatchingService.execute_instant_pin(matched_session_product)
+            target_product = matched_session_product
+        else:
+            # Fallback: check currently pinned product in session_products
+            target_product = session.session_products.filter(is_pinned=True).first()
+
+        # 4.1 Search Product-scoped RAG (if internal product is mapped)
         context_text = ""
         try:
-            context_text = search_knowledge(agent, user_message, limit=3, product_id=session.product_id)
+            rag_prod_id = session.product_id if session.product_id else None
+            context_text = search_knowledge(agent, user_message, limit=3, product_id=rag_prod_id)
             logger.info(f"[Session: {session_id}][Corr: {correlation_id}] RAG completed.")
             LiveConsoleEventService.emit(session_id, "live.rag.completed", {"context_found": bool(context_text)}, correlation_id)
         except Exception as e:
             logger.error(f"[Session: {session_id}][Corr: {correlation_id}] RAG error: {e}")
             LiveConsoleEventService.emit(session_id, "live.rag.error", {"error": str(e)}, correlation_id)
-            # Continue even if RAG fails
 
         # 4.5 Fetch Product Truth
-        product = session.product
-        product_truth = f"THÔNG TIN SẢN PHẨM ĐANG LIVE (BẮT BUỘC SỬ DỤNG LÀM CHUẨN):\n- Tên: {product.name}\n- Mã (SKU): {product.sku}\n- Giá tiêu chuẩn: {product.price}\n- Mô tả cơ bản: {product.description}\n"
-        
-        try:
-            from live_sessions.models import LivePlatformProduct
-            platform_product = LivePlatformProduct.objects.filter(
-                company_id=session.company_id,
-                product_id=product.id,
-                platform=session.platform
-            ).first()
+        if target_product:
+            price_str = f"{int(target_product.live_price):,} đồng" if target_product.live_price else (f"{int(target_product.original_price):,} đồng" if target_product.original_price else "ưu đãi đặc biệt")
+            orig_str = f" (Giá gốc: {int(target_product.original_price):,} đồng)" if (target_product.original_price and target_product.live_price) else ""
             
-            if platform_product and platform_product.live_price_override:
-                product_truth += f"- GIÁ ĐANG CHẠY FLASH SALE TRÊN LIVE: {platform_product.live_price_override} (Ưu tiên báo giá này cho khách livestream)\n"
-                
-            LiveConsoleEventService.emit(session_id, "live.product_truth.loaded", {"product_name": product.name, "sku": product.sku, "has_live_price": bool(platform_product and platform_product.live_price_override)}, correlation_id)
-        except Exception as e:
-            logger.error(f"[Session: {session_id}][Corr: {correlation_id}] Failed to load platform product truth: {e}")
+            product_truth = (
+                f"THÔNG TIN SẢN PHẨM TRÊN LIVE (ĐÃ ĐƯỢC GHIM TRỰC TIẾP TRÊN MÀN HÌNH BẰNG TÚI HÀNG):\n"
+                f"- Tên sản phẩm: {target_product.name}\n"
+                f"- Mã số gọi trong Live: Mã số {target_product.item_index} (Khách có thể comment hỏi 'mã {target_product.item_index}')\n"
+                f"- Mã SKU: {target_product.sku or 'N/A'}\n"
+                f"- Giá ưu đãi trên Live: {price_str}{orig_str}\n"
+                f"- Số lượng tồn kho: {target_product.stock} suất\n"
+                f"- Đặc điểm nổi bật / Luận điểm bán hàng (USP): {target_product.selling_points or 'Chuẩn hàng chính hãng, độ bền cao, bảo hành đầy đủ'}\n"
+            )
+            if pinned_voucher:
+                product_truth += f"- VOUCHER ĐANG ÁP DỤNG: Mã {pinned_voucher.voucher_code} ({pinned_voucher.discount_text})\n"
+            
+            LiveConsoleEventService.emit(
+                session_id,
+                "live.product_truth.loaded",
+                {
+                    "product_name": target_product.name,
+                    "item_index": target_product.item_index,
+                    "has_live_price": bool(target_product.live_price),
+                    "matched_from_comment": bool(matched_session_product),
+                },
+                correlation_id
+            )
+        elif session.product:
+            product = session.product
+            product_truth = f"THÔNG TIN SẢN PHẨM ĐANG LIVE (BẮT BUỘC SỬ DỤNG LÀM CHUẨN):\n- Tên: {product.name}\n- Mã (SKU): {product.sku}\n- Giá tiêu chuẩn: {product.price}\n- Mô tả cơ bản: {product.description}\n"
+            try:
+                from live_sessions.models import LivePlatformProduct
+                platform_product = LivePlatformProduct.objects.filter(
+                    company_id=session.company_id,
+                    product_id=product.id,
+                    platform=session.platform
+                ).first()
+                if platform_product and platform_product.live_price_override:
+                    product_truth += f"- GIÁ ĐANG CHẠY FLASH SALE TRÊN LIVE: {platform_product.live_price_override} (Ưu tiên báo giá này cho khách livestream)\n"
+                LiveConsoleEventService.emit(session_id, "live.product_truth.loaded", {"product_name": product.name, "sku": product.sku, "has_live_price": bool(platform_product and platform_product.live_price_override)}, correlation_id)
+            except Exception as e:
+                logger.error(f"[Session: {session_id}][Corr: {correlation_id}] Failed to load platform product truth: {e}")
+        else:
+            product_truth = "THÔNG TIN GIAN HÀNG: Đang phát sóng livestream trực tiếp với nhiều sản phẩm và voucher ưu đãi trong giỏ hàng góc trái màn hình.\n"
 
         # 5. Build conversation history & Call AI
         conversation_history = []
@@ -359,6 +400,27 @@ class LiveOrchestrator:
             "role": "system",
             "content": product_truth
         })
+
+        if matched_session_product:
+            conversation_history.append({
+                "role": "system",
+                "content": (
+                    f"[HƯỚNG DẪN TRẢ LỜI CHO SẢN PHẨM VỪA ĐƯỢC HỎI]:\n"
+                    f"Khách hàng vừa hỏi về sản phẩm Mã số {matched_session_product.item_index} ({matched_session_product.name}). "
+                    f"Hệ thống đã tự động ghim sản phẩm này lên góc trái màn hình của khách. "
+                    f"Hãy trả lời hồ hởi, ngắn gọn, cung cấp thông tin chính xác theo Product Truth trên, "
+                    f"và kèm câu nhắc: 'Em vừa ghim sản phẩm mã số {matched_session_product.item_index} lên màn hình rồi ạ, bạn bấm vào giỏ hàng chốt đơn ngay nhé!'."
+                )
+            })
+        elif pinned_voucher:
+            conversation_history.append({
+                "role": "system",
+                "content": (
+                    f"[HƯỚNG DẪN TRẢ LỜI VOUCHER]: Khách hàng vừa hỏi về voucher/khuyến mãi. "
+                    f"Shop đang có mã {pinned_voucher.voucher_code} ({pinned_voucher.discount_text}). "
+                    f"Hãy hướng dẫn khách bấm vào giỏ hàng góc trái màn hình lưu mã ngay để áp dụng giảm giá."
+                )
+            })
         
         # Inject Custom Session Script / Rules
         if getattr(session, 'session_prompt', None):
@@ -571,15 +633,76 @@ class LiveOrchestrator:
     def generate_proactive_sales_pitch(self, product, session, context_data: dict) -> str:
         """
         Tự động tạo câu tư vấn sản phẩm bán hàng chuyên nghiệp khi livestream chưa có comment (0đ TOKEN).
-        Ưu tiên:
-        1. Nếu người dùng có nhập kịch bản xoay vòng trong session.session_prompt (nhiều dòng),
-           hệ thống sẽ lần lượt xoay vòng các câu kịch bản đó của người dùng.
-        2. Nếu không có hoặc chỉ có 1 ghi chú ngắn, hệ thống dùng bộ kịch bản bán hàng đa ngành
-           chuẩn mực (chào mừng, USP tính năng, cam kết chính hãng, báo giá flash sale, kêu gọi giỏ hàng).
-        """
-        pitch_index = context_data.get("proactive_pitch_index", 0)
         
-        # 1. Kiểm tra kịch bản người dùng tự nhập (phân tách theo dòng)
+        Ưu tiên:
+        1. Động cơ Túi hàng Live (Live Shopping Bag Carousel):
+           Nếu phiên live có danh sách sản phẩm trong session.session_products:
+           Hệ thống tự động xoay vòng lần lượt các sản phẩm. Với mỗi sản phẩm, MC AI sẽ nói các câu mồi
+           chuẩn phễu (Chào mừng & Ghim SP -> Tính năng nổi bật/USP -> Giá flash sale -> Kêu gọi giỏ hàng).
+           Khi hết lượt hoặc sau thời lượng (duration_minutes), hệ thống tự động ghim sản phẩm tiếp theo.
+        2. Kịch bản tùy chỉnh do người dùng nhập trong session.session_prompt (nhiều dòng).
+        3. Bộ kịch bản bán hàng mặc định cho sản phẩm đơn lẻ (nếu có product).
+        """
+        import time
+        from live_sessions.services import LiveContextService, LiveProductMatchingService
+
+        pitch_index = context_data.get("proactive_pitch_index", 0)
+
+        # ── 1. ĐỘNG CƠ XOAY VÒNG TÚI HÀNG ĐA SẢN PHẨM (SESSION_PRODUCTS) ───────────
+        session_products = list(session.session_products.all().order_by('item_index', 'created_at'))
+        if session_products:
+            carousel_prod_idx = int(context_data.get("carousel_prod_idx", 0) or 0)
+            carousel_step_idx = int(context_data.get("carousel_step_idx", 0) or 0)
+            started_at = float(context_data.get("carousel_prod_started_at", 0) or 0)
+            now = time.time()
+
+            # Kiểm tra xem có sản phẩm nào đang được ghim thủ công từ Admin không
+            pinned_prod = session.session_products.filter(is_pinned=True).first()
+            if pinned_prod:
+                matching_indices = [i for i, p in enumerate(session_products) if p.id == pinned_prod.id]
+                if matching_indices and matching_indices[0] != carousel_prod_idx:
+                    carousel_prod_idx = matching_indices[0]
+                    carousel_step_idx = 0
+                    started_at = now
+
+            current_prod = session_products[carousel_prod_idx % len(session_products)]
+            duration_sec = (current_prod.duration_minutes or 2) * 60
+
+            # Kiểm tra xem đã hết lượt hoặc hết thời lượng cho sản phẩm này chưa
+            if carousel_step_idx >= 5 or (started_at > 0 and (now - started_at) >= duration_sec):
+                carousel_prod_idx = (carousel_prod_idx + 1) % len(session_products)
+                current_prod = session_products[carousel_prod_idx]
+                carousel_step_idx = 0
+                started_at = now
+                LiveProductMatchingService.execute_instant_pin(current_prod)
+            elif started_at <= 0:
+                started_at = now
+                if not current_prod.is_pinned:
+                    LiveProductMatchingService.execute_instant_pin(current_prod)
+
+            price_str = f"chỉ {int(current_prod.live_price):,} đồng" if current_prod.live_price else "mức giá cực kỳ ưu đãi"
+            orig_str = f" (thay vì giá gốc {int(current_prod.original_price):,} đồng)" if (current_prod.original_price and current_prod.live_price) else ""
+            usp_text = current_prod.selling_points or "chất lượng vượt trội, thiết kế thông minh và độ bền cực kỳ cao"
+
+            pitches = [
+                f"Dạ em xin chào mừng toàn thể cả nhà mình đang theo dõi phiên livestream nha! Món đồ em vừa ghim trực tiếp ở góc trái màn hình là mã số {current_prod.item_index} - {current_prod.name}, trợ giá sốc {price_str}{orig_str} thôi cả nhà ơi! Các bác bấm ngay vào giỏ hàng săn deal nha!",
+                f"Sản phẩm {current_prod.name} mã số {current_prod.item_index} này sở hữu ưu điểm vượt trội: {usp_text}. Bên em cam kết chuẩn hàng chính hãng 100%, bảo hành đầy đủ, cả nhà hoàn toàn yên tâm nhé!",
+                f"Số lượng suất flash sale dành cho mã số {current_prod.item_index} {price_str} trong phiên live hôm nay chỉ còn rất ít thôi cả nhà ơi! Mọi người nhanh tay chốt đơn kẻo hết mã giảm giá nha!",
+                f"Dạ các bác nhanh tay bấm vào giỏ hàng góc trái màn hình, chọn đúng mã số {current_prod.item_index} để nhận ngay voucher độc quyền và mã miễn phí vận chuyển toàn quốc cho đơn hàng hôm nay nha!",
+                f"Mọi người đang xem live nếu có bất kỳ thắc mắc nào về sản phẩm mã số {current_prod.item_index} {current_prod.name} thì cứ thả bình luận xuống bên dưới, em sẽ giải đáp chi tiết cho từng người luôn ạ!"
+            ]
+
+            chosen = pitches[carousel_step_idx % len(pitches)]
+
+            LiveContextService.update_context(str(session.company_id), str(session.id), {
+                "carousel_prod_idx": carousel_prod_idx,
+                "carousel_step_idx": carousel_step_idx + 1,
+                "carousel_prod_started_at": started_at,
+                "proactive_pitch_index": pitch_index + 1
+            })
+            return chosen
+
+        # ── 2. KIỂM TRA KỊCH BẢN TÙY CHỈNH NGƯỜI DÙNG NHẬP (Phân tách theo dòng) ──
         custom_pitches = []
         if getattr(session, 'session_prompt', None):
             raw_prompt = session.session_prompt.replace('\r\n', '\n').replace('\r', '\n')
@@ -592,13 +715,12 @@ class LiveOrchestrator:
 
         if custom_pitches:
             chosen = custom_pitches[pitch_index % len(custom_pitches)]
-            from live_sessions.services import LiveContextService
             LiveContextService.update_context(str(session.company_id), str(session.id), {
                 "proactive_pitch_index": pitch_index + 1
             })
             return chosen
 
-        # 2. Bộ kịch bản bán hàng đa ngành chuẩn phễu (tự động theo sản phẩm đang ghim)
+        # ── 3. BỘ KỊCH BẢN BÁN HÀNG MẶC ĐỊNH (Theo sản phẩm đơn) ──────────────────
         prod_name = product.name if product else "sản phẩm nổi bật của bên em"
         
         price_val = None
@@ -633,7 +755,6 @@ class LiveOrchestrator:
         ]
         
         chosen = pitches[pitch_index % len(pitches)]
-        from live_sessions.services import LiveContextService
         LiveContextService.update_context(str(session.company_id), str(session.id), {
             "proactive_pitch_index": pitch_index + 1
         })

@@ -25,6 +25,18 @@ class BaseAvatarEngine:
         """
         return False
 
+    def set_pinned_product(self, product_data: dict):
+        """
+        Sets the product currently pinned to the live stream overlay.
+        """
+        pass
+
+    def clear_pinned_product(self):
+        """
+        Clears any pinned product from the live stream overlay.
+        """
+        pass
+
     def start_speech(self, audio_filepath: str, text: str, pcm_data: bytes = None):
         """
         Prepares the avatar for speech playback.
@@ -79,6 +91,12 @@ class DummyAvatarEngine(BaseAvatarEngine):
         self.events.append(("trigger_action", action_id))
         return True
 
+    def set_pinned_product(self, product_data: dict):
+        self.events.append(("set_pinned_product", product_data))
+
+    def clear_pinned_product(self):
+        self.events.append(("clear_pinned_product", None))
+
     def start_speech(self, audio_filepath: str, text: str, pcm_data: bytes = None):
         self.is_speaking = True
         self.events.append(("start_speech", {"filepath": audio_filepath, "text": text}))
@@ -131,6 +149,14 @@ class Local2DAvatarEngine(BaseAvatarEngine):
         if hasattr(self.renderer, 'play_action'):
             return self.renderer.play_action(action_id)
         return False
+
+    def set_pinned_product(self, product_data: dict):
+        if hasattr(self.renderer, 'set_pinned_product'):
+            self.renderer.set_pinned_product(product_data)
+
+    def clear_pinned_product(self):
+        if hasattr(self.renderer, 'clear_pinned_product'):
+            self.renderer.clear_pinned_product()
 
     def start_speech(self, audio_filepath: str, text: str, pcm_data: bytes = None):
         self.is_speaking = True

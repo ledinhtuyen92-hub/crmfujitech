@@ -484,3 +484,212 @@ class LiveMediaAsset(models.Model):
 
     def __str__(self):
         return f"[{self.get_asset_type_display()}] {self.name}"
+
+
+class LiveSessionProduct(models.Model):
+    """
+    Sản phẩm trong Túi hàng Livestream (Live Shopping Bag).
+    Độc lập với kho nội bộ CRM, phục vụ các shop bán hàng sàn (Shopee, TikTok, v.v.).
+    """
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    session = models.ForeignKey(
+        LiveSession,
+        on_delete=models.CASCADE,
+        related_name="session_products",
+        verbose_name="Phiên Livestream",
+    )
+    item_index = models.PositiveIntegerField(
+        default=1,
+        verbose_name="Thứ tự / Mã gọi trong Live",
+        help_text="Số thứ tự hiển thị trong giỏ hàng (VD: 1, 2, 3...) để khách comment hỏi (mã 1, mã 2)",
+    )
+    platform_item_id = models.CharField(
+        max_length=255,
+        blank=True,
+        null=True,
+        verbose_name="ID Sản phẩm trên Sàn (Shopee Item ID)",
+    )
+    name = models.CharField(
+        max_length=255,
+        verbose_name="Tên sản phẩm",
+    )
+    sku = models.CharField(
+        max_length=100,
+        blank=True,
+        null=True,
+        verbose_name="Mã SKU",
+    )
+    original_price = models.DecimalField(
+        max_digits=15,
+        decimal_places=2,
+        null=True,
+        blank=True,
+        verbose_name="Giá niêm yết (Gốc)",
+    )
+    live_price = models.DecimalField(
+        max_digits=15,
+        decimal_places=2,
+        null=True,
+        blank=True,
+        verbose_name="Giá sốc trên Live",
+    )
+    stock = models.IntegerField(
+        default=100,
+        verbose_name="Số lượng tồn kho trong Live",
+    )
+    product_url = models.URLField(
+        max_length=1000,
+        blank=True,
+        null=True,
+        verbose_name="Đường dẫn sản phẩm trên sàn",
+    )
+    image_url = models.URLField(
+        max_length=1000,
+        blank=True,
+        null=True,
+        verbose_name="Đường dẫn ảnh sản phẩm",
+    )
+    image_file = models.ImageField(
+        upload_to="live_products/%Y/%m/",
+        blank=True,
+        null=True,
+        verbose_name="File ảnh tải lên",
+    )
+    selling_points = models.TextField(
+        blank=True,
+        null=True,
+        verbose_name="Luận điểm bán hàng / USP",
+        help_text="Đặc điểm nổi bật, chất liệu, tính năng, công dụng để AI tư vấn khi live",
+    )
+    duration_minutes = models.PositiveIntegerField(
+        default=2,
+        verbose_name="Thời lượng giới thiệu (phút)",
+        help_text="Thời gian AI ưu tiên nói về sản phẩm này trong kịch bản xoay vòng",
+    )
+    is_pinned = models.BooleanField(
+        default=False,
+        verbose_name="Đang được ghim",
+    )
+    pinned_at = models.DateTimeField(
+        null=True,
+        blank=True,
+        verbose_name="Thời điểm ghim",
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = "Sản phẩm Túi hàng Live"
+        verbose_name_plural = "Danh sách Sản phẩm Túi hàng Live"
+        ordering = ["item_index", "created_at"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["session", "item_index"],
+                name="unique_session_item_index"
+            )
+        ]
+
+    def __str__(self):
+        return f"[{self.item_index}] {self.name} (Session: {self.session_id})"
+
+    @property
+    def effective_image_url(self):
+        if self.image_file:
+            try:
+                return self.image_file.url
+            except Exception:
+                pass
+        return self.image_url or ""
+
+    def pin(self):
+        """
+        Ghim sản phẩm này lên màn hình live, đồng thời hủy ghim các sản phẩm khác trong cùng phiên.
+        """
+        now = timezone.now()
+        LiveSessionProduct.objects.filter(session=self.session, is_pinned=True).exclude(pk=self.pk).update(
+            is_pinned=False, pinned_at=None
+        )
+        self.is_pinned = True
+        self.pinned_at = now
+        self.save(update_fields=["is_pinned", "pinned_at", "updated_at"])
+
+    def unpin(self):
+        """Hủy ghim sản phẩm này."""
+        self.is_pinned = False
+        self.pinned_at = None
+        self.save(update_fields=["is_pinned", "pinned_at", "updated_at"])
+
+
+class LiveSessionVoucher(models.Model):
+    """
+    Voucher / Mã giảm giá ghim trong phiên Livestream.
+    """
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    session = models.ForeignKey(
+        LiveSession,
+        on_delete=models.CASCADE,
+        related_name="session_vouchers",
+        verbose_name="Phiên Livestream",
+    )
+    voucher_code = models.CharField(
+        max_length=100,
+        verbose_name="Mã giảm giá",
+    )
+    platform_voucher_id = models.CharField(
+        max_length=255,
+        blank=True,
+        null=True,
+        verbose_name="ID Voucher trên sàn",
+    )
+    discount_text = models.CharField(
+        max_length=255,
+        verbose_name="Nội dung ưu đãi",
+        help_text="Ví dụ: Giảm 30K cho đơn từ 200K, hoặc Giảm 15% tối đa 50K",
+    )
+    min_order_value = models.DecimalField(
+        max_digits=15,
+        decimal_places=2,
+        null=True,
+        blank=True,
+        verbose_name="Đơn hàng tối thiểu",
+    )
+    is_pinned = models.BooleanField(
+        default=False,
+        verbose_name="Đang ghim hiển thị",
+    )
+    pinned_at = models.DateTimeField(
+        null=True,
+        blank=True,
+        verbose_name="Thời điểm ghim",
+    )
+    is_active = models.BooleanField(
+        default=True,
+        verbose_name="Đang hiệu lực",
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = "Voucher Live"
+        verbose_name_plural = "Danh sách Voucher Live"
+        ordering = ["-is_pinned", "-created_at"]
+
+    def __str__(self):
+        return f"{self.voucher_code} ({self.discount_text}) - Session {self.session_id}"
+
+    def pin(self):
+        """Ghim voucher này, hủy ghim các voucher khác trong cùng phiên."""
+        now = timezone.now()
+        LiveSessionVoucher.objects.filter(session=self.session, is_pinned=True).exclude(pk=self.pk).update(
+            is_pinned=False, pinned_at=None
+        )
+        self.is_pinned = True
+        self.pinned_at = now
+        self.save(update_fields=["is_pinned", "pinned_at", "updated_at"])
+
+    def unpin(self):
+        """Hủy ghim voucher."""
+        self.is_pinned = False
+        self.pinned_at = None
+        self.save(update_fields=["is_pinned", "pinned_at", "updated_at"])
+

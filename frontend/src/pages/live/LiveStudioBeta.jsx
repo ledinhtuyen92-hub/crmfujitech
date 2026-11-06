@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react'
-import { Card, Typography, Row, Col, Spin, Badge, Space, Button, message, Popconfirm, Divider, Alert } from 'antd'
+import { Card, Typography, Row, Col, Spin, Badge, Space, Button, message, Popconfirm, Divider, Alert, Tabs, Tag } from 'antd'
 import { useParams } from 'react-router-dom'
 import {
   DesktopOutlined,
@@ -10,6 +10,9 @@ import {
   PoweroffOutlined,
   PictureOutlined,
   ReloadOutlined,
+  ShoppingOutlined,
+  PushpinOutlined,
+  TagOutlined,
 } from '@ant-design/icons'
 import { useLiveWebSocket } from '../../hooks/useLiveWebSocket'
 import api from '../../utils/api'
@@ -20,6 +23,8 @@ import VideoPreview from './components/VideoPreview'
 import LiveTtsVoiceCard from './components/LiveTtsVoiceCard'
 import LiveChat from './components/LiveChat'
 import LiveSceneBuilder from './components/LiveSceneBuilder'
+import LiveShoppingBagDrawer from './components/LiveShoppingBagDrawer'
+import LiveShoppingBagCompact from './components/LiveShoppingBagCompact'
 
 const { Title, Text } = Typography
 
@@ -46,6 +51,10 @@ export default function LiveStudioBeta() {
   const [loading, setLoading] = useState(true)
   const [actionLoading, setActionLoading] = useState(false)
   const [sceneBuilderVisible, setSceneBuilderVisible] = useState(false)
+  const [shoppingBagDrawerVisible, setShoppingBagDrawerVisible] = useState(false)
+  const [sessionProducts, setSessionProducts] = useState([])
+  const [pinnedProduct, setPinnedProduct] = useState(null)
+  const [rightTabKey, setRightTabKey] = useState('chat')
 
   // Realtime state
   const { connected, lastEvent, reconnect } = useLiveWebSocket(id)
@@ -130,6 +139,17 @@ export default function LiveStudioBeta() {
   }
 
   // ── Initial load ───────────────────────────────────────────────────────────
+  const fetchProducts = async () => {
+    if (!id) return
+    try {
+      const res = await api.get(`/live_sessions/session-products/?session=${id}`)
+      const items = Array.isArray(res.data) ? res.data : (res.data?.results || [])
+      setSessionProducts(items)
+      const pinned = items.find(p => p.is_pinned)
+      setPinnedProduct(pinned || null)
+    } catch (_) {}
+  }
+
   useEffect(() => {
     const fetchSession = async () => {
       try {
@@ -149,7 +169,10 @@ export default function LiveStudioBeta() {
         setLoading(false)
       }
     }
-    if (id) fetchSession()
+    if (id) {
+      fetchSession()
+      fetchProducts()
+    }
   }, [id])
 
   // ── Realtime event handler ─────────────────────────────────────────────────
@@ -187,6 +210,13 @@ export default function LiveStudioBeta() {
           setStopDispatched(false)
         }
       }
+    } else if (event_type === 'live.product.pinned') {
+      message.info(`Đang ghim SP #${payload.item_index}: ${payload.name}`)
+      fetchProducts()
+    } else if (event_type === 'live.product.unpinned') {
+      fetchProducts()
+    } else if (event_type === 'live.voucher.pinned') {
+      message.info(`Đã ghim voucher: ${payload.voucher_code}`)
     }
   }, [lastEvent, id])
 
@@ -195,6 +225,7 @@ export default function LiveStudioBeta() {
     try {
       const res = await api.get(`/live_sessions/sessions/${id}/`)
       setSession(res.data)
+      fetchProducts()
     } catch (_) {}
   }
 
@@ -418,6 +449,15 @@ export default function LiveStudioBeta() {
           marginLeft: 'auto'
         }}>
           <Button 
+            type="primary"
+            ghost
+            icon={<ShoppingOutlined />} 
+            style={{ borderColor: '#ee4d2d', color: '#ee4d2d', fontWeight: 500 }}
+            onClick={() => setShoppingBagDrawerVisible(true)}
+          >
+            Túi hàng Live ({sessionProducts.length})
+          </Button>
+          <Button 
             type="dashed" 
             icon={<PictureOutlined />} 
             onClick={() => setSceneBuilderVisible(true)}
@@ -433,6 +473,62 @@ export default function LiveStudioBeta() {
 
       {/* ── Status Banners ─────────────────────────────────────────────────── */}
       {renderStatusBanner()}
+
+      {/* ── Pinned Product Banner ──────────────────────────────────────────── */}
+      {pinnedProduct && (
+        <div style={{
+          background: '#fff7e6',
+          border: '1px solid #ffd591',
+          padding: '10px 16px',
+          borderRadius: 10,
+          marginBottom: 16,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          flexWrap: 'wrap',
+          gap: 10
+        }}>
+          <Space size="middle" style={{ flexWrap: 'wrap' }}>
+            <Badge status="processing" color="#ee4d2d" />
+            <Tag color="orange" style={{ fontWeight: 'bold', fontSize: 13, padding: '2px 8px' }}>
+              #{pinnedProduct.item_index < 10 ? `0${pinnedProduct.item_index}` : pinnedProduct.item_index}
+            </Tag>
+            <Text strong style={{ fontSize: 14 }}>{pinnedProduct.name}</Text>
+            {pinnedProduct.live_price && (
+              <Tag color="red" style={{ fontWeight: 'bold' }}>
+                {Number(pinnedProduct.live_price).toLocaleString()}đ
+              </Tag>
+            )}
+            <Text type="secondary" style={{ fontSize: 12 }}>
+              (Đang ghim trực tiếp trên màn hình livestream)
+            </Text>
+          </Space>
+          <Space>
+            <Button
+              size="small"
+              danger
+              onClick={async () => {
+                try {
+                  await api.post(`/live_sessions/session-products/${pinnedProduct.id}/unpin/`)
+                  message.info('Đã hủy ghim sản phẩm')
+                  fetchProducts()
+                } catch (_) {}
+              }}
+            >
+              Hủy ghim
+            </Button>
+            <Button
+              size="small"
+              type="primary"
+              ghost
+              style={{ borderColor: '#ee4d2d', color: '#ee4d2d' }}
+              onClick={() => setShoppingBagDrawerVisible(true)}
+            >
+              Đổi sản phẩm
+            </Button>
+          </Space>
+        </div>
+      )}
 
       {/* ── 3-Column Studio Layout ─────────────────────────────────────────── */}
       <Row gutter={[16, 16]} style={{ flex: 1, minHeight: 600 }}>
@@ -464,9 +560,48 @@ export default function LiveStudioBeta() {
           <AITimeline lastEvent={lastEvent} connected={connected} onReconnect={reconnect} />
         </Col>
 
-        {/* Right Column: Live Chat */}
+        {/* Right Column: Live Chat & Live Shopping Bag */}
         <Col xs={24} lg={6} style={{ display: 'flex', flexDirection: 'column', height: 600 }}>
-          <LiveChat lastEvent={lastEvent} sessionId={id} />
+          <Card
+            style={{
+              height: '100%',
+              display: 'flex',
+              flexDirection: 'column',
+              borderRadius: 12,
+              overflow: 'hidden'
+            }}
+            styles={{ body: { padding: 0, flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0 } }}
+          >
+            <Tabs
+              activeKey={rightTabKey}
+              onChange={setRightTabKey}
+              style={{ height: '100%', display: 'flex', flexDirection: 'column' }}
+              tabBarStyle={{ padding: '0 12px', margin: 0, borderBottom: '1px solid #f0f0f0' }}
+              items={[
+                {
+                  key: 'chat',
+                  label: 'Bình luận Live',
+                  children: (
+                    <div style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
+                      <LiveChat lastEvent={lastEvent} sessionId={id} />
+                    </div>
+                  )
+                },
+                {
+                  key: 'bag',
+                  label: `Túi hàng (${sessionProducts.length})`,
+                  children: (
+                    <LiveShoppingBagCompact
+                      products={sessionProducts}
+                      onRefresh={fetchProducts}
+                      onOpenFullDrawer={() => setShoppingBagDrawerVisible(true)}
+                      onProductPinnedChange={() => fetchProducts()}
+                    />
+                  )
+                }
+              ]}
+            />
+          </Card>
         </Col>
       </Row>
 
@@ -538,6 +673,13 @@ export default function LiveStudioBeta() {
             api.get(`/live_sessions/sessions/${id}/`).then(res => setSession(res.data))
           }
         }}
+      />
+
+      <LiveShoppingBagDrawer
+        visible={shoppingBagDrawerVisible}
+        onClose={() => setShoppingBagDrawerVisible(false)}
+        sessionId={id}
+        onProductPinnedChange={() => fetchProducts()}
       />
     </div>
   )

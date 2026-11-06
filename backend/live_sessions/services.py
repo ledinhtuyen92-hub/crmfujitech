@@ -173,3 +173,175 @@ class LivePollingLockService:
             
         key = f"live:polling:lock:{company_id}:{session_id}"
         redis_client.delete(key)
+
+
+import re
+from typing import Optional
+
+class LiveProductMatchingService:
+    """
+    Phân tích câu bình luận của người xem và so khớp với danh sách sản phẩm trong giỏ hàng Live.
+    Hỗ trợ phát hiện mã gọi (mã 1, mã 02, sp 3, mẫu 4), SKU, hoặc từ khóa tên sản phẩm.
+    """
+    INDEX_PATTERNS = [
+        re.compile(r'(?i)\b(?:mã|sp|sản phẩm|mẫu|số|ms|cái|item)\s*(?:số)?\s*#?([0-9]{1,3})\b'),
+        re.compile(r'(?i)#([0-9]{1,3})\b'),
+        re.compile(r'(?i)\b(?:m|sp)([0-9]{1,3})\b'),
+    ]
+
+    @classmethod
+    def match_product(cls, session, text: str):
+        if not text:
+            return None
+
+        clean_text = text.strip()
+        lower_text = clean_text.lower()
+
+        # 1. So khớp mã số thứ tự gọi trong live (item_index)
+        for pattern in cls.INDEX_PATTERNS:
+            match = pattern.search(clean_text)
+            if match:
+                for grp in match.groups():
+                    if grp and grp.isdigit():
+                        idx = int(grp)
+                        matched = session.session_products.filter(item_index=idx).first()
+                        if matched:
+                            return matched
+
+        # 2. So khớp theo SKU sản phẩm
+        products = list(session.session_products.all())
+        for prod in products:
+            if prod.sku and len(prod.sku) >= 2 and prod.sku.lower() in lower_text:
+                return prod
+
+        # 3. So khớp theo Tên sản phẩm
+        for prod in products:
+            if prod.name:
+                p_name_lower = prod.name.lower()
+                if len(p_name_lower) >= 4 and p_name_lower in lower_text:
+                    return prod
+                # Thử so khớp chuỗi từ khóa chính
+                keywords = [w for w in p_name_lower.split() if len(w) >= 3 and w not in ('màu', 'size', 'loại', 'hàng', 'của', 'cho', 'này', 'bên')]
+                if len(keywords) >= 2:
+                    phrase = " ".join(keywords[:3])
+                    if phrase in lower_text:
+                        return prod
+
+        return None
+
+    @classmethod
+    def execute_instant_pin(cls, product) -> bool:
+        """
+        Kích hoạt ghim tức thời sản phẩm khi có comment hoặc trigger xoay vòng,
+        đồng thời đồng bộ Shopee API và gửi lệnh WebSocket cập nhật Live Studio Overlay.
+        """
+        session = product.session
+        product.pin()
+
+        from .models import LiveSession, LivePlatformProduct
+
+        # Đồng bộ Shopee API nếu phiên đang chạy ở chế độ API
+        if (
+            session.status == LiveSession.STATUS_RUNNING
+            and session.platform == LivePlatformProduct.PLATFORM_SHOPEE
+            and getattr(session, 'shopee_connection_mode', None) == LiveSession.SHOPEE_CONNECTION_API
+            and product.platform_item_id
+        ):
+            try:
+                from .platforms.shopee import ShopeeAdapter
+                adapter = ShopeeAdapter(company_id=session.company_id)
+                adapter.set_highlighted_product(str(session.id), product.platform_item_id)
+            except Exception as e:
+                logger.warning(f"Shopee API instant pin failed for product {product.id}: {e}")
+
+        # Phát event Console tới Studio Web
+        try:
+            from .console_events import LiveConsoleEventService
+            LiveConsoleEventService.emit(
+                session_id=str(session.id),
+                event_type="live.product.pinned",
+                payload={
+                    "product_id": str(product.id),
+                    "item_index": product.item_index,
+                    "name": product.name,
+                    "live_price": str(product.live_price) if product.live_price is not None else None,
+                    "original_price": str(product.original_price) if product.original_price is not None else None,
+                    "image_url": product.effective_image_url,
+                }
+            )
+        except Exception:
+            pass
+
+        # Gửi WebSocket event tới Live Studio Desktop để cập nhật overlay thẻ sản phẩm
+        try:
+            from channels.layers import get_channel_layer
+            from asgiref.sync import async_to_sync
+            channel_layer = get_channel_layer()
+            session_group_name = f"live_session_{session.id}_device"
+            async_to_sync(channel_layer.group_send)(
+                session_group_name,
+                {
+                    "type": "send.command",
+                    "envelope": {
+                        "protocol_version": "1.0",
+                        "type": "event",
+                        "name": "overlay.product_pinned",
+                        "session_id": str(session.id),
+                        "payload": {
+                            "product_id": str(product.id),
+                            "item_index": product.item_index,
+                            "name": product.name,
+                            "original_price": str(product.original_price) if product.original_price is not None else None,
+                            "live_price": str(product.live_price) if product.live_price is not None else None,
+                            "image_url": product.effective_image_url,
+                            "selling_points": product.selling_points or "",
+                        }
+                    }
+                }
+            )
+        except Exception:
+            pass
+
+        return True
+
+
+class LiveVoucherMatchingService:
+    """
+    Phát hiện câu hỏi về voucher/mã giảm giá/freeship và kích hoạt ghim voucher.
+    """
+    VOUCHER_KEYWORDS = [
+        "voucher", "mã giảm giá", "mã giảm", "mã ưu đãi", "mã khuyến mãi",
+        "freeship", "miễn phí vận chuyển", "mã freeship", "mã ship", "mã hoàn xu", "xu"
+    ]
+
+    @classmethod
+    def match_and_pin_voucher(cls, session, text: str):
+        if not text:
+            return None
+
+        lower = text.lower()
+        if not any(kw in lower for kw in cls.VOUCHER_KEYWORDS):
+            return None
+
+        voucher = session.session_vouchers.filter(is_active=True).first()
+        if not voucher:
+            return None
+
+        voucher.pin()
+
+        try:
+            from .console_events import LiveConsoleEventService
+            LiveConsoleEventService.emit(
+                session_id=str(session.id),
+                event_type="live.voucher.pinned",
+                payload={
+                    "voucher_id": str(voucher.id),
+                    "voucher_code": voucher.voucher_code,
+                    "discount_text": voucher.discount_text,
+                    "min_order_value": str(voucher.min_order_value) if voucher.min_order_value is not None else None,
+                }
+            )
+        except Exception:
+            pass
+
+        return voucher

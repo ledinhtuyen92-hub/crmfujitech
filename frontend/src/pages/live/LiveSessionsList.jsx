@@ -1,14 +1,16 @@
 import React, { useState, useEffect } from 'react'
-import { Card, Typography, Button, Space, Drawer, Form, Select, Input, Radio, message, Spin, Row, Col, Empty } from 'antd'
-import { PlusOutlined, SyncOutlined, ThunderboltOutlined } from '@ant-design/icons'
+import { Card, Typography, Button, Space, Drawer, Form, Select, Input, Radio, message, Spin, Row, Col, Empty, Alert } from 'antd'
+import { PlusOutlined, SyncOutlined, ThunderboltOutlined, ShoppingOutlined } from '@ant-design/icons'
 import api from '../../utils/api'
 import StreamCard from './components/StreamCard'
+import LiveShoppingBagDrawer from './components/LiveShoppingBagDrawer'
 
 const { Title, Text } = Typography
 
 export default function LiveSessionsList() {
   const [sessions, setSessions] = useState([])
   const [loading, setLoading] = useState(false)
+  const [shoppingBagSessionId, setShoppingBagSessionId] = useState(null)
   
   // Create Form State
   const [createVisible, setCreateVisible] = useState(false)
@@ -114,9 +116,15 @@ export default function LiveSessionsList() {
 
   const handleEdit = (session) => {
     setEditSession(session)
+    let pSource = 'internal'
+    if (session.session_products?.length > 0) {
+      pSource = 'multiproduct'
+    } else if (session.external_product_link) {
+      pSource = 'external'
+    }
     form.setFieldsValue({
       device: session.device,
-      product_source: session.external_product_link ? 'external' : 'internal',
+      product_source: pSource,
       product: session.product,
       external_product_link: session.external_product_link,
       ai_agent: session.ai_agent,
@@ -149,6 +157,10 @@ export default function LiveSessionsList() {
       
       // Transform payload slightly if needed
       const payload = { ...values }
+      if (values.product_source === 'multiproduct') {
+        payload.product = null
+        payload.external_product_link = ''
+      }
       if (values.server_url && values.stream_key) {
         payload.stream_url = `${values.server_url.replace(/\/$/, '')}/${values.stream_key}`
         delete payload.server_url // Not accepted by backend model
@@ -213,6 +225,7 @@ export default function LiveSessionsList() {
                   onStop={(id) => handleAction(id, 'stop')}
                   onDelete={handleDelete}
                   onEdit={handleEdit}
+                  onOpenBag={(s) => setShoppingBagSessionId(s.id)}
                 />
               </Col>
             ))}
@@ -256,14 +269,26 @@ export default function LiveSessionsList() {
                 ))}
               </Select>
             </Form.Item>
-            <Form.Item name="product_source" label="Nguồn sản phẩm (Giỏ hàng Live)" initialValue="internal">
+            <Form.Item name="product_source" label="Nguồn sản phẩm (Giỏ hàng Live)" initialValue="multiproduct">
               <Radio.Group optionType="button" buttonStyle="solid">
-                <Radio.Button value="internal">Kho nội bộ (Tự doanh)</Radio.Button>
-                <Radio.Button value="external">Giỏ hàng Affiliate (Shopee/Tiktok)</Radio.Button>
+                <Radio.Button value="multiproduct">Túi hàng đa sản phẩm (Shopee/TikTok)</Radio.Button>
+                <Radio.Button value="internal">Kho nội bộ (1 SP cố định)</Radio.Button>
+                <Radio.Button value="external">Giỏ hàng Affiliate</Radio.Button>
               </Radio.Group>
             </Form.Item>
 
-            {productSource === 'internal' ? (
+            {productSource === 'multiproduct' && (
+              <Alert
+                message="Túi hàng đa sản phẩm (Khuyên dùng cho Shopee/TikTok Live)"
+                description="Bạn có thể tạo phiên ngay. Sau khi tạo, hãy mở 'Túi hàng Live' để thêm hàng loạt sản phẩm với mã hiển thị (#01, #02...), giá live sale, voucher và USP để AI tự động xoay vòng và ghim khi khách hỏi."
+                type="info"
+                showIcon
+                icon={<ShoppingOutlined style={{ color: '#ee4d2d' }} />}
+                style={{ marginBottom: 16 }}
+              />
+            )}
+
+            {productSource === 'internal' && (
               <Form.Item name="product" label="Sản phẩm trung tâm" rules={[{ required: true, message: 'Vui lòng chọn sản phẩm' }]}>
                 <Select 
                   showSearch
@@ -288,7 +313,9 @@ export default function LiveSessionsList() {
                   })}
                 </Select>
               </Form.Item>
-            ) : (
+            )}
+
+            {productSource === 'external' && (
               <Form.Item name="external_product_link" label="Link Giỏ hàng / Link Sản phẩm (Shopee/Tiktok)" rules={[{ required: true, message: 'Vui lòng nhập link sản phẩm' }]}>
                 <Input placeholder="https://shopee.vn/..." />
               </Form.Item>
@@ -429,6 +456,14 @@ export default function LiveSessionsList() {
           </Card>
         </Form>
       </Drawer>
+
+      {/* Drawer Quản lý Túi hàng Live đa sản phẩm */}
+      <LiveShoppingBagDrawer
+        visible={!!shoppingBagSessionId}
+        sessionId={shoppingBagSessionId}
+        onClose={() => setShoppingBagSessionId(null)}
+        onProductPinnedChange={fetchSessions}
+      />
     </div>
   )
 }

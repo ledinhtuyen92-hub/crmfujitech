@@ -130,6 +130,16 @@ class LiveStudioApp:
                 logger.info(f"Direct avatar.action received: {action_name}")
                 self.avatar_engine.trigger_action(action_name)
 
+        elif msg_name == "overlay.product_pinned":
+            logger.info(f"overlay.product_pinned received: {payload}")
+            if self.avatar_engine and hasattr(self.avatar_engine, 'set_pinned_product'):
+                self.avatar_engine.set_pinned_product(payload)
+
+        elif msg_name == "overlay.product_unpinned":
+            logger.info("overlay.product_unpinned received")
+            if self.avatar_engine and hasattr(self.avatar_engine, 'clear_pinned_product'):
+                self.avatar_engine.clear_pinned_product()
+
     async def _on_stream_state_change(self, state):
         import uuid
         import datetime

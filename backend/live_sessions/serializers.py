@@ -15,7 +15,78 @@ class LivePlatformProductSerializer(serializers.ModelSerializer):
                 raise serializers.ValidationError("Bạn không thể map sản phẩm của công ty khác.")
         return value
 
-from .models import LiveDevice, LiveSession
+from .models import LiveDevice, LiveSession, LiveSessionProduct, LiveSessionVoucher
+
+class LiveSessionProductSerializer(serializers.ModelSerializer):
+    effective_image_url = serializers.CharField(read_only=True)
+    item_index = serializers.IntegerField(required=False, min_value=1, allow_null=True)
+
+    class Meta:
+        model = LiveSessionProduct
+        fields = [
+            'id', 'session', 'item_index', 'platform_item_id', 'name', 'sku',
+            'original_price', 'live_price', 'stock', 'product_url',
+            'image_url', 'image_file', 'effective_image_url',
+            'selling_points', 'duration_minutes', 'is_pinned', 'pinned_at',
+            'created_at', 'updated_at'
+        ]
+        read_only_fields = ['id', 'is_pinned', 'pinned_at', 'created_at', 'updated_at']
+        validators = []
+
+    def validate(self, attrs):
+        request = self.context.get('request')
+        session = attrs.get('session') or (self.instance.session if self.instance else None)
+        if request and hasattr(request, 'user') and session:
+            if session.company != request.user.company:
+                raise serializers.ValidationError({"session": "Phiên Live không thuộc công ty của bạn."})
+
+        item_index = attrs.get('item_index')
+        if session and item_index:
+            qs = LiveSessionProduct.objects.filter(session=session, item_index=item_index)
+            if self.instance:
+                qs = qs.exclude(pk=self.instance.pk)
+            if qs.exists():
+                raise serializers.ValidationError({"item_index": f"Mã gọi số {item_index} đã tồn tại trong phiên live này."})
+
+        return attrs
+
+
+class LiveSessionProductBatchItemSerializer(serializers.Serializer):
+    item_index = serializers.IntegerField(required=False, min_value=1)
+    platform_item_id = serializers.CharField(required=False, allow_blank=True, allow_null=True)
+    name = serializers.CharField(required=True)
+    sku = serializers.CharField(required=False, allow_blank=True, allow_null=True)
+    original_price = serializers.DecimalField(max_digits=15, decimal_places=2, required=False, allow_null=True)
+    live_price = serializers.DecimalField(max_digits=15, decimal_places=2, required=False, allow_null=True)
+    stock = serializers.IntegerField(required=False, default=100)
+    product_url = serializers.URLField(required=False, allow_blank=True, allow_null=True)
+    image_url = serializers.URLField(required=False, allow_blank=True, allow_null=True)
+    selling_points = serializers.CharField(required=False, allow_blank=True, allow_null=True)
+    duration_minutes = serializers.IntegerField(required=False, default=2)
+
+
+class LiveSessionProductBatchCreateSerializer(serializers.Serializer):
+    session_id = serializers.UUIDField(required=True)
+    products = LiveSessionProductBatchItemSerializer(many=True, required=True)
+
+
+class LiveSessionVoucherSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = LiveSessionVoucher
+        fields = [
+            'id', 'session', 'voucher_code', 'platform_voucher_id',
+            'discount_text', 'min_order_value', 'is_pinned', 'pinned_at',
+            'is_active', 'created_at', 'updated_at'
+        ]
+        read_only_fields = ['id', 'is_pinned', 'pinned_at', 'created_at', 'updated_at']
+
+    def validate(self, attrs):
+        request = self.context.get('request')
+        session = attrs.get('session') or (self.instance.session if self.instance else None)
+        if request and hasattr(request, 'user') and session:
+            if session.company != request.user.company:
+                raise serializers.ValidationError({"session": "Phiên Live không thuộc công ty của bạn."})
+        return attrs
 
 class LiveDeviceSerializer(serializers.ModelSerializer):
     is_online = serializers.SerializerMethodField()
@@ -53,6 +124,10 @@ class LiveSessionSerializer(serializers.ModelSerializer):
     ai_agent_tts_speed = serializers.FloatField(source='ai_agent.tts_speed', read_only=True, default=1.0)
     device_name = serializers.CharField(source='device.name', read_only=True)
     product_name = serializers.CharField(source='product.name', read_only=True)
+    session_products = LiveSessionProductSerializer(many=True, read_only=True)
+    pinned_product = serializers.SerializerMethodField()
+    session_vouchers = LiveSessionVoucherSerializer(many=True, read_only=True)
+    pinned_voucher = serializers.SerializerMethodField()
     token_usage = serializers.SerializerMethodField()
     
     avatar_asset_url = serializers.SerializerMethodField()
@@ -96,6 +171,18 @@ class LiveSessionSerializer(serializers.ModelSerializer):
     def get_token_usage(self, obj):
         from .services import LiveContextService
         return LiveContextService.get_token_usage(str(obj.company_id), str(obj.id))
+
+    def get_pinned_product(self, obj):
+        pinned = obj.session_products.filter(is_pinned=True).first()
+        if pinned:
+            return LiveSessionProductSerializer(pinned, context=self.context).data
+        return None
+
+    def get_pinned_voucher(self, obj):
+        pinned = obj.session_vouchers.filter(is_pinned=True).first()
+        if pinned:
+            return LiveSessionVoucherSerializer(pinned, context=self.context).data
+        return None
 
     class Meta:
         model = LiveSession
@@ -146,8 +233,8 @@ class LiveSessionSerializer(serializers.ModelSerializer):
             if 'external_product_link' not in attrs:
                 external_link = self.instance.external_product_link
                 
-        if not product and not external_link:
-            raise serializers.ValidationError("Vui lòng chọn Sản phẩm từ kho nội bộ hoặc nhập Link giỏ hàng Affiliate.")
+        # Note: product and external_product_link are optional now because a session
+        # can manage multiple products dynamically in the live bag (LiveSessionProduct).
             
         return attrs
 

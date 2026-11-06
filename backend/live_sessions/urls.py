@@ -1,11 +1,23 @@
 from rest_framework.routers import DefaultRouter
-from .views import LivePlatformProductViewSet, LiveDeviceViewSet, LiveSessionViewSet, DeviceSessionViewSet, serve_audio_asset, PlatformAccountViewSet, LiveMediaAssetViewSet
+from .views import (
+    LivePlatformProductViewSet,
+    LiveDeviceViewSet,
+    LiveSessionViewSet,
+    DeviceSessionViewSet,
+    serve_audio_asset,
+    PlatformAccountViewSet,
+    LiveMediaAssetViewSet,
+    LiveSessionProductViewSet,
+    LiveSessionVoucherViewSet,
+)
 
 router = DefaultRouter()
 router.register(r'platform-products', LivePlatformProductViewSet, basename='platform-products')
 router.register(r'platform-accounts', PlatformAccountViewSet, basename='platform-accounts')
 router.register(r'devices', LiveDeviceViewSet, basename='devices')
 router.register(r'sessions', LiveSessionViewSet, basename='sessions')
+router.register(r'session-products', LiveSessionProductViewSet, basename='session-products')
+router.register(r'session-vouchers', LiveSessionVoucherViewSet, basename='session-vouchers')
 router.register(r'device/sessions', DeviceSessionViewSet, basename='device-sessions')
 router.register(r'media-assets', LiveMediaAssetViewSet, basename='media-assets')
 

@@ -57,6 +57,8 @@ class ProtocolDispatcher:
         elif msg_type == "command" and msg_name == "avatar.action":
             # Protocol-valid handling only. No avatar implementation yet.
             logger.info("Received avatar.action, ignoring execution.")
+        elif msg_name in ["overlay.product_pinned", "overlay.product_unpinned"]:
+            logger.info(f"Overlay product event received in dispatcher: {msg_name}")
         else:
             logger.debug(f"Unknown or unhandled command: {msg_type}/{msg_name}")
 
