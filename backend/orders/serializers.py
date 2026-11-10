@@ -401,10 +401,54 @@ class OrderSerializer(serializers.ModelSerializer):
     @transaction.atomic
     def update(self, instance, validated_data):
         items_data = self.initial_data.get('items')
+
+        # Kiểm tra xem đơn hàng có phiếu xuất kho nào đang hoạt động (pending hoặc completed) hay không
+        active_export = None
+        if hasattr(instance, "inventory_transactions"):
+            active_export = instance.inventory_transactions.filter(
+                type="export"
+            ).exclude(status="rejected").first()
+        else:
+            from inventory.models import InventoryTransaction
+            active_export = InventoryTransaction.objects.filter(
+                reference_order=instance,
+                type=InventoryTransaction.TYPE_EXPORT
+            ).exclude(status=InventoryTransaction.STATUS_REJECTED).first()
+
+        if active_export and items_data is not None and isinstance(items_data, list):
+            # So sánh xem danh mục sản phẩm, số lượng, quy cách có bị thay đổi không
+            old_items = list(instance.items.all().order_by('id'))
+
+            def get_item_sig(it):
+                if hasattr(it, 'product_id'):
+                    p_id = it.product_id
+                    qty = int(it.quantity or 1)
+                    itype = str(it.item_type or 'product')
+                    uprice = str(it.unit_price or 0)
+                else:
+                    p_val = it.get('product')
+                    p_id = p_val if isinstance(p_val, int) else None
+                    qty = int(it.get('quantity', 1) or 1)
+                    itype = str(it.get('item_type', 'product'))
+                    uprice = str(it.get('unit_price', 0) or 0)
+                return (p_id, qty, itype, uprice)
+
+            old_sigs = [get_item_sig(x) for x in old_items]
+            new_sigs = [get_item_sig(x) for x in items_data]
+
+            if old_sigs != new_sigs:
+                status_display = active_export.get_status_display()
+                raise serializers.ValidationError({
+                    "items": f"Đơn hàng này đã có Phiếu xuất kho [{active_export.transaction_code}] (Trạng thái: {status_display}). "
+                             f"Không thể thay đổi danh mục sản phẩm hoặc số lượng. "
+                             f"Vui lòng hủy phiếu xuất kho tại mục Quản lý Kho vận trước khi chỉnh sửa sản phẩm."
+                })
+
         instance = super().update(instance, validated_data)
         if items_data is not None and isinstance(items_data, list):
-            instance.items.all().delete()
-            self._save_items(instance, items_data)
+            if not active_export:
+                instance.items.all().delete()
+                self._save_items(instance, items_data)
         return instance
 
     def _save_items(self, order, items_data):

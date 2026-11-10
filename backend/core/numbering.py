@@ -136,9 +136,18 @@ def derive_code_from_order(source_order_number: str, company, target_doc_type: s
             is_taken = False
             if model_info:
                 model_cls, field = model_info
-                is_taken = model_cls.objects.filter(
+                qs_taken = model_cls.objects.filter(
                     company=company, **{field: candidate_code}
-                ).exists()
+                )
+                if base_doc in ["EXP", "IMP", "ADJ", "TRF"]:
+                    qs_taken = qs_taken.exclude(status=InventoryTransaction.STATUS_REJECTED)
+                elif base_doc == "LSX":
+                    qs_taken = qs_taken.exclude(status=ProductionOrder.STATUS_CANCELLED)
+                elif base_doc == "GH":
+                    qs_taken = qs_taken.exclude(status=DeliveryOrder.STATUS_FAILED)
+                elif base_doc == "DH":
+                    qs_taken = qs_taken.exclude(status=Order.STATUS_CANCELLED)
+                is_taken = qs_taken.exists()
 
             if not is_taken:
                 # Đảm bảo bộ đếm trung tâm không bao giờ nhỏ hơn seq này

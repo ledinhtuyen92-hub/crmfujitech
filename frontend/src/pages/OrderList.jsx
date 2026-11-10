@@ -1,4 +1,4 @@
-import { AlertOutlined, CheckCircleOutlined, ClockCircleOutlined, CloseCircleOutlined, DeleteOutlined, EditOutlined, FileDoneOutlined, FileTextOutlined, MessageOutlined, MinusCircleOutlined, PlusOutlined, PrinterOutlined, SearchOutlined, UploadOutlined, PictureOutlined, CameraOutlined, TableOutlined, ToolOutlined, EnvironmentOutlined , SettingOutlined, ExclamationCircleOutlined, InfoCircleOutlined, InboxOutlined, CarOutlined, SafetyCertificateOutlined, RightOutlined, LinkOutlined, ArrowRightOutlined } from '@ant-design/icons'
+import { AlertOutlined, CheckCircleOutlined, ClockCircleOutlined, CloseCircleOutlined, DeleteOutlined, EditOutlined, FileDoneOutlined, FileTextOutlined, MessageOutlined, MinusCircleOutlined, PlusOutlined, PrinterOutlined, SearchOutlined, UploadOutlined, PictureOutlined, CameraOutlined, TableOutlined, ToolOutlined, EnvironmentOutlined , SettingOutlined, ExclamationCircleOutlined, InfoCircleOutlined, InboxOutlined, CarOutlined, SafetyCertificateOutlined, RightOutlined, LinkOutlined, ArrowRightOutlined, LockOutlined } from '@ant-design/icons'
 import {
   Alert,
   AutoComplete,
@@ -3037,7 +3037,16 @@ export default function OrderList() {
         messageApi.error('Vui lòng điền đầy đủ các thông tin bắt buộc.')
         return
       }
-      messageApi.error('Lưu đơn hàng thất bại. Vui lòng thử lại.')
+      const errData = error.response?.data
+      let errMsg = 'Lưu đơn hàng thất bại. Vui lòng thử lại.'
+      if (typeof errData?.items === 'string') {
+        errMsg = errData.items
+      } else if (Array.isArray(errData?.items) && errData.items.length > 0) {
+        errMsg = errData.items[0]
+      } else if (errData?.detail) {
+        errMsg = errData.detail
+      }
+      messageApi.error(errMsg)
     } finally {
       setSubmitting(false)
     }
@@ -4395,60 +4404,154 @@ export default function OrderList() {
               </Col>
             )}
           </Row>
-          <Divider style={{ margin: '12px 0' }}>
-            <Space>
-              <Text strong>Bảng Tính Chi Tiết Hạng Mục (Mẫu: {companyTemplate?.name || 'Tiêu chuẩn'})</Text>
-              <Tag color="blue">{formItems.length} dòng</Tag>
-            </Space>
-          </Divider>
+          {(() => {
+            const activeExportDoc = (editingOrder?.linked_documents?.export && editingOrder.linked_documents.export.status !== 'rejected')
+              ? editingOrder.linked_documents.export
+              : null
+            const isExportLocked = !!activeExportDoc
 
-          <div style={{ marginBottom: 16, border: '1px solid #e2e8f0', borderRadius: 8, overflow: 'hidden' }}>
-            <DndContext sensors={sensors} modifiers={[restrictToVerticalAxis]} onDragEnd={(e) => handleDragEnd(e, formItems, setFormItems)}>
-              <SortableContext items={formItems.map(i => i.key)} strategy={verticalListSortingStrategy}>
-                <Table
-                  components={{ body: { row: DraggableBodyRow } }}
-                  dataSource={formItems}
-                  columns={getItemColumns()}
-                  rowKey="key"
-                  pagination={false}
-                  size="small"
-                  scroll={{ x: 'max-content' }}
-                />
-              </SortableContext>
-            </DndContext>
-          </div>
+            return (
+              <>
+                {isExportLocked && (
+                  <Alert
+                    type="warning"
+                    showIcon
+                    icon={<ExclamationCircleOutlined style={{ fontSize: 20, color: '#d97706', marginTop: 2 }} />}
+                    style={{
+                      margin: '16px 0',
+                      border: '1px solid #fde68a',
+                      background: '#fffbeb',
+                      borderRadius: 10,
+                      padding: '12px 16px',
+                    }}
+                    message={
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 8 }}>
+                        <Text strong style={{ color: '#92400e', fontSize: 14 }}>
+                          Đơn hàng đã liên kết Phiếu xuất kho: {activeExportDoc.code} ({activeExportDoc.status_display})
+                        </Text>
+                        <Button
+                          size="small"
+                          type="primary"
+                          ghost
+                          onClick={() => {
+                            setModalVisible(false)
+                            navigate(`/inventory?search=${activeExportDoc.code}`)
+                          }}
+                          style={{ fontWeight: 600, borderColor: '#d97706', color: '#b45309' }}
+                        >
+                          Mở phiếu xuất kho tại Kho vận →
+                        </Button>
+                      </div>
+                    }
+                    description={
+                      <div style={{ color: '#b45309', fontSize: 13, marginTop: 4, lineHeight: 1.5 }}>
+                        Danh mục sản phẩm, đơn vị tính và số lượng đã được <strong>khóa (chỉ đọc)</strong> để đảm bảo đồng bộ với Kho vận.
+                        Nếu cần thay đổi danh mục hoặc số lượng sản phẩm, vui lòng liên hệ Thủ kho/Quản trị viên thực hiện <strong>Hủy phiếu xuất kho</strong> trước tại màn hình Quản lý Kho vận.
+                      </div>
+                    }
+                  />
+                )}
 
+                <Divider style={{ margin: '12px 0' }}>
+                  <Space>
+                    <Text strong>Bảng Tính Chi Tiết Hạng Mục (Mẫu: {companyTemplate?.name || 'Tiêu chuẩn'})</Text>
+                    <Tag color="blue">{formItems.length} dòng</Tag>
+                    {isExportLocked && (
+                      <Tag color="warning" icon={<LockOutlined />}>
+                        Đang khóa chỉnh sửa do đã xuất kho
+                      </Tag>
+                    )}
+                  </Space>
+                </Divider>
 
-          <Button type="dashed" onClick={handleAddLine} block icon={<PlusOutlined />} style={{ marginBottom: 20 }}>
-            Thêm dòng sản phẩm / hạng mục mới
-          </Button>
+                <div
+                  style={{
+                    marginBottom: 16,
+                    border: isExportLocked ? '1px dashed #f59e0b' : '1px solid #e2e8f0',
+                    borderRadius: 8,
+                    overflow: 'hidden',
+                    background: isExportLocked ? '#fcfbf7' : '#fff',
+                  }}
+                >
+                  <div style={{ pointerEvents: isExportLocked ? 'none' : 'auto', opacity: isExportLocked ? 0.85 : 1 }}>
+                    <DndContext sensors={sensors} modifiers={[restrictToVerticalAxis]} onDragEnd={(e) => !isExportLocked && handleDragEnd(e, formItems, setFormItems)}>
+                      <SortableContext items={formItems.map(i => i.key)} strategy={verticalListSortingStrategy}>
+                        <Table
+                          components={{ body: { row: DraggableBodyRow } }}
+                          dataSource={formItems}
+                          columns={getItemColumns()}
+                          rowKey="key"
+                          pagination={false}
+                          size="small"
+                          scroll={{ x: 'max-content' }}
+                        />
+                      </SortableContext>
+                    </DndContext>
+                  </div>
+                </div>
 
-          <Divider style={{ margin: '12px 0' }}>
-            <Space>
-              <Text strong>Dịch Vụ & Chi Phí Phát Sinh</Text>
-              <Tag color="blue">{serviceItems.length} dịch vụ</Tag>
-            </Space>
-          </Divider>
+                <Button
+                  type="dashed"
+                  onClick={handleAddLine}
+                  block
+                  icon={<PlusOutlined />}
+                  disabled={isExportLocked}
+                  style={{ marginBottom: 20, opacity: isExportLocked ? 0.6 : 1 }}
+                >
+                  {isExportLocked ? 'Đã khóa thêm sản phẩm (Đơn hàng đã phát sinh xuất kho)' : 'Thêm dòng sản phẩm / hạng mục mới'}
+                </Button>
 
-          <div style={{ marginBottom: 16, border: '1px solid #e2e8f0', borderRadius: 8, overflow: 'hidden' }}>
-            <DndContext sensors={sensors} modifiers={[restrictToVerticalAxis]} onDragEnd={(e) => handleDragEnd(e, serviceItems, setServiceItems)}>
-              <SortableContext items={serviceItems.map(i => i.key)} strategy={verticalListSortingStrategy}>
-                <Table
-                  components={{ body: { row: DraggableBodyRow } }}
-                  dataSource={serviceItems}
-                  columns={getServiceItemColumns()}
-                  rowKey="key"
-                  pagination={false}
-                  size="small"
-                  scroll={{ x: 'max-content' }}
-                />
-              </SortableContext>
-            </DndContext>
-          </div>
+                <Divider style={{ margin: '12px 0' }}>
+                  <Space>
+                    <Text strong>Dịch Vụ & Chi Phí Phát Sinh</Text>
+                    <Tag color="blue">{serviceItems.length} dịch vụ</Tag>
+                    {isExportLocked && (
+                      <Tag color="warning" icon={<LockOutlined />}>
+                        Chỉ đọc
+                      </Tag>
+                    )}
+                  </Space>
+                </Divider>
 
-          <Button type="dashed" onClick={handleAddServiceLine} block icon={<PlusOutlined />} style={{ marginBottom: 20 }}>
-            Thêm dịch vụ / chi phí phát sinh
-          </Button>
+                <div
+                  style={{
+                    marginBottom: 16,
+                    border: isExportLocked ? '1px dashed #f59e0b' : '1px solid #e2e8f0',
+                    borderRadius: 8,
+                    overflow: 'hidden',
+                    background: isExportLocked ? '#fcfbf7' : '#fff',
+                  }}
+                >
+                  <div style={{ pointerEvents: isExportLocked ? 'none' : 'auto', opacity: isExportLocked ? 0.85 : 1 }}>
+                    <DndContext sensors={sensors} modifiers={[restrictToVerticalAxis]} onDragEnd={(e) => !isExportLocked && handleDragEnd(e, serviceItems, setServiceItems)}>
+                      <SortableContext items={serviceItems.map(i => i.key)} strategy={verticalListSortingStrategy}>
+                        <Table
+                          components={{ body: { row: DraggableBodyRow } }}
+                          dataSource={serviceItems}
+                          columns={getServiceItemColumns()}
+                          rowKey="key"
+                          pagination={false}
+                          size="small"
+                          scroll={{ x: 'max-content' }}
+                        />
+                      </SortableContext>
+                    </DndContext>
+                  </div>
+                </div>
+
+                <Button
+                  type="dashed"
+                  onClick={handleAddServiceLine}
+                  block
+                  icon={<PlusOutlined />}
+                  disabled={isExportLocked}
+                  style={{ marginBottom: 20, opacity: isExportLocked ? 0.6 : 1 }}
+                >
+                  {isExportLocked ? 'Đã khóa thêm dịch vụ (Đơn hàng đã phát sinh xuất kho)' : 'Thêm dịch vụ / chi phí phát sinh'}
+                </Button>
+              </>
+            )
+          })()}
 
           <Card size="small" style={{ background: '#f8fafc', borderRadius: 8, marginBottom: 16 }}>
             {(() => {
