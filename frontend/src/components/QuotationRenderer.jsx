@@ -474,19 +474,19 @@ export default function QuotationRenderer({ layoutConfig, layoutStyle, data, ren
                                 )}
                                 <div style={{ flexShrink: 0 }}>
                                   {enableProductName && <strong style={{ color: '#1e293b', display: 'block' }}>{item.product_name || item.name}</strong>}
-                                  {enableProductDescription && !showSpecs && (item.description || item.spec) && <div style={{ fontSize: 11, color: '#64748b', fontStyle: 'italic', whiteSpace: 'pre-wrap', marginTop: 4, textAlign: 'left', display: 'inline-block', maxWidth: '100%' }}>{item.description || item.spec}</div>}
+                                  {enableProductDescription && !showSpecs && (item.spec || item.description) && <div style={{ fontSize: 11, color: '#64748b', fontStyle: 'italic', whiteSpace: 'pre-wrap', marginTop: 4, textAlign: 'left', display: 'inline-block', maxWidth: '100%' }}>{item.spec || item.description}</div>}
                                 </div>
                               </div>
                             </td>
                           ) : null;
                           if (colId === 'symbol') return (
                             <td key="symbol" style={{ ...tdStyle, textAlign: 'center' }}>
-                              <span style={{fontWeight: 600, color: '#2563eb'}}>{item.custom_data?.symbol || item.symbol}</span>
+                              <span style={{fontWeight: 600, color: '#2563eb'}}>{item.symbol !== undefined && item.symbol !== '' ? item.symbol : (item.custom_data?.symbol || '')}</span>
                             </td>
                           );
                           if (colId === 'specs') return (
                             <td key="specs" style={{ ...tdStyle, textAlign: 'left', whiteSpace: 'pre-wrap' }}>
-                              <span style={{color: '#475569', fontSize: 11}}>{item.description || item.spec}</span>
+                              <span style={{color: '#475569', fontSize: 11}}>{item.spec || item.description}</span>
                             </td>
                           );
                           if (colId === 'dimensions') {

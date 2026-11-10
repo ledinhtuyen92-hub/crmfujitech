@@ -76,12 +76,13 @@ export default function QuotationPrintView({ quotation, type = 'quotation', docu
       const catalogImage = prodObj ? (prodObj.image_url || prodObj.image || '') : '';
       return {
         ...item,
+        symbol: item.symbol !== undefined && item.symbol !== '' ? item.symbol : (item.custom_data?.symbol || ''),
         product_name: item.product_name || (prodObj ? prodObj.name : ''),
         // Giữ nguyên ảnh snapshot - nếu snapshot bị lỗi (URL hết hạn), fallback sang ảnh catalog hiện tại
         product_image: getSafeMediaUrl(item.product_image || catalogImage),
         fallback_product_image: getSafeMediaUrl(catalogImage),
         spec: item.spec || (prodObj ? prodObj.description : ''),
-        unit: item.custom_data?.unit || item.unit || (prodObj ? prodObj.unit : (item.item_type === 'service' ? 'lần' : 'cái'))
+        unit: item.unit || item.custom_data?.unit || (prodObj ? prodObj.unit : (item.item_type === 'service' ? 'lần' : 'cái'))
       };
     }),
     // Totals

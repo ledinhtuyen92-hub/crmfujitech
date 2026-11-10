@@ -695,6 +695,7 @@ export default function QuotationList() {
           }
         }
         if (field === 'symbol') {
+          currentItem.symbol = value
           currentItem.custom_data = { ...(currentItem.custom_data || {}), symbol: value }
         }
         updated[idx] = currentItem
@@ -736,6 +737,10 @@ export default function QuotationList() {
         } else {
           currentItem.product = null
         }
+      }
+      if (field === 'symbol') {
+        currentItem.symbol = value
+        currentItem.custom_data = { ...(currentItem.custom_data || {}), symbol: value }
       }
       updated[index] = currentItem
       return updated
@@ -843,9 +848,12 @@ export default function QuotationList() {
                 discount_percent: Number(it.discount_percent || 0),
                 note: it.note || '',
                 product_image: it.product_image || (prodObj ? (prodObj.image_url || prodObj.image) : '') || '',
-                unit: it.custom_data?.unit || (prodObj ? prodObj.unit : 'cái'),
-                symbol: it.custom_data?.symbol || it.symbol || '',
-                custom_data: it.custom_data || {},
+                unit: it.unit !== undefined && it.unit !== '' ? it.unit : (it.custom_data?.unit || (prodObj ? prodObj.unit : 'cái')),
+                symbol: it.symbol !== undefined && it.symbol !== '' ? it.symbol : (it.custom_data?.symbol ?? ''),
+                custom_data: {
+                  ...(it.custom_data || {}),
+                  symbol: it.symbol !== undefined && it.symbol !== '' ? it.symbol : (it.custom_data?.symbol ?? ''),
+                },
                 product_name: it.product_name || (prodObj ? prodObj.name : ''),
               }
             })
@@ -863,13 +871,16 @@ export default function QuotationList() {
               product_name: it.product_name || '',
               unit_price: Number(it.unit_price || 0),
               quantity: Number(it.quantity || 1),
-              unit: it.custom_data?.unit || it.unit || 'lần',
+              unit: it.unit || it.custom_data?.unit || 'lần',
               discount_percent: Number(it.discount_percent || 0),
               spec: it.spec || '',
               note: it.note || '',
-              symbol: it.custom_data?.symbol || it.symbol || '',
+              symbol: it.symbol !== undefined && it.symbol !== '' ? it.symbol : (it.custom_data?.symbol ?? ''),
               product_image: it.product_image || '',
-              custom_data: it.custom_data || {},
+              custom_data: {
+                ...(it.custom_data || {}),
+                symbol: it.symbol !== undefined && it.symbol !== '' ? it.symbol : (it.custom_data?.symbol ?? ''),
+              },
             }))
           )
         } else {
@@ -978,14 +989,16 @@ export default function QuotationList() {
               length: Math.round(Number(it.length || 0)),
               thickness: Math.round(Number(it.thickness || 0)),
               area: Number(Number(it.area || 0).toFixed(2)),
-              spec: it.spec || (prodObj ? prodObj.description : '') || '',
-              warranty: it.warranty || '12 tháng',
-              product_image: it.product_image || (prodObj ? (prodObj.image_url || prodObj.image) : '') || '',
+              spec: it.spec !== undefined ? it.spec : ((prodObj ? prodObj.description : '') || ''),
+              warranty: it.warranty !== undefined && it.warranty !== null ? it.warranty : '12 tháng',
+              product_image: it.product_image !== undefined && it.product_image !== null ? it.product_image : (prodObj ? (prodObj.image_url || prodObj.image) : '') || '',
+              unit: it.unit !== undefined && it.unit !== null ? it.unit : (it.custom_data?.unit || (prodObj ? prodObj.unit : 'cái')),
+              symbol: it.symbol !== undefined ? it.symbol : (it.custom_data?.symbol ?? ''),
               custom_data: {
                 ...(it.custom_data || {}),
-                unit: it.unit || (prodObj ? prodObj.unit : 'cái'),
+                unit: it.unit !== undefined && it.unit !== null ? it.unit : (it.custom_data?.unit || (prodObj ? prodObj.unit : 'cái')),
                 thickness: Math.round(Number(it.thickness || 0)),
-                symbol: it.custom_data?.symbol || it.symbol || '',
+                symbol: it.symbol !== undefined ? it.symbol : (it.custom_data?.symbol ?? ''),
               },
               quantity: Number(it.quantity || 1),
               discount_percent: Number(it.discount_percent || 0),
@@ -1010,10 +1023,12 @@ export default function QuotationList() {
               spec: srv.spec || '',
               note: srv.note || '',
               product_image: srv.product_image || '',
+              unit: srv.unit !== undefined && srv.unit !== null ? srv.unit : (srv.custom_data?.unit || 'lần'),
+              symbol: srv.symbol !== undefined ? srv.symbol : (srv.custom_data?.symbol ?? ''),
               custom_data: {
                 ...(srv.custom_data || {}),
-                unit: srv.unit || srv.custom_data?.unit || 'lần',
-                symbol: srv.symbol || srv.custom_data?.symbol || '',
+                unit: srv.unit !== undefined && srv.unit !== null ? srv.unit : (srv.custom_data?.unit || 'lần'),
+                symbol: srv.symbol !== undefined ? srv.symbol : (srv.custom_data?.symbol ?? ''),
               },
               quantity: Number(srv.quantity || 1),
               discount_percent: Number(srv.discount_percent || 0),
@@ -1023,8 +1038,11 @@ export default function QuotationList() {
       }
 
       if (editingQuotation) {
-        await api.patch(`/sales/quotations/${editingQuotation.id}/`, payload)
+        const patchRes = await api.patch(`/sales/quotations/${editingQuotation.id}/`, payload)
         messageApi.success('Cập nhật báo giá thành công!')
+        if (selectedQuotation && selectedQuotation.id === editingQuotation.id) {
+          setSelectedQuotation(patchRes.data)
+        }
       } else {
         await api.post('/sales/quotations/', payload)
         messageApi.success('Tạo báo giá mới thành công!')
@@ -1735,7 +1753,7 @@ export default function QuotationList() {
           id: 'symbol',
           width: 100,
           align: 'center',
-          render: (val, record, idx) => <DebouncedInput style={{ textAlign: 'center', fontWeight: 600, color: '#2563eb' }} placeholder="VD: D1.1" value={record.symbol || ''} onChange={(e) => handleServiceLineChange(idx, 'symbol', e.target.value)} />,
+          render: (val, record, idx) => <DebouncedInput style={{ textAlign: 'center', fontWeight: 600, color: '#2563eb' }} placeholder="VD: D1.1" value={record.symbol !== undefined ? record.symbol : (record.custom_data?.symbol ?? '')} onChange={(e) => handleServiceLineChange(idx, 'symbol', e.target.value)} />,
         },
         {
           title: 'GHI CHÚ KỸ THUẬT',
@@ -2354,7 +2372,15 @@ export default function QuotationList() {
           dataIndex: 'symbol',
           width: 100,
           align: 'center',
-          render: (val, record, idx) => <CustomInfoInput templateKey="symbol" style={{ textAlign: 'center', fontWeight: 600, color: '#2563eb' }} placeholder="VD: D1.1" value={record.custom_data?.symbol || record.symbol || ''} onChange={(v) => handleLineChange(idx, 'symbol', v)} />,
+          render: (val, record, idx) => (
+            <CustomInfoInput
+              templateKey="symbol"
+              style={{ textAlign: 'center', fontWeight: 600, color: '#2563eb' }}
+              placeholder="VD: D1.1"
+              value={record.symbol !== undefined ? record.symbol : (record.custom_data?.symbol ?? '')}
+              onChange={(v) => handleLineChange(idx, 'symbol', v)}
+            />
+          ),
         },
         {
           title: 'GHI CHÚ KỸ THUẬT',

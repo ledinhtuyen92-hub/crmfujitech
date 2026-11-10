@@ -35,7 +35,6 @@ backend/test_detection.py
 temp_original.jsx
 test.jpg
 crop*.ps1
-
 # Ignore large binaries
 live_studio/bin/*.exe
 live_studio/assets/cache/
