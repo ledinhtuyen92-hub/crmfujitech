@@ -88,18 +88,11 @@ export default function Inventory() {
   const [currentWarehousePage, setCurrentWarehousePage] = useState(1)
   const [warehouseTotalCount, setWarehouseTotalCount] = useState(0)
 
-  // Filters
-  const [searchText, setSearchText] = useState('')
   const location = useLocation()
+  const initSearch = new URLSearchParams(location.search).get('search') || ''
 
-  useEffect(() => {
-    const params = new URLSearchParams(location.search)
-    const searchQuery = params.get('search')
-    if (searchQuery) {
-      setSearchText(searchQuery)
-      setActiveTab('transactions')
-    }
-  }, [location.search])
+  // Filters
+  const [searchText, setSearchText] = useState(initSearch)
   const [stockSearchText, setStockSearchText] = useState('')
   const [stockSearchQuery, setStockSearchQuery] = useState('')
   const stockSearchTimeoutRef = useRef(null)
@@ -115,8 +108,8 @@ export default function Inventory() {
   const [warehouseFilter, setWarehouseFilter] = useState('')
   const [lowStockOnly, setLowStockOnly] = useState(false)
   const [lowStockThreshold, setLowStockThreshold] = useState(null)
-  const [txnSearchText, setTxnSearchText] = useState('')
-  const [txnSearchQuery, setTxnSearchQuery] = useState('')
+  const [txnSearchText, setTxnSearchText] = useState(initSearch)
+  const [txnSearchQuery, setTxnSearchQuery] = useState(initSearch)
   const txnSearchTimeoutRef = useRef(null)
   const handleTxnSearchChange = (e) => {
     const val = e.target.value;
@@ -128,6 +121,17 @@ export default function Inventory() {
   }
   const [txnTypeFilter, setTxnTypeFilter] = useState('')
   const [txnStatusFilter, setTxnStatusFilter] = useState('')
+
+  useEffect(() => {
+    const params = new URLSearchParams(location.search)
+    const searchQuery = params.get('search')
+    if (searchQuery !== null && searchQuery !== undefined) {
+      setSearchText(searchQuery)
+      setTxnSearchText(searchQuery)
+      setTxnSearchQuery(searchQuery)
+      setActiveTab('transactions')
+    }
+  }, [location.search])
   const [txnWarehouseFilter, setTxnWarehouseFilter] = useState('')
 
   // Modals

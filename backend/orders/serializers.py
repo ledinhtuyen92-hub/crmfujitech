@@ -95,6 +95,7 @@ class OrderSerializer(serializers.ModelSerializer):
     requires_inventory_export = serializers.ReadOnlyField()
     factory_name = serializers.CharField(source="factory.name", read_only=True, default=None)
     total_quantity = serializers.SerializerMethodField()
+    linked_documents = serializers.SerializerMethodField()
 
     class Meta:
         model = Order
@@ -153,6 +154,7 @@ class OrderSerializer(serializers.ModelSerializer):
             "has_pending_export",
             "requires_inventory_export",
             "total_quantity",
+            "linked_documents",
         ]
         read_only_fields = [
             "id", "company", "order_number", "status_display", "financial_status_display",
@@ -167,6 +169,7 @@ class OrderSerializer(serializers.ModelSerializer):
             "has_production_order",
             "has_pending_export",
             "requires_inventory_export",
+            "linked_documents",
         ]
 
     def get_company_info(self, obj):
@@ -200,6 +203,81 @@ class OrderSerializer(serializers.ModelSerializer):
         if not getattr(obj, 'requires_inventory_export', True):
             return display.replace(" (Đủ ĐK xuất kho)", "")
         return display
+
+    def get_linked_documents(self, obj):
+        # 1. Báo giá (Quotation)
+        quotation_data = None
+        if obj.quotation_id and getattr(obj, "quotation", None):
+            q = obj.quotation
+            quotation_data = {
+                "id": q.id,
+                "code": getattr(q, "quotation_number", None) or getattr(q, "code", None) or f"BG-{q.id}",
+                "status": q.status,
+                "status_display": q.get_status_display(),
+            }
+
+        # 2. Xuất kho (Inventory Export)
+        export_data = None
+        txns = list(obj.inventory_transactions.all()) if hasattr(obj, "inventory_transactions") else []
+        export_txns = [t for t in txns if t.type == "export"]
+        if export_txns:
+            active_txns = [t for t in export_txns if t.status != "rejected"]
+            target_txn = active_txns[-1] if active_txns else export_txns[-1]
+            export_data = {
+                "id": target_txn.id,
+                "code": target_txn.transaction_code or f"XK-{target_txn.id}",
+                "status": target_txn.status,
+                "status_display": target_txn.get_status_display(),
+            }
+
+        # 3. Lệnh sản xuất (Production Order)
+        production_data = None
+        pos = list(obj.production_orders.all()) if hasattr(obj, "production_orders") else []
+        if pos:
+            active_pos = [p for p in pos if p.status != "cancelled"]
+            target_po = active_pos[-1] if active_pos else pos[-1]
+            production_data = {
+                "id": target_po.id,
+                "code": target_po.production_order_code or f"LSX-{target_po.id}",
+                "status": target_po.status,
+                "status_display": target_po.get_status_display(),
+            }
+
+        # 4. Giao hàng (Delivery Order)
+        delivery_data = None
+        try:
+            d_order = getattr(obj, "delivery_order", None)
+            if d_order:
+                delivery_data = {
+                    "id": d_order.id,
+                    "code": d_order.delivery_code or f"GH-{d_order.id}",
+                    "status": d_order.status,
+                    "status_display": d_order.get_status_display(),
+                }
+        except Exception:
+            pass
+
+        # 5. Bảo hành (Warranty Card)
+        warranty_data = None
+        try:
+            w_card = getattr(obj, "warranty_card", None)
+            if w_card:
+                warranty_data = {
+                    "id": w_card.id,
+                    "code": w_card.warranty_code or f"BH-{w_card.id}",
+                    "status": w_card.status,
+                    "status_display": w_card.get_status_display(),
+                }
+        except Exception:
+            pass
+
+        return {
+            "quotation": quotation_data,
+            "export": export_data,
+            "production": production_data,
+            "delivery": delivery_data,
+            "warranty": warranty_data,
+        }
 
     def get_has_production_order(self, obj):
         return obj.production_orders.exists()

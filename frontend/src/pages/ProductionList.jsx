@@ -39,7 +39,7 @@ import {
 } from 'antd'
 import dayjs from 'dayjs'
 import { useCallback, useEffect, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useLocation } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
 import useDebounce from '../hooks/useDebounce'
 import api from '../utils/api'
@@ -200,9 +200,18 @@ export default function ProductionList() {
   const [companyTemplate, setCompanyTemplate] = useState(null)
 
   // Filters
-  const [searchInput, searchQuery, handleSearchChange] = useDebounce('', 400)
+  const location = useLocation()
+  const initSearch = new URLSearchParams(location.search).get('search') || ''
+  const [searchInput, searchQuery, handleSearchChange] = useDebounce(initSearch, 400)
   const [statusFilter, setStatusFilter] = useState('')
   const [factoryFilter, setFactoryFilter] = useState('')
+
+  useEffect(() => {
+    const s = new URLSearchParams(location.search).get('search')
+    if (s !== null && s !== undefined && s !== searchInput) {
+      handleSearchChange({ target: { value: s } })
+    }
+  }, [location.search])
 
   // Modal Add / Edit Production Order
   const [modalVisible, setModalVisible] = useState(false)

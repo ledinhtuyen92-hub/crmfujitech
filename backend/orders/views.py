@@ -20,8 +20,11 @@ class OrderViewSet(TenantQuerySetMixin, viewsets.ModelViewSet):
     module_code = "orders"
 
     queryset = Order.objects.select_related(
-        "company", "customer", "quotation", "created_by", "approved_by"
-    ).prefetch_related("items").order_by("-created_at")
+        "company", "customer", "quotation", "created_by", "approved_by",
+        "delivery_order", "warranty_card"
+    ).prefetch_related(
+        "items", "production_orders", "inventory_transactions"
+    ).order_by("-created_at")
     serializer_class = OrderSerializer
     pagination_class = StandardPagination
     permission_classes = [permissions.IsAuthenticated, ActionBasedPermission]
