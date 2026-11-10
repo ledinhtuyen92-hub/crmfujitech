@@ -1008,6 +1008,10 @@ export default function OrderList() {
             currentItem.product_image = prod.image_url || prod.image || ''
           }
         }
+        if (field === 'symbol') {
+          currentItem.symbol = value
+          currentItem.custom_data = { ...(currentItem.custom_data || {}), symbol: value }
+        }
         updated[idx] = currentItem
       };
 
@@ -1520,7 +1524,15 @@ export default function OrderList() {
           dataIndex: 'symbol',
           width: 100,
           align: 'center',
-          render: (val, record, idx) => <CustomInfoInput templateKey="symbol" style={{ textAlign: 'center', fontWeight: 600, color: '#2563eb' }} placeholder="VD: D1.1" value={record.custom_data?.symbol || record.symbol || ''} onChange={(v) => handleLineChange(idx, 'symbol', v)} />,
+          render: (val, record, idx) => (
+            <CustomInfoInput
+              templateKey="symbol"
+              style={{ textAlign: 'center', fontWeight: 600, color: '#2563eb' }}
+              placeholder="VD: D1.1"
+              value={record.symbol !== undefined ? record.symbol : (record.custom_data?.symbol ?? '')}
+              onChange={(v) => handleLineChange(idx, 'symbol', v)}
+            />
+          ),
         },
         {
           title: 'GHI CHÚ KỸ THUẬT',
@@ -1611,7 +1623,7 @@ export default function OrderList() {
           dataIndex: 'unit',
           width: 70,
           align: 'center',
-          render: (val, record, idx) => <DebouncedInput style={{ textAlign: 'center' }} value={val ?? 'bộ'} onChange={(e) => handleLineChange(idx, 'unit', e.target.value)} />,
+          render: (val, record, idx) => <DebouncedInput style={{ textAlign: 'center' }} value={val !== undefined && val !== null && val !== '' ? val : (record.custom_data?.unit || 'bộ')} onChange={(e) => handleLineChange(idx, 'unit', e.target.value)} />,
         },
         {
           title: 'ĐƠN GIÁ/BỘ',
@@ -2391,7 +2403,7 @@ export default function OrderList() {
           id: 'symbol',
           width: 100,
           align: 'center',
-          render: (val, record, idx) => <DebouncedInput style={{ textAlign: 'center', fontWeight: 600, color: '#2563eb' }} placeholder="VD: D1.1" value={record.symbol || ''} onChange={(e) => handleServiceLineChange(idx, 'symbol', e.target.value)} />,
+          render: (val, record, idx) => <DebouncedInput style={{ textAlign: 'center', fontWeight: 600, color: '#2563eb' }} placeholder="VD: D1.1" value={record.symbol !== undefined ? record.symbol : (record.custom_data?.symbol ?? '')} onChange={(e) => handleServiceLineChange(idx, 'symbol', e.target.value)} />,
         },
         {
           title: 'GHI CHÚ KỸ THUẬT',
@@ -2414,7 +2426,7 @@ export default function OrderList() {
           id: 'unit',
           width: 70,
           align: 'center',
-          render: (val, record, idx) => <DebouncedInput style={{ textAlign: 'center' }} value={val ?? 'lần'} onChange={(e) => handleServiceLineChange(idx, 'unit', e.target.value)} />,
+          render: (val, record, idx) => <DebouncedInput style={{ textAlign: 'center' }} value={val !== undefined && val !== null && val !== '' ? val : (record.custom_data?.unit || 'lần')} onChange={(e) => handleServiceLineChange(idx, 'unit', e.target.value)} />,
         }
       );
     } else {
@@ -2432,7 +2444,7 @@ export default function OrderList() {
           id: 'unit',
           width: 70,
           align: 'center',
-          render: (val, record, idx) => <DebouncedInput style={{ textAlign: 'center' }} value={val ?? 'lần'} onChange={(e) => handleServiceLineChange(idx, 'unit', e.target.value)} />,
+          render: (val, record, idx) => <DebouncedInput style={{ textAlign: 'center' }} value={val !== undefined && val !== null && val !== '' ? val : (record.custom_data?.unit || 'lần')} onChange={(e) => handleServiceLineChange(idx, 'unit', e.target.value)} />,
         },
         {
           title: 'SL',
@@ -2706,6 +2718,10 @@ export default function OrderList() {
           currentItem.product = null
         }
       }
+      if (field === 'symbol') {
+        currentItem.symbol = value
+        currentItem.custom_data = { ...(currentItem.custom_data || {}), symbol: value }
+      }
       updated[index] = currentItem
       return updated
     })
@@ -2807,9 +2823,12 @@ export default function OrderList() {
               discount_percent: Number(it.discount_percent || 0),
               note: it.note || '',
               product_image: it.product_image || (products.find(p => p.id === it.product)?.image_url || products.find(p => p.id === it.product)?.image) || '',
-              unit: it.custom_data?.unit || (products.find(p => p.id === it.product)?.unit || 'cái'),
-              symbol: it.custom_data?.symbol || it.symbol || '',
-              custom_data: it.custom_data || {},
+              unit: it.unit !== undefined && it.unit !== '' ? it.unit : (it.custom_data?.unit || (products.find(p => p.id === it.product)?.unit || 'cái')),
+              symbol: it.symbol !== undefined && it.symbol !== '' ? it.symbol : (it.custom_data?.symbol ?? ''),
+              custom_data: {
+                ...(it.custom_data || {}),
+                symbol: it.symbol !== undefined && it.symbol !== '' ? it.symbol : (it.custom_data?.symbol ?? ''),
+              },
               product_name: it.product_name || (products.find(p => p.id === it.product)?.name || ''),
             }))
           )
@@ -2826,13 +2845,16 @@ export default function OrderList() {
               product_name: it.product_name || '',
               unit_price: Number(it.unit_price || 0),
               quantity: Number(it.quantity || 1),
-              unit: it.custom_data?.unit || it.unit || 'lần',
+              unit: it.unit || it.custom_data?.unit || 'lần',
               discount_percent: Number(it.discount_percent || 0),
               spec: it.spec || '',
               note: it.note || '',
-              symbol: it.custom_data?.symbol || it.symbol || '',
+              symbol: it.symbol !== undefined && it.symbol !== '' ? it.symbol : (it.custom_data?.symbol ?? ''),
               product_image: it.product_image || '',
-              custom_data: it.custom_data || {},
+              custom_data: {
+                ...(it.custom_data || {}),
+                symbol: it.symbol !== undefined && it.symbol !== '' ? it.symbol : (it.custom_data?.symbol ?? ''),
+              },
             }))
           )
         } else {
@@ -2911,8 +2933,8 @@ export default function OrderList() {
         shipping_fee: Number(values.shipping_fee || 0),
         installation_fee: Number(values.installation_fee) || 0,
         delivery_time: values.delivery_time || '',
-        warranty_months: Number(values.warranty_months) || 36,
-        validity_days: Number(values.validity_days) || 30,
+        warranty_months: values.warranty_months !== undefined && values.warranty_months !== null && values.warranty_months !== '' ? Number(values.warranty_months) : 36,
+        validity_days: values.validity_days !== undefined && values.validity_days !== null && values.validity_days !== '' ? Number(values.validity_days) : 30,
         payment_terms_schedule: values.payment_terms_schedule || [],
         subtotal: subtotal,
         vat_rate: Number(values.vat_rate || 0),
@@ -2947,14 +2969,16 @@ export default function OrderList() {
                 length: Number(it.length || 0),
                 thickness: Number(it.thickness || 0),
                 area: Number(Number(it.area || 0).toFixed(2)),
-                spec: it.spec || (prodObj ? prodObj.description : '') || '',
-                warranty: it.warranty || '12 tháng',
-                product_image: it.product_image || (prodObj ? (prodObj.image_url || prodObj.image) : '') || '',
+                spec: it.spec !== undefined ? it.spec : ((prodObj ? prodObj.description : '') || ''),
+                warranty: it.warranty !== undefined && it.warranty !== null ? it.warranty : '12 tháng',
+                product_image: it.product_image !== undefined && it.product_image !== null ? it.product_image : (prodObj ? (prodObj.image_url || prodObj.image) : '') || '',
+                unit: it.unit !== undefined && it.unit !== null ? it.unit : (it.custom_data?.unit || (prodObj ? prodObj.unit : 'cái')),
+                symbol: it.symbol !== undefined ? it.symbol : (it.custom_data?.symbol ?? ''),
                 custom_data: {
                   ...(it.custom_data || {}),
-                  unit: it.unit || (prodObj ? prodObj.unit : 'cái'),
+                  unit: it.unit !== undefined && it.unit !== null ? it.unit : (it.custom_data?.unit || (prodObj ? prodObj.unit : 'cái')),
                   thickness: Math.round(Number(it.thickness || 0)),
-                  symbol: it.custom_data?.symbol || it.symbol || '',
+                  symbol: it.symbol !== undefined ? it.symbol : (it.custom_data?.symbol ?? ''),
                 },
                 quantity: Number(it.quantity || 1),
                 discount_percent: Number(it.discount_percent || 0),
@@ -2979,10 +3003,12 @@ export default function OrderList() {
                 spec: srv.spec || '',
                 warranty: srv.warranty || '',
                 product_image: srv.product_image || '',
+                unit: srv.unit !== undefined && srv.unit !== null ? srv.unit : (srv.custom_data?.unit || 'lần'),
+                symbol: srv.symbol !== undefined ? srv.symbol : (srv.custom_data?.symbol ?? ''),
                 custom_data: {
                   ...(srv.custom_data || {}),
-                  unit: srv.unit || srv.custom_data?.unit || 'lần',
-                  symbol: srv.symbol || srv.custom_data?.symbol || '',
+                  unit: srv.unit !== undefined && srv.unit !== null ? srv.unit : (srv.custom_data?.unit || 'lần'),
+                  symbol: srv.symbol !== undefined ? srv.symbol : (srv.custom_data?.symbol ?? ''),
                 },
                 quantity: Number(srv.quantity || 1),
                 discount_percent: Number(srv.discount_percent || 0),
@@ -2994,8 +3020,11 @@ export default function OrderList() {
       }
 
       if (editingOrder) {
-        await api.patch(`/orders/orders/${editingOrder.id}/`, payload)
+        const patchRes = await api.patch(`/orders/orders/${editingOrder.id}/`, payload)
         messageApi.success('Cập nhật đơn hàng thành công!')
+        if (selectedOrder && selectedOrder.id === editingOrder.id) {
+          setSelectedOrder(patchRes.data)
+        }
       } else {
         await api.post('/orders/orders/', payload)
         messageApi.success('Tạo đơn hàng mới thành công!')

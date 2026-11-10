@@ -33,3 +33,5 @@ backend/test_detection.py
 temp_original.jsx
 test.jpg
 crop*.ps1
+session_credentials*.txt
+test_frame.png

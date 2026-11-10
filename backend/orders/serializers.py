@@ -7,6 +7,9 @@ from finance.serializers import OrderPaymentMilestoneSerializer, PaymentReceiptS
 
 
 class OrderItemSerializer(serializers.ModelSerializer):
+    symbol = serializers.SerializerMethodField()
+    unit = serializers.SerializerMethodField()
+
     class Meta:
         model = OrderItem
         fields = [
@@ -29,8 +32,20 @@ class OrderItemSerializer(serializers.ModelSerializer):
             "thickness",
             "product_image",
             "custom_data",
+            "symbol",
+            "unit",
         ]
         read_only_fields = ["id", "line_total"]
+
+    def get_symbol(self, obj):
+        if isinstance(obj.custom_data, dict):
+            return obj.custom_data.get('symbol', '')
+        return ''
+
+    def get_unit(self, obj):
+        if isinstance(obj.custom_data, dict):
+            return obj.custom_data.get('unit', '')
+        return ''
 
     def validate(self, attrs):
         custom_data = attrs.get('custom_data', {})
@@ -48,6 +63,9 @@ class OrderItemSerializer(serializers.ModelSerializer):
                         data[field] = str(int(f_val))
                 except (ValueError, TypeError):
                     pass
+        if isinstance(instance.custom_data, dict):
+            data['symbol'] = instance.custom_data.get('symbol', '')
+            data['unit'] = instance.custom_data.get('unit', '')
         return data
 
 
@@ -323,6 +341,10 @@ class OrderSerializer(serializers.ModelSerializer):
             disc = Decimal(str(it.get('discount_percent', 0) or 0))
             area_val = Decimal(str(it.get('area', 0) or 0))
             custom_d = it.get('custom_data', {}) or {}
+            if 'symbol' in it and it.get('symbol') is not None:
+                custom_d['symbol'] = it.get('symbol')
+            if 'unit' in it and it.get('unit') is not None:
+                custom_d['unit'] = it.get('unit')
             unit_str = str(custom_d.get('unit', '') or it.get('unit', '')).lower()
             if ('m2' in unit_str or 'm²' in unit_str) and area_val > 0:
                 calc_total = area_val * Decimal(qty) * u_price * (Decimal(1) - disc / Decimal(100))
