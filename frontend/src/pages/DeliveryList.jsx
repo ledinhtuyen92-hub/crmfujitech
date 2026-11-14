@@ -31,6 +31,7 @@ import SortableColumnOption from '../components/SortableColumnOption';
 
 import api from '../utils/api'
 import { useAuth } from '../contexts/AuthContext'
+import { useLocation } from 'react-router-dom'
 import useDebounce from '../hooks/useDebounce'
 import QuotationPrintView from '../components/QuotationPrintView'
 import TransactionPrintView from '../components/TransactionPrintView'
@@ -52,8 +53,17 @@ export default function DeliveryList() {
   const [currentPage, setCurrentPage] = useState(1)
   const [pageSize, setPageSize] = useState(25)
   const [totalCount, setTotalCount] = useState(0)
-  const [searchInput, searchQuery, handleSearchChange] = useDebounce('', 400)
+  const location = useLocation()
+  const initSearch = new URLSearchParams(location.search).get('search') || ''
+  const [searchInput, searchQuery, handleSearchChange] = useDebounce(initSearch, 400)
   const [statusFilter, setStatusFilter] = useState(null)
+
+  useEffect(() => {
+    const s = new URLSearchParams(location.search).get('search')
+    if (s !== null && s !== undefined && s !== searchInput) {
+      handleSearchChange({ target: { value: s } })
+    }
+  }, [location.search])
 
   const allColumnsOptions = [
     { label: 'Mã GH', value: 'delivery_code' },

@@ -545,6 +545,55 @@ class StockLevelViewSet(mixins.UpdateModelMixin, mixins.DestroyModelMixin, views
 
 from core.pagination import StandardPagination
 
+
+def revert_transaction_stock(txn):
+    """
+    Hoàn trả lại tồn kho nếu giao dịch này đã hoàn thành (STATUS_COMPLETED).
+    - export: cộng lại vào warehouse (hoàn trả hàng về kho đã xuất)
+    - import: trừ bớt khỏi warehouse (hủy hàng đã nhập)
+    - transfer: cộng lại kho xuất, trừ bớt kho nhận
+    """
+    if txn.status != InventoryTransaction.STATUS_COMPLETED or not txn.product:
+        return
+
+    from .models import StockLevel
+
+    if txn.type == InventoryTransaction.TYPE_EXPORT and txn.warehouse:
+        stock, _ = StockLevel.objects.select_for_update().get_or_create(
+            product=txn.product,
+            warehouse=txn.warehouse,
+            defaults={"quantity": 0}
+        )
+        stock.quantity += txn.quantity
+        stock.save(update_fields=["quantity"])
+
+    elif txn.type == InventoryTransaction.TYPE_IMPORT and txn.warehouse:
+        stock, _ = StockLevel.objects.select_for_update().get_or_create(
+            product=txn.product,
+            warehouse=txn.warehouse,
+            defaults={"quantity": 0}
+        )
+        stock.quantity = max(0, stock.quantity - txn.quantity)
+        stock.save(update_fields=["quantity"])
+
+    elif txn.type == InventoryTransaction.TYPE_TRANSFER and txn.warehouse and txn.target_warehouse:
+        src_stock, _ = StockLevel.objects.select_for_update().get_or_create(
+            product=txn.product,
+            warehouse=txn.warehouse,
+            defaults={"quantity": 0}
+        )
+        src_stock.quantity += txn.quantity
+        src_stock.save(update_fields=["quantity"])
+
+        target_stock, _ = StockLevel.objects.select_for_update().get_or_create(
+            product=txn.product,
+            warehouse=txn.target_warehouse,
+            defaults={"quantity": 0}
+        )
+        target_stock.quantity = max(0, target_stock.quantity - txn.quantity)
+        target_stock.save(update_fields=["quantity"])
+
+
 class InventoryTransactionViewSet(TenantQuerySetMixin, viewsets.ModelViewSet):
     """
     CRUD phiếu kho — cô lập theo company.
@@ -565,6 +614,9 @@ class InventoryTransactionViewSet(TenantQuerySetMixin, viewsets.ModelViewSet):
         "create": ["inventory.import", "inventory.adjust", "inventory.manual_export"],
         "update": "inventory.adjust",
         "partial_update": "inventory.adjust",
+        "destroy": "inventory.delete_history",
+        "delete_by_code": "inventory.delete_history",
+        "cancel_by_code": "inventory.approve_export",
     }
 
     def list(self, request, *args, **kwargs):
@@ -647,6 +699,7 @@ class InventoryTransactionViewSet(TenantQuerySetMixin, viewsets.ModelViewSet):
             )
         return qs
 
+    @transaction.atomic
     def destroy(self, request, *args, **kwargs):
         user_perms = self.request.user.get_permission_codes()
         if not request.user.is_company_admin and not request.user.is_superuser and "inventory.delete_history" not in user_perms:
@@ -654,6 +707,8 @@ class InventoryTransactionViewSet(TenantQuerySetMixin, viewsets.ModelViewSet):
                 {"detail": "Bạn không có quyền xóa lịch sử giao dịch kho."},
                 status=status.HTTP_403_FORBIDDEN
             )
+        instance = self.get_object()
+        revert_transaction_stock(instance)
         return super().destroy(request, *args, **kwargs)
 
     @transaction.atomic
@@ -930,6 +985,7 @@ class InventoryTransactionViewSet(TenantQuerySetMixin, viewsets.ModelViewSet):
         return Response({"detail": f"Đã xóa {count} giao dịch kho thành công."})
 
     @action(detail=False, methods=["delete"], url_path="delete-by-code")
+    @transaction.atomic
     def delete_by_code(self, request):
         user_perms = self.request.user.get_permission_codes()
         if not request.user.is_company_admin and not request.user.is_superuser and "inventory.delete_history" not in user_perms:
@@ -945,8 +1001,59 @@ class InventoryTransactionViewSet(TenantQuerySetMixin, viewsets.ModelViewSet):
         if not qs.exists():
             return Response({"detail": "Không tìm thấy giao dịch nào với mã này."}, status=status.HTTP_404_NOT_FOUND)
             
+        txns_list = list(qs)
+        for txn in txns_list:
+            revert_transaction_stock(txn)
+
         count, _ = qs.delete()
-        return Response({"detail": f"Đã xóa {count} giao dịch thuộc phiếu {code}."})
+        return Response({"detail": f"Đã xóa {count} giao dịch thuộc phiếu {code} và hoàn trả tồn kho tương ứng."})
+
+    @action(detail=False, methods=["post"], url_path="cancel-by-code")
+    @transaction.atomic
+    def cancel_by_code(self, request):
+        """
+        Hủy phiếu xuất kho (cả pending và completed):
+        - Nếu completed: tự động hoàn trả tồn kho về StockLevel của từng kho tương ứng.
+        - Chuyển trạng thái các giao dịch thuộc phiếu sang 'rejected'.
+        - Hủy ApprovalRequest liên quan nếu có.
+        """
+        user = request.user
+        has_approve_perm = user.is_superuser or getattr(user, 'is_company_admin', False) or (user.role and user.role.permissions.filter(code="inventory.approve_export").exists())
+        if not has_approve_perm:
+            return Response({"detail": "Bạn không có quyền hủy lệnh xuất kho."}, status=status.HTTP_403_FORBIDDEN)
+
+        code = request.data.get("code") or request.query_params.get("code")
+        if not code:
+            return Response({"detail": "Thiếu mã phiếu (transaction_code)."}, status=status.HTTP_400_BAD_REQUEST)
+
+        qs = self.get_queryset().filter(transaction_code=code, type=InventoryTransaction.TYPE_EXPORT)
+        if not qs.exists():
+            return Response({"detail": "Không tìm thấy lệnh xuất kho nào với mã này."}, status=status.HTTP_404_NOT_FOUND)
+
+        txns_list = list(qs)
+        for txn in txns_list:
+            if txn.status == InventoryTransaction.STATUS_COMPLETED:
+                revert_transaction_stock(txn)
+            txn.status = InventoryTransaction.STATUS_REJECTED
+            txn.save(update_fields=["status"])
+
+        first_txn = qs.first()
+        if first_txn and first_txn.reference_order:
+            order = first_txn.reference_order
+            try:
+                from approvals.models import ApprovalRequest
+                from django.contrib.contenttypes.models import ContentType
+                ct = ContentType.objects.get_for_model(order)
+                ApprovalRequest.objects.filter(
+                    content_type=ct,
+                    object_id=order.id,
+                    status=ApprovalRequest.STATUS_PENDING,
+                    title__startswith="Duyệt xuất kho nợ"
+                ).update(status=ApprovalRequest.STATUS_CANCELLED)
+            except Exception:
+                pass
+
+        return Response({"detail": f"Đã hủy phiếu xuất kho {code} và hoàn trả tồn kho thành công."})
 
     @action(detail=False, methods=["post"], url_path="bulk-create")
     @transaction.atomic

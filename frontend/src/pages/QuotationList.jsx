@@ -810,14 +810,14 @@ export default function QuotationList() {
         installation_date: quotation.installation_date ? dayjs(quotation.installation_date) : null,
         shipping_fee: Number(quotation.shipping_fee || 0),
         installation_fee: Number(quotation.installation_fee || 0),
-        delivery_time: quotation.delivery_time || '9 - 10 ngày',
-        warranty_months: quotation.warranty_months !== undefined ? quotation.warranty_months : 36,
+        delivery_time: quotation.delivery_time !== undefined && quotation.delivery_time !== null ? quotation.delivery_time : '',
+        warranty_months: quotation.warranty_months !== undefined && quotation.warranty_months !== null && String(quotation.warranty_months).trim() !== '' && Number(quotation.warranty_months) > 0 ? Number(quotation.warranty_months) : null,
         payment_terms: quotation.payment_terms || defaultPaymentTerms,
         payment_terms_schedule: quotation.payment_terms_schedule && quotation.payment_terms_schedule.length > 0 
           ? quotation.payment_terms_schedule 
           : [{ title: 'Thanh toán đợt 1', percentage: 100, type: 'deposit' }],
         vat_rate: Number(quotation.vat_rate || 0),
-        validity_days: Number(quotation.validity_days || 15),
+        validity_days: quotation.validity_days !== undefined && quotation.validity_days !== null && String(quotation.validity_days).trim() !== '' && Number(quotation.validity_days) > 0 ? Number(quotation.validity_days) : null,
         notes: quotation.notes,
         discount_total: Number(quotation.discount_total || 0),
       })
@@ -963,11 +963,11 @@ export default function QuotationList() {
         notes: values.notes || '',
         shipping_fee: Number(values.shipping_fee || 0),
         installation_fee: Number(values.installation_fee || 0),
-        delivery_time: values.delivery_time || '',
-        warranty_months: Number(values.warranty_months) || 36,
+        delivery_time: values.delivery_time ? String(values.delivery_time).trim() : '',
+        warranty_months: values.warranty_months !== undefined && values.warranty_months !== null && String(values.warranty_months).trim() !== '' ? Number(values.warranty_months) : 0,
         payment_terms: values.payment_terms || '',
         payment_terms_schedule: values.payment_terms_schedule || [],
-        validity_days: Number(values.validity_days || 15),
+        validity_days: values.validity_days !== undefined && values.validity_days !== null && String(values.validity_days).trim() !== '' ? Number(values.validity_days) : 0,
         subtotal: subtotal,
         vat_rate: Number(values.vat_rate || 0),
         vat_amount: vatAmount,
@@ -975,6 +975,9 @@ export default function QuotationList() {
         total_amount: Math.max(0, totalAmt),
         custom_data: {
           ...(editingQuotation?.custom_data || {}),
+          delivery_time: values.delivery_time ? String(values.delivery_time).trim() : '',
+          warranty_months: values.warranty_months !== undefined && values.warranty_months !== null && String(values.warranty_months).trim() !== '' ? Number(values.warranty_months) : 0,
+          validity_days: values.validity_days !== undefined && values.validity_days !== null && String(values.validity_days).trim() !== '' ? Number(values.validity_days) : 0,
           ...(templateSnapshot ? { template_snapshot: templateSnapshot } : {}),
         },
         items: [
@@ -3651,7 +3654,7 @@ export default function QuotationList() {
             </Col>
             <Col xs={24} sm={8}>
               <Form.Item name="validity_days" label="Hiệu lực báo giá (ngày)">
-                <InputNumber min={1} style={{ width: '100%' }} />
+                <InputNumber min={0} style={{ width: '100%' }} />
               </Form.Item>
             </Col>
           </Row>

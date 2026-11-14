@@ -18,7 +18,7 @@ import {
   TagOutlined,
   UploadOutlined,
   WarningOutlined,
-  TableOutlined, SettingOutlined } from '@ant-design/icons'
+  TableOutlined, SettingOutlined, RollbackOutlined } from '@ant-design/icons'
 import {
   Alert,
   Button,
@@ -88,18 +88,11 @@ export default function Inventory() {
   const [currentWarehousePage, setCurrentWarehousePage] = useState(1)
   const [warehouseTotalCount, setWarehouseTotalCount] = useState(0)
 
-  // Filters
-  const [searchText, setSearchText] = useState('')
   const location = useLocation()
+  const initSearch = new URLSearchParams(location.search).get('search') || ''
 
-  useEffect(() => {
-    const params = new URLSearchParams(location.search)
-    const searchQuery = params.get('search')
-    if (searchQuery) {
-      setSearchText(searchQuery)
-      setActiveTab('transactions')
-    }
-  }, [location.search])
+  // Filters
+  const [searchText, setSearchText] = useState(initSearch)
   const [stockSearchText, setStockSearchText] = useState('')
   const [stockSearchQuery, setStockSearchQuery] = useState('')
   const stockSearchTimeoutRef = useRef(null)
@@ -115,8 +108,8 @@ export default function Inventory() {
   const [warehouseFilter, setWarehouseFilter] = useState('')
   const [lowStockOnly, setLowStockOnly] = useState(false)
   const [lowStockThreshold, setLowStockThreshold] = useState(null)
-  const [txnSearchText, setTxnSearchText] = useState('')
-  const [txnSearchQuery, setTxnSearchQuery] = useState('')
+  const [txnSearchText, setTxnSearchText] = useState(initSearch)
+  const [txnSearchQuery, setTxnSearchQuery] = useState(initSearch)
   const txnSearchTimeoutRef = useRef(null)
   const handleTxnSearchChange = (e) => {
     const val = e.target.value;
@@ -128,6 +121,17 @@ export default function Inventory() {
   }
   const [txnTypeFilter, setTxnTypeFilter] = useState('')
   const [txnStatusFilter, setTxnStatusFilter] = useState('')
+
+  useEffect(() => {
+    const params = new URLSearchParams(location.search)
+    const searchQuery = params.get('search')
+    if (searchQuery !== null && searchQuery !== undefined) {
+      setSearchText(searchQuery)
+      setTxnSearchText(searchQuery)
+      setTxnSearchQuery(searchQuery)
+      setActiveTab('transactions')
+    }
+  }, [location.search])
   const [txnWarehouseFilter, setTxnWarehouseFilter] = useState('')
 
   // Modals
@@ -694,6 +698,20 @@ export default function Inventory() {
       window.dispatchEvent(new Event('refresh-notifications'))
     } catch (err) {
       messageApi.error('Từ chối thất bại.')
+    }
+  }
+
+  const handleCancelCompletedExport = async (txn) => {
+    try {
+      const code = txn.transaction_code
+      await api.post('/inventory/transactions/cancel-by-code/', { code })
+      messageApi.success(`Đã hủy phiếu xuất kho ${code} và hoàn trả tồn kho thành công!`)
+      fetchTransactions()
+      fetchStockLevels()
+      window.dispatchEvent(new Event('refresh-notifications'))
+    } catch (err) {
+      const msg = err.response?.data?.detail || 'Hủy phiếu xuất kho thất bại.'
+      messageApi.error(msg)
     }
   }
 
@@ -1405,6 +1423,29 @@ export default function Inventory() {
             okButtonProps={{ danger: true }}
           >
             <Button danger size="small" icon={<CloseCircleOutlined />} title="Từ chối" />
+          </Popconfirm>
+        )}
+        {canApprove && r.status === 'completed' && r.type === 'export' && (
+          <Popconfirm
+            title="Hủy phiếu xuất kho?"
+            description={
+              <div style={{ maxWidth: 280 }}>
+                Hủy phiếu này sẽ <strong>tự động hoàn trả tồn kho</strong> về đúng kho đã xuất và mở khóa đơn hàng để chỉnh sửa. Bạn có chắc chắn muốn hủy không?
+              </div>
+            }
+            onConfirm={() => handleCancelCompletedExport(r)}
+            okText="Hủy & Hoàn tồn"
+            cancelText="Đóng"
+            okButtonProps={{ danger: true }}
+          >
+            <Button
+              danger
+              size="small"
+              icon={<RollbackOutlined />}
+              title="Hủy phiếu xuất kho & hoàn trả tồn kho"
+            >
+              Hủy xuất
+            </Button>
           </Popconfirm>
         )}
         <Button
@@ -2917,7 +2958,7 @@ export default function Inventory() {
             </div>
           )}
           <Text type="danger" style={{ display: 'block', marginBottom: 12 }}>
-            Thao tác này sẽ xoá vĩnh viễn giao dịch này khỏi hệ thống. Số lượng tồn kho hiện tại sẽ <Text strong>KHÔNG</Text> được hoàn lại.
+            Thao tác này sẽ xoá vĩnh viễn giao dịch này khỏi hệ thống. Nếu giao dịch đã Hoàn thành, số lượng tồn kho sẽ <Text strong style={{ color: '#16a34a' }}>TỰ ĐỘNG HOÀN TRẢ</Text> lại kho tương ứng.
           </Text>
           <Text style={{ display: 'block', marginBottom: 8 }}>
             Để xác nhận, vui lòng nhập chính xác dòng chữ: <strong>XOA GIAO DICH</strong> vào ô bên dưới:

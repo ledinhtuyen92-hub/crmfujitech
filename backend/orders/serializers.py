@@ -95,6 +95,7 @@ class OrderSerializer(serializers.ModelSerializer):
     requires_inventory_export = serializers.ReadOnlyField()
     factory_name = serializers.CharField(source="factory.name", read_only=True, default=None)
     total_quantity = serializers.SerializerMethodField()
+    linked_documents = serializers.SerializerMethodField()
 
     class Meta:
         model = Order
@@ -153,6 +154,7 @@ class OrderSerializer(serializers.ModelSerializer):
             "has_pending_export",
             "requires_inventory_export",
             "total_quantity",
+            "linked_documents",
         ]
         read_only_fields = [
             "id", "company", "order_number", "status_display", "financial_status_display",
@@ -167,6 +169,7 @@ class OrderSerializer(serializers.ModelSerializer):
             "has_production_order",
             "has_pending_export",
             "requires_inventory_export",
+            "linked_documents",
         ]
 
     def get_company_info(self, obj):
@@ -200,6 +203,81 @@ class OrderSerializer(serializers.ModelSerializer):
         if not getattr(obj, 'requires_inventory_export', True):
             return display.replace(" (Đủ ĐK xuất kho)", "")
         return display
+
+    def get_linked_documents(self, obj):
+        # 1. Báo giá (Quotation)
+        quotation_data = None
+        if obj.quotation_id and getattr(obj, "quotation", None):
+            q = obj.quotation
+            quotation_data = {
+                "id": q.id,
+                "code": getattr(q, "quotation_number", None) or getattr(q, "code", None) or f"BG-{q.id}",
+                "status": q.status,
+                "status_display": q.get_status_display(),
+            }
+
+        # 2. Xuất kho (Inventory Export)
+        export_data = None
+        txns = list(obj.inventory_transactions.all()) if hasattr(obj, "inventory_transactions") else []
+        export_txns = [t for t in txns if t.type == "export"]
+        if export_txns:
+            active_txns = [t for t in export_txns if t.status != "rejected"]
+            target_txn = active_txns[-1] if active_txns else export_txns[-1]
+            export_data = {
+                "id": target_txn.id,
+                "code": target_txn.transaction_code or f"XK-{target_txn.id}",
+                "status": target_txn.status,
+                "status_display": target_txn.get_status_display(),
+            }
+
+        # 3. Lệnh sản xuất (Production Order)
+        production_data = None
+        pos = list(obj.production_orders.all()) if hasattr(obj, "production_orders") else []
+        if pos:
+            active_pos = [p for p in pos if p.status != "cancelled"]
+            target_po = active_pos[-1] if active_pos else pos[-1]
+            production_data = {
+                "id": target_po.id,
+                "code": target_po.production_order_code or f"LSX-{target_po.id}",
+                "status": target_po.status,
+                "status_display": target_po.get_status_display(),
+            }
+
+        # 4. Giao hàng (Delivery Order)
+        delivery_data = None
+        try:
+            d_order = getattr(obj, "delivery_order", None)
+            if d_order:
+                delivery_data = {
+                    "id": d_order.id,
+                    "code": d_order.delivery_code or f"GH-{d_order.id}",
+                    "status": d_order.status,
+                    "status_display": d_order.get_status_display(),
+                }
+        except Exception:
+            pass
+
+        # 5. Bảo hành (Warranty Card)
+        warranty_data = None
+        try:
+            w_card = getattr(obj, "warranty_card", None)
+            if w_card:
+                warranty_data = {
+                    "id": w_card.id,
+                    "code": w_card.warranty_code or f"BH-{w_card.id}",
+                    "status": w_card.status,
+                    "status_display": w_card.get_status_display(),
+                }
+        except Exception:
+            pass
+
+        return {
+            "quotation": quotation_data,
+            "export": export_data,
+            "production": production_data,
+            "delivery": delivery_data,
+            "warranty": warranty_data,
+        }
 
     def get_has_production_order(self, obj):
         return obj.production_orders.exists()
@@ -323,10 +401,54 @@ class OrderSerializer(serializers.ModelSerializer):
     @transaction.atomic
     def update(self, instance, validated_data):
         items_data = self.initial_data.get('items')
+
+        # Kiểm tra xem đơn hàng có phiếu xuất kho nào đang hoạt động (pending hoặc completed) hay không
+        active_export = None
+        if hasattr(instance, "inventory_transactions"):
+            active_export = instance.inventory_transactions.filter(
+                type="export"
+            ).exclude(status="rejected").first()
+        else:
+            from inventory.models import InventoryTransaction
+            active_export = InventoryTransaction.objects.filter(
+                reference_order=instance,
+                type=InventoryTransaction.TYPE_EXPORT
+            ).exclude(status=InventoryTransaction.STATUS_REJECTED).first()
+
+        if active_export and items_data is not None and isinstance(items_data, list):
+            # So sánh xem danh mục sản phẩm, số lượng, quy cách có bị thay đổi không
+            old_items = list(instance.items.all().order_by('id'))
+
+            def get_item_sig(it):
+                if hasattr(it, 'product_id'):
+                    p_id = it.product_id
+                    qty = int(it.quantity or 1)
+                    itype = str(it.item_type or 'product')
+                    uprice = str(it.unit_price or 0)
+                else:
+                    p_val = it.get('product')
+                    p_id = p_val if isinstance(p_val, int) else None
+                    qty = int(it.get('quantity', 1) or 1)
+                    itype = str(it.get('item_type', 'product'))
+                    uprice = str(it.get('unit_price', 0) or 0)
+                return (p_id, qty, itype, uprice)
+
+            old_sigs = [get_item_sig(x) for x in old_items]
+            new_sigs = [get_item_sig(x) for x in items_data]
+
+            if old_sigs != new_sigs:
+                status_display = active_export.get_status_display()
+                raise serializers.ValidationError({
+                    "items": f"Đơn hàng này đã có Phiếu xuất kho [{active_export.transaction_code}] (Trạng thái: {status_display}). "
+                             f"Không thể thay đổi danh mục sản phẩm hoặc số lượng. "
+                             f"Vui lòng hủy phiếu xuất kho tại mục Quản lý Kho vận trước khi chỉnh sửa sản phẩm."
+                })
+
         instance = super().update(instance, validated_data)
         if items_data is not None and isinstance(items_data, list):
-            instance.items.all().delete()
-            self._save_items(instance, items_data)
+            if not active_export:
+                instance.items.all().delete()
+                self._save_items(instance, items_data)
         return instance
 
     def _save_items(self, order, items_data):

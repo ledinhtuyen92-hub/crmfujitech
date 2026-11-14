@@ -8,56 +8,82 @@ const ChuSo = ["không", "một", "hai", "ba", "bốn", "năm", "sáu", "bảy",
 const Tien = ["", " nghìn", " triệu", " tỷ", " nghìn tỷ", " triệu tỷ"];
 
 function docSo(so) {
-    if (so === 0) return "Không đồng";
-    let str = parseInt(so).toString();
-    let result = "";
-    let len = str.length;
-    let i = 0;
-    while (i < len) {
-        let n = parseInt(str[i]);
-        let p = len - i - 1;
-        let t = p % 3;
-        if (n === 0) {
-            if (t === 0 && p > 0 && (parseInt(str[i-1]) !== 0 || parseInt(str[i-2]) !== 0)) {
-                result += Tien[p/3] + " ";
-            } else if (t === 1 && parseInt(str[i+1]) !== 0) {
-                result += "lẻ ";
-            } else if (t === 2 && (parseInt(str[i+1]) !== 0 || parseInt(str[i+2]) !== 0)) {
-                result += "không trăm ";
-            }
+  if (so === 0) return "Không đồng";
+  let str = parseInt(so).toString();
+  let result = "";
+  let len = str.length;
+  let i = 0;
+  while (i < len) {
+    let n = parseInt(str[i]);
+    let p = len - i - 1;
+    let t = p % 3;
+    if (n === 0) {
+      if (t === 0 && p > 0 && (parseInt(str[i - 1]) !== 0 || parseInt(str[i - 2]) !== 0)) {
+        result += Tien[p / 3] + " ";
+      } else if (t === 1 && parseInt(str[i + 1]) !== 0) {
+        result += "lẻ ";
+      } else if (t === 2 && (parseInt(str[i + 1]) !== 0 || parseInt(str[i + 2]) !== 0)) {
+        result += "không trăm ";
+      }
+    } else {
+      if (t === 1 && n === 1) {
+        result += "mười ";
+      } else {
+        if (n === 5 && t === 0 && i > 0 && parseInt(str[i - 1]) !== 0) {
+          result += "lăm ";
+        } else if (n === 1 && t === 0 && i > 0 && parseInt(str[i - 1]) !== 0 && parseInt(str[i - 1]) !== 1) {
+          result += "mốt ";
         } else {
-            if (t === 1 && n === 1) {
-                result += "mười ";
-            } else {
-                if (n === 5 && t === 0 && i > 0 && parseInt(str[i-1]) !== 0) {
-                    result += "lăm ";
-                } else if (n === 1 && t === 0 && i > 0 && parseInt(str[i-1]) !== 0 && parseInt(str[i-1]) !== 1) {
-                    result += "mốt ";
-                } else {
-                    result += ChuSo[n] + " ";
-                }
-                if (t === 2) result += "trăm ";
-                if (t === 1 && n !== 1) result += "mươi ";
-            }
-            if (t === 0) result += Tien[p/3] + " ";
+          result += ChuSo[n] + " ";
         }
-        i++;
+        if (t === 2) result += "trăm ";
+        if (t === 1 && n !== 1) result += "mươi ";
+      }
+      if (t === 0) result += Tien[p / 3] + " ";
     }
-    result = result.trim() + " đồng.";
-    return result.charAt(0).toUpperCase() + result.slice(1);
+    i++;
+  }
+  result = result.trim() + " đồng.";
+  return result.charAt(0).toUpperCase() + result.slice(1);
 }
 
 const { Text } = Typography;
 
+const formatWarranty = (val) => {
+  if (val === undefined || val === null) return null;
+  const str = String(val).trim();
+  if (!str || str === '0') return null;
+  if (str.toLowerCase().includes('tháng') || str.toLowerCase().includes('năm') || str.toLowerCase().includes('ngày')) {
+    return str;
+  }
+  return `${str} tháng`;
+};
+
+const formatDate = (val) => {
+  if (!val) return null;
+  const str = String(val).trim();
+  if (!str) return null;
+  const match = str.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/);
+  if (match) {
+    const [, y, m, d] = match;
+    return `${d.padStart(2, '0')}/${m.padStart(2, '0')}/${y}`;
+  }
+  const d = new Date(val);
+  if (!isNaN(d.getTime())) {
+    return d.toLocaleDateString('vi-VN');
+  }
+  return str;
+};
+
 const computeLineTotal = (item) => {
   if (item.quantity === null || item.quantity === '' || item.quantity === undefined ||
-      item.unit_price === null || item.unit_price === '' || item.unit_price === undefined) {
+    item.unit_price === null || item.unit_price === '' || item.unit_price === undefined) {
     return null;
   }
   const qty = Number(item.quantity)
   const price = Number(item.unit_price)
   const discount = Number(item.discount_percent || 0)
-  
+
   const unit = (item.unit || item.custom_data?.unit || '').toLowerCase();
   const isAreaUnit = unit === 'm²' || unit === 'm2' || unit === 'mét vuông';
   const area = Number(item.area || 0);
@@ -65,14 +91,14 @@ const computeLineTotal = (item) => {
   if (isAreaUnit && area > 0) {
     return Number((area * qty * price * (1 - discount / 100)).toFixed(0));
   }
-  
+
   return Number((qty * price * (1 - discount / 100)).toFixed(0));
 };
 
 const computeRowSpan = (data, index, field = 'product') => {
   if (!data || !data[index]) return 1
   if (data[index].item_type === 'service') return 1
-  
+
   const currentItem = data[index];
   const matches = (item1, item2) => {
     if (!item1 || !item2) return false;
@@ -141,7 +167,7 @@ export default function QuotationRenderer({ layoutConfig, layoutStyle, data, ren
     if (!val) return true;
     const str = String(val).trim();
     const placeholders = [
-      '[Tên công ty]', '[Địa chỉ công ty]', '[SĐT công ty]', '[Email công ty]', 
+      '[Tên công ty]', '[Địa chỉ công ty]', '[SĐT công ty]', '[Email công ty]',
       '[Mã số thuế]', '[Website công ty]', '[Tên giám đốc]'
     ];
     return placeholders.includes(str) || (str.startsWith('{{') && str.endsWith('}}'));
@@ -158,7 +184,7 @@ export default function QuotationRenderer({ layoutConfig, layoutStyle, data, ren
       textAlign: 'center',
       verticalAlign: 'middle',
     };
-    const tdStyle = { 
+    const tdStyle = {
       border: hideAllBorders || isNoBorder ? 'none' : '1px solid #e2e8f0',
       borderBottom: hideAllBorders ? 'none' : '1px solid #e2e8f0',
       padding: '8px 4px',
@@ -168,7 +194,7 @@ export default function QuotationRenderer({ layoutConfig, layoutStyle, data, ren
       case BLOCK_TYPES.HEADER_LOGO:
         let finalLogoUrl = block.props.logoUrl;
         if (finalLogoUrl === '{{company_logo}}' || !finalLogoUrl) finalLogoUrl = company?.logo || data?.company_info?.logo;
-        
+
         const headerCompanyName = company?.name || data?.company_info?.name || parseVariables(block.props.companyName || '[Tên công ty]', data, company);
         const headerTaxCode = company?.tax_code || data?.company_info?.tax_code || parseVariables(block.props.taxCode || '', data, company);
         const headerPhone = company?.phone || data?.company_info?.phone || parseVariables(block.props.phone || '', data, company);
@@ -204,13 +230,13 @@ export default function QuotationRenderer({ layoutConfig, layoutStyle, data, ren
 
       case BLOCK_TYPES.TITLE:
         const isOrder = documentType === 'order';
-        const displayTitle = isOrder 
+        const displayTitle = isOrder
           ? (block.props.orderTitle !== undefined ? block.props.orderTitle : 'ĐƠN ĐẶT HÀNG')
           : (block.props.title || '');
-        const displaySubtitle = isOrder 
+        const displaySubtitle = isOrder
           ? (block.props.orderSubtitle !== undefined ? block.props.orderSubtitle : 'Kính gửi Quý khách hàng, chúng tôi xin gửi thông tin đơn hàng chi tiết dưới đây:')
           : (block.props.subtitle || '');
-        
+
         let parsedMeta = block.props.metaText !== undefined ? block.props.metaText : (block.props.showDate ? 'Số: {{quotation_code}} | Ngày: {{current_date}}' : '');
         parsedMeta = parseVariables(parsedMeta, data, company);
         return (
@@ -237,7 +263,7 @@ export default function QuotationRenderer({ layoutConfig, layoutStyle, data, ren
         let htmlContent = block.props.content || '';
         htmlContent = parseVariables(htmlContent, data, company);
         return <div dangerouslySetInnerHTML={{ __html: htmlContent }} style={{ textAlign: block.props.textAlign }} />;
-        
+
       case BLOCK_TYPES.IMAGE:
         let imgUrl = block.props.url;
         if (imgUrl === '{{company_logo}}') imgUrl = company?.logo || data?.company_info?.logo;
@@ -249,7 +275,7 @@ export default function QuotationRenderer({ layoutConfig, layoutStyle, data, ren
             <img src={getSafeMediaUrl(imgUrl)} alt="Image" style={{ width: block.props.width, maxWidth: '100%' }} />
           </div>
         ) : null;
-        
+
       case BLOCK_TYPES.CUSTOMER_INFO:
         if (hideCustomerInfo) return null;
         // Resolve seller info: luôn ưu tiên dữ liệu thực từ company
@@ -300,7 +326,7 @@ export default function QuotationRenderer({ layoutConfig, layoutStyle, data, ren
                   {hasCompany && !isPlaceholder(buyerCompany) ? `: ${buyerCompany}` : ''}
                 </div>
                 {!isPlaceholder(buyerName) && <div style={{ fontSize: 12, color: '#334155' }}><strong>{hasCompany ? 'Đại diện' : 'Khách hàng'}:</strong> {buyerName}</div>}
-                
+
                 {(!isPlaceholder(buyerTax) || !isPlaceholder(buyerPhone)) && (
                   <div style={{ fontSize: 12, color: '#334155' }}>
                     {!isPlaceholder(buyerTax) ? <span><strong>Mã số thuế:</strong> {buyerTax}</span> : null}
@@ -318,18 +344,18 @@ export default function QuotationRenderer({ layoutConfig, layoutStyle, data, ren
       case BLOCK_TYPES.PRODUCT_TABLE:
         const isService = block.type === BLOCK_TYPES.SERVICE_TABLE;
         const hasServiceBlock = allBlocks.some(b => b.type === BLOCK_TYPES.SERVICE_TABLE);
-        
+
         let tableData = items || [];
         if (isService) {
           tableData = tableData.filter(it => it.item_type === 'service');
         } else if (hasServiceBlock) {
           tableData = tableData.filter(it => it.item_type !== 'service');
         }
-        
+
         if (isService && tableData.length === 0) {
           return null;
         }
-        
+
         const isLandscape = layoutConfig?.paper_orientation === 'landscape';
         const tableTitle = block.props.tableTitle;
         const enableProductImage = (() => {
@@ -360,59 +386,59 @@ export default function QuotationRenderer({ layoutConfig, layoutStyle, data, ren
               {block.props.showHeader !== false && (
                 <thead>
                   <tr style={{ background: '#fafafa' }}>
-                  {(block.props.columns || []).filter(col => {
-                    const colId = typeof col === 'object' ? col.id : col;
-                    if (hidePricing && (colId === 'price' || colId === 'total')) return false;
-                    return true;
-                  }).map(col => {
-                    const colId = typeof col === 'object' ? col.id : col;
-                    const colTitle = typeof col === 'object' ? col.title : null;
-                    if (colId === 'stt') return <th key="stt" style={{ ...thStyle, color: clr, width: 40 }}>{colTitle || 'STT'}</th>;
-                    if (colId === 'name') return <th key="name" style={{...thStyle, width: 200}}>{colTitle || (isService ? 'Tên dịch vụ / chi phí' : 'Tên hàng hóa / Dịch vụ')}</th>;
-                    if (colId === 'symbol') return <th key="symbol" style={{...thStyle, width: 80}}>{colTitle || 'Ký hiệu'}</th>;
-                    if (colId === 'specs') return <th key="specs" style={{...thStyle, width: 150}}>{colTitle || (isService ? 'Ghi chú kỹ thuật' : 'Quy cách kỹ thuật')}</th>;
-                    if (colId === 'dimensions') return (
-                      <th key="dimensions" style={{...thStyle, padding: 0, width: 180}}>
-                        <div style={{ borderBottom: useComplexDimensions ? '1px solid #e2e8f0' : 'none', padding: '4px 6px' }}>{colTitle || 'Kích thước (mm)'}</div>
-                        {useComplexDimensions && (
-                          <div style={{ display: 'flex' }}>
-                            {dimensionFields.map((field, idx) => (
-                              <div key={field.id} style={{ flex: 1, borderRight: idx < dimensionFields.length - 1 ? '1px solid #e2e8f0' : 'none', padding: '2px 6px' }}>{field.label}</div>
-                            ))}
-                          </div>
-                        )}
-                      </th>
-                    );
-                    if (colId === 'note') return <th key="note" style={{...thStyle, width: 120}}>{colTitle || 'Ghi chú'}</th>;
-                    if (colId === 'unit') return <th key="unit" style={{...thStyle, width: 50}}>{colTitle || 'ĐVT'}</th>;
-                    if (colId === 'qty') return <th key="qty" style={{...thStyle, width: 50}}>{colTitle || 'SL'}</th>;
-                    if (colId === 'price') return <th key="price" style={{...thStyle, width: 90}}>{colTitle || 'Đơn giá'}</th>;
-                    if (colId === 'total') return <th key="total" style={{...thStyle, width: 100}}>{colTitle || 'Thành tiền'}</th>;
-                    
-                    // Xử lý Custom Column
-                    if (colId.startsWith('custom_')) {
-                      return <th key={colId} style={{...thStyle, width: 100}}>{colTitle || 'Cột tuỳ chỉnh'}</th>;
-                    }
-                    if (colId.startsWith('group_')) {
-                      const children = col.children || [];
-                      return (
-                        <th key={colId} style={{...thStyle, padding: 0, width: Math.max(100, children.length * 60)}}>
-                          <div style={{ borderBottom: children.length > 0 ? '1px solid #e2e8f0' : 'none', padding: '4px 6px' }}>{colTitle}</div>
-                          {children.length > 0 && (
+                    {(block.props.columns || []).filter(col => {
+                      const colId = typeof col === 'object' ? col.id : col;
+                      if (hidePricing && (colId === 'price' || colId === 'total')) return false;
+                      return true;
+                    }).map(col => {
+                      const colId = typeof col === 'object' ? col.id : col;
+                      const colTitle = typeof col === 'object' ? col.title : null;
+                      if (colId === 'stt') return <th key="stt" style={{ ...thStyle, color: clr, width: 40 }}>{colTitle || 'STT'}</th>;
+                      if (colId === 'name') return <th key="name" style={{ ...thStyle, width: 200 }}>{colTitle || (isService ? 'Tên dịch vụ / chi phí' : 'Tên hàng hóa / Dịch vụ')}</th>;
+                      if (colId === 'symbol') return <th key="symbol" style={{ ...thStyle, width: 80 }}>{colTitle || 'Ký hiệu'}</th>;
+                      if (colId === 'specs') return <th key="specs" style={{ ...thStyle, width: 150 }}>{colTitle || (isService ? 'Ghi chú kỹ thuật' : 'Quy cách kỹ thuật')}</th>;
+                      if (colId === 'dimensions') return (
+                        <th key="dimensions" style={{ ...thStyle, padding: 0, width: 180 }}>
+                          <div style={{ borderBottom: useComplexDimensions ? '1px solid #e2e8f0' : 'none', padding: '4px 6px' }}>{colTitle || 'Kích thước (mm)'}</div>
+                          {useComplexDimensions && (
                             <div style={{ display: 'flex' }}>
-                              {children.map((child, idx) => (
-                                <div key={child.id} style={{ flex: 1, borderRight: idx < children.length - 1 ? '1px solid #e2e8f0' : 'none', padding: '2px 6px' }}>{child.title}</div>
+                              {dimensionFields.map((field, idx) => (
+                                <div key={field.id} style={{ flex: 1, borderRight: idx < dimensionFields.length - 1 ? '1px solid #e2e8f0' : 'none', padding: '2px 6px' }}>{field.label}</div>
                               ))}
                             </div>
                           )}
                         </th>
                       );
-                    }
-                    
-                    return null;
-                  })}
-                </tr>
-              </thead>
+                      if (colId === 'note') return <th key="note" style={{ ...thStyle, width: 120 }}>{colTitle || 'Ghi chú'}</th>;
+                      if (colId === 'unit') return <th key="unit" style={{ ...thStyle, width: 50 }}>{colTitle || 'ĐVT'}</th>;
+                      if (colId === 'qty') return <th key="qty" style={{ ...thStyle, width: 50 }}>{colTitle || 'SL'}</th>;
+                      if (colId === 'price') return <th key="price" style={{ ...thStyle, width: 90 }}>{colTitle || 'Đơn giá'}</th>;
+                      if (colId === 'total') return <th key="total" style={{ ...thStyle, width: 100 }}>{colTitle || 'Thành tiền'}</th>;
+
+                      // Xử lý Custom Column
+                      if (colId.startsWith('custom_')) {
+                        return <th key={colId} style={{ ...thStyle, width: 100 }}>{colTitle || 'Cột tuỳ chỉnh'}</th>;
+                      }
+                      if (colId.startsWith('group_')) {
+                        const children = col.children || [];
+                        return (
+                          <th key={colId} style={{ ...thStyle, padding: 0, width: Math.max(100, children.length * 60) }}>
+                            <div style={{ borderBottom: children.length > 0 ? '1px solid #e2e8f0' : 'none', padding: '4px 6px' }}>{colTitle}</div>
+                            {children.length > 0 && (
+                              <div style={{ display: 'flex' }}>
+                                {children.map((child, idx) => (
+                                  <div key={child.id} style={{ flex: 1, borderRight: idx < children.length - 1 ? '1px solid #e2e8f0' : 'none', padding: '2px 6px' }}>{child.title}</div>
+                                ))}
+                              </div>
+                            )}
+                          </th>
+                        );
+                      }
+
+                      return null;
+                    })}
+                  </tr>
+                </thead>
               )}
               <tbody>
                 {tableData.length === 0 ? (
@@ -431,10 +457,10 @@ export default function QuotationRenderer({ layoutConfig, layoutStyle, data, ren
                           return true;
                         }).map(col => {
                           const colId = typeof col === 'object' ? col.id : col;
-                          const showSpecs = typeof block.props.columns?.[0] === 'object' 
+                          const showSpecs = typeof block.props.columns?.[0] === 'object'
                             ? block.props.columns.some(c => c.id === 'specs')
                             : block.props.columns?.includes('specs');
-                            
+
                           const merges = item.custom_data?.merge_columns;
                           if (merges && Array.isArray(merges) && merges.length > 1) {
                             const idx = merges.indexOf(colId);
@@ -442,15 +468,15 @@ export default function QuotationRenderer({ layoutConfig, layoutStyle, data, ren
                             if (idx === 0) {
                               return (
                                 <td key={colId} colSpan={merges.length} style={{ ...tdStyle, textAlign: 'left', whiteSpace: 'pre-wrap', verticalAlign: 'middle' }}>
-                                  <span style={{color: '#334155'}}>{item.custom_data?.custom_size_text || ''}</span>
+                                  <span style={{ color: '#334155' }}>{item.custom_data?.custom_size_text || ''}</span>
                                 </td>
                               );
                             }
                           }
-                          
+
                           if (colId === 'stt') return rowSpan > 0 ? <td key="stt" rowSpan={rowSpan} style={{ ...tdStyle, textAlign: 'center', fontWeight: 600, color: clr, verticalAlign: 'middle' }}>{sttNum}</td> : null;
                           if (colId === 'name') return rowSpan > 0 ? (
-                            <td key="name" rowSpan={rowSpan} style={{...tdStyle, verticalAlign: 'middle', textAlign: 'left', height: '1px'}}>
+                            <td key="name" rowSpan={rowSpan} style={{ ...tdStyle, verticalAlign: 'middle', textAlign: 'left', height: '1px' }}>
                               <div style={{ height: '100%', display: 'flex', flexDirection: 'column', minHeight: (enableProductImage && item.product_image) ? 80 : 'auto' }}>
                                 {enableProductImage && item.product_image && (
                                   <div style={{ flex: 1, position: 'relative', width: '100%', minHeight: 0, marginBottom: 4 }}>
@@ -481,12 +507,12 @@ export default function QuotationRenderer({ layoutConfig, layoutStyle, data, ren
                           ) : null;
                           if (colId === 'symbol') return (
                             <td key="symbol" style={{ ...tdStyle, textAlign: 'center' }}>
-                              <span style={{fontWeight: 600, color: '#2563eb'}}>{item.symbol !== undefined && item.symbol !== '' ? item.symbol : (item.custom_data?.symbol || '')}</span>
+                              <span style={{ fontWeight: 600, color: '#2563eb' }}>{item.symbol !== undefined && item.symbol !== '' ? item.symbol : (item.custom_data?.symbol || '')}</span>
                             </td>
                           );
                           if (colId === 'specs') return (
                             <td key="specs" style={{ ...tdStyle, textAlign: 'left', whiteSpace: 'pre-wrap' }}>
-                              <span style={{color: '#475569', fontSize: 11}}>{item.spec || item.description}</span>
+                              <span style={{ color: '#475569', fontSize: 11 }}>{item.spec || item.description}</span>
                             </td>
                           );
                           if (colId === 'dimensions') {
@@ -499,7 +525,7 @@ export default function QuotationRenderer({ layoutConfig, layoutStyle, data, ren
                             if (isCustomSize) {
                               return (
                                 <td key="dimensions" style={{ ...tdStyle, verticalAlign: 'middle', whiteSpace: 'pre-wrap' }}>
-                                  <span style={{color: '#334155'}}>{item.custom_data?.custom_size_text || ''}</span>
+                                  <span style={{ color: '#334155' }}>{item.custom_data?.custom_size_text || ''}</span>
                                 </td>
                               );
                             }
@@ -514,29 +540,29 @@ export default function QuotationRenderer({ layoutConfig, layoutStyle, data, ren
                                       if (Number(item.width) > 0) parts.push(item.width);
                                       if (Number(item.thickness) > 0) parts.push(item.thickness);
                                       return parts.join(' x ');
-                                  })()}
-                                </div>
-                              ) : (
-                                <div style={{ display: 'flex', height: '100%' }}>
-                                  {dimensionFields.map((field, idx) => {
-                                    const canShowChildImg = field.allowImageUpload === true;
-                                    const childImgUrl = canShowChildImg ? item.custom_data?.[`img_${field.id}`] : null;
-                                    const val = Number(getDimVal(item, field)) === 0 ? '' : getDimVal(item, field);
-                                    return (
-                                      <div key={field.id} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', borderRight: idx < dimensionFields.length - 1 ? '1px dashed #e2e8f0' : 'none', padding: '4px 6px', textAlign: 'center' }}>
-                                        {childImgUrl && (
-                                          <div style={{ marginBottom: 4, display: 'flex', justifyContent: 'center' }}>
-                                            <img src={getSafeMediaUrl(childImgUrl)} alt="" style={{ maxWidth: '100%', maxHeight: 60, objectFit: 'contain', borderRadius: 4, border: '1px solid #cbd5e1' }} />
-                                          </div>
-                                        )}
-                                        <div>{val}</div>
-                                      </div>
-                                    );
-                                  })}
-                                </div>
-                              )}
-                            </td>
-                          );
+                                    })()}
+                                  </div>
+                                ) : (
+                                  <div style={{ display: 'flex', height: '100%' }}>
+                                    {dimensionFields.map((field, idx) => {
+                                      const canShowChildImg = field.allowImageUpload === true;
+                                      const childImgUrl = canShowChildImg ? item.custom_data?.[`img_${field.id}`] : null;
+                                      const val = Number(getDimVal(item, field)) === 0 ? '' : getDimVal(item, field);
+                                      return (
+                                        <div key={field.id} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', borderRight: idx < dimensionFields.length - 1 ? '1px dashed #e2e8f0' : 'none', padding: '4px 6px', textAlign: 'center' }}>
+                                          {childImgUrl && (
+                                            <div style={{ marginBottom: 4, display: 'flex', justifyContent: 'center' }}>
+                                              <img src={getSafeMediaUrl(childImgUrl)} alt="" style={{ maxWidth: '100%', maxHeight: 60, objectFit: 'contain', borderRadius: 4, border: '1px solid #cbd5e1' }} />
+                                            </div>
+                                          )}
+                                          <div>{val}</div>
+                                        </div>
+                                      );
+                                    })}
+                                  </div>
+                                )}
+                              </td>
+                            );
                           }
                           if (colId === 'note') return (
                             <td key="note" style={{ ...tdStyle, textAlign: 'center', whiteSpace: 'pre-wrap' }}>
@@ -545,22 +571,22 @@ export default function QuotationRenderer({ layoutConfig, layoutStyle, data, ren
                                   <img src={getSafeMediaUrl(item.custom_data.note_image)} alt="note" style={{ maxWidth: '100%', maxHeight: 60, objectFit: 'contain', borderRadius: 4, border: '1px solid #cbd5e1' }} />
                                 </div>
                               )}
-                              <span style={{color: '#475569', fontSize: 11}}>{item.note || item.custom_data?.note}</span>
+                              <span style={{ color: '#475569', fontSize: 11 }}>{item.note || item.custom_data?.note}</span>
                             </td>
                           );
                           if (colId === 'unit') return (
                             <td key="unit" style={{ ...tdStyle, textAlign: 'center' }}>
-                              <span style={{fontWeight: 500, color: item.item_type === 'accessory' ? '#64748b' : '#334155'}}>{item.unit || item.custom_data?.unit}</span>
+                              <span style={{ fontWeight: 500, color: item.item_type === 'accessory' ? '#64748b' : '#334155' }}>{item.unit || item.custom_data?.unit}</span>
                             </td>
                           );
                           if (colId === 'qty') return (
                             <td key="qty" style={{ ...tdStyle, textAlign: 'center' }}>
-                              <span style={{fontWeight: 500, color: item.item_type === 'accessory' ? '#64748b' : '#334155'}}>{item.quantity}</span>
+                              <span style={{ fontWeight: 500, color: item.item_type === 'accessory' ? '#64748b' : '#334155' }}>{item.quantity}</span>
                             </td>
                           );
                           if (colId === 'price') return (
                             <td key="price" style={{ ...tdStyle, textAlign: 'right' }}>
-                              <span style={{color: item.item_type === 'accessory' ? '#64748b' : '#334155'}}>{Number(item.unit_price).toLocaleString()} đ</span>
+                              <span style={{ color: item.item_type === 'accessory' ? '#64748b' : '#334155' }}>{Number(item.unit_price).toLocaleString()} đ</span>
                             </td>
                           );
                           if (colId === 'total') return (
@@ -570,7 +596,7 @@ export default function QuotationRenderer({ layoutConfig, layoutStyle, data, ren
                               </strong>
                             </td>
                           );
-                          
+
                           // Xử lý Custom Column
                           if (colId.startsWith('custom_')) {
                             const canShowImg = typeof col === 'object' && col.allowImageUpload === true;
@@ -578,11 +604,11 @@ export default function QuotationRenderer({ layoutConfig, layoutStyle, data, ren
                             return (
                               <td key={colId} style={{ ...tdStyle, textAlign: 'center' }}>
                                 {imgUrl && <div style={{ marginBottom: 4, display: 'flex', justifyContent: 'center' }}><img src={getSafeMediaUrl(imgUrl)} alt="" style={{ maxWidth: '100%', maxHeight: 60, objectFit: 'contain', borderRadius: 4, border: '1px solid #cbd5e1' }} /></div>}
-                                <span style={{color: '#334155'}}>{item.custom_data?.[colId] || ''}</span>
+                                <span style={{ color: '#334155' }}>{item.custom_data?.[colId] || ''}</span>
                               </td>
                             );
                           }
-                          
+
                           if (colId.startsWith('group_')) {
                             const children = col.children || [];
                             return (
@@ -594,7 +620,7 @@ export default function QuotationRenderer({ layoutConfig, layoutStyle, data, ren
                                     return (
                                       <div key={child.id} style={{ flex: 1, borderRight: idx < children.length - 1 ? '1px dashed #e2e8f0' : 'none', padding: '4px 6px', textAlign: 'center' }}>
                                         {childImgUrl && <div style={{ marginBottom: 4, display: 'flex', justifyContent: 'center' }}><img src={getSafeMediaUrl(childImgUrl)} alt="" style={{ maxWidth: '100%', maxHeight: 60, objectFit: 'contain', borderRadius: 4, border: '1px solid #cbd5e1' }} /></div>}
-                                        <span style={{color: '#334155'}}>{item.custom_data?.[child.id] || ''}</span>
+                                        <span style={{ color: '#334155' }}>{item.custom_data?.[child.id] || ''}</span>
                                       </div>
                                     );
                                   }) : <div style={{ padding: '4px 6px', flex: 1 }} />}
@@ -602,7 +628,7 @@ export default function QuotationRenderer({ layoutConfig, layoutStyle, data, ren
                               </td>
                             );
                           }
-                          
+
                           return null;
                         })}
                       </tr>
@@ -668,22 +694,27 @@ export default function QuotationRenderer({ layoutConfig, layoutStyle, data, ren
             )}
             {block.props.showDate && (
               <div style={{ fontSize: 12, color: '#334155', marginBottom: 4 }}>
-                Ngày báo giá: <strong>{data?.quotation_date ? new Date(data.quotation_date).toLocaleDateString('vi-VN') : new Date().toLocaleDateString('vi-VN')}</strong>
+                Ngày báo giá: <strong>{data?.quotation_date ? formatDate(data.quotation_date) : formatDate(new Date())}</strong>
               </div>
             )}
-            {block.props.showDeliveryTime && (data?.delivery_time || data?.delivery_time === '') && (
+            {data?.delivery_time && String(data.delivery_time).trim() !== '' && (
               <div style={{ fontSize: 12, color: '#334155', marginBottom: 4 }}>
-                Thời gian giao hàng / thi công: <strong>{data.delivery_time || '9 - 10 ngày'}</strong>
+                Thời gian giao hàng: <strong>{String(data.delivery_time).trim()}</strong>
               </div>
             )}
-            {block.props.showInstallationDate && data?.installation_date && (
+            {data?.installation_date && (
               <div style={{ fontSize: 12, color: '#334155', marginBottom: 4 }}>
-                Ngày giao hàng / lắp đặt dự kiến: <strong>{new Date(data.installation_date).toLocaleDateString('vi-VN')}</strong>
+                Ngày giao hàng dự kiến: <strong>{formatDate(data.installation_date)}</strong>
               </div>
             )}
-            {block.props.showValidity && (data?.validity_days || data?.validity_days === 0) && (
+            {formatWarranty(data?.warranty_months) && (
+              <div style={{ fontSize: 12, color: '#334155', marginBottom: 4 }}>
+                Thời gian bảo hành: <strong>{formatWarranty(data.warranty_months)}</strong>
+              </div>
+            )}
+            {data?.validity_days !== undefined && data?.validity_days !== null && String(data.validity_days).trim() !== '' && Number(data.validity_days) > 0 && (
               <div style={{ fontSize: 12, color: '#334155' }}>
-                Báo giá có giá trị trong vòng: <strong>{data.validity_days || 30} ngày</strong>
+                Báo giá có giá trị trong vòng: <strong>{data.validity_days} ngày</strong>
               </div>
             )}
           </div>
@@ -709,27 +740,27 @@ export default function QuotationRenderer({ layoutConfig, layoutStyle, data, ren
               const title = block.props.titles?.[idx] || 'CHỮ KÝ';
               if (hideCustomerInfo && (title.toUpperCase().includes('KHÁCH HÀNG') || title.toUpperCase().includes('BÊN MUA'))) return null;
               return (
-              <Col xs={24} md={24 / (block.props.columns || 2)} key={idx}>
-                <div style={{ fontWeight: 700, color: clr, fontSize: 13 }}>{title}</div>
-                <div style={{ fontSize: 11, color: '#64748b', fontStyle: 'italic', marginBottom: 12 }}>(Ký, đóng dấu & ghi rõ họ tên)</div>
-                
-                <div style={{ minHeight: 140, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'flex-start', paddingTop: 10, position: 'relative' }}>
-                  {!hideSignatures ? (
-                    block.props.signatures?.[idx]?.includes('{{customer_signature}}') && renderCustomerSignature ? (
-                      renderCustomerSignature()
-                    ) : block.props.signatures?.[idx] ? (
-                      <div 
-                        dangerouslySetInnerHTML={{ __html: parseVariables(block.props.signatures[idx], data, company).replace(/\n{3,}/g, '\n\n').replace(/\n/g, '<br/>') }} 
-                        style={{ display: 'block', textAlign: 'center', whiteSpace: 'pre-wrap', position: 'relative', width: '100%', lineHeight: '1.2' }}
-                      />
+                <Col xs={24} md={24 / (block.props.columns || 2)} key={idx}>
+                  <div style={{ fontWeight: 700, color: clr, fontSize: 13 }}>{title}</div>
+                  <div style={{ fontSize: 11, color: '#64748b', fontStyle: 'italic', marginBottom: 12 }}>(Ký, đóng dấu & ghi rõ họ tên)</div>
+
+                  <div style={{ minHeight: 140, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'flex-start', paddingTop: 10, position: 'relative' }}>
+                    {!hideSignatures ? (
+                      block.props.signatures?.[idx]?.includes('{{customer_signature}}') && renderCustomerSignature ? (
+                        renderCustomerSignature()
+                      ) : block.props.signatures?.[idx] ? (
+                        <div
+                          dangerouslySetInnerHTML={{ __html: parseVariables(block.props.signatures[idx], data, company).replace(/\n{3,}/g, '\n\n').replace(/\n/g, '<br/>') }}
+                          style={{ display: 'block', textAlign: 'center', whiteSpace: 'pre-wrap', position: 'relative', width: '100%', lineHeight: '1.2' }}
+                        />
+                      ) : (
+                        <div style={{ height: 115 }} />
+                      )
                     ) : (
                       <div style={{ height: 115 }} />
-                    )
-                  ) : (
-                    <div style={{ height: 115 }} />
-                  )}
-                </div>
-              </Col>
+                    )}
+                  </div>
+                </Col>
               );
             })}
           </Row>
@@ -737,7 +768,7 @@ export default function QuotationRenderer({ layoutConfig, layoutStyle, data, ren
 
       case BLOCK_TYPES.DIVIDER:
         return <Divider type="horizontal" style={{ borderTopWidth: block.props.thickness, borderColor: block.props.color, margin: `${block.props.margin}px 0` }} />;
-      
+
       case BLOCK_TYPES.LAYOUT_ROW:
         return (
           <Row gutter={block.props.gap || 16}>

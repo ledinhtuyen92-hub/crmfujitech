@@ -1,4 +1,4 @@
-import { AlertOutlined, CheckCircleOutlined, ClockCircleOutlined, CloseCircleOutlined, DeleteOutlined, EditOutlined, FileDoneOutlined, FileTextOutlined, MessageOutlined, MinusCircleOutlined, PlusOutlined, PrinterOutlined, SearchOutlined, UploadOutlined, PictureOutlined, CameraOutlined, TableOutlined, ToolOutlined, EnvironmentOutlined , SettingOutlined, ExclamationCircleOutlined, InfoCircleOutlined } from '@ant-design/icons'
+import { AlertOutlined, CheckCircleOutlined, ClockCircleOutlined, CloseCircleOutlined, DeleteOutlined, EditOutlined, FileDoneOutlined, FileTextOutlined, MessageOutlined, MinusCircleOutlined, PlusOutlined, PrinterOutlined, SearchOutlined, UploadOutlined, PictureOutlined, CameraOutlined, TableOutlined, ToolOutlined, EnvironmentOutlined , SettingOutlined, ExclamationCircleOutlined, InfoCircleOutlined, InboxOutlined, CarOutlined, SafetyCertificateOutlined, RightOutlined, LinkOutlined, ArrowRightOutlined, LockOutlined } from '@ant-design/icons'
 import {
   Alert,
   AutoComplete,
@@ -2789,9 +2789,9 @@ export default function OrderList() {
         discount_total: Number(order.discount_total || 0),
         shipping_fee: Number(order.shipping_fee || 0),
         installation_fee: Number(order.installation_fee || 0),
-        delivery_time: order.delivery_time || '9 - 10 ngày',
-        warranty_months: order.warranty_months !== undefined ? order.warranty_months : 36,
-        validity_days: order.validity_days || 30,
+        delivery_time: order.delivery_time !== undefined && order.delivery_time !== null ? order.delivery_time : '',
+        warranty_months: order.warranty_months !== undefined && order.warranty_months !== null && String(order.warranty_months).trim() !== '' && Number(order.warranty_months) > 0 ? Number(order.warranty_months) : null,
+        validity_days: order.validity_days !== undefined && order.validity_days !== null && String(order.validity_days).trim() !== '' && Number(order.validity_days) > 0 ? Number(order.validity_days) : null,
         payment_terms_schedule: order.payment_terms_schedule && order.payment_terms_schedule.length > 0 
           ? order.payment_terms_schedule 
           : [{ title: 'Thanh toán đợt 1', percentage: 100, type: 'deposit' }],
@@ -2932,9 +2932,9 @@ export default function OrderList() {
         notes: values.notes || '',
         shipping_fee: Number(values.shipping_fee || 0),
         installation_fee: Number(values.installation_fee) || 0,
-        delivery_time: values.delivery_time || '',
-        warranty_months: values.warranty_months !== undefined && values.warranty_months !== null && values.warranty_months !== '' ? Number(values.warranty_months) : 36,
-        validity_days: values.validity_days !== undefined && values.validity_days !== null && values.validity_days !== '' ? Number(values.validity_days) : 30,
+        delivery_time: values.delivery_time ? String(values.delivery_time).trim() : '',
+        warranty_months: values.warranty_months !== undefined && values.warranty_months !== null && String(values.warranty_months).trim() !== '' ? Number(values.warranty_months) : 0,
+        validity_days: values.validity_days !== undefined && values.validity_days !== null && String(values.validity_days).trim() !== '' ? Number(values.validity_days) : 0,
         payment_terms_schedule: values.payment_terms_schedule || [],
         subtotal: subtotal,
         vat_rate: Number(values.vat_rate || 0),
@@ -2943,6 +2943,9 @@ export default function OrderList() {
         total_amount: Math.max(0, totalAmt),
         custom_data: {
           ...(editingOrder?.custom_data || {}),
+          delivery_time: values.delivery_time ? String(values.delivery_time).trim() : '',
+          warranty_months: values.warranty_months !== undefined && values.warranty_months !== null && String(values.warranty_months).trim() !== '' ? Number(values.warranty_months) : 0,
+          validity_days: values.validity_days !== undefined && values.validity_days !== null && String(values.validity_days).trim() !== '' ? Number(values.validity_days) : 0,
           ...(templateSnapshot ? { template_snapshot: templateSnapshot } : {}),
         },
         payment_target: values.payment_target || null,
@@ -3037,7 +3040,16 @@ export default function OrderList() {
         messageApi.error('Vui lòng điền đầy đủ các thông tin bắt buộc.')
         return
       }
-      messageApi.error('Lưu đơn hàng thất bại. Vui lòng thử lại.')
+      const errData = error.response?.data
+      let errMsg = 'Lưu đơn hàng thất bại. Vui lòng thử lại.'
+      if (typeof errData?.items === 'string') {
+        errMsg = errData.items
+      } else if (Array.isArray(errData?.items) && errData.items.length > 0) {
+        errMsg = errData.items[0]
+      } else if (errData?.detail) {
+        errMsg = errData.detail
+      }
+      messageApi.error(errMsg)
     } finally {
       setSubmitting(false)
     }
@@ -3321,51 +3333,441 @@ export default function OrderList() {
     </Space>
   )
 
+  // ── Helper chuỗi chứng từ liên kết (Báo giá ➔ Đơn hàng ➔ Xuất kho ➔ Sản xuất ➔ Giao hàng ➔ Bảo hành) ──
+  const getLifecycleSteps = (record) => {
+    const linked = record?.linked_documents || {}
+    
+    // 1. Báo giá
+    const quotationDoc = linked.quotation || (record.quotation_detail?.quotation_number ? {
+      id: record.quotation_detail.id,
+      code: record.quotation_detail.quotation_number,
+      status: record.quotation_detail.status,
+      status_display: record.quotation_detail.status_display || 'Báo giá',
+    } : null)
+
+    // 2. Xuất kho
+    const exportDoc = linked.export || null
+
+    // 3. Sản xuất
+    const productionDoc = linked.production || null
+
+    // 4. Giao hàng
+    const deliveryDoc = linked.delivery || null
+
+    // 5. Bảo hành
+    const warrantyDoc = linked.warranty || null
+
+    const allSteps = [
+      {
+        key: 'quotation',
+        module: 'sales',
+        permission: 'sales.view',
+        short: 'BG',
+        label: 'Báo giá',
+        icon: <FileTextOutlined />,
+        route: '/quotations',
+        doc: quotationDoc,
+        getStatusType: (st) => {
+          if (!st) return 'default'
+          if (['approved', 'accepted'].includes(st)) return 'success'
+          if (['pending_approval', 'sent'].includes(st)) return 'warning'
+          if (['rejected'].includes(st)) return 'error'
+          return 'processing'
+        }
+      },
+      {
+        key: 'export',
+        module: 'inventory',
+        permission: 'inventory.view',
+        short: 'XK',
+        label: 'Xuất kho',
+        icon: <InboxOutlined />,
+        route: '/inventory',
+        doc: exportDoc,
+        getStatusType: (st) => {
+          if (!st) return 'default'
+          if (['completed', 'approved'].includes(st)) return 'success'
+          if (['pending'].includes(st)) return 'warning'
+          if (['rejected'].includes(st)) return 'error'
+          return 'processing'
+        }
+      },
+      {
+        key: 'production',
+        module: 'production',
+        permission: 'production.view',
+        short: 'SX',
+        label: 'Lệnh sản xuất',
+        icon: <ToolOutlined />,
+        route: '/production',
+        doc: productionDoc,
+        getStatusType: (st) => {
+          if (!st) return 'default'
+          if (['completed'].includes(st)) return 'success'
+          if (['in_progress'].includes(st)) return 'processing'
+          if (['pending'].includes(st)) return 'warning'
+          if (['cancelled'].includes(st)) return 'error'
+          return 'default'
+        }
+      },
+      {
+        key: 'delivery',
+        module: 'delivery',
+        permission: 'delivery.view',
+        short: 'GH',
+        label: 'Giao hàng',
+        icon: <CarOutlined />,
+        route: '/delivery',
+        doc: deliveryDoc,
+        getStatusType: (st) => {
+          if (!st) return 'default'
+          if (['delivered'].includes(st)) return 'success'
+          if (['in_transit'].includes(st)) return 'processing'
+          if (['pending'].includes(st)) return 'warning'
+          if (['failed'].includes(st)) return 'error'
+          return 'default'
+        }
+      },
+      {
+        key: 'warranty',
+        module: 'warranty',
+        permission: 'warranty.view',
+        short: 'BH',
+        label: 'Bảo hành',
+        icon: <SafetyCertificateOutlined />,
+        route: '/warranty',
+        doc: warrantyDoc,
+        getStatusType: (st) => {
+          if (!st) return 'default'
+          if (['active'].includes(st)) return 'success'
+          if (['expired'].includes(st)) return 'warning'
+          if (['void'].includes(st)) return 'error'
+          return 'default'
+        }
+      },
+    ]
+
+    // Lọc theo quyền tài khoản và cấu hình module của công ty
+    return allSteps.filter((st) => {
+      if (!isModuleActive(st.module)) return false
+      if (!isCompanyAdmin && !hasPermission(st.permission)) return false
+      return true
+    })
+  }
+
+  const getStepBadgeTheme = (type, hasDoc) => {
+    if (!hasDoc) {
+      return {
+        bg: '#f8fafc',
+        color: '#94a3b8',
+        border: '#e2e8f0',
+      }
+    }
+    switch (type) {
+      case 'success':
+        return {
+          bg: '#ecfdf5',
+          color: '#059669',
+          border: '#a7f3d0',
+        }
+      case 'processing':
+        return {
+          bg: '#eff6ff',
+          color: '#2563eb',
+          border: '#bfdbfe',
+        }
+      case 'warning':
+        return {
+          bg: '#fffbeb',
+          color: '#d97706',
+          border: '#fde68a',
+        }
+      case 'error':
+        return {
+          bg: '#fef2f2',
+          color: '#dc2626',
+          border: '#fecaca',
+        }
+      default:
+        return {
+          bg: '#f1f5f9',
+          color: '#475569',
+          border: '#cbd5e1',
+        }
+    }
+  }
+
+  const renderLifecyclePopover = (record, steps) => {
+    return (
+      <div style={{ width: 340, maxWidth: 'calc(100vw - 32px)', borderRadius: 12, overflow: 'hidden' }}>
+        {/* Header */}
+        <div
+          style={{
+            background: 'linear-gradient(135deg, #0f172a 0%, #1e293b 100%)',
+            padding: '14px 18px',
+            color: '#fff',
+          }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
+            <span style={{ fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.8px', color: '#94a3b8', fontWeight: 700 }}>
+              Chuỗi chứng từ liên kết
+            </span>
+            <Tag
+              color={record.status === 'approved' ? 'success' : (record.status === 'pending' ? 'warning' : 'default')}
+              style={{ margin: 0, fontSize: 11, borderRadius: 4, fontWeight: 600, padding: '1px 8px' }}
+            >
+              {record.status_display || record.status}
+            </Tag>
+          </div>
+          <div style={{ fontSize: 15, fontWeight: 700, color: '#f8fafc', display: 'flex', alignItems: 'center', gap: 6 }}>
+            <span style={{ color: '#38bdf8', fontWeight: 600 }}>Đơn hàng:</span> {record.order_number || `DH-${record.id}`}
+          </div>
+        </div>
+
+        {/* Body: Filtered Steps */}
+        <div style={{ padding: '14px 16px', background: '#fff', display: 'flex', flexDirection: 'column', gap: 8 }}>
+          {steps.map((st) => {
+            const hasDoc = !!st.doc
+            const statusType = st.getStatusType(st.doc?.status)
+            const theme = getStepBadgeTheme(statusType, hasDoc)
+
+            return (
+              <div
+                key={st.key}
+                onClick={(e) => {
+                  if (hasDoc && st.doc.code) {
+                    if (e.ctrlKey || e.metaKey) {
+                      window.open(`${st.route}?search=${encodeURIComponent(st.doc.code)}`, '_blank')
+                    } else {
+                      navigate(`${st.route}?search=${encodeURIComponent(st.doc.code)}`)
+                    }
+                  }
+                }}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  padding: '9px 12px',
+                  borderRadius: 8,
+                  background: hasDoc ? '#f8fafc' : '#ffffff',
+                  border: `1px solid ${hasDoc ? '#e2e8f0' : '#f1f5f9'}`,
+                  cursor: hasDoc ? 'pointer' : 'default',
+                  transition: 'all 0.18s ease',
+                }}
+                onMouseEnter={(e) => {
+                  if (hasDoc) {
+                    e.currentTarget.style.background = '#f1f5f9'
+                    e.currentTarget.style.borderColor = '#cbd5e1'
+                    e.currentTarget.style.transform = 'translateX(2px)'
+                  }
+                }}
+                onMouseLeave={(e) => {
+                  if (hasDoc) {
+                    e.currentTarget.style.background = '#f8fafc'
+                    e.currentTarget.style.borderColor = '#e2e8f0'
+                    e.currentTarget.style.transform = 'none'
+                  }
+                }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                  <div
+                    style={{
+                      width: 30,
+                      height: 30,
+                      borderRadius: '50%',
+                      background: theme.bg,
+                      color: theme.color,
+                      border: `1px solid ${theme.border}`,
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      fontSize: 12,
+                      fontWeight: 700,
+                      flexShrink: 0,
+                    }}
+                  >
+                    {st.short}
+                  </div>
+                  <div>
+                    <div style={{ fontSize: 11, color: '#64748b', lineHeight: 1.3, fontWeight: 500 }}>{st.label}</div>
+                    {hasDoc ? (
+                      <div style={{ fontSize: 13, fontWeight: 700, color: '#0f172a' }}>
+                        {st.doc.code}
+                      </div>
+                    ) : (
+                      <div style={{ fontSize: 12, color: '#94a3b8', fontStyle: 'italic' }}>
+                        Chưa phát sinh
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {hasDoc ? (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                    <Tag
+                      style={{
+                        margin: 0,
+                        fontSize: 11,
+                        fontWeight: 600,
+                        background: theme.bg,
+                        color: theme.color,
+                        borderColor: theme.border,
+                        borderRadius: 4,
+                        padding: '1px 7px',
+                      }}
+                    >
+                      {st.doc.status_display || st.doc.status}
+                    </Tag>
+                    <RightOutlined style={{ fontSize: 10, color: '#94a3b8' }} />
+                  </div>
+                ) : (
+                  <span style={{ fontSize: 12, color: '#cbd5e1', fontWeight: 600 }}>—</span>
+                )}
+              </div>
+            )
+          })}
+        </div>
+
+        {/* Footer */}
+        <div
+          style={{
+            padding: '10px 18px',
+            background: '#f8fafc',
+            borderTop: '1px solid #e2e8f0',
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+          }}
+        >
+          <span style={{ fontSize: 11, color: '#64748b', display: 'flex', alignItems: 'center', gap: 4 }}>
+            <LinkOutlined style={{ color: '#94a3b8' }} /> Bấm vào mã để mở nhanh
+          </span>
+          <Button
+            type="link"
+            size="small"
+            style={{ padding: 0, fontSize: 12, fontWeight: 600 }}
+            onClick={() => {
+              setSelectedOrder(record)
+              setDrawerVisible(true)
+            }}
+          >
+            Chi tiết đơn hàng →
+          </Button>
+        </div>
+      </div>
+    )
+  }
+
   const columns = [
     {
       title: 'Mã đơn hàng',
       dataIndex: 'order_number',
       key: 'order_number',
       fixed: 'left',
-      render: (val, record) => (
-        <Space>
-          <div
-            style={{
-              width: 32,
-              height: 32,
-              borderRadius: 8,
-              background: 'rgba(16, 185, 129, 0.1)',
-              color: '#10b981',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              fontWeight: 700,
-            }}
-          >
-            ĐH
-          </div>
-          <div>
-            <Text
-              strong
-              style={{ color: '#2563eb', cursor: 'pointer', display: 'block' }}
-              onClick={() => {
-                setSelectedOrder(record)
-                setDrawerVisible(true)
+      render: (val, record) => {
+        const steps = getLifecycleSteps(record)
+        const cellContent = (
+          <Space align="start">
+            <div
+              style={{
+                width: 32,
+                height: 32,
+                borderRadius: 8,
+                background: 'rgba(16, 185, 129, 0.1)',
+                color: '#10b981',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                fontWeight: 700,
+                flexShrink: 0,
+                marginTop: 2,
               }}
             >
-              {val || `DH-${record.id}`}
-            </Text>
-            {record.quotation_detail?.quotation_number && (
-              <Text type="secondary" style={{ fontSize: 11, display: 'block' }}>
-                Báo giá: <Text strong style={{ color: '#8b5cf6', cursor: 'pointer' }}>{record.quotation_detail.quotation_number}</Text>
+              ĐH
+            </div>
+            <div>
+              <Text
+                strong
+                style={{ color: '#2563eb', display: 'block', fontSize: 13, cursor: 'pointer' }}
+                onClick={() => {
+                  setSelectedOrder(record)
+                  setDrawerVisible(true)
+                }}
+              >
+                {val || `DH-${record.id}`}
               </Text>
-            )}
-            <Text type="secondary" style={{ fontSize: 11 }}>
-              {dayjs(record.created_at).format('DD/MM/YYYY')}
-            </Text>
-          </div>
-        </Space>
-      ),
+              
+              <Text type="secondary" style={{ fontSize: 11, display: 'block', marginBottom: 4 }}>
+                {dayjs(record.created_at).format('DD/MM/YYYY')}
+              </Text>
+
+              {/* ── Mini-Badges Pipeline ── */}
+              {steps.length > 0 && (
+                <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
+                  {steps.map((st) => {
+                    const hasDoc = !!st.doc
+                    const statusType = st.getStatusType(st.doc?.status)
+                    const theme = getStepBadgeTheme(statusType, hasDoc)
+                    return (
+                      <span
+                        key={st.key}
+                        onClick={(e) => {
+                          if (hasDoc && st.doc.code) {
+                            e.stopPropagation()
+                            navigate(`${st.route}?search=${encodeURIComponent(st.doc.code)}`)
+                          }
+                        }}
+                        style={{
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          padding: '2px 6px',
+                          borderRadius: 4,
+                          fontSize: 10,
+                          fontWeight: 700,
+                          lineHeight: '14px',
+                          background: theme.bg,
+                          color: theme.color,
+                          border: `1px solid ${theme.border}`,
+                          cursor: hasDoc ? 'pointer' : 'default',
+                          transition: 'all 0.15s ease',
+                          boxShadow: hasDoc ? '0 1px 2px rgba(0, 0, 0, 0.04)' : 'none',
+                        }}
+                        title={hasDoc ? `${st.label}: ${st.doc.code} (${st.doc.status_display || st.doc.status})` : `${st.label}: Chưa phát sinh`}
+                      >
+                        {st.short}
+                      </span>
+                    )
+                  })}
+                </div>
+              )}
+            </div>
+          </Space>
+        )
+
+        if (steps.length === 0) {
+          return cellContent
+        }
+
+        return (
+          <Popover
+            placement="rightTop"
+            content={renderLifecyclePopover(record, steps)}
+            trigger={['hover']}
+            overlayInnerStyle={{
+              padding: 0,
+              borderRadius: 12,
+              overflow: 'hidden',
+              boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.15), 0 8px 10px -6px rgba(0, 0, 0, 0.1)',
+              border: '1px solid #e2e8f0',
+            }}
+          >
+            <div style={{ cursor: 'pointer' }}>
+              {cellContent}
+            </div>
+          </Popover>
+        )
+      },
     },
     {
       title: 'Khách hàng',
@@ -4005,60 +4407,154 @@ export default function OrderList() {
               </Col>
             )}
           </Row>
-          <Divider style={{ margin: '12px 0' }}>
-            <Space>
-              <Text strong>Bảng Tính Chi Tiết Hạng Mục (Mẫu: {companyTemplate?.name || 'Tiêu chuẩn'})</Text>
-              <Tag color="blue">{formItems.length} dòng</Tag>
-            </Space>
-          </Divider>
+          {(() => {
+            const activeExportDoc = (editingOrder?.linked_documents?.export && editingOrder.linked_documents.export.status !== 'rejected')
+              ? editingOrder.linked_documents.export
+              : null
+            const isExportLocked = !!activeExportDoc
 
-          <div style={{ marginBottom: 16, border: '1px solid #e2e8f0', borderRadius: 8, overflow: 'hidden' }}>
-            <DndContext sensors={sensors} modifiers={[restrictToVerticalAxis]} onDragEnd={(e) => handleDragEnd(e, formItems, setFormItems)}>
-              <SortableContext items={formItems.map(i => i.key)} strategy={verticalListSortingStrategy}>
-                <Table
-                  components={{ body: { row: DraggableBodyRow } }}
-                  dataSource={formItems}
-                  columns={getItemColumns()}
-                  rowKey="key"
-                  pagination={false}
-                  size="small"
-                  scroll={{ x: 'max-content' }}
-                />
-              </SortableContext>
-            </DndContext>
-          </div>
+            return (
+              <>
+                {isExportLocked && (
+                  <Alert
+                    type="warning"
+                    showIcon
+                    icon={<ExclamationCircleOutlined style={{ fontSize: 20, color: '#d97706', marginTop: 2 }} />}
+                    style={{
+                      margin: '16px 0',
+                      border: '1px solid #fde68a',
+                      background: '#fffbeb',
+                      borderRadius: 10,
+                      padding: '12px 16px',
+                    }}
+                    message={
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 8 }}>
+                        <Text strong style={{ color: '#92400e', fontSize: 14 }}>
+                          Đơn hàng đã liên kết Phiếu xuất kho: {activeExportDoc.code} ({activeExportDoc.status_display})
+                        </Text>
+                        <Button
+                          size="small"
+                          type="primary"
+                          ghost
+                          onClick={() => {
+                            setModalVisible(false)
+                            navigate(`/inventory?search=${activeExportDoc.code}`)
+                          }}
+                          style={{ fontWeight: 600, borderColor: '#d97706', color: '#b45309' }}
+                        >
+                          Mở phiếu xuất kho tại Kho vận →
+                        </Button>
+                      </div>
+                    }
+                    description={
+                      <div style={{ color: '#b45309', fontSize: 13, marginTop: 4, lineHeight: 1.5 }}>
+                        Danh mục sản phẩm, đơn vị tính và số lượng đã được <strong>khóa (chỉ đọc)</strong> để đảm bảo đồng bộ với Kho vận.
+                        Nếu cần thay đổi danh mục hoặc số lượng sản phẩm, vui lòng liên hệ Thủ kho/Quản trị viên thực hiện <strong>Hủy phiếu xuất kho</strong> trước tại màn hình Quản lý Kho vận.
+                      </div>
+                    }
+                  />
+                )}
 
+                <Divider style={{ margin: '12px 0' }}>
+                  <Space>
+                    <Text strong>Bảng Tính Chi Tiết Hạng Mục (Mẫu: {companyTemplate?.name || 'Tiêu chuẩn'})</Text>
+                    <Tag color="blue">{formItems.length} dòng</Tag>
+                    {isExportLocked && (
+                      <Tag color="warning" icon={<LockOutlined />}>
+                        Đang khóa chỉnh sửa do đã xuất kho
+                      </Tag>
+                    )}
+                  </Space>
+                </Divider>
 
-          <Button type="dashed" onClick={handleAddLine} block icon={<PlusOutlined />} style={{ marginBottom: 20 }}>
-            Thêm dòng sản phẩm / hạng mục mới
-          </Button>
+                <div
+                  style={{
+                    marginBottom: 16,
+                    border: isExportLocked ? '1px dashed #f59e0b' : '1px solid #e2e8f0',
+                    borderRadius: 8,
+                    overflow: 'hidden',
+                    background: isExportLocked ? '#fcfbf7' : '#fff',
+                  }}
+                >
+                  <div style={{ pointerEvents: isExportLocked ? 'none' : 'auto', opacity: isExportLocked ? 0.85 : 1 }}>
+                    <DndContext sensors={sensors} modifiers={[restrictToVerticalAxis]} onDragEnd={(e) => !isExportLocked && handleDragEnd(e, formItems, setFormItems)}>
+                      <SortableContext items={formItems.map(i => i.key)} strategy={verticalListSortingStrategy}>
+                        <Table
+                          components={{ body: { row: DraggableBodyRow } }}
+                          dataSource={formItems}
+                          columns={getItemColumns()}
+                          rowKey="key"
+                          pagination={false}
+                          size="small"
+                          scroll={{ x: 'max-content' }}
+                        />
+                      </SortableContext>
+                    </DndContext>
+                  </div>
+                </div>
 
-          <Divider style={{ margin: '12px 0' }}>
-            <Space>
-              <Text strong>Dịch Vụ & Chi Phí Phát Sinh</Text>
-              <Tag color="blue">{serviceItems.length} dịch vụ</Tag>
-            </Space>
-          </Divider>
+                <Button
+                  type="dashed"
+                  onClick={handleAddLine}
+                  block
+                  icon={<PlusOutlined />}
+                  disabled={isExportLocked}
+                  style={{ marginBottom: 20, opacity: isExportLocked ? 0.6 : 1 }}
+                >
+                  {isExportLocked ? 'Đã khóa thêm sản phẩm (Đơn hàng đã phát sinh xuất kho)' : 'Thêm dòng sản phẩm / hạng mục mới'}
+                </Button>
 
-          <div style={{ marginBottom: 16, border: '1px solid #e2e8f0', borderRadius: 8, overflow: 'hidden' }}>
-            <DndContext sensors={sensors} modifiers={[restrictToVerticalAxis]} onDragEnd={(e) => handleDragEnd(e, serviceItems, setServiceItems)}>
-              <SortableContext items={serviceItems.map(i => i.key)} strategy={verticalListSortingStrategy}>
-                <Table
-                  components={{ body: { row: DraggableBodyRow } }}
-                  dataSource={serviceItems}
-                  columns={getServiceItemColumns()}
-                  rowKey="key"
-                  pagination={false}
-                  size="small"
-                  scroll={{ x: 'max-content' }}
-                />
-              </SortableContext>
-            </DndContext>
-          </div>
+                <Divider style={{ margin: '12px 0' }}>
+                  <Space>
+                    <Text strong>Dịch Vụ & Chi Phí Phát Sinh</Text>
+                    <Tag color="blue">{serviceItems.length} dịch vụ</Tag>
+                    {isExportLocked && (
+                      <Tag color="warning" icon={<LockOutlined />}>
+                        Chỉ đọc
+                      </Tag>
+                    )}
+                  </Space>
+                </Divider>
 
-          <Button type="dashed" onClick={handleAddServiceLine} block icon={<PlusOutlined />} style={{ marginBottom: 20 }}>
-            Thêm dịch vụ / chi phí phát sinh
-          </Button>
+                <div
+                  style={{
+                    marginBottom: 16,
+                    border: isExportLocked ? '1px dashed #f59e0b' : '1px solid #e2e8f0',
+                    borderRadius: 8,
+                    overflow: 'hidden',
+                    background: isExportLocked ? '#fcfbf7' : '#fff',
+                  }}
+                >
+                  <div style={{ pointerEvents: isExportLocked ? 'none' : 'auto', opacity: isExportLocked ? 0.85 : 1 }}>
+                    <DndContext sensors={sensors} modifiers={[restrictToVerticalAxis]} onDragEnd={(e) => !isExportLocked && handleDragEnd(e, serviceItems, setServiceItems)}>
+                      <SortableContext items={serviceItems.map(i => i.key)} strategy={verticalListSortingStrategy}>
+                        <Table
+                          components={{ body: { row: DraggableBodyRow } }}
+                          dataSource={serviceItems}
+                          columns={getServiceItemColumns()}
+                          rowKey="key"
+                          pagination={false}
+                          size="small"
+                          scroll={{ x: 'max-content' }}
+                        />
+                      </SortableContext>
+                    </DndContext>
+                  </div>
+                </div>
+
+                <Button
+                  type="dashed"
+                  onClick={handleAddServiceLine}
+                  block
+                  icon={<PlusOutlined />}
+                  disabled={isExportLocked}
+                  style={{ marginBottom: 20, opacity: isExportLocked ? 0.6 : 1 }}
+                >
+                  {isExportLocked ? 'Đã khóa thêm dịch vụ (Đơn hàng đã phát sinh xuất kho)' : 'Thêm dịch vụ / chi phí phát sinh'}
+                </Button>
+              </>
+            )
+          })()}
 
           <Card size="small" style={{ background: '#f8fafc', borderRadius: 8, marginBottom: 16 }}>
             {(() => {
@@ -4138,7 +4634,7 @@ export default function OrderList() {
             </Col>
             <Col xs={24} sm={6}>
               <Form.Item name="validity_days" label="Hiệu lực giá (ngày)">
-                <InputNumber min={1} style={{ width: '100%' }} />
+                <InputNumber min={0} style={{ width: '100%' }} />
               </Form.Item>
             </Col>
             <Col xs={24} sm={6}>
@@ -4272,6 +4768,144 @@ export default function OrderList() {
       >
         {selectedOrder && (
           <div>
+            {/* ── Banner Chuỗi chứng từ liên kết trong Drawer ── */}
+            {(() => {
+              const drawerSteps = getLifecycleSteps(selectedOrder)
+              if (drawerSteps.length === 0) return null
+              return (
+                <div
+                  style={{
+                    marginBottom: 16,
+                    padding: '14px 18px',
+                    background: '#ffffff',
+                    borderRadius: 10,
+                    border: '1px solid #e2e8f0',
+                    boxShadow: '0 2px 6px rgba(0,0,0,0.04)',
+                  }}
+                >
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12, flexWrap: 'wrap', gap: 6 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                      <div
+                        style={{
+                          width: 28,
+                          height: 28,
+                          borderRadius: 6,
+                          background: 'rgba(37, 99, 235, 0.1)',
+                          color: '#2563eb',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          fontSize: 14,
+                        }}
+                      >
+                        <LinkOutlined />
+                      </div>
+                      <div>
+                        <div style={{ fontSize: 13, fontWeight: 700, color: '#0f172a', textTransform: 'uppercase', letterSpacing: '0.4px' }}>
+                          Chuỗi chứng từ liên kết
+                        </div>
+                        <div style={{ fontSize: 11, color: '#64748b' }}>Hành trình vòng đời từ Báo giá tới Bảo hành của đơn hàng</div>
+                      </div>
+                    </div>
+                    <span style={{ fontSize: 11, color: '#64748b' }}>Bấm vào thẻ để mở nhanh tại module tương ứng</span>
+                  </div>
+
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: 10 }}>
+                    {drawerSteps.map((st) => {
+                      const hasDoc = !!st.doc
+                      const statusType = st.getStatusType(st.doc?.status)
+                      const theme = getStepBadgeTheme(statusType, hasDoc)
+
+                      return (
+                        <div
+                          key={st.key}
+                          onClick={() => {
+                            if (hasDoc && st.doc.code) {
+                              navigate(`${st.route}?search=${encodeURIComponent(st.doc.code)}`)
+                            }
+                          }}
+                          style={{
+                            padding: '10px 12px',
+                            borderRadius: 8,
+                            background: hasDoc ? '#ffffff' : '#f8fafc',
+                            border: `1px solid ${hasDoc ? theme.border : '#e2e8f0'}`,
+                            cursor: hasDoc ? 'pointer' : 'default',
+                            transition: 'all 0.18s ease',
+                            display: 'flex',
+                            flexDirection: 'column',
+                            gap: 4,
+                            boxShadow: hasDoc ? '0 1px 3px rgba(0,0,0,0.03)' : 'none',
+                          }}
+                          onMouseEnter={(e) => {
+                            if (hasDoc) {
+                              e.currentTarget.style.borderColor = '#2563eb'
+                              e.currentTarget.style.transform = 'translateY(-2px)'
+                              e.currentTarget.style.boxShadow = '0 4px 10px rgba(37, 99, 235, 0.12)'
+                            }
+                          }}
+                          onMouseLeave={(e) => {
+                            if (hasDoc) {
+                              e.currentTarget.style.borderColor = theme.border
+                              e.currentTarget.style.transform = 'none'
+                              e.currentTarget.style.boxShadow = '0 1px 3px rgba(0,0,0,0.03)'
+                            }
+                          }}
+                        >
+                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                            <span style={{ fontSize: 12, color: '#64748b', fontWeight: 600 }}>{st.label}</span>
+                            <span
+                              style={{
+                                width: 20,
+                                height: 20,
+                                borderRadius: '50%',
+                                background: theme.bg,
+                                color: theme.color,
+                                border: `1px solid ${theme.border}`,
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                fontSize: 10,
+                                fontWeight: 700,
+                              }}
+                            >
+                              {st.short}
+                            </span>
+                          </div>
+                          {hasDoc ? (
+                            <>
+                              <span style={{ fontSize: 13, fontWeight: 700, color: '#0f172a' }}>
+                                {st.doc.code}
+                              </span>
+                              <Tag
+                                style={{
+                                  alignSelf: 'flex-start',
+                                  margin: 0,
+                                  fontSize: 10,
+                                  lineHeight: '16px',
+                                  padding: '1px 6px',
+                                  background: theme.bg,
+                                  color: theme.color,
+                                  borderColor: theme.border,
+                                  borderRadius: 4,
+                                  fontWeight: 600,
+                                }}
+                              >
+                                {st.doc.status_display || st.doc.status}
+                              </Tag>
+                            </>
+                          ) : (
+                            <span style={{ fontSize: 11, color: '#94a3b8', fontStyle: 'italic', marginTop: 2 }}>
+                              Chưa phát sinh
+                            </span>
+                          )}
+                        </div>
+                      )
+                    })}
+                  </div>
+                </div>
+              )
+            })()}
+
             <div style={{ marginBottom: 24, border: '1px solid #e2e8f0', borderRadius: 8, padding: 16, background: '#fff', boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)' }}>
               <QuotationPrintView
                 quotation={selectedOrder}
