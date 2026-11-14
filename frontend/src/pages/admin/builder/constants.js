@@ -41,7 +41,7 @@ export const DEFAULT_BLOCK_PROPS = {
   [BLOCK_TYPES.TOTALS]: { showSubtotal: true, showVAT: true, showDiscount: true, showShippingFee: true, showInstallationFee: true, showWords: true, showBorder: true, backgroundColor: '#f8fafc' },
   [BLOCK_TYPES.TERMS]: { content: '1. Báo giá có hiệu lực trong vòng 15 ngày.\n2. Thanh toán: Tạm ứng 50% ngay sau khi xác nhận.' },
   [BLOCK_TYPES.SIGNATURES]: { columns: 2, titles: ['ĐẠI DIỆN KHÁCH HÀNG', 'ĐẠI DIỆN CÔNG TY'], signatures: ['{{customer_signature}}\n\n\n\n\n<b>{{customer_name}}</b>', '{{company_signature}}\n{{company_stamp}}\n\n<b>{{director_name}}</b>'] },
-  [BLOCK_TYPES.PAYMENT_PROGRESS]: { title: 'Tiến độ thanh toán:', showPaidAndDebt: true, showDeliveryTime: true, showValidity: true },
+  [BLOCK_TYPES.PAYMENT_PROGRESS]: { title: 'Tiến độ thanh toán:', showPaidAndDebt: true, showDeliveryTime: true, showInstallationDate: true, showWarranty: true, showValidity: true },
   [BLOCK_TYPES.DIVIDER]: { style: 'solid', thickness: 1, color: '#e8e8e8', margin: 16 },
   [BLOCK_TYPES.LAYOUT_ROW]: { columns: 2, ratios: [50, 50], gap: 16 },
   [BLOCK_TYPES.SERVICE_TABLE]: { columns: ['stt', 'name', 'symbol', 'specs', 'qty', 'unit', 'price', 'total'], showHeader: true, tableTitle: 'DỊCH VỤ & CHI PHÍ PHÁT SINH:', showBorder: true, enableProductImage: true, enableProductName: true }

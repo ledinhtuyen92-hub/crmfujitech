@@ -68,8 +68,17 @@ export default function QuotationPrintView({ quotation, type = 'quotation', docu
   const companyInfo = quotation.company_info || effectiveTemplate?.company_info || null;
   const customerInfo = quotation.customer_info || {};
   
+  const deliveryTime = quotation.delivery_time !== undefined && quotation.delivery_time !== null ? quotation.delivery_time : (quotation.custom_data?.delivery_time || '');
+  const installationDate = quotation.installation_date || quotation.custom_data?.installation_date || null;
+  const warrantyMonths = quotation.warranty_months !== undefined && quotation.warranty_months !== null && quotation.warranty_months !== '' ? quotation.warranty_months : (quotation.custom_data?.warranty_months ?? null);
+  const validityDays = quotation.validity_days !== undefined && quotation.validity_days !== null && quotation.validity_days !== '' ? quotation.validity_days : (quotation.custom_data?.validity_days ?? null);
+
   const quotationData = {
     ...quotation,
+    delivery_time: deliveryTime,
+    installation_date: installationDate,
+    warranty_months: warrantyMonths,
+    validity_days: validityDays,
     // Items (sản phẩm)
     items: (quotation.items || []).sort((a, b) => a.id - b.id).map(item => {
       const prodObj = products.find(p => p.id === item.product);

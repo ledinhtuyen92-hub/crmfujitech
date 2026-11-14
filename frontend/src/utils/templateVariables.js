@@ -32,6 +32,8 @@ export const TEMPLATE_VARIABLES = [
   { tag: '{{quotation_notes}}', label: 'Ghi chú & Điều khoản chung', type: 'quotation' },
   { tag: '{{delivery_date}}', label: 'Ngày giao hàng/lắp đặt', type: 'quotation' },
   { tag: '{{delivery_time}}', label: 'Thời gian giao/thi công', type: 'quotation' },
+  { tag: '{{warranty_months}}', label: 'Thời hạn bảo hành', type: 'quotation' },
+  { tag: '{{validity_days}}', label: 'Hiệu lực giá (ngày)', type: 'quotation' },
   { tag: '{{total_amount}}', label: 'Tổng tiền', type: 'quotation' },
 ];
 
@@ -76,6 +78,8 @@ export const parseVariables = (text, quotationData = {}, companyData = {}, total
     '{{current_date}}': new Date().toLocaleDateString('vi-VN'),
     '{{quotation_notes}}': quotationData?.notes || '',
     '{{delivery_time}}': quotationData?.delivery_time || '',
+    '{{warranty_months}}': quotationData?.warranty_months ? (String(quotationData.warranty_months).includes('tháng') ? String(quotationData.warranty_months) : `${quotationData.warranty_months} tháng`) : '',
+    '{{validity_days}}': quotationData?.validity_days ? `${quotationData.validity_days} ngày` : '',
     '{{delivery_date}}': quotationData?.installation_date ? new Date(quotationData.installation_date).toLocaleDateString('vi-VN') : '',
     '{{total_amount}}': (() => {
       const total = quotationData?.total_amount || totals?.total || 0;

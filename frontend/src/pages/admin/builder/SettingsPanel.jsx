@@ -476,6 +476,9 @@ export default function SettingsPanel({ block, onChange, categories = [] }) {
             <Form.Item name="showDeliveryTime" label="Hiển thị thời gian giao hàng" valuePropName="checked">
               <Switch />
             </Form.Item>
+            <Form.Item name="showWarranty" label="Hiển thị thời hạn bảo hành" valuePropName="checked">
+              <Switch />
+            </Form.Item>
             <Form.Item name="showValidity" label="Hiển thị hiệu lực báo giá" valuePropName="checked">
               <Switch />
             </Form.Item>

@@ -2789,9 +2789,9 @@ export default function OrderList() {
         discount_total: Number(order.discount_total || 0),
         shipping_fee: Number(order.shipping_fee || 0),
         installation_fee: Number(order.installation_fee || 0),
-        delivery_time: order.delivery_time || '9 - 10 ngày',
-        warranty_months: order.warranty_months !== undefined ? order.warranty_months : 36,
-        validity_days: order.validity_days || 30,
+        delivery_time: order.delivery_time !== undefined && order.delivery_time !== null ? order.delivery_time : '',
+        warranty_months: order.warranty_months !== undefined && order.warranty_months !== null && String(order.warranty_months).trim() !== '' && Number(order.warranty_months) > 0 ? Number(order.warranty_months) : null,
+        validity_days: order.validity_days !== undefined && order.validity_days !== null && String(order.validity_days).trim() !== '' && Number(order.validity_days) > 0 ? Number(order.validity_days) : null,
         payment_terms_schedule: order.payment_terms_schedule && order.payment_terms_schedule.length > 0 
           ? order.payment_terms_schedule 
           : [{ title: 'Thanh toán đợt 1', percentage: 100, type: 'deposit' }],
@@ -2932,9 +2932,9 @@ export default function OrderList() {
         notes: values.notes || '',
         shipping_fee: Number(values.shipping_fee || 0),
         installation_fee: Number(values.installation_fee) || 0,
-        delivery_time: values.delivery_time || '',
-        warranty_months: values.warranty_months !== undefined && values.warranty_months !== null && values.warranty_months !== '' ? Number(values.warranty_months) : 36,
-        validity_days: values.validity_days !== undefined && values.validity_days !== null && values.validity_days !== '' ? Number(values.validity_days) : 30,
+        delivery_time: values.delivery_time ? String(values.delivery_time).trim() : '',
+        warranty_months: values.warranty_months !== undefined && values.warranty_months !== null && String(values.warranty_months).trim() !== '' ? Number(values.warranty_months) : 0,
+        validity_days: values.validity_days !== undefined && values.validity_days !== null && String(values.validity_days).trim() !== '' ? Number(values.validity_days) : 0,
         payment_terms_schedule: values.payment_terms_schedule || [],
         subtotal: subtotal,
         vat_rate: Number(values.vat_rate || 0),
@@ -2943,6 +2943,9 @@ export default function OrderList() {
         total_amount: Math.max(0, totalAmt),
         custom_data: {
           ...(editingOrder?.custom_data || {}),
+          delivery_time: values.delivery_time ? String(values.delivery_time).trim() : '',
+          warranty_months: values.warranty_months !== undefined && values.warranty_months !== null && String(values.warranty_months).trim() !== '' ? Number(values.warranty_months) : 0,
+          validity_days: values.validity_days !== undefined && values.validity_days !== null && String(values.validity_days).trim() !== '' ? Number(values.validity_days) : 0,
           ...(templateSnapshot ? { template_snapshot: templateSnapshot } : {}),
         },
         payment_target: values.payment_target || null,
@@ -4631,7 +4634,7 @@ export default function OrderList() {
             </Col>
             <Col xs={24} sm={6}>
               <Form.Item name="validity_days" label="Hiệu lực giá (ngày)">
-                <InputNumber min={1} style={{ width: '100%' }} />
+                <InputNumber min={0} style={{ width: '100%' }} />
               </Form.Item>
             </Col>
             <Col xs={24} sm={6}>

@@ -462,14 +462,24 @@ export default function BlockRenderer({ block, allBlocks, isActive, onSelect, on
                 Ngày báo giá: <strong>{new Date().toLocaleDateString('vi-VN')}</strong>
               </div>
             )}
-            {block.props.showDeliveryTime && (
+            {block.props.showDeliveryTime !== false && (
               <div style={{ fontSize: 12, color: '#334155', marginBottom: 4 }}>
-                Thời gian giao hàng / thi công: <strong>9 - 10 ngày</strong>
+                Thời gian giao hàng: <strong>9 - 10 ngày</strong>
               </div>
             )}
-            {block.props.showValidity && (
+            {block.props.showInstallationDate && (
+              <div style={{ fontSize: 12, color: '#334155', marginBottom: 4 }}>
+                Ngày giao hàng dự kiến: <strong>15/11/2026</strong>
+              </div>
+            )}
+            {block.props.showWarranty !== false && (
+              <div style={{ fontSize: 12, color: '#334155', marginBottom: 4 }}>
+                Thời gian bảo hành: <strong>36 tháng</strong>
+              </div>
+            )}
+            {block.props.showValidity !== false && (
               <div style={{ fontSize: 12, color: '#334155' }}>
-                Báo giá có giá trị trong vòng: <strong>30 ngày</strong>
+                Báo giá có giá trị trong vòng: <strong>15 ngày</strong>
               </div>
             )}
           </div>
