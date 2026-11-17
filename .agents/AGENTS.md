@@ -68,6 +68,6 @@ ull hoặc chuỗi rỗng ''), tuyệt đối KHÔNG dùng dấu gạch ngang (�
 - Nếu phát hiện logic luồng đi chưa hợp lý, hoặc thiếu Validate bảo vệ dữ liệu (Frontend/Backend), AI phải CHỦ ĐỘNG báo lại cho người dùng và ĐƯA RA PHƯƠNG ÁN XỬ LÝ tốt nhất (như thêm validator, thêm try-catch, bổ sung trường dữ liệu).
 - **Mục tiêu:** Không chỉ code đúng theo yêu cầu, mà còn phải tư vấn và bọc lót các lỗ hổng trải nghiệm/bảo mật.
 
-## 12. H?n ch? s? d?ng Emoji tr�n Giao di?n (Ant Design Icons)
-- **Quy t?c:** Tuy?t d?i KH�NG s? d?ng c�c k� t? Emoji (nhu ??, ??, ?...) tr�n giao di?n Frontend v� d? g�y ra l?i font ch? (mojibake ho?c bi?n th�nh � vu�ng) tr�n m?t s? h? di?u h�nh/tr�nh duy?t cu.
-- Thay v�o d�, LU�N LU�N s? d?ng b? icon chu?n c?a Ant Design (@ant-design/icons) nhu <RobotOutlined />, <WarningOutlined />, <CloseCircleOutlined />... d? d?m b?o t�nh d?ng b? v� chuy�n nghi?p cho UI.
+## 12. Hạn chế sử dụng Emoji trên Giao diện (Ant Design Icons)
+- **Quy tắc:** Tuyệt đối KHÔNG sử dụng các ký tự Emoji (như robot, cảnh báo, dấu tích...) trên giao diện Frontend vì dễ gây ra lỗi font chữ (mojibake hoặc biến thành ô vuông) trên một số hệ điều hành/trình duyệt cũ.
+- Thay vào đó, LUÔN LUÔN sử dụng bộ icon chuẩn của Ant Design (@ant-design/icons) như <RobotOutlined />, <WarningOutlined />, <CloseCircleOutlined />... để đảm bảo tính đồng bộ và chuyên nghiệp cho UI.
