@@ -616,7 +616,7 @@ class InventoryTransactionViewSet(TenantQuerySetMixin, viewsets.ModelViewSet):
         "partial_update": "inventory.adjust",
         "destroy": "inventory.delete_history",
         "delete_by_code": "inventory.delete_history",
-        "cancel_by_code": "inventory.approve_export",
+        # cancel_by_code tự xử lý kiểm tra quyền nghiêm ngặt theo role (chặn cả Admin/SuperAdmin nếu role không có quyền)
     }
 
     def list(self, request, *args, **kwargs):
@@ -1018,28 +1018,65 @@ class InventoryTransactionViewSet(TenantQuerySetMixin, viewsets.ModelViewSet):
         - Hủy ApprovalRequest liên quan nếu có.
         """
         user = request.user
-        has_approve_perm = user.is_superuser or getattr(user, 'is_company_admin', False) or (user.role and user.role.permissions.filter(code="inventory.approve_export").exists())
-        if not has_approve_perm:
-            return Response({"detail": "Bạn không có quyền hủy lệnh xuất kho."}, status=status.HTTP_403_FORBIDDEN)
+        # Kể cả SuperAdmin hay Quản trị viên công ty cũng không mặc định có quyền này,
+        # CHỈ nhân sự có vai trò (Role) được phân quyền cụ thể 'Duyệt lệnh xuất kho' mới được thực hiện.
+        has_role_cancel_perm = bool(user.role and user.role.permissions.filter(code="inventory.approve_export").exists())
+        if not has_role_cancel_perm:
+            return Response(
+                {"detail": "Chỉ nhân sự có vai trò được phân quyền 'Duyệt lệnh xuất kho' mới được thực hiện thao tác hủy phiếu xuất kho."},
+                status=status.HTTP_403_FORBIDDEN
+            )
 
         code = request.data.get("code") or request.query_params.get("code")
         if not code:
             return Response({"detail": "Thiếu mã phiếu (transaction_code)."}, status=status.HTTP_400_BAD_REQUEST)
+
+        reason = (request.data.get("reason") or request.data.get("cancel_reason") or "").strip()
 
         qs = self.get_queryset().filter(transaction_code=code, type=InventoryTransaction.TYPE_EXPORT)
         if not qs.exists():
             return Response({"detail": "Không tìm thấy lệnh xuất kho nào với mã này."}, status=status.HTTP_404_NOT_FOUND)
 
         txns_list = list(qs)
+        has_completed = any(t.status == InventoryTransaction.STATUS_COMPLETED for t in txns_list)
+        if has_completed and not reason:
+            return Response({"detail": "Vui lòng nhập lý do hủy phiếu xuất kho."}, status=status.HTTP_400_BAD_REQUEST)
+
+        from django.utils import timezone
+        user_name = getattr(user, 'full_name', '') or user.get_full_name() or user.username
+        now_str = timezone.now().strftime('%d/%m/%Y %H:%M')
+
         for txn in txns_list:
             if txn.status == InventoryTransaction.STATUS_COMPLETED:
                 revert_transaction_stock(txn)
             txn.status = InventoryTransaction.STATUS_REJECTED
-            txn.save(update_fields=["status"])
+            cancel_str = f"[Đã hủy bởi {user_name} lúc {now_str}: {reason}]" if reason else f"[Đã hủy bởi {user_name} lúc {now_str}]"
+            txn.note = f"{txn.note}\n{cancel_str}".strip() if txn.note else cancel_str
+            txn.save(update_fields=["status", "note"])
 
         first_txn = qs.first()
         if first_txn and first_txn.reference_order:
             order = first_txn.reference_order
+            # Ghi nhận lịch sử kiểm toán vào đơn hàng liên quan
+            try:
+                order_custom = dict(order.custom_data or {})
+                order_history = list(order_custom.get("edit_history") or [])
+                order_history.append({
+                    "timestamp": now_str,
+                    "user_name": user_name,
+                    "reason": f"Hủy phiếu xuất kho {code}: {reason}",
+                    "diff_summary": f"Đã hoàn trả {len(txns_list)} sản phẩm về kho ban đầu",
+                })
+                order_custom["edit_history"] = order_history
+                order_custom["last_edit_reason"] = f"Hủy phiếu xuất kho {code}: {reason}"
+                order_custom["last_edit_diff"] = f"Đã hoàn trả {len(txns_list)} sản phẩm về kho ban đầu"
+                order_custom["last_edit_user"] = user_name
+                order_custom["last_edit_time"] = now_str
+                order.custom_data = order_custom
+                order.save(update_fields=["custom_data"])
+            except Exception:
+                pass
+
             try:
                 from approvals.models import ApprovalRequest
                 from django.contrib.contenttypes.models import ContentType

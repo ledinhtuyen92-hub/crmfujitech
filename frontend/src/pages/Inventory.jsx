@@ -18,12 +18,13 @@ import {
   TagOutlined,
   UploadOutlined,
   WarningOutlined,
-  TableOutlined, SettingOutlined, RollbackOutlined } from '@ant-design/icons'
+  TableOutlined, SettingOutlined, RollbackOutlined, MoreOutlined } from '@ant-design/icons'
 import {
   Alert,
   Button,
   Card,
   Col,
+  Dropdown,
   Form,
   Input,
   InputNumber,
@@ -36,6 +37,7 @@ import {
   Table,
   Tabs,
   Tag,
+  Tooltip,
   Typography,
   message,
   List,
@@ -61,6 +63,251 @@ import SortableColumnOption from '../components/SortableColumnOption';
 const { Title, Text } = Typography
 const { Option } = Select
 const { TextArea } = Input
+
+// Trích xuất thông tin người hủy, thời gian và lý do hủy từ chuỗi ghi chú kiểm toán
+function parseCancelNote(note) {
+  if (!note || typeof note !== 'string') return null
+  const match = note.match(/\[Đã hủy bởi\s+([^\]]+?)\s+lúc\s+([^\]:]+?)(?::\s*([^\]]+?))?\]/)
+  if (!match) {
+    if (note.includes('[Đã hủy bởi')) {
+      return {
+        user: '',
+        time: '',
+        reason: note.replace(/\[|\]/g, '').trim(),
+      }
+    }
+    return null
+  }
+  return {
+    user: (match[1] || '').trim(),
+    time: (match[2] || '').trim(),
+    reason: (match[3] || '').trim(),
+  }
+}
+
+// Lấy ghi chú gốc loại bỏ chuỗi lưu vết hủy
+function getCleanNote(note) {
+  if (!note || typeof note !== 'string') return ''
+  return note.replace(/\n?\[Đã hủy bởi\s+.*?\]/g, '').trim()
+}
+
+// Tooltip hiển thị chi tiết lý do hủy phiếu xuất kho theo phong cách chuẩn như OrderList
+function renderCancelTooltip(cancelInfo) {
+  if (!cancelInfo) return null
+  return (
+    <div style={{ maxWidth: 360, padding: '4px 2px', lineHeight: 1.5 }}>
+      <div
+        style={{
+          fontWeight: 600,
+          color: '#f87171',
+          marginBottom: 6,
+          display: 'flex',
+          alignItems: 'center',
+          gap: 6,
+          borderBottom: '1px solid rgba(255,255,255,0.2)',
+          paddingBottom: 4,
+        }}
+      >
+        <RollbackOutlined /> Thông tin hủy phiếu xuất kho
+      </div>
+      {cancelInfo.user && (
+        <div style={{ fontSize: 12, marginBottom: 4 }}>
+          <span style={{ color: '#94a3b8' }}>Người hủy:</span>{' '}
+          <strong style={{ color: '#f8fafc' }}>{cancelInfo.user}</strong>{' '}
+          {cancelInfo.time && <span style={{ color: '#cbd5e1', fontSize: 11 }}>({cancelInfo.time})</span>}
+        </div>
+      )}
+      <div style={{ fontSize: 12, marginBottom: 4 }}>
+        <span style={{ color: '#94a3b8' }}>Lý do hủy:</span>{' '}
+        <span style={{ color: '#fbbf24', fontWeight: 600 }}>
+          "{cancelInfo.reason || 'Không có lý do'}"
+        </span>
+      </div>
+      <div
+        style={{
+          fontSize: 12,
+          color: '#f1f5f9',
+          marginTop: 6,
+          background: 'rgba(255,255,255,0.12)',
+          padding: '6px 8px',
+          borderRadius: 6,
+          borderLeft: '3px solid #f87171',
+        }}
+      >
+        <div style={{ color: '#f87171', fontWeight: 600, fontSize: 11, marginBottom: 2 }}>Trạng thái kho:</div>
+        <div>Đã tự động hoàn trả toàn bộ số lượng hàng hóa về kho ban đầu.</div>
+      </div>
+    </div>
+  )
+}
+
+// Component Modal Hủy xuất kho độc lập — cô lập state tránh re-render toàn bộ trang khi gõ phím
+function CancelExportModal({
+  open,
+  txn,
+  loading,
+  onClose,
+  onConfirm,
+  products,
+  isMobile,
+}) {
+  const [reason, setReason] = useState('')
+
+  useEffect(() => {
+    if (open) {
+      setReason('')
+    }
+  }, [open])
+
+  const handleOk = () => {
+    const trimmed = reason.trim()
+    if (!trimmed) return
+    onConfirm(trimmed)
+  }
+
+  if (!open || !txn) return null
+
+  const items = txn.items || [txn]
+
+  return (
+    <Modal
+      title={
+        <Space>
+          <ExclamationCircleOutlined style={{ color: '#ff4d4f', fontSize: 18 }} />
+          <span style={{ fontSize: 16, fontWeight: 600 }}>Xác nhận Hủy phiếu xuất kho</span>
+        </Space>
+      }
+      open={open}
+      onCancel={() => {
+        if (!loading) onClose()
+      }}
+      footer={[
+        <Button key="cancel" onClick={onClose} disabled={loading}>
+          Đóng
+        </Button>,
+        <Button
+          key="submit"
+          type="primary"
+          danger
+          icon={<RollbackOutlined />}
+          loading={loading}
+          disabled={!reason.trim()}
+          onClick={handleOk}
+        >
+          Xác nhận Hủy & Hoàn tồn
+        </Button>,
+      ]}
+      width={isMobile ? '95%' : 560}
+      centered
+      destroyOnClose
+    >
+      <div style={{ marginTop: 12 }}>
+        <Alert
+          type="error"
+          showIcon
+          message="Hành động có rủi ro cao"
+          description="Hủy phiếu xuất kho này sẽ TỰ ĐỘNG HOÀN TRẢ toàn bộ số lượng hàng hóa về kho ban đầu và mở khóa đơn hàng để cho phép chỉnh sửa."
+          style={{ marginBottom: 16 }}
+        />
+
+        <div style={{ background: '#f8fafc', padding: '12px 16px', borderRadius: 8, border: '1px solid #e2e8f0', marginBottom: 16 }}>
+          <Row gutter={[12, 8]}>
+            <Col xs={24} sm={12}>
+              <Text type="secondary">Mã phiếu xuất:</Text>{' '}
+              <Tag color="purple" style={{ fontWeight: 600 }}>{txn.transaction_code}</Tag>
+            </Col>
+            <Col xs={24} sm={12}>
+              <Text type="secondary">Đơn hàng liên kết:</Text>{' '}
+              {txn.reference_order_number ? (
+                <Tag color="blue" style={{ fontWeight: 600 }}>{txn.reference_order_number}</Tag>
+              ) : (
+                <Text type="secondary">—</Text>
+              )}
+            </Col>
+            <Col xs={24} sm={24}>
+              <Text type="secondary">Kho xuất gốc:</Text>{' '}
+              <Text strong>{txn.warehouse_name || 'Kho mặc định'}</Text>
+            </Col>
+          </Row>
+        </div>
+
+        {/* Danh sách hàng sẽ được hoàn kho */}
+        <div style={{ marginBottom: 16 }}>
+          <div style={{ marginBottom: 8, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <Text strong style={{ color: '#0f172a' }}>Danh sách hàng hóa hoàn trả về kho:</Text>
+            <Tag color="orange">{items.length} sản phẩm</Tag>
+          </div>
+          <div style={{ maxHeight: 180, overflowY: 'auto', border: '1px solid #e2e8f0', borderRadius: 8 }}>
+            <Table
+              dataSource={items}
+              rowKey="id"
+              pagination={false}
+              size="small"
+              columns={[
+                {
+                  title: 'Sản phẩm',
+                  dataIndex: 'product_name',
+                  key: 'product_name',
+                  render: (_, item) => {
+                    const prod = (products || []).find(p => p.id === item.product)
+                    return (
+                      <div>
+                        <Text strong style={{ fontSize: 13 }}>{item.custom_product_name || item.product_name || prod?.name || `SP #${item.product}`}</Text>
+                        {(item.product_sku || prod?.sku) && (
+                          <div style={{ fontSize: 11, color: '#64748b' }}>SKU: {item.product_sku || prod?.sku}</div>
+                        )}
+                      </div>
+                    )
+                  }
+                },
+                {
+                  title: 'Số lượng hoàn',
+                  dataIndex: 'quantity',
+                  key: 'quantity',
+                  width: 130,
+                  align: 'right',
+                  render: (qty, item) => {
+                    const prod = (products || []).find(p => p.id === item.product)
+                    return (
+                      <Tag color="green" style={{ fontWeight: 600, margin: 0 }}>
+                        +{qty} {prod?.unit || 'cái'}
+                      </Tag>
+                    )
+                  }
+                }
+              ]}
+            />
+          </div>
+        </div>
+
+        {/* Form nhập lý do */}
+        <Form layout="vertical">
+          <Form.Item
+            label={
+              <Space>
+                <Text strong>Lý do hủy phiếu xuất kho</Text>
+                <Text type="danger">*</Text>
+              </Space>
+            }
+            required
+            extra="Bắt buộc nhập lý do hủy để lưu vết kiểm toán hệ thống."
+            style={{ marginBottom: 0 }}
+          >
+            <TextArea
+              rows={3}
+              placeholder="Ví dụ: Khách đổi kích thước / Sửa thông tin đơn hàng / Xuất nhầm kho..."
+              value={reason}
+              onChange={(e) => setReason(e.target.value)}
+              maxLength={500}
+              showCount
+              autoFocus
+            />
+          </Form.Item>
+        </Form>
+      </div>
+    </Modal>
+  )
+}
 
 export default function Inventory() {
   const { isCompanyAdmin, hasPermission, checkMaintenance, user, companySettings, refreshSettings } = useAuth()
@@ -312,6 +559,11 @@ export default function Inventory() {
   const [deleteSingleConfirmText, setDeleteSingleConfirmText] = useState('')
 
   const [selectedTxnForPrint, setSelectedTxnForPrint] = useState(null)
+
+  // Hủy phiếu xuất kho & hoàn tồn kho an toàn
+  const [cancelModalVisible, setCancelModalVisible] = useState(false)
+  const [selectedCancelTxn, setSelectedCancelTxn] = useState(null)
+  const [cancelLoading, setCancelLoading] = useState(false)
 
   // Recreate production order modal
   const [recreateMOTxn, setRecreateMOTxn] = useState(null)
@@ -701,17 +953,41 @@ export default function Inventory() {
     }
   }
 
-  const handleCancelCompletedExport = async (txn) => {
+  const handleOpenCancelModal = (txn) => {
+    if (checkMaintenance && checkMaintenance()) return
+    const hasRoleCancelPerm = (user?.permissions || []).includes('inventory.approve_export')
+    if (!hasRoleCancelPerm) {
+      messageApi.error('Chỉ nhân sự được phân quyền vai trò "Duyệt lệnh xuất kho" mới có quyền hủy phiếu xuất kho.')
+      return
+    }
+    setSelectedCancelTxn(txn)
+    setCancelModalVisible(true)
+  }
+
+  const handleConfirmCancelCompletedExport = async (trimmedReason) => {
+    if (!selectedCancelTxn) return
+    if (!trimmedReason) {
+      messageApi.error('Vui lòng nhập lý do hủy phiếu xuất kho.')
+      return
+    }
+    setCancelLoading(true)
     try {
-      const code = txn.transaction_code
-      await api.post('/inventory/transactions/cancel-by-code/', { code })
+      const code = selectedCancelTxn.transaction_code
+      await api.post('/inventory/transactions/cancel-by-code/', {
+        code,
+        reason: trimmedReason,
+      })
       messageApi.success(`Đã hủy phiếu xuất kho ${code} và hoàn trả tồn kho thành công!`)
+      setCancelModalVisible(false)
+      setSelectedCancelTxn(null)
       fetchTransactions()
       fetchStockLevels()
       window.dispatchEvent(new Event('refresh-notifications'))
     } catch (err) {
-      const msg = err.response?.data?.detail || 'Hủy phiếu xuất kho thất bại.'
+      const msg = err.response?.data?.detail || err.response?.data?.message || 'Hủy phiếu xuất kho thất bại.'
       messageApi.error(msg)
+    } finally {
+      setCancelLoading(false)
     }
   }
 
@@ -1400,10 +1676,39 @@ export default function Inventory() {
 
   const renderTxnActions = (r) => {
     const canApprove = isCompanyAdmin || hasPermission('inventory.approve_export')
+    // Chỉ nhân sự được phân quyền vai trò 'inventory.approve_export' mới có quyền hủy phiếu xuất
+    // (Kể cả SuperAdmin hoặc Quản trị viên công ty nếu không có quyền này trong vai trò cũng không được dùng)
+    const canCancelExport = (user?.permissions || []).includes('inventory.approve_export')
     const isPendingExport = r.status === 'pending' && r.type === 'export'
-    
+    const isCompletedExport = r.status === 'completed' && r.type === 'export'
+
+    const moreMenuItems = []
+
+    if (canCancelExport && isCompletedExport) {
+      moreMenuItems.push({
+        key: 'cancel_export',
+        danger: true,
+        icon: <RollbackOutlined />,
+        label: 'Hủy phiếu xuất & Hoàn kho',
+        onClick: () => handleOpenCancelModal(r),
+      })
+    }
+
+    if (hasPermission('inventory.delete_history')) {
+      if (moreMenuItems.length > 0) {
+        moreMenuItems.push({ key: 'divider_delete', type: 'divider' })
+      }
+      moreMenuItems.push({
+        key: 'delete_txn',
+        danger: true,
+        icon: <DeleteOutlined />,
+        label: 'Xóa giao dịch',
+        onClick: () => handleDeleteSingleTxnClick(r),
+      })
+    }
+
     return (
-      <Space wrap size={8}>
+      <Space wrap size={6} align="center">
         {canApprove && isPendingExport && (
           <Button
             type="primary"
@@ -1425,43 +1730,21 @@ export default function Inventory() {
             <Button danger size="small" icon={<CloseCircleOutlined />} title="Từ chối" />
           </Popconfirm>
         )}
-        {canApprove && r.status === 'completed' && r.type === 'export' && (
-          <Popconfirm
-            title="Hủy phiếu xuất kho?"
-            description={
-              <div style={{ maxWidth: 280 }}>
-                Hủy phiếu này sẽ <strong>tự động hoàn trả tồn kho</strong> về đúng kho đã xuất và mở khóa đơn hàng để chỉnh sửa. Bạn có chắc chắn muốn hủy không?
-              </div>
-            }
-            onConfirm={() => handleCancelCompletedExport(r)}
-            okText="Hủy & Hoàn tồn"
-            cancelText="Đóng"
-            okButtonProps={{ danger: true }}
-          >
-            <Button
-              danger
-              size="small"
-              icon={<RollbackOutlined />}
-              title="Hủy phiếu xuất kho & hoàn trả tồn kho"
-            >
-              Hủy xuất
-            </Button>
-          </Popconfirm>
-        )}
         <Button
           type="text"
           icon={<PrinterOutlined />}
           onClick={() => handlePrintTxn(r)}
           title="Thông tin chi tiết"
         />
-        {hasPermission('inventory.delete_history') && (
-          <Button
-            type="text"
-            danger
-            icon={<DeleteOutlined />}
-            onClick={() => handleDeleteSingleTxnClick(r)}
-            title="Xoá giao dịch"
-          />
+        {moreMenuItems.length > 0 && (
+          <Dropdown menu={{ items: moreMenuItems }} trigger={['click']} placement="bottomRight">
+            <Button
+              type="text"
+              icon={<MoreOutlined style={{ fontSize: 16 }} />}
+              title="Thao tác khác"
+              style={{ color: '#64748b' }}
+            />
+          </Dropdown>
         )}
       </Space>
     )
@@ -1491,7 +1774,25 @@ export default function Inventory() {
       key: 'status',
       render: (val, r) => {
         if (r.status === 'pending') return <Tag color="warning">{val || 'Chờ duyệt'}</Tag>
-        if (r.status === 'rejected') return <Tag color="default">{val || 'Đã hủy'}</Tag>
+        if (r.status === 'rejected') {
+          const cancelInfo = parseCancelNote(r.note)
+          return (
+            <Space direction="vertical" size={2}>
+              <Tag color="default">{val || 'Đã hủy'}</Tag>
+              {cancelInfo && (
+                <Tooltip title={renderCancelTooltip(cancelInfo)} placement="topLeft" overlayStyle={{ maxWidth: 380 }}>
+                  <Tag
+                    color="red"
+                    icon={<RollbackOutlined />}
+                    style={{ fontSize: 10, cursor: 'pointer', margin: 0 }}
+                  >
+                    Đã hoàn kho
+                  </Tag>
+                </Tooltip>
+              )}
+            </Space>
+          )
+        }
         // Phiếu xuất hoàn thành: kiểm tra lệnh SX
         const completedTag = <Tag color="success">{val || 'Hoàn thành'}</Tag>
         if (r.type === 'export' && r.status === 'completed' && r.reference_order && r.has_production_order === false) {
@@ -1612,8 +1913,41 @@ export default function Inventory() {
       title: 'Ghi chú',
       dataIndex: 'note',
       key: 'note',
-      width: 250,
-      render: (v) => <Text type="secondary">{v || '—'}</Text>,
+      width: 260,
+      render: (v) => {
+        const cleanNote = getCleanNote(v)
+        const cancelInfo = parseCancelNote(v)
+
+        if (!cleanNote && !cancelInfo) return <Text type="secondary">—</Text>
+
+        return (
+          <Space size={6} align="center" wrap>
+            {cleanNote ? (
+              <Text type="secondary">{cleanNote}</Text>
+            ) : (
+              <Text type="secondary">—</Text>
+            )}
+            {cancelInfo && (
+              <Tooltip title={renderCancelTooltip(cancelInfo)} placement="topLeft" overlayStyle={{ maxWidth: 380 }}>
+                <Tag
+                  color="red"
+                  icon={<HistoryOutlined />}
+                  style={{
+                    fontSize: 10,
+                    cursor: 'pointer',
+                    margin: 0,
+                    padding: '0 6px',
+                    lineHeight: '18px',
+                    borderRadius: 4,
+                  }}
+                >
+                  Lý do hủy
+                </Tag>
+              </Tooltip>
+            )}
+          </Space>
+        )
+      },
     },
     ...(hasFactoryInHistory ? [{
       title: 'Nhà máy sản xuất',
@@ -1865,7 +2199,25 @@ export default function Inventory() {
                       renderItem={(r) => {
                         let statusTag
                         if (r.status === 'pending') statusTag = <Tag color="warning">{r.status_display || 'Chờ duyệt'}</Tag>
-                        else if (r.status === 'rejected') statusTag = <Tag color="default">{r.status_display || 'Đã hủy'}</Tag>
+                        else if (r.status === 'rejected') {
+                          const cancelInfo = parseCancelNote(r.note)
+                          statusTag = (
+                            <Space direction="vertical" size={2} align="end">
+                              <Tag color="default">{r.status_display || 'Đã hủy'}</Tag>
+                              {cancelInfo && (
+                                <Tooltip title={renderCancelTooltip(cancelInfo)} placement="topLeft" overlayStyle={{ maxWidth: 320 }}>
+                                  <Tag
+                                    color="red"
+                                    icon={<RollbackOutlined />}
+                                    style={{ fontSize: 10, cursor: 'pointer', margin: 0 }}
+                                  >
+                                    Đã hoàn kho
+                                  </Tag>
+                                </Tooltip>
+                              )}
+                            </Space>
+                          )
+                        }
                         else {
                           const completedTag = <Tag color="success">{r.status_display || 'Hoàn thành'}</Tag>
                           if (r.type === 'export' && r.status === 'completed' && r.reference_order && r.has_production_order === false) {
@@ -1950,6 +2302,12 @@ export default function Inventory() {
                               <Text type="secondary" style={{ fontSize: 13 }}>Số lượng: </Text>
                               {qtyDisplay}
                             </div>
+                            {getCleanNote(r.note) && (
+                              <div style={{ marginBottom: 12 }}>
+                                <Text type="secondary" style={{ fontSize: 13 }}>Ghi chú: </Text>
+                                <Text style={{ fontSize: 13 }}>{getCleanNote(r.note)}</Text>
+                              </div>
+                            )}
                             <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', flexWrap: 'wrap' }}>
                               {renderTxnActions(r)}
                             </div>
@@ -3196,6 +3554,20 @@ export default function Inventory() {
           </div>
         )}
       </Modal>
+
+      {/* Modal Xác nhận Hủy phiếu xuất kho & Hoàn kho an toàn */}
+      <CancelExportModal
+        open={cancelModalVisible}
+        txn={selectedCancelTxn}
+        loading={cancelLoading}
+        onClose={() => {
+          setCancelModalVisible(false)
+          setSelectedCancelTxn(null)
+        }}
+        onConfirm={handleConfirmCancelCompletedExport}
+        products={products}
+        isMobile={isMobile}
+      />
 
       {/* Hidden Print Container */}
       {selectedTxnForPrint && (

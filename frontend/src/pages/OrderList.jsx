@@ -1,4 +1,4 @@
-import { AlertOutlined, CheckCircleOutlined, ClockCircleOutlined, CloseCircleOutlined, DeleteOutlined, EditOutlined, FileDoneOutlined, FileTextOutlined, MessageOutlined, MinusCircleOutlined, PlusOutlined, PrinterOutlined, SearchOutlined, UploadOutlined, PictureOutlined, CameraOutlined, TableOutlined, ToolOutlined, EnvironmentOutlined , SettingOutlined, ExclamationCircleOutlined, InfoCircleOutlined, InboxOutlined, CarOutlined, SafetyCertificateOutlined, RightOutlined, LinkOutlined, ArrowRightOutlined, LockOutlined } from '@ant-design/icons'
+import { AlertOutlined, CheckCircleOutlined, ClockCircleOutlined, CloseCircleOutlined, DeleteOutlined, EditOutlined, FileDoneOutlined, FileTextOutlined, MessageOutlined, MinusCircleOutlined, PlusOutlined, PrinterOutlined, SearchOutlined, UploadOutlined, PictureOutlined, CameraOutlined, TableOutlined, ToolOutlined, EnvironmentOutlined , SettingOutlined, ExclamationCircleOutlined, InfoCircleOutlined, InboxOutlined, CarOutlined, SafetyCertificateOutlined, RightOutlined, LeftOutlined, UnorderedListOutlined, LinkOutlined, ArrowRightOutlined, LockOutlined, HistoryOutlined, WarningOutlined } from '@ant-design/icons'
 import {
   Alert,
   AutoComplete,
@@ -24,6 +24,7 @@ import {
   Table,
   Tabs,
   Tag,
+  Timeline,
   Tooltip,
   Typography,
   message,
@@ -156,6 +157,287 @@ const statusConfig = {
   rejected: { label: 'Đã từ chối', color: 'error', icon: <CloseCircleOutlined /> },
   cancelled: { label: 'Đã hủy', color: 'default', icon: <MinusCircleOutlined /> },
   completed: { label: 'Hoàn thành', color: 'success', icon: <CheckCircleOutlined /> },
+}
+
+// ── Modal Lịch sử chỉnh sửa đơn hàng (Dòng thời gian Timeline) ─────────────
+function OrderEditHistoryModal({ open, onClose, order, history = [], isMobile }) {
+  if (!open || !order) return null
+
+  // Sắp xếp ngược: Lần sửa mới nhất lên đầu tiên
+  const reversedHistory = [...history].reverse()
+  const total = history.length
+
+  return (
+    <Modal
+      title={
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <div
+            style={{
+              width: 32,
+              height: 32,
+              borderRadius: 8,
+              background: '#fef3c7',
+              color: '#d97706',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              fontSize: 16,
+            }}
+          >
+            <HistoryOutlined />
+          </div>
+          <div>
+            <div style={{ fontSize: 16, fontWeight: 700, color: '#0f172a' }}>
+              Lịch sử chỉnh sửa Đơn hàng {order.order_number}
+            </div>
+            <div style={{ fontSize: 12, color: '#64748b', fontWeight: 400 }}>
+              Ghi nhận toàn bộ {total} lần thay đổi dữ liệu & lý do sửa
+            </div>
+          </div>
+        </div>
+      }
+      open={open}
+      onCancel={onClose}
+      footer={[
+        <Button key="close" type="primary" onClick={onClose} style={{ background: '#d97706', borderColor: '#d97706' }}>
+          Đóng
+        </Button>,
+      ]}
+      width={isMobile ? '95%' : 620}
+      centered
+      destroyOnClose
+    >
+      <div style={{ maxHeight: 460, overflowY: 'auto', padding: '16px 8px 8px 8px' }}>
+        <Timeline
+          items={reversedHistory.map((item, idx) => {
+            const versionNum = total - idx
+            const isLatest = idx === 0
+            return {
+              color: isLatest ? '#d97706' : '#94a3b8',
+              dot: (
+                <div
+                  style={{
+                    width: 22,
+                    height: 22,
+                    borderRadius: '50%',
+                    background: isLatest ? '#d97706' : '#cbd5e1',
+                    color: '#fff',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    fontSize: 11,
+                    fontWeight: 700,
+                  }}
+                >
+                  {versionNum}
+                </div>
+              ),
+              children: (
+                <div
+                  style={{
+                    background: isLatest ? '#fffbeb' : '#f8fafc',
+                    border: `1px solid ${isLatest ? '#fde68a' : '#e2e8f0'}`,
+                    borderRadius: 8,
+                    padding: '12px 14px',
+                    marginBottom: 14,
+                    boxShadow: isLatest ? '0 2px 4px rgba(217,119,6,0.06)' : 'none',
+                  }}
+                >
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6, flexWrap: 'wrap', gap: 6 }}>
+                    <Space size={6}>
+                      <strong style={{ fontSize: 13, color: isLatest ? '#92400e' : '#1e293b' }}>
+                        Lần sửa #{versionNum}
+                      </strong>
+                      {isLatest && (
+                        <Tag color="orange" style={{ margin: 0, fontSize: 10, fontWeight: 600 }}>
+                          Mới nhất
+                        </Tag>
+                      )}
+                    </Space>
+                    <span style={{ fontSize: 11, color: '#64748b' }}>
+                      {item.timestamp} • bởi <strong style={{ color: '#334155' }}>{item.user_name}</strong>
+                    </span>
+                  </div>
+
+                  <div style={{ fontSize: 12.5, marginBottom: 4, lineHeight: 1.5 }}>
+                    <span style={{ color: '#64748b', fontWeight: 600 }}>Lý do sửa: </span>
+                    <strong style={{ color: isLatest ? '#b45309' : '#0f172a' }}>"{item.reason}"</strong>
+                  </div>
+
+                  {item.diff_summary && (
+                    <div
+                      style={{
+                        fontSize: 11.5,
+                        color: '#334155',
+                        background: isLatest ? 'rgba(254, 243, 199, 0.7)' : '#ffffff',
+                        border: `1px solid ${isLatest ? '#fcd34d' : '#e2e8f0'}`,
+                        borderLeft: `3px solid ${isLatest ? '#d97706' : '#38bdf8'}`,
+                        padding: '6px 10px',
+                        borderRadius: 6,
+                        marginTop: 6,
+                        lineHeight: 1.45,
+                      }}
+                    >
+                      <div style={{ color: isLatest ? '#92400e' : '#0284c7', fontWeight: 600, fontSize: 10.5, marginBottom: 2 }}>
+                        Biến động dữ liệu:
+                      </div>
+                      <div>{item.diff_summary}</div>
+                    </div>
+                  )}
+                </div>
+              ),
+            }
+          })}
+        />
+      </div>
+    </Modal>
+  )
+}
+
+// ── Banner Lịch sử chỉnh sửa tích hợp bộ lật nhanh và nút xem Timeline ───
+function OrderEditHistoryBanner({ order, isMobile }) {
+  const history = order?.custom_data?.edit_history || []
+  const [currentIndex, setCurrentIndex] = useState(history.length > 0 ? history.length - 1 : 0)
+  const [modalVisible, setModalVisible] = useState(false)
+
+  // Cập nhật lại lần sửa mới nhất khi đổi đơn hàng hoặc khi lịch sử có thêm bản ghi mới
+  useEffect(() => {
+    if (history.length > 0) {
+      setCurrentIndex(history.length - 1)
+    }
+  }, [order?.id, history.length])
+
+  if (history.length === 0) return null
+
+  const current = history[currentIndex] || history[history.length - 1]
+  const isLatest = currentIndex === history.length - 1
+  const isFirst = currentIndex === 0
+
+  return (
+    <>
+      <div
+        style={{
+          marginBottom: 16,
+          padding: '14px 18px',
+          background: '#fffbeb',
+          borderRadius: 10,
+          border: '1px solid #fde68a',
+          boxShadow: '0 2px 6px rgba(217, 119, 6, 0.05)',
+        }}
+      >
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8, flexWrap: 'wrap', gap: 6 }}>
+          <Space size={8}>
+            <div
+              style={{
+                width: 26,
+                height: 26,
+                borderRadius: 6,
+                background: 'rgba(217, 119, 6, 0.15)',
+                color: '#d97706',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                fontSize: 13,
+              }}
+            >
+              <HistoryOutlined />
+            </div>
+            <span style={{ fontSize: 13, fontWeight: 700, color: '#92400e' }}>
+              Lịch sử chỉnh sửa đơn hàng:
+            </span>
+            <span style={{ fontSize: 12, color: '#78350f' }}>
+              {isLatest ? 'Lần sửa gần nhất' : `Lần sửa #${currentIndex + 1}`} lúc <strong>{current.timestamp}</strong> bởi <strong>{current.user_name}</strong>
+            </span>
+          </Space>
+
+          {/* Bộ điều hướng lật nhanh & Nút xem toàn bộ Timeline */}
+          <Space size={6} align="center">
+            {history.length > 1 && (
+              <div
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  background: '#fef3c7',
+                  border: '1px solid #fcd34d',
+                  borderRadius: 6,
+                  padding: '2px 4px',
+                  gap: 2,
+                }}
+              >
+                <Button
+                  size="small"
+                  type="text"
+                  icon={<LeftOutlined style={{ fontSize: 10 }} />}
+                  disabled={isFirst}
+                  onClick={() => setCurrentIndex((prev) => Math.max(0, prev - 1))}
+                  title="Xem lần sửa trước đó"
+                  style={{ height: 22, width: 22, padding: 0 }}
+                />
+                <span
+                  style={{
+                    fontSize: 11,
+                    fontWeight: 700,
+                    color: '#92400e',
+                    minWidth: 70,
+                    textAlign: 'center',
+                    userSelect: 'none',
+                  }}
+                >
+                  Lần {currentIndex + 1}/{history.length} {isLatest && <span style={{ color: '#d97706', fontSize: 10 }}>(Mới)</span>}
+                </span>
+                <Button
+                  size="small"
+                  type="text"
+                  icon={<RightOutlined style={{ fontSize: 10 }} />}
+                  disabled={isLatest}
+                  onClick={() => setCurrentIndex((prev) => Math.min(history.length - 1, prev + 1))}
+                  title="Xem lần sửa kế tiếp"
+                  style={{ height: 22, width: 22, padding: 0 }}
+                />
+              </div>
+            )}
+
+            <Button
+              size="small"
+              type="primary"
+              ghost
+              icon={<UnorderedListOutlined />}
+              onClick={() => setModalVisible(true)}
+              style={{
+                borderColor: '#d97706',
+                color: '#b45309',
+                fontWeight: 600,
+                fontSize: 12,
+                borderRadius: 6,
+                height: 26,
+              }}
+            >
+              {history.length > 1 ? `Xem tất cả (${history.length} lần)` : 'Chi tiết'}
+            </Button>
+          </Space>
+        </div>
+
+        <div style={{ fontSize: 13, color: '#1f2937', marginBottom: 4, paddingLeft: 34 }}>
+          <span style={{ color: '#64748b', fontWeight: 600 }}>Lý do sửa: </span>
+          <span style={{ color: '#b45309', fontWeight: 600 }}>"{current.reason}"</span>
+        </div>
+        {current.diff_summary && (
+          <div style={{ fontSize: 12, color: '#475569', paddingLeft: 34 }}>
+            <span style={{ color: '#64748b', fontWeight: 600 }}>Biến động dữ liệu: </span>
+            <span>{current.diff_summary}</span>
+          </div>
+        )}
+      </div>
+
+      <OrderEditHistoryModal
+        open={modalVisible}
+        onClose={() => setModalVisible(false)}
+        order={order}
+        history={history}
+        isMobile={isMobile}
+      />
+    </>
+  )
 }
 
 export default function OrderList() {
@@ -396,6 +678,19 @@ export default function OrderList() {
   const [showMapLink, setShowMapLink] = useState(false)
   const [form] = Form.useForm()
   const [submitting, setSubmitting] = useState(false)
+
+  // Modal Confirm Edit & Lý do sửa (Option 3)
+  const [confirmEditModalVisible, setConfirmEditModalVisible] = useState(false)
+  const [editReasonForm] = Form.useForm()
+  const [pendingOrderPayload, setPendingOrderPayload] = useState(null)
+  const [editDiffStats, setEditDiffStats] = useState({
+    oldTotal: 0,
+    newTotal: 0,
+    diffTotal: 0,
+    oldQty: 0,
+    newQty: 0,
+    diffQty: 0,
+  })
 
   // Dynamic products in form
   const [formItems, setFormItems] = useState(() => [
@@ -3022,6 +3317,29 @@ export default function OrderList() {
         })(),
       }
 
+      // Kiểm tra nếu đơn hàng cần nhập lý do sửa và trình duyệt lại (Phương án 3)
+      const needsEditReason = Boolean(editingOrder && ['pending', 'approved', 'rejected'].includes(editingOrder.status))
+      if (needsEditReason) {
+        const oldTotal = Number(editingOrder.total_amount || 0)
+        const newTotal = Number(payload.total_amount || 0)
+        const oldQty = (editingOrder.items || []).reduce((sum, it) => sum + Number(it.quantity || 1), 0)
+        const newQty = (payload.items || []).reduce((sum, it) => sum + Number(it.quantity || 1), 0)
+
+        setEditDiffStats({
+          oldTotal,
+          newTotal,
+          diffTotal: newTotal - oldTotal,
+          oldQty,
+          newQty,
+          diffQty: newQty - oldQty,
+        })
+        setPendingOrderPayload(payload)
+        editReasonForm.resetFields()
+        setConfirmEditModalVisible(true)
+        setSubmitting(false)
+        return
+      }
+
       if (editingOrder) {
         const patchRes = await api.patch(`/orders/orders/${editingOrder.id}/`, payload)
         messageApi.success('Cập nhật đơn hàng thành công!')
@@ -3040,6 +3358,40 @@ export default function OrderList() {
         messageApi.error('Vui lòng điền đầy đủ các thông tin bắt buộc.')
         return
       }
+      const errData = error.response?.data
+      let errMsg = 'Lưu đơn hàng thất bại. Vui lòng thử lại.'
+      if (typeof errData?.items === 'string') {
+        errMsg = errData.items
+      } else if (Array.isArray(errData?.items) && errData.items.length > 0) {
+        errMsg = errData.items[0]
+      } else if (errData?.detail) {
+        errMsg = errData.detail
+      }
+      messageApi.error(errMsg)
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
+  // ── Xác nhận Lưu kèm Lý do sửa (Phương án 3) ─────────────────────────
+  const handleConfirmSaveWithReason = async () => {
+    try {
+      const { edit_reason } = await editReasonForm.validateFields()
+      setSubmitting(true)
+      const finalPayload = {
+        ...pendingOrderPayload,
+        edit_reason: String(edit_reason).trim(),
+      }
+      const patchRes = await api.patch(`/orders/orders/${editingOrder.id}/`, finalPayload)
+      messageApi.success('Đã cập nhật đơn hàng và gửi yêu cầu phê duyệt thành công!')
+      if (selectedOrder && selectedOrder.id === editingOrder.id) {
+        setSelectedOrder(patchRes.data)
+      }
+      setConfirmEditModalVisible(false)
+      setModalVisible(false)
+      fetchOrders()
+    } catch (error) {
+      if (error.errorFields) return
       const errData = error.response?.data
       let errMsg = 'Lưu đơn hàng thất bại. Vui lòng thử lại.'
       if (typeof errData?.items === 'string') {
@@ -3822,34 +4174,89 @@ export default function OrderList() {
       key: 'status',
       render: (st, r) => {
         const cfg = statusConfig[st] || { label: st, color: 'default' }
+        const history = r.custom_data?.edit_history || []
+        const latest = history.length > 0 ? history[history.length - 1] : null
+        // Tìm bản ghi có diff_summary chi tiết hoặc lấy bản ghi mới nhất
+        const lastWithDiff = [...history].reverse().find(h => h.diff_summary && !h.diff_summary.includes('Không đổi')) || latest
+        const reason = latest?.reason || r.custom_data?.last_edit_reason || 'Cập nhật thông tin đơn hàng'
+        const diffSummary = lastWithDiff?.diff_summary || r.custom_data?.last_edit_diff
+        const editor = latest?.user_name || r.custom_data?.last_edit_user
+        const editTime = latest?.timestamp || r.custom_data?.last_edit_time
+        const hasEdit = Boolean(st === 'pending' && (r.custom_data?.last_edit_reason || latest))
+
+        const tooltipContent = hasEdit ? (
+          <div style={{ maxWidth: 360, padding: '4px 2px', lineHeight: 1.5 }}>
+            <div style={{ fontWeight: 600, color: '#f59e0b', marginBottom: 6, display: 'flex', alignItems: 'center', gap: 6, borderBottom: '1px solid rgba(255,255,255,0.2)', paddingBottom: 4 }}>
+              <EditOutlined /> Thông tin chỉnh sửa đơn hàng
+            </div>
+            {editor && (
+              <div style={{ fontSize: 12, marginBottom: 4 }}>
+                <span style={{ color: '#94a3b8' }}>Người sửa:</span>{' '}
+                <strong style={{ color: '#f8fafc' }}>{editor}</strong> {editTime && <span style={{ color: '#cbd5e1', fontSize: 11 }}>({editTime})</span>}
+              </div>
+            )}
+            <div style={{ fontSize: 12, marginBottom: 4 }}>
+              <span style={{ color: '#94a3b8' }}>Lý do sửa:</span>{' '}
+              <span style={{ color: '#fbbf24', fontWeight: 600 }}>"{reason.replace(/^Trình duyệt lại:\s*/, '')}"</span>
+            </div>
+            {diffSummary && (
+              <div style={{ fontSize: 12, color: '#f1f5f9', marginTop: 6, background: 'rgba(255,255,255,0.12)', padding: '6px 8px', borderRadius: 6, borderLeft: '3px solid #38bdf8' }}>
+                <div style={{ color: '#38bdf8', fontWeight: 600, fontSize: 11, marginBottom: 2 }}>Biến động dữ liệu:</div>
+                <div>{diffSummary}</div>
+              </div>
+            )}
+            {history.length > 1 && (
+              <div style={{ fontSize: 11, color: '#94a3b8', marginTop: 6, textAlign: 'right' }}>
+                Đã sửa {history.length} lần (Bấm để xem chi tiết)
+              </div>
+            )}
+          </div>
+        ) : null
+
         return (
           <Space direction="vertical" size={2}>
             <Tag color={cfg.color} icon={cfg.icon}>{cfg.label}</Tag>
+            {hasEdit && (
+              <Tooltip title={tooltipContent} placement="topLeft" overlayStyle={{ maxWidth: 380 }}>
+                <Tag
+                  color="orange"
+                  icon={<EditOutlined />}
+                  style={{ fontSize: 11, cursor: 'pointer' }}
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    setSelectedOrder(r)
+                    setDrawerVisible(true)
+                  }}
+                >
+                  Đã sửa (Chờ duyệt lại)
+                </Tag>
+              </Tooltip>
+            )}
             {isModuleActive('inventory') && r.needs_export_request && ['fully_paid', 'deposit_paid', 'credit_approved'].includes(r.financial_status) && (
-              <Tag color="error" style={{ fontSize: 11, cursor: 'pointer' }} onClick={(e) => {
+              <Tag color="error" icon={<WarningOutlined />} style={{ fontSize: 11, cursor: 'pointer' }} onClick={(e) => {
                 e.stopPropagation()
                 setSelectedOrder(r)
                 setDrawerVisible(true)
               }}>
-                ⚠️ Chưa có lệnh XK
+                Chưa có lệnh XK
               </Tag>
             )}
             {isModuleActive('inventory') && r.has_pending_export && (
-              <Tag color="error" style={{ fontSize: 11, cursor: 'pointer' }} onClick={(e) => {
+              <Tag color="error" icon={<WarningOutlined />} style={{ fontSize: 11, cursor: 'pointer' }} onClick={(e) => {
                 e.stopPropagation()
                 setSelectedOrder(r)
                 setDrawerVisible(true)
               }}>
-                ⚠️ Đang đợi duyệt xuất kho
+                Đang đợi duyệt xuất kho
               </Tag>
             )}
             {isModuleActive('production') && !r.has_production_order && !r.has_pending_export && ['fully_paid', 'deposit_paid', 'credit_approved'].includes(r.financial_status) && ['approved', 'completed'].includes(r.status) && (
-              <Tag color="error" style={{ fontSize: 11, cursor: 'pointer' }} onClick={(e) => {
+              <Tag color="error" icon={<WarningOutlined />} style={{ fontSize: 11, cursor: 'pointer' }} onClick={(e) => {
                 e.stopPropagation()
                 setSelectedOrder(r)
                 setDrawerVisible(true)
               }}>
-                ⚠️ Thiếu lệnh SX
+                Thiếu lệnh SX
               </Tag>
             )}
           </Space>
@@ -4730,6 +5137,81 @@ export default function OrderList() {
         </Form>
       </Modal>
 
+      {/* ── Modal Xác nhận Sửa Đơn Hàng & Nhập Lý Do (Phương án 3) ── */}
+      <Modal
+        title={
+          <Space>
+            <EditOutlined style={{ color: '#2563eb' }} />
+            <span>Xác nhận cập nhật & Trình duyệt lại đơn hàng</span>
+          </Space>
+        }
+        open={confirmEditModalVisible}
+        onCancel={() => setConfirmEditModalVisible(false)}
+        onOk={handleConfirmSaveWithReason}
+        confirmLoading={submitting}
+        okText="Xác nhận & Gửi duyệt"
+        cancelText="Quay lại sửa tiếp"
+        width={600}
+        destroyOnClose
+      >
+        <Alert
+          type="warning"
+          showIcon
+          style={{ marginBottom: 16 }}
+          message="Đơn hàng sẽ chuyển sang trạng thái Chờ duyệt lại"
+          description="Đơn hàng này đã từng được duyệt hoặc đang trong quy trình xét duyệt. Khi bạn lưu thay đổi, hệ thống sẽ tự động gửi yêu cầu phê duyệt mới tới Quản lý / Giám đốc kèm theo lý do bạn giải trình dưới đây."
+        />
+
+        {/* Thẻ tóm tắt biến động (Auto-Diff) */}
+        <div style={{ background: '#f8fafc', padding: '14px 16px', borderRadius: 8, border: '1px solid #e2e8f0', marginBottom: 16 }}>
+          <div style={{ fontWeight: 600, color: '#334155', marginBottom: 10, fontSize: 13 }}>
+            📊 Tóm tắt biến động dữ liệu:
+          </div>
+          <Row gutter={[16, 12]}>
+            <Col xs={24} sm={12}>
+              <div style={{ fontSize: 12, color: '#64748b' }}>Tổng tiền đơn hàng:</div>
+              <div style={{ fontWeight: 700, color: '#0f172a', fontSize: 13, marginTop: 2 }}>
+                {editDiffStats.oldTotal.toLocaleString('vi-VN')} đ ➜ {editDiffStats.newTotal.toLocaleString('vi-VN')} đ
+              </div>
+              {editDiffStats.diffTotal !== 0 ? (
+                <Tag color={editDiffStats.diffTotal > 0 ? 'green' : 'red'} style={{ marginTop: 4, fontWeight: 600 }}>
+                  {editDiffStats.diffTotal > 0 ? `+${editDiffStats.diffTotal.toLocaleString('vi-VN')}` : editDiffStats.diffTotal.toLocaleString('vi-VN')} đ
+                </Tag>
+              ) : (
+                <Tag style={{ marginTop: 4, color: '#64748b' }}>Không đổi</Tag>
+              )}
+            </Col>
+            <Col xs={24} sm={12}>
+              <div style={{ fontSize: 12, color: '#64748b' }}>Số lượng sản phẩm:</div>
+              <div style={{ fontWeight: 700, color: '#0f172a', fontSize: 13, marginTop: 2 }}>
+                {editDiffStats.oldQty} SP ➜ {editDiffStats.newQty} SP
+              </div>
+              {editDiffStats.diffQty !== 0 ? (
+                <Tag color={editDiffStats.diffQty > 0 ? 'blue' : 'orange'} style={{ marginTop: 4, fontWeight: 600 }}>
+                  {editDiffStats.diffQty > 0 ? `+${editDiffStats.diffQty}` : editDiffStats.diffQty} SP
+                </Tag>
+              ) : (
+                <Tag style={{ marginTop: 4, color: '#64748b' }}>Không đổi</Tag>
+              )}
+            </Col>
+          </Row>
+        </div>
+
+        <Form form={editReasonForm} layout="vertical">
+          <Form.Item
+            name="edit_reason"
+            label={<span style={{ fontWeight: 600 }}>Lý do chỉnh sửa đơn hàng <span style={{ color: '#ef4444' }}>*</span></span>}
+            rules={[{ required: true, message: 'Vui lòng nhập lý do chỉnh sửa đơn hàng để quản lý nắm thông tin phê duyệt!' }]}
+          >
+            <Input.TextArea
+              rows={3}
+              placeholder="VD: Khách đổi kích thước cửa phòng ngủ từ 900x2200 sang 920x2200 theo số đo thực tế..."
+              autoFocus
+            />
+          </Form.Item>
+        </Form>
+      </Modal>
+
       {/* ── Drawer View Order Details ──────────────────────────────────── */}
       <Drawer
         title={
@@ -4905,6 +5387,9 @@ export default function OrderList() {
                 </div>
               )
             })()}
+
+            {/* ── Banner Lịch sử chỉnh sửa & Lý do sửa (Phương án 3: Lật nhanh + Modal Timeline) ── */}
+            <OrderEditHistoryBanner order={selectedOrder} isMobile={isMobile} />
 
             <div style={{ marginBottom: 24, border: '1px solid #e2e8f0', borderRadius: 8, padding: 16, background: '#fff', boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)' }}>
               <QuotationPrintView

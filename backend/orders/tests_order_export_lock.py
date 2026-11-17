@@ -122,7 +122,10 @@ class OrderExportLockAndReversalTests(TestCase):
         self.assertEqual(self.order.delivery_address, "Đà Nẵng")
 
         # 3. Hủy phiếu xuất kho bằng action cancel-by-code
-        res_cancel = self.client.post("/api/inventory/transactions/cancel-by-code/", {"code": txn_code})
+        res_cancel = self.client.post("/api/inventory/transactions/cancel-by-code/", {
+            "code": txn_code,
+            "reason": "Hủy phiếu xuất kho để cập nhật lại số lượng hàng"
+        })
         self.assertEqual(res_cancel.status_code, status.HTTP_200_OK)
 
         # Kiểm tra tồn kho ĐÃ ĐƯỢC TỰ ĐỘNG HOÀN TRẢ
@@ -143,3 +146,48 @@ class OrderExportLockAndReversalTests(TestCase):
         # 5. Kiểm tra mã xuất kho khi sinh lại: GIỮ NGUYÊN FT-EXP-999
         new_txn_code = derive_code_from_order(self.order.order_number, self.company, "export")
         self.assertEqual(new_txn_code, "FT-EXP-999")
+
+    def test_cancel_export_strictly_requires_role_permission(self):
+        """Kiểm tra: Admin/SuperAdmin không có role chứa inventory.approve_export sẽ bị chặn 403."""
+        # Tạo phiếu xuất kho hoàn thành
+        txn = InventoryTransaction.objects.create(
+            company=self.company,
+            transaction_code="FT-EXP-888",
+            type=InventoryTransaction.TYPE_EXPORT,
+            status=InventoryTransaction.STATUS_COMPLETED,
+            product=self.product,
+            warehouse=self.warehouse,
+            quantity=2,
+            reference_order=self.order,
+        )
+
+        # 1. Tạo user là Company Admin nhưng Role KHÔNG có quyền inventory.approve_export
+        role_no_perm = Role.objects.create(company=self.company, name="Admin Không Có Quyền Kho")
+        admin_no_perm = User.objects.create_user(
+            username="admin_no_perm",
+            email="no_perm@fujitech.test",
+            password="Password123!",
+            company=self.company,
+            role=role_no_perm,
+            is_company_admin=True,
+        )
+        self.client.force_authenticate(admin_no_perm)
+
+        res_fail = self.client.post("/api/inventory/transactions/cancel-by-code/", {
+            "code": "FT-EXP-888",
+            "reason": "Thử hủy nhưng không có quyền role"
+        })
+        self.assertEqual(res_fail.status_code, status.HTTP_403_FORBIDDEN)
+        self.assertIn("Chỉ nhân sự có vai trò được phân quyền", str(res_fail.data.get("detail", "")))
+
+        # 2. Cấp quyền inventory.approve_export vào role -> Hủy THÀNH CÔNG
+        perm_approve = Permission.objects.get(code="inventory.approve_export")
+        role_no_perm.permissions.add(perm_approve)
+
+        res_ok = self.client.post("/api/inventory/transactions/cancel-by-code/", {
+            "code": "FT-EXP-888",
+            "reason": "Hủy hợp lệ sau khi được cấp quyền vai trò"
+        })
+        self.assertEqual(res_ok.status_code, status.HTTP_200_OK)
+        txn.refresh_from_db()
+        self.assertEqual(txn.status, InventoryTransaction.STATUS_REJECTED)

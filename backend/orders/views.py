@@ -241,6 +241,10 @@ class OrderViewSet(TenantQuerySetMixin, viewsets.ModelViewSet):
             return
             
         old_status = instance.status
+        old_total = instance.total_amount or 0
+        old_qty = sum(item.quantity for item in instance.items.all())
+        edit_reason = str(self.request.data.get("edit_reason") or "").strip()
+
         new_status = serializer.validated_data.get("status", instance.status)
         if new_status != instance.status:
             if hasattr(instance, 'delivery_order') and instance.delivery_order.status == 'delivered':
@@ -279,6 +283,52 @@ class OrderViewSet(TenantQuerySetMixin, viewsets.ModelViewSet):
         order = serializer.save(**kwargs)
         order.generate_payment_milestones()
 
+        # Tính toán biến động (Auto-Diff) và ghi nhận lịch sử chỉnh sửa
+        new_total = order.total_amount or 0
+        new_qty = sum(item.quantity for item in order.items.all())
+
+        diff_amount = new_total - old_total
+        if diff_amount != 0:
+            diff_sign = "+" if diff_amount > 0 else ""
+            amount_diff_str = f"Tổng tiền: {old_total:,.0f} đ ➜ {new_total:,.0f} đ ({diff_sign}{diff_amount:,.0f} đ)"
+        else:
+            amount_diff_str = f"Tổng tiền: {new_total:,.0f} đ (Không đổi)"
+
+        diff_qty = new_qty - old_qty
+        if diff_qty != 0:
+            diff_qty_sign = "+" if diff_qty > 0 else ""
+            qty_diff_str = f"SL: {old_qty} ➜ {new_qty} SP ({diff_qty_sign}{diff_qty})"
+        else:
+            qty_diff_str = f"SL: {new_qty} SP (Không đổi)"
+
+        diff_summary = f"{amount_diff_str} | {qty_diff_str}"
+
+        # Ghi nhận audit trail vào custom_data nếu có lý do hoặc đơn hàng đã từng duyệt/chờ duyệt
+        if edit_reason or old_status in ["pending", "rejected", "approved"]:
+            from django.utils import timezone
+            now_str = timezone.now().strftime("%d/%m/%Y %H:%M")
+            user_display = getattr(self.request.user, 'full_name', '') or self.request.user.get_full_name() or self.request.user.username
+            edit_entry = {
+                "timestamp": now_str,
+                "user_id": self.request.user.id,
+                "user_name": user_display,
+                "reason": edit_reason or "Cập nhật thông tin đơn hàng",
+                "old_total": float(old_total),
+                "new_total": float(new_total),
+                "diff_amount": float(diff_amount),
+                "old_qty": int(old_qty),
+                "new_qty": int(new_qty),
+                "diff_summary": diff_summary,
+            }
+            custom_d = dict(order.custom_data or {})
+            history = list(custom_d.get("edit_history") or [])
+            history.append(edit_entry)
+            custom_d["edit_history"] = history
+            custom_d["last_edit_reason"] = edit_reason or "Cập nhật thông tin đơn hàng"
+            custom_d["last_edit_diff"] = diff_summary
+            order.custom_data = custom_d
+            order.save(update_fields=["custom_data"])
+
         if old_status in ["pending", "rejected", "approved"]:
             from approvals.models import ApprovalRequest, ApprovalStep
             from django.contrib.contenttypes.models import ContentType
@@ -293,14 +343,21 @@ class OrderViewSet(TenantQuerySetMixin, viewsets.ModelViewSet):
 
             if require_approval:
                 try:
-                    # Tạo request mới
+                    desc_lines = [
+                        f"Đơn hàng {order.order_number} — Khách hàng: {order.customer.name if order.customer else 'Khách lẻ'}",
+                    ]
+                    if edit_reason:
+                        desc_lines.append(f"Lý do sửa: {edit_reason}")
+                    if diff_summary:
+                        desc_lines.append(f"Biến động: {diff_summary}")
+
                     req = ApprovalRequest.objects.create(
                         company=order.company,
                         content_type=ct,
                         object_id=order.id,
                         requester=self.request.user,
                         title=f"Phê duyệt Đơn hàng {order.order_number} (Cập nhật)",
-                        description=f"Đơn hàng {order.order_number} — Khách hàng: {order.customer.name if order.customer else 'Khách lẻ'}",
+                        description="\n".join(desc_lines),
                         status=ApprovalRequest.STATUS_PENDING,
                     )
                     ApprovalStep.objects.create(
@@ -519,14 +576,20 @@ class OrderViewSet(TenantQuerySetMixin, viewsets.ModelViewSet):
             from approvals.models import ApprovalRequest, ApprovalStep
             from django.contrib.contenttypes.models import ContentType
             ct = ContentType.objects.get_for_model(order)
-            
+
+            desc_lines = [
+                f"Đơn hàng {order.order_number} — Khách hàng: {order.customer.name if order.customer else 'Khách lẻ'}",
+            ]
+            if description:
+                desc_lines.append(f"Lý do trình duyệt lại: {description}")
+
             req = ApprovalRequest.objects.create(
                 company=order.company,
                 content_type=ct,
                 object_id=order.id,
                 requester=request.user,
                 title=f"Phê duyệt lại Đơn hàng {order.order_number}",
-                description=description,
+                description="\n".join(desc_lines),
                 status=ApprovalRequest.STATUS_PENDING,
             )
             ApprovalStep.objects.create(
@@ -535,6 +598,33 @@ class OrderViewSet(TenantQuerySetMixin, viewsets.ModelViewSet):
                 step_order=1,
                 status=ApprovalStep.STATUS_PENDING,
             )
+
+            # Ghi nhận lịch sử trình duyệt lại vào custom_data
+            if description:
+                from django.utils import timezone
+                now_str = timezone.now().strftime("%d/%m/%Y %H:%M")
+                user_display = getattr(request.user, 'full_name', '') or request.user.get_full_name() or request.user.username
+                total_val = float(order.total_amount or 0)
+                qty_val = sum(it.quantity for it in order.items.all())
+                edit_entry = {
+                    "timestamp": now_str,
+                    "user_id": request.user.id,
+                    "user_name": user_display,
+                    "reason": f"Trình duyệt lại: {description}",
+                    "old_total": total_val,
+                    "new_total": total_val,
+                    "diff_amount": 0.0,
+                    "old_qty": qty_val,
+                    "new_qty": qty_val,
+                    "diff_summary": "Trình duyệt lại đơn hàng (Không đổi số liệu)",
+                }
+                custom_d = dict(order.custom_data or {})
+                history = list(custom_d.get("edit_history") or [])
+                history.append(edit_entry)
+                custom_d["edit_history"] = history
+                custom_d["last_edit_reason"] = description
+                order.custom_data = custom_d
+                order.save(update_fields=["custom_data"])
         except Exception:
             pass
 

@@ -1,4 +1,4 @@
-import { CheckCircleOutlined, CloseCircleOutlined, ClockCircleOutlined, EyeOutlined, CheckOutlined, CloseOutlined, DeleteOutlined, AuditOutlined } from '@ant-design/icons'
+import { CheckCircleOutlined, CloseCircleOutlined, ClockCircleOutlined, EyeOutlined, CheckOutlined, CloseOutlined, DeleteOutlined, AuditOutlined, EditOutlined, BarChartOutlined } from '@ant-design/icons'
 import { Alert, Badge, Button, Card, Col, Divider, Form, Input, Modal, Row, Select, Space, Table, Tag, Tooltip, Typography, message, Tabs, Steps, List, Collapse } from 'antd'
 import dayjs from 'dayjs'
 import React, { useCallback, useEffect, useState } from 'react'
@@ -148,9 +148,27 @@ export default function ApprovalList() {
       render: (text, record) => (
         <div>
           <Text strong style={{ color: '#1649c9', fontSize: 15 }}>{text}</Text>
-          <div style={{ color: '#64748b', fontSize: 13, marginTop: 4 }}>
-            Loại: <Tag color="blue">{record.content_type}</Tag> ID: {record.object_id}
+          <div style={{ color: '#64748b', fontSize: 13, marginTop: 4, display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+            <span>Loại:</span> <Tag color="blue">{record.content_type}</Tag>
+            <span>ID:</span> <Tag>{record.object_id}</Tag>
+            {record.description && record.description.includes('Lý do sửa:') && (
+              <Tag color="orange" icon={<EditOutlined />}>Đã chỉnh sửa</Tag>
+            )}
           </div>
+          {record.description && record.description.includes('Lý do sửa:') && (
+            <div style={{ marginTop: 4, display: 'flex', flexDirection: 'column', gap: 3 }}>
+              <div style={{ fontSize: 12, color: '#b45309', background: '#fffbeb', padding: '2px 8px', borderRadius: 4, display: 'inline-block', maxWidth: 420, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                <EditOutlined style={{ marginRight: 4 }} />
+                {record.description.split('\n').find(l => l.startsWith('Lý do sửa:'))}
+              </div>
+              {record.description.includes('Biến động:') && (
+                <div style={{ fontSize: 11, color: '#0369a1', background: '#f0f9ff', padding: '2px 8px', borderRadius: 4, display: 'inline-block', maxWidth: 420, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                  <BarChartOutlined style={{ marginRight: 4 }} />
+                  {record.description.split('\n').find(l => l.startsWith('Biến động:'))}
+                </div>
+              )}
+            </div>
+          )}
         </div>
       )
     },
@@ -399,9 +417,30 @@ export default function ApprovalList() {
       >
         {selectedReq && (
           <div style={{ marginTop: 16 }}>
-            <div style={{ background: '#f8fafc', padding: 16, borderRadius: 8, marginBottom: 24 }}>
-              <Paragraph style={{ margin: 0 }}><strong>Mô tả:</strong> {selectedReq.description || 'Không có mô tả'}</Paragraph>
-              <div style={{ marginTop: 8, color: '#64748b' }}>
+            <div style={{ background: '#f8fafc', padding: 16, borderRadius: 8, marginBottom: 24, border: '1px solid #e2e8f0' }}>
+              <Paragraph style={{ margin: 0, fontSize: 13 }}>
+                <strong>Thông tin chi tiết:</strong>
+                <div style={{ marginTop: 8 }}>
+                  {selectedReq.description ? selectedReq.description.split('\n').map((line, idx) => {
+                    if (line.startsWith('Lý do sửa:')) {
+                      return (
+                        <div key={idx} style={{ marginTop: 8, padding: '10px 14px', background: '#fffbeb', borderLeft: '4px solid #f59e0b', borderRadius: 6, color: '#92400e', fontWeight: 600 }}>
+                          <EditOutlined style={{ marginRight: 6 }} /> {line}
+                        </div>
+                      )
+                    }
+                    if (line.startsWith('Biến động:')) {
+                      return (
+                        <div key={idx} style={{ marginTop: 8, padding: '10px 14px', background: '#eff6ff', borderLeft: '4px solid #3b82f6', borderRadius: 6, color: '#1e40af', fontWeight: 600 }}>
+                          <BarChartOutlined style={{ marginRight: 6 }} /> {line}
+                        </div>
+                      )
+                    }
+                    return <div key={idx} style={{ color: '#334155' }}>{line}</div>
+                  }) : 'Không có mô tả'}
+                </div>
+              </Paragraph>
+              <div style={{ marginTop: 12, color: '#64748b', fontSize: 12, borderTop: '1px solid #e2e8f0', paddingTop: 8 }}>
                 Gửi bởi: <strong>{selectedReq.requester_name}</strong> lúc {dayjs(selectedReq.created_at).format('DD/MM/YYYY HH:mm')}
               </div>
             </div>
