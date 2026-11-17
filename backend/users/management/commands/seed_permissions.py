@@ -155,6 +155,11 @@ PERMISSIONS = [
 
     # 🌐 Tích hợp Website (website_integration)
     {"code": "website_integration.manage", "name": "Quản lý tích hợp Website (Webhooks)", "module": "website_integration"},
+
+    # 💬 Chat Nội Bộ (Internal Chat)
+    {"code": "chat.view", "name": "Sử dụng Chat nội bộ", "module": "chat"},
+    {"code": "chat.manage_groups", "name": "Tạo & Quản lý nhóm chat", "module": "chat"},
+    {"code": "chat.admin", "name": "Quản trị chat & Cấu hình lưu trữ", "module": "chat"},
 ]
 
 # [FUTURE RESERVED PERMISSIONS - MỞ RỘNG SAU NÀY]
@@ -198,11 +203,17 @@ class Command(BaseCommand):
     help = "Seed danh sách permissions mặc định cho toàn bộ module CRM SaaS."
 
     def handle(self, *args, **options):
-        # --- MIGRATION LOGIC CHO VIỆC TÁCH MODULE SẢN PHẨM ---
-        self.stdout.write("Checking module products migration...")
+        # --- MIGRATION LOGIC CHO VIỆC TÁCH MODULE SẢN PHẨM & CHAT NỘI BỘ ---
+        self.stdout.write("Checking module products & chat migration...")
         for cs in CompanySettings.objects.all():
+            modified = False
             if 'inventory' in cs.active_modules and 'products' not in cs.active_modules:
                 cs.active_modules.append('products')
+                modified = True
+            if 'chat' not in cs.active_modules:
+                cs.active_modules.append('chat')
+                modified = True
+            if modified:
                 cs.save(update_fields=['active_modules'])
         
         try:
@@ -251,6 +262,15 @@ class Command(BaseCommand):
                 created_count += 1
             else:
                 updated_count += 1
+
+        # Mặc định cấp quyền chat.view và chat.manage_groups cho tất cả các vai trò hiện có
+        try:
+            chat_view_perm = Permission.objects.get(code="chat.view")
+            chat_group_perm = Permission.objects.get(code="chat.manage_groups")
+            for r in Role.objects.all():
+                r.permissions.add(chat_view_perm, chat_group_perm)
+        except Exception:
+            pass
 
         # Tự động cấp toàn bộ quyền cho vai trò Giám đốc
         all_perms = Permission.objects.all()

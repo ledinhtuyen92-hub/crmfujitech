@@ -61,6 +61,8 @@ import {
   RocketOutlined,
 } from '@ant-design/icons'
 import { useAuth } from '../contexts/AuthContext'
+import { useChat } from '../contexts/ChatContext'
+import FloatingChatWidget from './chat/FloatingChatWidget'
 
 const { Header, Sider, Content } = Layout
 const { Text, Title } = Typography
@@ -76,6 +78,7 @@ function MainLayout({ children, isDarkMode, toggleTheme }) {
   const [headerCollapsed, setHeaderCollapsed] = useState(false)
   
   const { user, logout, isSuperAdmin, isCompanyAdmin, hasPermission, maintenanceMode, isModuleActive } = useAuth()
+  const { totalUnreadCount = 0 } = useChat() || {}
 
   // ── Thông báo ──────────────────────────────────────────────────
   const [unreadCount, setUnreadCount] = useState(0)
@@ -209,6 +212,11 @@ function MainLayout({ children, isDarkMode, toggleTheme }) {
           key: '/warranty',
           icon: <SafetyCertificateOutlined />,
           label: <Link to="/warranty">Bảo hành</Link>,
+        }] : []),
+        ...(isModuleActive('chat') && hasPermission('chat.view') ? [{
+          key: '/internal-chat',
+          icon: <MessageOutlined style={{ color: '#0284c7' }} />,
+          label: <Link to="/internal-chat">Chat nội bộ {totalUnreadCount > 0 && <Badge count={totalUnreadCount} style={{ marginLeft: 8 }} />}</Link>,
         }] : []),
         ...(isModuleActive('zalo') && (hasPermission('zalo.view') || hasPermission('zalo.config') || hasPermission('zalo.manage_templates') || hasPermission('zalo.campaigns')) ? [{
           key: 'zalo-group',
@@ -908,6 +916,9 @@ function MainLayout({ children, isDarkMode, toggleTheme }) {
           {children}
         </Content>
       </Layout>
+
+      {/* Widget Chat Nội Bộ nổi (Floating) toàn hệ thống */}
+      <FloatingChatWidget />
 
       {/* Modal Đổi Mật Khẩu */}
       <Modal

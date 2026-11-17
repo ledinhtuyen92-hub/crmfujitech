@@ -36,6 +36,8 @@ urlpatterns = [
     path('api/facebook/', include('facebook_integration.urls')),
     # ── AI Agents (Multi-Agent Auto-Sale) ─────────────────────────────
     path('api/ai_agents/', include('ai_agents.urls')),
+    # ── Internal Chat (Chat Nội Bộ) ──────────────────────────────────
+    path('api/chat/', include('chat.urls')),
 ]
 
 # Explicitly serve media files even in DEBUG=False (since Nginx might not be configured for it yet)

@@ -88,6 +88,7 @@ INSTALLED_APPS = [
     'zalo_integration',
     'facebook_integration',
     'ai_agents',
+    'chat',
     'django_cleanup.apps.CleanupConfig',
 ]
 
@@ -283,6 +284,11 @@ try:
         "facebook-poll-bot-comments": {
             "task": "facebook.poll_recent_comments",
             "schedule": 30.0,
+        },
+        # Tự động dọn dẹp tin nhắn & tệp đính kèm chat cũ theo cấu hình công ty mỗi đêm lúc 2h sáng
+        "chat-cleanup-old-messages": {
+            "task": "chat.cleanup_old_messages",
+            "schedule": crontab(minute=0, hour=2),
         },
         # Tự động gửi ZNS chúc mừng sinh nhật mỗi ngày lúc 8h sáng (legacy)
         "zalo-send-birthday-zns": {

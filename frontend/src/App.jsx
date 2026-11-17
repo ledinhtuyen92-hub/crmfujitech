@@ -5,6 +5,7 @@ import 'antd/dist/reset.css'
 
 import { AuthProvider } from './contexts/AuthContext'
 import { useAuth } from './contexts/AuthContext'
+import { ChatProvider } from './contexts/ChatContext'
 import MainLayout from './components/MainLayout'
 import {
   CompanyAdminRoute,
@@ -52,6 +53,7 @@ const WebsiteIntegration = lazy(() => import('./pages/settings/WebsiteIntegratio
 const AiAgentSettings = lazy(() => import('./pages/settings/AiAgentSettings'))
 const AiKnowledgeBase = lazy(() => import('./pages/settings/AiKnowledgeBase'))
 const Announcements = lazy(() => import('./pages/Announcements'))
+const InternalChat = lazy(() => import('./pages/InternalChat'))
 
 // Loading fallback chung
 function PageLoader() {
@@ -87,6 +89,7 @@ function DynamicTitle() {
     else if (path.startsWith('/login')) title = 'Đăng nhập | Fujitech Group CRM';
     else if (path.startsWith('/approvals')) title = 'Phê duyệt | Fujitech Group CRM';
     else if (path.startsWith('/announcements')) title = 'Thông báo | Fujitech Group CRM';
+    else if (path.startsWith('/internal-chat')) title = 'Chat nội bộ | Fujitech Group CRM';
 
     document.title = title;
   }, [location.pathname]);
@@ -134,8 +137,9 @@ function App() {
         <DynamicTitle />
         {/* AuthProvider must be inside BrowserRouter so useNavigate works */}
         <AuthProvider>
-          <Suspense fallback={<PageLoader />}>
-          <Routes>
+          <ChatProvider>
+            <Suspense fallback={<PageLoader />}>
+            <Routes>
             {/* ── Public routes ──────────────────────────────────── */}
             <Route path="/login" element={<Login />} />
             <Route path="/register" element={<RegisterCompany />} />
@@ -220,6 +224,15 @@ function App() {
                 <ModuleRoute moduleCode="warranty">
                   <PermissionRoute permissionCode="warranty.view">
                     <WarrantyList />
+                  </PermissionRoute>
+                </ModuleRoute>
+              } />
+
+              {/* Chat nội bộ */}
+              <Route path="/internal-chat" element={
+                <ModuleRoute moduleCode="chat">
+                  <PermissionRoute permissionCode="chat.view">
+                    <InternalChat />
                   </PermissionRoute>
                 </ModuleRoute>
               } />
@@ -414,6 +427,7 @@ function App() {
             <Route path="*" element={<Navigate to="/dashboard" replace />} />
           </Routes>
           </Suspense>
+          </ChatProvider>
         </AuthProvider>
       </BrowserRouter>
     </ConfigProvider>

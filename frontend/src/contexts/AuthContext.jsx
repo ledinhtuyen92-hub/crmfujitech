@@ -150,6 +150,7 @@ export function AuthProvider({ children }) {
   const value = useMemo(
     () => ({
       user,
+      token: localStorage.getItem('accessToken'),
       loading,
       isAuthenticated,
       isSuperAdmin,
