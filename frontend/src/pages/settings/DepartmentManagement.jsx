@@ -86,6 +86,7 @@ export default function DepartmentManagement() {
       manager: department?.manager ?? null,
       factory: department?.factory ?? null,
       is_sales_department: department?.is_sales_department ?? false,
+      is_auto_assign_target: department?.is_auto_assign_target ?? false,
     })
     setModalOpen(true)
   }
@@ -158,6 +159,14 @@ export default function DepartmentManagement() {
         <Text strong style={{ color: managerName ? token.colorPrimary : token.colorTextDisabled }}>
           {managerName || 'Chưa phân công'}
         </Text>
+      ),
+    },
+    {
+      title: 'Nhận khách',
+      key: 'is_auto_assign_target',
+      align: 'center',
+      render: (_, record) => (
+        record.is_auto_assign_target ? <Tag color="blue">Có</Tag> : <Text type="secondary">Không</Text>
       ),
     },
     {
@@ -261,6 +270,10 @@ export default function DepartmentManagement() {
                     </Text>
                   </div>
                   <div>
+                    <Text type="secondary" style={{ fontSize: 13 }}>Nhận khách tự động:</Text>{' '}
+                    {record.is_auto_assign_target ? <Tag color="blue" style={{ margin: 0 }}>Có</Tag> : <Text type="secondary" style={{ fontSize: 13 }}>Không</Text>}
+                  </div>
+                  <div>
                     <Text type="secondary" style={{ fontSize: 13 }}>Thống kê Doanh số:</Text>{' '}
                     {record.is_sales_department ? <Tag color="green" style={{ margin: 0 }}>Có</Tag> : <Text type="secondary" style={{ fontSize: 13 }}>Không</Text>}
                   </div>
@@ -317,7 +330,7 @@ export default function DepartmentManagement() {
           <Form.Item
             name="manager"
             label="Trưởng phòng (Quản lý)"
-            help="Trưởng phòng có thể xem dữ liệu của toàn bộ nhân viên thuộc phòng ban này."
+            tooltip="Trưởng phòng có thể xem dữ liệu của toàn bộ nhân viên thuộc phòng ban này."
           >
             <Select
               size="large"
@@ -337,7 +350,7 @@ export default function DepartmentManagement() {
           <Form.Item
             name="factory"
             label="Nhà máy trực thuộc"
-            help="Nếu bộ phận này là tổ sản xuất/chuyền may... hãy chọn nhà máy tương ứng để hệ thống phân quyền tự động."
+            tooltip="Nếu bộ phận này là tổ sản xuất/chuyền may... hãy chọn nhà máy tương ứng để hệ thống phân quyền tự động."
           >
             <Select
               size="large"
@@ -354,13 +367,63 @@ export default function DepartmentManagement() {
             />
           </Form.Item>
 
-          <Form.Item
-            name="is_sales_department"
-            valuePropName="checked"
-            help="Bật tùy chọn này để hệ thống tính doanh số của các nhân viên trong phòng ban này vào bảng xếp hạng Sales Tốt/Yếu nhất."
+          <Divider orientation="left" style={{ margin: '20px 0 14px', fontSize: 13, color: '#475569', fontWeight: 600 }}>
+            Cấu hình nghiệp vụ phòng ban
+          </Divider>
+
+          {/* Hộp cấu hình 1: Nhận khách tự động */}
+          <div
+            style={{
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              gap: 16,
+              padding: '12px 16px',
+              background: '#f8fafc',
+              border: '1px solid #e2e8f0',
+              borderRadius: 8,
+              marginBottom: 12,
+            }}
           >
-            <Switch checkedChildren="Có thống kê" unCheckedChildren="Không" />
-          </Form.Item>
+            <div style={{ flex: 1 }}>
+              <div style={{ fontWeight: 600, fontSize: 13.5, color: '#0f172a', marginBottom: 2 }}>
+                Nhận khách tự động (Lead Routing)
+              </div>
+              <div style={{ fontSize: 12, color: '#64748b', lineHeight: '1.4' }}>
+                Tự động chia khách hàng từ các kênh Marketing/Zalo/Website cho các nhân viên thuộc phòng ban này.
+              </div>
+            </div>
+            <Form.Item name="is_auto_assign_target" valuePropName="checked" noStyle>
+              <Switch checkedChildren="Bật" unCheckedChildren="Tắt" />
+            </Form.Item>
+          </div>
+
+          {/* Hộp cấu hình 2: Thống kê Doanh số */}
+          <div
+            style={{
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              gap: 16,
+              padding: '12px 16px',
+              background: '#f8fafc',
+              border: '1px solid #e2e8f0',
+              borderRadius: 8,
+              marginBottom: 20,
+            }}
+          >
+            <div style={{ flex: 1 }}>
+              <div style={{ fontWeight: 600, fontSize: 13.5, color: '#0f172a', marginBottom: 2 }}>
+                Thống kê Doanh số Sales
+              </div>
+              <div style={{ fontSize: 12, color: '#64748b', lineHeight: '1.4' }}>
+                Tính doanh số của nhân viên trong phòng ban này vào bảng xếp hạng Sales Tốt/Yếu nhất của công ty.
+              </div>
+            </div>
+            <Form.Item name="is_sales_department" valuePropName="checked" noStyle>
+              <Switch checkedChildren="Bật" unCheckedChildren="Tắt" />
+            </Form.Item>
+          </div>
 
           <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 24 }}>
             <Button onClick={() => setModalOpen(false)}>Hủy</Button>

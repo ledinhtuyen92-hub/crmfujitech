@@ -77,6 +77,12 @@ export function ChatProvider({ children }) {
       const res = await api.get('/chat/conversations/')
       const list = Array.isArray(res.data) ? res.data : (res.data.results || [])
       setConversations(list)
+      const onlineFromConvs = list
+        .filter((c) => c.type === 'direct' && c.direct_partner?.is_online)
+        .map((c) => c.direct_partner.id)
+      if (onlineFromConvs.length > 0) {
+        setOnlineUserIds((prev) => new Set([...prev, ...onlineFromConvs]))
+      }
     } catch (err) {
       console.error('Lỗi tải danh sách hội thoại chat:', err)
     }
@@ -253,6 +259,9 @@ export function ChatProvider({ children }) {
               }
               return prev
             })
+          } else if (data.type === 'initial_presence') {
+            const ids = data.online_user_ids || []
+            setOnlineUserIds(new Set(ids))
           } else if (data.type === 'presence_update') {
             const { user_id, status: presStatus } = data
             setOnlineUserIds((prev) => {

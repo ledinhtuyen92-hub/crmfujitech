@@ -94,6 +94,10 @@ class ConversationDetailSerializer(serializers.ModelSerializer):
         if obj.type == Conversation.TYPE_DIRECT and current_user:
             partner_p = obj.participants.exclude(user=current_user).first()
             if partner_p and partner_p.user:
+                if "_online_ids" not in self.context and current_user.company_id:
+                    from chat.presence import get_online_user_ids_sync
+                    self.context["_online_ids"] = get_online_user_ids_sync(current_user.company_id)
+                online_ids = self.context.get("_online_ids", set())
                 return {
                     "id": partner_p.user.id,
                     "full_name": partner_p.user.full_name,
@@ -101,6 +105,7 @@ class ConversationDetailSerializer(serializers.ModelSerializer):
                     "avatar": partner_p.user.avatar.url if partner_p.user.avatar else None,
                     "department_name": partner_p.user.department.name if partner_p.user.department else "",
                     "role_name": partner_p.user.role.name if partner_p.user.role else "",
+                    "is_online": partner_p.user.id in online_ids,
                 }
         return None
 

@@ -5,6 +5,7 @@ from channels.db import database_sync_to_async
 from django.utils import timezone
 from .models import Conversation, ConversationParticipant, ChatMessage
 from .serializers import ChatMessageSerializer
+from .presence import add_user_presence, remove_user_presence, get_online_user_ids
 
 logger = logging.getLogger(__name__)
 
@@ -128,8 +129,19 @@ class ChatConsumer(AsyncWebsocketConsumer):
             "full_name": user.full_name or user.username,
         }))
 
-        # Thông báo trạng thái Online cho đồng nghiệp
+        # Ghi nhận trạng thái online vào Redis
+        is_first_tab = await add_user_presence(user.company_id, user.id, self.channel_name)
+
+        # Gửi danh sách toàn bộ đồng nghiệp đang online cho chính người dùng này
         if user.company_id:
+            online_users = await get_online_user_ids(user.company_id)
+            await self.send(text_data=json.dumps({
+                "type": "initial_presence",
+                "online_user_ids": list(online_users),
+            }))
+
+        # Nếu là tab đầu tiên của user, thông báo Online cho các đồng nghiệp khác
+        if is_first_tab and user.company_id:
             await self.channel_layer.group_send(
                 self.company_presence_group,
                 {
@@ -144,15 +156,20 @@ class ChatConsumer(AsyncWebsocketConsumer):
             await self.channel_layer.group_discard(self.user_group, self.channel_name)
         if hasattr(self, "company_presence_group") and self.user.company_id:
             await self.channel_layer.group_discard(self.company_presence_group, self.channel_name)
-            # Thông báo trạng thái Offline
-            await self.channel_layer.group_send(
-                self.company_presence_group,
-                {
-                    "type": "presence_status",
-                    "user_id": self.user.id,
-                    "status": "offline",
-                }
-            )
+
+            # Xóa connection khỏi Redis
+            is_last_tab = await remove_user_presence(self.user.company_id, self.user.id, self.channel_name)
+
+            # Chỉ thông báo Offline nếu user đã đóng toàn bộ các tab
+            if is_last_tab:
+                await self.channel_layer.group_send(
+                    self.company_presence_group,
+                    {
+                        "type": "presence_status",
+                        "user_id": self.user.id,
+                        "status": "offline",
+                    }
+                )
 
     async def receive(self, text_data):
         try:

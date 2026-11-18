@@ -44,11 +44,11 @@ def auto_assign_customer(sender, instance, **kwargs):
                     User.objects.filter(
                         company=company,
                         is_active=True,
+                        is_company_admin=False,
                         is_superuser=False,
+                        is_auto_assign_target=True,
                     )
-                    .filter(
-                        Q(role__is_auto_assign_target=True) | Q(is_auto_assign_target=True)
-                    )
+                    .distinct()
                     .annotate(last_lead_time=Max("assigned_customers__created_at"))
                     .order_by(F("last_lead_time").asc(nulls_first=True))
                     .first()

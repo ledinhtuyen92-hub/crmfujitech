@@ -129,6 +129,11 @@ class Department(models.Model):
         verbose_name="Thống kê Doanh số Sales",
         help_text="Bật để tính doanh số của phòng ban này vào báo cáo Sales Tốt/Yếu nhất."
     )
+    is_auto_assign_target = models.BooleanField(
+        default=False,
+        verbose_name="Nhận khách tự động",
+        help_text="Bật tùy chọn này để nhân viên thuộc phòng ban này được nhận khách từ chức năng phân bổ tự động.",
+    )
 
     class Meta:
         ordering = ["name"]
@@ -221,7 +226,7 @@ class User(AbstractUser):
     is_auto_assign_target = models.BooleanField(
         default=False,
         verbose_name="Nhận khách tự động",
-        help_text="Ghi đè cấu hình Role: Nếu bật, tài khoản này sẽ được chia khách tự động.",
+        help_text="Công tắc cá nhân: Gạt Tắt khi nhân viên nghỉ phép, nghỉ ốm hoặc tạm dừng nhận khách.",
     )
     department = models.ForeignKey(
         "Department",

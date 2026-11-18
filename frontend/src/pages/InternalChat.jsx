@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react'
+import React, { useState, useEffect, useRef, useMemo } from 'react'
 import {
   Avatar,
   Badge,
@@ -88,6 +88,8 @@ export default function InternalChat() {
   const [inputContent, setInputContent] = useState('')
   const [activeTab, setActiveTab] = useState('all') // 'all' | 'direct' | 'department' | 'group'
   const [searchText, setSearchText] = useState('')
+  const [colleagueSearchText, setColleagueSearchText] = useState('')
+  const [colleagueFilterTab, setColleagueFilterTab] = useState('all') // 'all' | 'online' | 'offline'
   const [createGroupModalOpen, setCreateGroupModalOpen] = useState(false)
   const [directChatModalOpen, setDirectChatModalOpen] = useState(false)
   const [crmDocModalOpen, setCrmDocModalOpen] = useState(false)
@@ -126,9 +128,15 @@ export default function InternalChat() {
   const canManageConfig = isSuperAdmin || isCompanyAdmin || hasPermission('chat.admin')
 
   // Tải danh sách đồng nghiệp
-  useEffect(() => {
+  const fetchColleagues = () => {
     if (user) {
       api.get('/chat/colleagues/').then((res) => setColleagues(res.data || [])).catch(() => {})
+    }
+  }
+
+  useEffect(() => {
+    if (user) {
+      fetchColleagues()
       api.get('/chat/department-groups/').then(() => fetchConversations()).catch(() => {})
       if (canManageConfig) {
         api.get('/chat/config/').then((res) => setChatConfig(res.data)).catch(() => {})
@@ -136,16 +144,97 @@ export default function InternalChat() {
     }
   }, [user, canManageConfig, fetchConversations])
 
-  // Lọc danh sách hội thoại
-  const filteredConversations = conversations.filter((c) => {
-    if (activeTab === 'direct' && c.type !== 'direct') return false
-    if (activeTab === 'department' && c.type !== 'department') return false
-    if (activeTab === 'group' && c.type !== 'group') return false
-    if (!searchText) return true
+  const openDirectChatModal = () => {
+    setColleagueSearchText('')
+    setColleagueFilterTab('all')
+    setDirectChatModalOpen(true)
+    fetchColleagues()
+  }
 
-    const title = c.type === 'direct' ? c.direct_partner?.full_name || '' : c.title || ''
-    return title.toLowerCase().includes(searchText.toLowerCase())
-  })
+  // Số lượng đồng nghiệp online
+  const onlineCount = useMemo(() => {
+    return colleagues.filter((c) => onlineUserIds.has(c.id) || !!c.is_online).length
+  }, [colleagues, onlineUserIds])
+
+  // Danh sách đồng nghiệp hiển thị trong modal Nhắn tin trực tiếp
+  const filteredColleaguesInModal = useMemo(() => {
+    let list = colleagues.map((c) => ({
+      ...c,
+      isOnline: onlineUserIds.has(c.id) || !!c.is_online,
+    }))
+
+    if (colleagueSearchText.trim()) {
+      const q = colleagueSearchText.trim().toLowerCase()
+      list = list.filter((c) =>
+        (c.full_name || '').toLowerCase().includes(q) ||
+        (c.username || '').toLowerCase().includes(q) ||
+        (c.department_name || '').toLowerCase().includes(q) ||
+        (c.role_name || '').toLowerCase().includes(q)
+      )
+    }
+
+    if (colleagueFilterTab === 'online') {
+      list = list.filter((c) => c.isOnline)
+    } else if (colleagueFilterTab === 'offline') {
+      list = list.filter((c) => !c.isOnline)
+    }
+
+    return list.sort((a, b) => {
+      if (a.isOnline !== b.isOnline) return a.isOnline ? -1 : 1
+      return (a.full_name || '').localeCompare(b.full_name || '', 'vi')
+    })
+  }, [colleagues, onlineUserIds, colleagueSearchText, colleagueFilterTab])
+
+  // Lọc danh sách hội thoại theo từ khóa và tab
+  const searchLower = searchText.trim().toLowerCase()
+  const filteredConversations = useMemo(() => {
+    return conversations.filter((c) => {
+      if (activeTab === 'direct' && c.type !== 'direct') return false
+      if (activeTab === 'department' && c.type !== 'department') return false
+      if (activeTab === 'group' && c.type !== 'group') return false
+      if (!searchLower) return true
+
+      if (c.type === 'direct') {
+        const partner = c.direct_partner || {}
+        return (
+          (partner.full_name || '').toLowerCase().includes(searchLower) ||
+          (partner.username || '').toLowerCase().includes(searchLower) ||
+          (partner.department_name || '').toLowerCase().includes(searchLower) ||
+          (partner.role_name || '').toLowerCase().includes(searchLower)
+        )
+      }
+      return (
+        (c.title || '').toLowerCase().includes(searchLower) ||
+        (c.department_name || '').toLowerCase().includes(searchLower)
+      )
+    })
+  }, [conversations, activeTab, searchLower])
+
+  // Lọc danh sách đồng nghiệp phù hợp với từ khóa tìm kiếm (dùng để gợi ý chat 1-1 ngay trên thanh tìm kiếm)
+  const matchingColleagues = useMemo(() => {
+    if (!searchLower || activeTab === 'department' || activeTab === 'group') return []
+    return colleagues
+      .filter((col) => {
+        const name = (col.full_name || '').toLowerCase()
+        const uname = (col.username || '').toLowerCase()
+        const dept = (col.department_name || '').toLowerCase()
+        const role = (col.role_name || '').toLowerCase()
+        return (
+          name.includes(searchLower) ||
+          uname.includes(searchLower) ||
+          dept.includes(searchLower) ||
+          role.includes(searchLower)
+        )
+      })
+      .map((col) => ({
+        ...col,
+        isOnline: onlineUserIds.has(col.id) || !!col.is_online,
+      }))
+      .sort((a, b) => {
+        if (a.isOnline !== b.isOnline) return a.isOnline ? -1 : 1
+        return (a.full_name || '').localeCompare(b.full_name || '', 'vi')
+      })
+  }, [searchLower, colleagues, activeTab, onlineUserIds])
 
   const currentMessages = (activeConversation && messagesByConv[activeConversation.id]) || []
   const currentTyping = (activeConversation && typingUsers[activeConversation.id]) || []
@@ -282,6 +371,128 @@ export default function InternalChat() {
     }
   }
 
+  // Hàm render danh sách cuộc trò chuyện
+  const renderConversationList = (list) => (
+    <List
+      dataSource={list}
+      renderItem={(item) => {
+        const isDirect = item.type === 'direct'
+        const isDept = item.type === 'department'
+        const partner = item.direct_partner
+        const title = isDirect ? partner?.full_name : item.title
+        const isOnline = isDirect && (onlineUserIds.has(partner?.id) || !!partner?.is_online)
+        const isSelected = activeConversation?.id === item.id
+
+        return (
+          <List.Item
+            onClick={() => {
+              setActiveConversation(item)
+              fetchMessages(item.id)
+              markAsRead(item.id)
+            }}
+            style={{
+              padding: '12px 16px',
+              cursor: 'pointer',
+              borderBottom: '1px solid #f8fafc',
+              background: isSelected ? '#eff6ff' : item.unread_count > 0 ? '#f0fdf4' : '#ffffff',
+              borderLeft: isSelected ? '4px solid #2563eb' : '4px solid transparent',
+              transition: 'all 0.15s',
+            }}
+          >
+            <List.Item.Meta
+              avatar={
+                <div style={{ position: 'relative' }}>
+                  <Avatar
+                    src={isDirect ? partner?.avatar : item.avatar}
+                    icon={isDirect ? <UserOutlined /> : isDept ? <ApartmentOutlined /> : <TeamOutlined />}
+                    size={42}
+                    style={{
+                      background: isDirect ? '#3b82f6' : isDept ? '#8b5cf6' : '#10b981',
+                    }}
+                  />
+                  {isOnline && (
+                    <span
+                      style={{
+                        position: 'absolute',
+                        bottom: 0,
+                        right: 0,
+                        width: 11,
+                        height: 11,
+                        background: '#22c55e',
+                        border: '2px solid #fff',
+                        borderRadius: '50%',
+                      }}
+                    />
+                  )}
+                </div>
+              }
+              title={
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <span style={{ fontWeight: item.unread_count > 0 ? 700 : 600, fontSize: 13.5, color: '#0f172a' }}>
+                    {title}
+                  </span>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6 }} onClick={(e) => e.stopPropagation()}>
+                    {item.unread_count > 0 && (
+                      <Badge count={item.unread_count} style={{ backgroundColor: '#ef4444' }} />
+                    )}
+                    {item.type !== 'department' && (
+                      <Popconfirm
+                        title={
+                          item.type === 'direct'
+                            ? 'Xóa cuộc trò chuyện ở phía bạn?'
+                            : (item.created_by?.id === user?.id || isCompanyAdmin || isSuperAdmin
+                                ? 'Giải tán nhóm trò chuyện này?'
+                                : 'Rời khỏi nhóm trò chuyện này?')
+                        }
+                        description={
+                          item.type === 'direct'
+                            ? 'Cuộc trò chuyện sẽ được ẩn khỏi danh sách của bạn. Người đối diện vẫn giữ lịch sử trò chuyện. Nếu cả hai bên đều xóa, dữ liệu sẽ được xóa triệt để.'
+                            : (item.created_by?.id === user?.id || isCompanyAdmin || isSuperAdmin
+                                ? 'Toàn bộ tin nhắn và dữ liệu nhóm sẽ bị xóa triệt để khỏi hệ thống.'
+                                : 'Bạn sẽ rời nhóm và không nhận được tin nhắn từ nhóm này nữa.')
+                        }
+                        okText={
+                          item.type === 'direct'
+                            ? 'Xóa ở phía tôi'
+                            : (item.created_by?.id === user?.id || isCompanyAdmin || isSuperAdmin
+                                ? 'Giải tán nhóm'
+                                : 'Rời nhóm')
+                        }
+                        cancelText="Hủy"
+                        okButtonProps={{ danger: true }}
+                        onConfirm={() => deleteConversation(item.id)}
+                      >
+                        <Button
+                          type="text"
+                          size="small"
+                          icon={<DeleteOutlined style={{ fontSize: 13, color: '#94a3b8' }} />}
+                          style={{ padding: 2, height: 22, width: 22 }}
+                          title={
+                            item.type === 'direct'
+                              ? 'Xóa ở phía tôi'
+                              : (item.created_by?.id === user?.id || isCompanyAdmin || isSuperAdmin
+                                  ? 'Giải tán nhóm'
+                                  : 'Rời nhóm')
+                          }
+                        />
+                      </Popconfirm>
+                    )}
+                  </div>
+                </div>
+              }
+              description={
+                <div style={{ fontSize: 12, color: item.unread_count > 0 ? '#1e40af' : '#64748b', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', fontWeight: item.unread_count > 0 ? 600 : 400 }}>
+                  {item.last_sender_name ? `${item.last_sender_name}: ` : ''}
+                  {item.last_message_text || 'Bắt đầu cuộc trò chuyện'}
+                </div>
+              }
+            />
+          </List.Item>
+        )
+      }}
+    />
+  )
+
   // Render Left Pane (Danh sách hội thoại)
   const renderLeftPane = () => (
     <div
@@ -327,7 +538,7 @@ export default function InternalChat() {
               <Button
                 type="text"
                 icon={<UserOutlined style={{ fontSize: 16, color: '#2563eb' }} />}
-                onClick={() => setDirectChatModalOpen(true)}
+                onClick={openDirectChatModal}
               />
             </Tooltip>
             <Tooltip title="Tạo nhóm chat mới">
@@ -388,125 +599,166 @@ export default function InternalChat() {
 
       {/* Danh sách hội thoại cuộn */}
       <div style={{ flex: 1, overflowY: 'auto' }}>
-        <List
-          dataSource={filteredConversations}
-          locale={{ emptyText: <Empty description="Chưa có cuộc trò chuyện nào" image={Empty.PRESENTED_IMAGE_SIMPLE} /> }}
-          renderItem={(item) => {
-            const isDirect = item.type === 'direct'
-            const isDept = item.type === 'department'
-            const partner = item.direct_partner
-            const title = isDirect ? partner?.full_name : item.title
-            const isOnline = isDirect && onlineUserIds.has(partner?.id)
-            const isSelected = activeConversation?.id === item.id
-
-            return (
-              <List.Item
-                onClick={() => {
-                  setActiveConversation(item)
-                  fetchMessages(item.id)
-                  markAsRead(item.id)
-                }}
-                style={{
-                  padding: '12px 16px',
-                  cursor: 'pointer',
-                  borderBottom: '1px solid #f8fafc',
-                  background: isSelected ? '#eff6ff' : item.unread_count > 0 ? '#f0fdf4' : '#ffffff',
-                  borderLeft: isSelected ? '4px solid #2563eb' : '4px solid transparent',
-                  transition: 'all 0.15s',
-                }}
-              >
-                <List.Item.Meta
-                  avatar={
-                    <div style={{ position: 'relative' }}>
-                      <Avatar
-                        src={isDirect ? partner?.avatar : item.avatar}
-                        icon={isDirect ? <UserOutlined /> : isDept ? <ApartmentOutlined /> : <TeamOutlined />}
-                        size={42}
-                        style={{
-                          background: isDirect ? '#3b82f6' : isDept ? '#8b5cf6' : '#10b981',
-                        }}
-                      />
-                      {isOnline && (
-                        <span
-                          style={{
-                            position: 'absolute',
-                            bottom: 0,
-                            right: 0,
-                            width: 11,
-                            height: 11,
-                            background: '#22c55e',
-                            border: '2px solid #fff',
-                            borderRadius: '50%',
-                          }}
-                        />
-                      )}
+        {searchLower ? (
+          <div>
+            {matchingColleagues.length === 0 && filteredConversations.length === 0 ? (
+              <Empty
+                description={`Không tìm thấy cuộc trò chuyện hoặc đồng nghiệp nào phù hợp với "${searchText}"`}
+                image={Empty.PRESENTED_IMAGE_SIMPLE}
+                style={{ margin: '40px 16px' }}
+              />
+            ) : (
+              <>
+                {/* Kết quả tìm kiếm đồng nghiệp */}
+                {matchingColleagues.length > 0 && (
+                  <div>
+                    <div
+                      style={{
+                        padding: '8px 16px',
+                        background: '#f8fafc',
+                        borderBottom: '1px solid #f1f5f9',
+                        fontSize: 11,
+                        fontWeight: 700,
+                        color: '#64748b',
+                        textTransform: 'uppercase',
+                        letterSpacing: '0.5px',
+                      }}
+                    >
+                      Đồng nghiệp ({matchingColleagues.length})
                     </div>
-                  }
-                  title={
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                      <span style={{ fontWeight: item.unread_count > 0 ? 700 : 600, fontSize: 13.5, color: '#0f172a' }}>
-                        {title}
-                      </span>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 6 }} onClick={(e) => e.stopPropagation()}>
-                        {item.unread_count > 0 && (
-                          <Badge count={item.unread_count} style={{ backgroundColor: '#ef4444' }} />
-                        )}
-                        {item.type !== 'department' && (
-                          <Popconfirm
-                            title={
-                              item.type === 'direct'
-                                ? 'Xóa cuộc trò chuyện ở phía bạn?'
-                                : (item.created_by?.id === user?.id || isCompanyAdmin || isSuperAdmin
-                                    ? 'Giải tán nhóm trò chuyện này?'
-                                    : 'Rời khỏi nhóm trò chuyện này?')
-                            }
-                            description={
-                              item.type === 'direct'
-                                ? 'Cuộc trò chuyện sẽ được ẩn khỏi danh sách của bạn. Người đối diện vẫn giữ lịch sử trò chuyện. Nếu cả hai bên đều xóa, dữ liệu sẽ được xóa triệt để.'
-                                : (item.created_by?.id === user?.id || isCompanyAdmin || isSuperAdmin
-                                    ? 'Toàn bộ tin nhắn và dữ liệu nhóm sẽ bị xóa triệt để khỏi hệ thống.'
-                                    : 'Bạn sẽ rời nhóm và không nhận được tin nhắn từ nhóm này nữa.')
-                            }
-                            okText={
-                              item.type === 'direct'
-                                ? 'Xóa ở phía tôi'
-                                : (item.created_by?.id === user?.id || isCompanyAdmin || isSuperAdmin
-                                    ? 'Giải tán nhóm'
-                                    : 'Rời nhóm')
-                            }
-                            cancelText="Hủy"
-                            okButtonProps={{ danger: true }}
-                            onConfirm={() => deleteConversation(item.id)}
+                    <List
+                      dataSource={matchingColleagues}
+                      renderItem={(col) => {
+                        const isOnline = col.isOnline
+                        return (
+                          <List.Item
+                            onClick={async () => {
+                              setSearchText('')
+                              await startDirectChat(col.id)
+                            }}
+                            style={{
+                              padding: '10px 16px',
+                              cursor: 'pointer',
+                              borderBottom: '1px solid #f8fafc',
+                              transition: 'all 0.15s',
+                            }}
+                            onMouseEnter={(e) => (e.currentTarget.style.background = '#f1f5f9')}
+                            onMouseLeave={(e) => (e.currentTarget.style.background = '#ffffff')}
                           >
-                            <Button
-                              type="text"
-                              size="small"
-                              icon={<DeleteOutlined style={{ fontSize: 13, color: '#94a3b8' }} />}
-                              style={{ padding: 2, height: 22, width: 22 }}
+                            <List.Item.Meta
+                              avatar={
+                                <div style={{ position: 'relative' }}>
+                                  <Avatar
+                                    src={col.avatar}
+                                    icon={<UserOutlined />}
+                                    size={40}
+                                    style={{ background: isOnline ? '#2563eb' : '#94a3b8' }}
+                                  />
+                                  <span
+                                    style={{
+                                      position: 'absolute',
+                                      bottom: 0,
+                                      right: 0,
+                                      width: 10,
+                                      height: 10,
+                                      background: isOnline ? '#22c55e' : '#cbd5e1',
+                                      border: '2px solid #fff',
+                                      borderRadius: '50%',
+                                    }}
+                                  />
+                                </div>
+                              }
                               title={
-                                item.type === 'direct'
-                                  ? 'Xóa ở phía tôi'
-                                  : (item.created_by?.id === user?.id || isCompanyAdmin || isSuperAdmin
-                                      ? 'Giải tán nhóm'
-                                      : 'Rời nhóm')
+                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                  <span style={{ fontWeight: 600, fontSize: 13.5, color: '#0f172a' }}>
+                                    {col.full_name}
+                                  </span>
+                                  {isOnline ? (
+                                    <span style={{ fontSize: 11, color: '#16a34a', fontWeight: 500 }}>
+                                      Online
+                                    </span>
+                                  ) : (
+                                    <span style={{ fontSize: 11, color: '#94a3b8' }}>
+                                      Offline
+                                    </span>
+                                  )}
+                                </div>
+                              }
+                              description={
+                                <div style={{ fontSize: 12, color: '#64748b', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                  {col.department_name ? <span>{col.department_name}</span> : null}
+                                  {col.role_name && <span style={{ color: '#94a3b8' }}> • {col.role_name}</span>}
+                                </div>
                               }
                             />
-                          </Popconfirm>
-                        )}
-                      </div>
+                          </List.Item>
+                        )
+                      }}
+                    />
+                  </div>
+                )}
+
+                {/* Kết quả tìm kiếm cuộc trò chuyện */}
+                {filteredConversations.length > 0 && (
+                  <div>
+                    <div
+                      style={{
+                        padding: '8px 16px',
+                        background: '#f8fafc',
+                        borderBottom: '1px solid #f1f5f9',
+                        fontSize: 11,
+                        fontWeight: 700,
+                        color: '#64748b',
+                        textTransform: 'uppercase',
+                        letterSpacing: '0.5px',
+                      }}
+                    >
+                      Cuộc trò chuyện ({filteredConversations.length})
                     </div>
-                  }
-                  description={
-                    <div style={{ fontSize: 12, color: item.unread_count > 0 ? '#1e40af' : '#64748b', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', fontWeight: item.unread_count > 0 ? 600 : 400 }}>
-                      {item.last_sender_name ? `${item.last_sender_name}: ` : ''}
-                      {item.last_message_text || 'Bắt đầu cuộc trò chuyện'}
-                    </div>
-                  }
-                />
-              </List.Item>
-            )
-          }}
-        />
+                    {renderConversationList(filteredConversations)}
+                  </div>
+                )}
+              </>
+            )}
+          </div>
+        ) : filteredConversations.length > 0 ? (
+          renderConversationList(filteredConversations)
+        ) : (
+          <div style={{ textAlign: 'center', padding: '40px 16px' }}>
+            <Empty
+              description={
+                activeTab === 'direct'
+                  ? 'Chưa có cuộc trò chuyện 1-1 nào'
+                  : activeTab === 'department'
+                  ? 'Chưa có nhóm phòng ban nào'
+                  : activeTab === 'group'
+                  ? 'Chưa có nhóm trò chuyện nào'
+                  : 'Chưa có cuộc trò chuyện nào'
+              }
+              image={Empty.PRESENTED_IMAGE_SIMPLE}
+            />
+            {activeTab === 'direct' && (
+              <Button
+                type="primary"
+                icon={<UserOutlined />}
+                onClick={openDirectChatModal}
+                style={{ marginTop: 12, background: '#2563eb' }}
+              >
+                Nhắn tin với đồng nghiệp
+              </Button>
+            )}
+            {activeTab === 'group' && (
+              <Button
+                type="primary"
+                icon={<PlusOutlined />}
+                onClick={() => setCreateGroupModalOpen(true)}
+                style={{ marginTop: 12, background: '#16a34a' }}
+              >
+                Tạo nhóm chat mới
+              </Button>
+            )}
+          </div>
+        )}
       </div>
     </div>
   )
@@ -941,34 +1193,172 @@ export default function InternalChat() {
 
       {/* ── Modal Bắt đầu chat 1-1 với đồng nghiệp ── */}
       <Modal
-        title="Nhắn tin với đồng nghiệp"
+        title={
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <UserOutlined style={{ color: '#2563eb' }} />
+            <span>Nhắn tin với đồng nghiệp</span>
+          </div>
+        }
         open={directChatModalOpen}
-        onCancel={() => setDirectChatModalOpen(false)}
+        onCancel={() => {
+          setDirectChatModalOpen(false)
+          setColleagueSearchText('')
+        }}
         footer={null}
-        width={420}
+        width={460}
         centered
         destroyOnClose
       >
-        <div style={{ maxHeight: 400, overflowY: 'auto' }}>
+        {/* Ô tìm kiếm trong modal */}
+        <Input
+          placeholder="Tìm theo tên, phòng ban, chức danh..."
+          prefix={<SearchOutlined style={{ color: '#94a3b8' }} />}
+          value={colleagueSearchText}
+          onChange={(e) => setColleagueSearchText(e.target.value)}
+          allowClear
+          style={{ borderRadius: 8, marginBottom: 10 }}
+        />
+
+        {/* Bộ lọc trạng thái Online / Offline */}
+        <div style={{ display: 'flex', gap: 6, marginBottom: 12 }}>
+          <Button
+            size="small"
+            type={colleagueFilterTab === 'all' ? 'primary' : 'default'}
+            onClick={() => setColleagueFilterTab('all')}
+            style={{ borderRadius: 6, fontSize: 12 }}
+          >
+            Tất cả ({colleagues.length})
+          </Button>
+          <Button
+            size="small"
+            type={colleagueFilterTab === 'online' ? 'primary' : 'default'}
+            onClick={() => setColleagueFilterTab('online')}
+            style={{
+              borderRadius: 6,
+              fontSize: 12,
+              background: colleagueFilterTab === 'online' ? '#16a34a' : undefined,
+              borderColor: colleagueFilterTab === 'online' ? '#16a34a' : undefined,
+            }}
+          >
+            Đang online ({onlineCount})
+          </Button>
+          <Button
+            size="small"
+            type={colleagueFilterTab === 'offline' ? 'primary' : 'default'}
+            onClick={() => setColleagueFilterTab('offline')}
+            style={{ borderRadius: 6, fontSize: 12 }}
+          >
+            Ngoại tuyến ({colleagues.length - onlineCount})
+          </Button>
+        </div>
+
+        {/* Danh sách đồng nghiệp */}
+        <div style={{ maxHeight: 380, overflowY: 'auto' }}>
           <List
-            dataSource={colleagues}
-            renderItem={(c) => (
-              <List.Item
-                onClick={async () => {
-                  setDirectChatModalOpen(false)
-                  await startDirectChat(c.id)
-                }}
-                style={{ cursor: 'pointer', padding: '10px 14px', borderRadius: 8 }}
-                onMouseEnter={(e) => (e.currentTarget.style.background = '#f1f5f9')}
-                onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
-              >
-                <List.Item.Meta
-                  avatar={<Avatar src={c.avatar} icon={<UserOutlined />} style={{ background: '#3b82f6' }} />}
-                  title={<strong style={{ fontSize: 13.5 }}>{c.full_name}</strong>}
-                  description={<span style={{ fontSize: 12, color: '#64748b' }}>{c.department_name || c.role_name || c.username}</span>}
+            dataSource={filteredColleaguesInModal}
+            locale={{
+              emptyText: (
+                <Empty
+                  description={
+                    colleagueSearchText
+                      ? 'Không tìm thấy đồng nghiệp phù hợp'
+                      : colleagueFilterTab === 'online'
+                      ? 'Hiện không có đồng nghiệp nào online'
+                      : 'Không có dữ liệu'
+                  }
+                  image={Empty.PRESENTED_IMAGE_SIMPLE}
                 />
-              </List.Item>
-            )}
+              ),
+            }}
+            renderItem={(c) => {
+              const isOnline = c.isOnline
+              return (
+                <List.Item
+                  onClick={async () => {
+                    setDirectChatModalOpen(false)
+                    setColleagueSearchText('')
+                    await startDirectChat(c.id)
+                  }}
+                  style={{
+                    cursor: 'pointer',
+                    padding: '10px 14px',
+                    borderRadius: 8,
+                    transition: 'all 0.15s',
+                    borderBottom: '1px solid #f1f5f9',
+                  }}
+                  onMouseEnter={(e) => (e.currentTarget.style.background = '#f8fafc')}
+                  onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
+                >
+                  <List.Item.Meta
+                    avatar={
+                      <div style={{ position: 'relative' }}>
+                        <Avatar
+                          src={c.avatar}
+                          icon={<UserOutlined />}
+                          size={40}
+                          style={{ background: isOnline ? '#2563eb' : '#94a3b8' }}
+                        />
+                        <span
+                          style={{
+                            position: 'absolute',
+                            bottom: 0,
+                            right: 0,
+                            width: 10,
+                            height: 10,
+                            background: isOnline ? '#22c55e' : '#cbd5e1',
+                            border: '2px solid #fff',
+                            borderRadius: '50%',
+                          }}
+                        />
+                      </div>
+                    }
+                    title={
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <strong style={{ fontSize: 13.5, color: '#0f172a' }}>{c.full_name}</strong>
+                        {isOnline ? (
+                          <span
+                            style={{
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: 4,
+                              fontSize: 11,
+                              color: '#16a34a',
+                              fontWeight: 500,
+                              background: '#f0fdf4',
+                              border: '1px solid #bbf7d0',
+                              padding: '1px 8px',
+                              borderRadius: 10,
+                            }}
+                          >
+                            <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#22c55e' }} />
+                            Đang online
+                          </span>
+                        ) : (
+                          <span
+                            style={{
+                              fontSize: 11,
+                              color: '#94a3b8',
+                              background: '#f8fafc',
+                              border: '1px solid #e2e8f0',
+                              padding: '1px 8px',
+                              borderRadius: 10,
+                            }}
+                          >
+                            Ngoại tuyến
+                          </span>
+                        )}
+                      </div>
+                    }
+                    description={
+                      <div style={{ fontSize: 12, color: '#64748b', marginTop: 2 }}>
+                        {c.department_name ? <span>{c.department_name}</span> : null}
+                        {c.role_name && <span style={{ color: '#94a3b8' }}> • {c.role_name}</span>}
+                      </div>
+                    }
+                  />
+                </List.Item>
+              )
+            }}
           />
         </div>
       </Modal>
@@ -1014,7 +1404,7 @@ export default function InternalChat() {
               onChange={setSelectedMemberIds}
               style={{ width: '100%', marginTop: 6 }}
               options={colleagues.map((c) => ({
-                label: `${c.full_name} (${c.department_name || c.username})`,
+                label: `${c.full_name} ${onlineUserIds.has(c.id) || !!c.is_online ? '(Online)' : ''} (${c.department_name || c.username})`,
                 value: c.id,
               }))}
             />

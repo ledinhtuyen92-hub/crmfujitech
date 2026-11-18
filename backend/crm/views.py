@@ -245,7 +245,7 @@ class CustomerViewSet(TenantQuerySetMixin, viewsets.ModelViewSet):
             )
 
         from users.models import User
-        from django.db.models import Max, F
+        from django.db.models import Max, F, Q
 
         company = request.user.company
 
@@ -256,10 +256,11 @@ class CustomerViewSet(TenantQuerySetMixin, viewsets.ModelViewSet):
                 is_active=True,
                 is_company_admin=False,
                 is_superuser=False,
-                role__is_auto_assign_target=True,
-            ).annotate(
-                last_lead_time=Max("assigned_customers__created_at")
-            ).order_by(F("last_lead_time").asc(nulls_first=True))
+                is_auto_assign_target=True,
+            )
+            .distinct()
+            .annotate(last_lead_time=Max("assigned_customers__created_at"))
+            .order_by(F("last_lead_time").asc(nulls_first=True))
         )
 
         if not sale_users:

@@ -621,8 +621,11 @@ def get_colleagues(request):
     if q:
         qs = qs.filter(Q(full_name__icontains=q) | Q(username__icontains=q) | Q(email__icontains=q))
 
+    from chat.presence import get_online_user_ids_sync
+    online_ids = get_online_user_ids_sync(user.company_id)
+
     results = []
-    for u in qs.select_related("department", "role").order_by("full_name")[:50]:
+    for u in qs.select_related("department", "role").order_by("full_name")[:100]:
         results.append({
             "id": u.id,
             "full_name": u.full_name,
@@ -630,6 +633,7 @@ def get_colleagues(request):
             "avatar": u.avatar.url if u.avatar else None,
             "department_name": u.department.name if u.department else "",
             "role_name": u.role.name if u.role else "",
+            "is_online": u.id in online_ids,
         })
     return Response(results)
 

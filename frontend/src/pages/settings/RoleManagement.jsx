@@ -377,19 +377,6 @@ export default function RoleManagement() {
             </Col>
           </Row>
 
-          <Form.Item
-            name="is_auto_assign_target"
-            valuePropName="checked"
-            style={{ marginBottom: 8 }}
-          >
-            <Checkbox>
-              <Text strong>Nhóm được chia khách tự động</Text>
-              <Tooltip title="Bật tùy chọn này để nhân viên thuộc vai trò này có thể nhận khách từ chức năng Phân bổ tự động (Round-robin)">
-                <InfoCircleOutlined style={{ marginLeft: 8, color: token.colorTextSecondary }} />
-              </Tooltip>
-            </Checkbox>
-          </Form.Item>
-
           <Divider orientation="left" style={{ margin: '16px 0 16px' }}>
             <Text strong>Phân quyền theo Module</Text>
           </Divider>

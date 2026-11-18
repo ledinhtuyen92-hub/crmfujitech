@@ -565,6 +565,14 @@ export default function UserManagement() {
                   size="large"
                   placeholder="Chọn phòng ban chính..."
                   options={departments.map((d) => ({ value: d.id, label: d.name }))}
+                  onChange={(deptId) => {
+                    const dept = departments.find((d) => d.id === deptId)
+                    if (dept) {
+                      form.setFieldsValue({ is_auto_assign_target: !!dept.is_auto_assign_target })
+                    } else {
+                      form.setFieldsValue({ is_auto_assign_target: false })
+                    }
+                  }}
                   allowClear
                 />
               </Form.Item>
@@ -632,28 +640,34 @@ export default function UserManagement() {
               </Form.Item>
             </Col>
           </Row>
-          <Form.Item
-            noStyle
-            shouldUpdate={(prevValues, currentValues) => prevValues.role !== currentValues.role}
-          >
-            {({ getFieldValue }) => {
-              const selectedRoleId = getFieldValue('role');
-              const selectedRole = roles.find((r) => r.id === selectedRoleId);
-              const hasAutoAssignRole = selectedRole && selectedRole.is_auto_assign_target;
 
-              if (hasAutoAssignRole) return null;
-
-              return (
-                <Row gutter={24}>
-                  <Col xs={24} md={24}>
-                    <Form.Item name="is_auto_assign_target" label="Nhận khách tự động (Quyền mở rộng)" valuePropName="checked" help="Hiển thị do tài khoản đang không có Nhóm quyền nhận khách. Bật lên nếu muốn tài khoản này được nhận khách.">
-                      <Switch checkedChildren="Có nhận" unCheckedChildren="Không nhận" />
-                    </Form.Item>
-                  </Col>
-                </Row>
-              );
+          {/* Hộp cấu hình: Nhận khách tự động (Cá nhân) */}
+          <div
+            style={{
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              gap: 16,
+              padding: '12px 16px',
+              background: '#f8fafc',
+              border: '1px solid #e2e8f0',
+              borderRadius: 8,
+              marginTop: 4,
+              marginBottom: 16,
             }}
-          </Form.Item>
+          >
+            <div style={{ flex: 1 }}>
+              <div style={{ fontWeight: 600, fontSize: 13.5, color: '#0f172a', marginBottom: 2 }}>
+                Nhận khách tự động (Cá nhân)
+              </div>
+              <div style={{ fontSize: 12, color: '#64748b', lineHeight: '1.4' }}>
+                Gạt Tắt nếu nhân viên nghỉ phép, nghỉ ốm hoặc tạm dừng nhận khách mới. Gạt Bật khi làm việc trở lại.
+              </div>
+            </div>
+            <Form.Item name="is_auto_assign_target" valuePropName="checked" noStyle>
+              <Switch checkedChildren="Bật" unCheckedChildren="Tắt" />
+            </Form.Item>
+          </div>
 
           <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 8 }}>
             <Button onClick={() => setModalOpen(false)}>Hủy</Button>

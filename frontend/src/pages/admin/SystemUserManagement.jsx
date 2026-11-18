@@ -542,6 +542,14 @@ export default function SystemUserManagement() {
                       placeholder="Chọn phòng ban chính..."
                       allowClear
                       options={departments.map((d) => ({ value: d.id, label: d.name }))}
+                      onChange={(deptId) => {
+                        const dept = departments.find((d) => d.id === deptId)
+                        if (dept) {
+                          form.setFieldsValue({ is_auto_assign_target: !!dept.is_auto_assign_target })
+                        } else {
+                          form.setFieldsValue({ is_auto_assign_target: false })
+                        }
+                      }}
                     />
                   </Form.Item>
                 </Col>
@@ -580,14 +588,32 @@ export default function SystemUserManagement() {
                     <Switch checkedChildren="Admin công ty" unCheckedChildren="Tài khoản thường" />
                   </Form.Item>
                 </Col>
-                <Col xs={24} md={12}>
-                  <Form.Item
-                    name="is_auto_assign_target"
-                    valuePropName="checked"
-                    help="Nếu bật, tài khoản này sẽ được tự động chia khách hàng từ các kênh Marketing/Zalo."
+                <Col xs={24} md={24}>
+                  <div
+                    style={{
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      alignItems: 'center',
+                      gap: 16,
+                      padding: '12px 16px',
+                      background: '#f8fafc',
+                      border: '1px solid #e2e8f0',
+                      borderRadius: 8,
+                      marginBottom: 16,
+                    }}
                   >
-                    <Switch checkedChildren="Nhận khách tự động: Bật" unCheckedChildren="Nhận khách tự động: Tắt" />
-                  </Form.Item>
+                    <div style={{ flex: 1 }}>
+                      <div style={{ fontWeight: 600, fontSize: 13.5, color: '#0f172a', marginBottom: 2 }}>
+                        Nhận khách tự động (Cá nhân)
+                      </div>
+                      <div style={{ fontSize: 12, color: '#64748b', lineHeight: '1.4' }}>
+                        Gạt Tắt nếu nhân viên nghỉ phép, nghỉ ốm hoặc tạm dừng nhận khách mới. Gạt Bật khi làm việc trở lại.
+                      </div>
+                    </div>
+                    <Form.Item name="is_auto_assign_target" valuePropName="checked" noStyle>
+                      <Switch checkedChildren="Bật" unCheckedChildren="Tắt" />
+                    </Form.Item>
+                  </div>
                 </Col>
               </>
             )}

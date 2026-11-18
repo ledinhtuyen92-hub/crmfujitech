@@ -64,6 +64,7 @@ class DepartmentSerializer(serializers.ModelSerializer):
             "manager_name",
             "created_at",
             "is_sales_department",
+            "is_auto_assign_target",
             "factory",
             "user_count",
         ]

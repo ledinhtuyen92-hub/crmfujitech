@@ -158,7 +158,12 @@ class TenantQuerySetMixin:
             raise serializers.ValidationError(
                 {"company": "Superadmin hệ thống phải được gán công ty để tạo dữ liệu."}
             )
-        serializer.save(company=company)
+        dept = serializer.validated_data.get("department")
+        # Nếu không truyền tường minh is_auto_assign_target, kế thừa mặc định từ phòng ban
+        if "is_auto_assign_target" not in serializer.validated_data and dept:
+            serializer.save(company=company, is_auto_assign_target=dept.is_auto_assign_target)
+        else:
+            serializer.save(company=company)
 
 
 # ─────────────────────────────────────────────
@@ -319,6 +324,19 @@ class DepartmentViewSet(TenantQuerySetMixin, viewsets.ModelViewSet):
                 {"company": "Superadmin hệ thống phải được gán công ty để tạo phòng ban."}
             )
         serializer.save(company=company)
+
+    def perform_update(self, serializer):
+        old_instance = self.get_object()
+        old_auto_assign = old_instance.is_auto_assign_target
+        instance = serializer.save()
+
+        # Nếu trạng thái nhận khách tự động của phòng ban thay đổi:
+        if old_auto_assign != instance.is_auto_assign_target:
+            from users.models import User
+            # Đồng bộ toàn bộ nhân sự trực thuộc phòng ban này
+            User.objects.filter(department=instance).update(
+                is_auto_assign_target=instance.is_auto_assign_target
+            )
 
 
 # ─────────────────────────────────────────────
