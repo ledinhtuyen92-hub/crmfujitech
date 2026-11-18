@@ -48,6 +48,9 @@ const MODULE_ORDER = [
   'reports',
   'zalo',
   'facebook',
+  'ai_agent',
+  'website_integration',
+  'chat',
   'settings'
 ]
 export default function RoleManagement() {

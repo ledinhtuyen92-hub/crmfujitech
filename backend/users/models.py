@@ -231,6 +231,13 @@ class User(AbstractUser):
         related_name="users",
         verbose_name="Phòng ban",
     )
+    extra_departments = models.ManyToManyField(
+        "Department",
+        blank=True,
+        related_name="extra_users",
+        verbose_name="Phòng ban kiêm nhiệm",
+        help_text="Các phòng ban nhân sự kiêm nhiệm hoặc tham gia theo dõi công việc.",
+    )
     created_at = models.DateTimeField(auto_now_add=True)
 
     REQUIRED_FIELDS = ["email", "full_name"]

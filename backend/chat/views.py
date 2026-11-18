@@ -34,6 +34,58 @@ class ConversationViewSet(viewsets.ModelViewSet):
     serializer_class = ConversationDetailSerializer
     pagination_class = None
 
+    def _sync_user_department_conversations(self, user):
+        """Tự động đồng bộ các nhóm phòng ban mà user trực thuộc, kiêm nhiệm hoặc có quyền theo dõi."""
+        if not user or not user.is_authenticated or not user.company_id:
+            return
+
+        # 1. Nếu user có quyền chat.view_all_departments hoặc là admin công ty / superuser:
+        # Tự động có quyền tham gia TẤT CẢ các nhóm phòng ban trong công ty để điều hành & giám sát
+        can_view_all = (
+            user.is_company_admin
+            or user.is_superuser
+            or user.has_perm_code("chat.view_all_departments")
+        )
+
+        if can_view_all:
+            dept_ids = set(Department.objects.filter(company_id=user.company_id).values_list("id", flat=True))
+        else:
+            # 2. Ngược lại: User chỉ tham gia đúng phòng ban chính và các phòng ban kiêm nhiệm (dựa 100% vào quan hệ ID)
+            dept_ids = set()
+            if user.department_id:
+                dept_ids.add(user.department_id)
+            if hasattr(user, "extra_departments"):
+                dept_ids.update(user.extra_departments.values_list("id", flat=True))
+
+        if not dept_ids:
+            return
+
+        for dept in Department.objects.filter(id__in=dept_ids, company_id=user.company_id):
+            clean_name = dept.name.strip()
+            title = clean_name if clean_name.lower().startswith(("phòng", "ban")) else f"Phòng {clean_name}"
+            conv, created = Conversation.objects.get_or_create(
+                company_id=user.company_id,
+                type=Conversation.TYPE_DEPARTMENT,
+                department=dept,
+                defaults={"title": title, "created_by": user}
+            )
+            if not created and conv.title != title:
+                conv.title = title
+                conv.save(update_fields=["title"])
+
+            ConversationParticipant.objects.get_or_create(conversation=conv, user=user)
+
+        # Loại bỏ user khỏi các nhóm phòng ban không còn thuộc về/kiêm nhiệm
+        ConversationParticipant.objects.filter(
+            conversation__company_id=user.company_id,
+            conversation__type=Conversation.TYPE_DEPARTMENT,
+            user=user
+        ).exclude(conversation__department_id__in=dept_ids).delete()
+
+    def list(self, request, *args, **kwargs):
+        self._sync_user_department_conversations(request.user)
+        return super().list(request, *args, **kwargs)
+
     def get_queryset(self):
         user = self.request.user
         return Conversation.objects.filter(
@@ -588,25 +640,48 @@ def get_department_groups(request):
     """
     Lấy danh sách các nhóm phòng ban trong công ty.
     Tự động đồng bộ và thêm các nhân sự thuộc phòng ban vào nhóm tương ứng.
+    Hỗ trợ:
+    - Nhân sự thuộc phòng ban chính (department)
+    - Nhân sự kiêm nhiệm nhiều phòng ban (extra_departments)
+    - Người dùng có quyền xem/tham gia toàn bộ phòng ban (chat.view_all_departments / is_company_admin)
     """
     user = request.user
     departments = Department.objects.filter(company_id=user.company_id)
     results = []
 
+    # Danh sách user có quyền tham gia tất cả các nhóm phòng ban (dựa trên quyền RBAC & cờ Admin)
+    company_users = User.objects.filter(company_id=user.company_id, is_active=True).prefetch_related("role__permissions", "extra_departments")
+    view_all_user_ids = {
+        u.id for u in company_users
+        if u.is_company_admin or u.is_superuser or u.has_perm_code("chat.view_all_departments")
+    }
+
     for dept in departments:
+        clean_name = dept.name.strip()
+        title = clean_name if clean_name.lower().startswith(("phòng", "ban")) else f"Phòng {clean_name}"
         conv, created = Conversation.objects.get_or_create(
             company_id=user.company_id,
             type=Conversation.TYPE_DEPARTMENT,
             department=dept,
             defaults={
-                "title": f"Phòng {dept.name}",
+                "title": title,
                 "created_by": user,
             }
         )
-        # Đảm bảo toàn bộ nhân sự trong phòng ban đều là thành viên nhóm
-        dept_users = User.objects.filter(company_id=user.company_id, department=dept, is_active=True)
+        if not created and conv.title != title:
+            conv.title = title
+            conv.save(update_fields=["title"])
+
+        # Nhân sự thuộc phòng ban này: phòng chính, kiêm nhiệm, hoặc quyền theo dõi toàn bộ
+        q = Q(department=dept) | Q(id__in=view_all_user_ids)
+        if hasattr(User, "extra_departments"):
+            q |= Q(extra_departments=dept)
+
+        dept_users = User.objects.filter(Q(company_id=user.company_id, is_active=True) & q).distinct()
         for du in dept_users:
             ConversationParticipant.objects.get_or_create(conversation=conv, user=du)
+        # Loại bỏ các thành viên cũ không còn thuộc phòng ban này
+        ConversationParticipant.objects.filter(conversation=conv).exclude(user__in=dept_users).delete()
 
         # Kiểm tra xem user hiện tại có thuộc nhóm này không
         if ConversationParticipant.objects.filter(conversation=conv, user=user).exists():

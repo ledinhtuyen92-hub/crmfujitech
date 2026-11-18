@@ -1073,6 +1073,15 @@
   }
 },
 {
+  "model": "users.permission",
+  "pk": 163,
+  "fields": {
+    "code": "chat.view_all_departments",
+    "name": "Tham gia & Theo dõi tất cả các nhóm chat phòng ban",
+    "module": "chat"
+  }
+},
+{
   "model": "users.department",
   "pk": 3,
   "fields": {
@@ -1479,6 +1488,7 @@
       162,
       161,
       160,
+      163,
       6,
       45,
       43,
@@ -1590,6 +1600,19 @@
   }
 },
 {
+  "model": "users.role",
+  "pk": 37,
+  "fields": {
+    "company": 15,
+    "name": "Hội Đồng Quản Trị",
+    "description": "",
+    "is_auto_assign_target": false,
+    "permissions": [
+      163
+    ]
+  }
+},
+{
   "model": "users.user",
   "pk": 1,
   "fields": {
@@ -1614,7 +1637,8 @@
     "department": null,
     "created_at": "2026-07-04T04:29:39.557Z",
     "groups": [],
-    "user_permissions": []
+    "user_permissions": [],
+    "extra_departments": []
   }
 },
 {
@@ -1642,7 +1666,8 @@
     "department": 10,
     "created_at": "2026-07-06T02:27:55.417Z",
     "groups": [],
-    "user_permissions": []
+    "user_permissions": [],
+    "extra_departments": []
   }
 },
 {
@@ -1670,7 +1695,8 @@
     "department": 3,
     "created_at": "2026-07-09T02:26:24.428Z",
     "groups": [],
-    "user_permissions": []
+    "user_permissions": [],
+    "extra_departments": []
   }
 },
 {
@@ -1698,7 +1724,8 @@
     "department": 3,
     "created_at": "2026-07-09T02:29:28.940Z",
     "groups": [],
-    "user_permissions": []
+    "user_permissions": [],
+    "extra_departments": []
   }
 },
 {
@@ -1726,7 +1753,8 @@
     "department": 6,
     "created_at": "2026-07-09T07:12:53.643Z",
     "groups": [],
-    "user_permissions": []
+    "user_permissions": [],
+    "extra_departments": []
   }
 },
 {
@@ -1754,7 +1782,8 @@
     "department": 9,
     "created_at": "2026-08-03T08:41:58.760Z",
     "groups": [],
-    "user_permissions": []
+    "user_permissions": [],
+    "extra_departments": []
   }
 },
 {
@@ -1782,7 +1811,8 @@
     "department": 3,
     "created_at": "2026-08-15T03:28:20.972Z",
     "groups": [],
-    "user_permissions": []
+    "user_permissions": [],
+    "extra_departments": []
   }
 },
 {
@@ -1810,7 +1840,8 @@
     "department": 3,
     "created_at": "2026-08-15T03:29:30.755Z",
     "groups": [],
-    "user_permissions": []
+    "user_permissions": [],
+    "extra_departments": []
   }
 },
 {
@@ -1838,7 +1869,8 @@
     "department": 4,
     "created_at": "2026-08-15T03:30:38.330Z",
     "groups": [],
-    "user_permissions": []
+    "user_permissions": [],
+    "extra_departments": []
   }
 },
 {
@@ -1863,10 +1895,13 @@
     "role": 36,
     "is_company_admin": true,
     "is_auto_assign_target": false,
-    "department": null,
+    "department": 10,
     "created_at": "2026-08-27T02:26:17.964Z",
     "groups": [],
-    "user_permissions": []
+    "user_permissions": [],
+    "extra_departments": [
+      3
+    ]
   }
 },
 {
@@ -1894,7 +1929,8 @@
     "department": 3,
     "created_at": "2026-11-05T07:47:25.009Z",
     "groups": [],
-    "user_permissions": []
+    "user_permissions": [],
+    "extra_departments": []
   }
 },
 {
@@ -413221,6 +413257,45 @@
     "old_expires_at": "2026-10-14T07:34:06.715Z",
     "new_expires_at": null,
     "created_at": "2026-11-17T09:00:00.331Z"
+  }
+},
+{
+  "model": "zalo_integration.zalotokenrefreshlog",
+  "pk": 857,
+  "fields": {
+    "oa_config": 1,
+    "status": "failed",
+    "trigger": "auto",
+    "error_message": "Zalo error=-14014: Invalid refresh token.",
+    "old_expires_at": "2026-10-14T07:34:06.715Z",
+    "new_expires_at": null,
+    "created_at": "2026-11-17T10:00:00.206Z"
+  }
+},
+{
+  "model": "zalo_integration.zalotokenrefreshlog",
+  "pk": 858,
+  "fields": {
+    "oa_config": 1,
+    "status": "failed",
+    "trigger": "auto",
+    "error_message": "Zalo error=-14014: Invalid refresh token.",
+    "old_expires_at": "2026-10-14T07:34:06.715Z",
+    "new_expires_at": null,
+    "created_at": "2026-11-18T02:17:32.696Z"
+  }
+},
+{
+  "model": "zalo_integration.zalotokenrefreshlog",
+  "pk": 859,
+  "fields": {
+    "oa_config": 1,
+    "status": "failed",
+    "trigger": "auto",
+    "error_message": "Zalo error=-14014: Invalid refresh token.",
+    "old_expires_at": "2026-10-14T07:34:06.715Z",
+    "new_expires_at": null,
+    "created_at": "2026-11-18T03:00:00.238Z"
   }
 },
 {
@@ -997329,7 +997404,7 @@
   "fields": {
     "company": 15,
     "type": "department",
-    "title": "Phòng Ban Giám Đốc",
+    "title": "Ban Giám Đốc",
     "avatar": "",
     "department": 10,
     "created_by": 10,
@@ -997347,7 +997422,7 @@
   "fields": {
     "company": 15,
     "type": "department",
-    "title": "Phòng Phòng Giao Hàng",
+    "title": "Phòng Giao Hàng",
     "avatar": "",
     "department": 9,
     "created_by": 10,
@@ -997365,7 +997440,7 @@
   "fields": {
     "company": 15,
     "type": "department",
-    "title": "Phòng Phòng Kho Vận & Cung Ứng",
+    "title": "Phòng Kho Vận & Cung Ứng",
     "avatar": "",
     "department": 7,
     "created_by": 10,
@@ -997383,16 +997458,16 @@
   "fields": {
     "company": 15,
     "type": "department",
-    "title": "Phòng Phòng Kinh Doanh",
+    "title": "Phòng Kinh Doanh",
     "avatar": "",
     "department": 3,
     "created_by": 10,
-    "last_message_text": "",
-    "last_message_at": null,
-    "last_sender_name": "",
+    "last_message_text": "[Chứng từ CRM] FT-DH-741",
+    "last_message_at": "2026-11-18T03:35:23.270Z",
+    "last_sender_name": "Lê Đình Tuyền",
     "is_active": true,
     "created_at": "2026-11-17T08:17:17.187Z",
-    "updated_at": "2026-11-17T08:17:17.187Z"
+    "updated_at": "2026-11-18T03:35:23.313Z"
   }
 },
 {
@@ -997401,7 +997476,7 @@
   "fields": {
     "company": 15,
     "type": "department",
-    "title": "Phòng Phòng Marketing",
+    "title": "Phòng Marketing",
     "avatar": "",
     "department": 5,
     "created_by": 10,
@@ -997419,7 +997494,7 @@
   "fields": {
     "company": 15,
     "type": "department",
-    "title": "Phòng Phòng Sản Xuất & Kỹ Thuật",
+    "title": "Phòng Sản Xuất & Kỹ Thuật",
     "avatar": "",
     "department": 8,
     "created_by": 10,
@@ -997437,7 +997512,7 @@
   "fields": {
     "company": 15,
     "type": "department",
-    "title": "Phòng Phòng Tài Chính - Kế Toán",
+    "title": "Phòng Tài Chính - Kế Toán",
     "avatar": "",
     "department": 6,
     "created_by": 10,
@@ -997455,7 +997530,7 @@
   "fields": {
     "company": 15,
     "type": "department",
-    "title": "Phòng Phòng Vận Hành",
+    "title": "Phòng Vận Hành",
     "avatar": "",
     "department": 4,
     "created_by": 10,
@@ -997465,24 +997540,6 @@
     "is_active": true,
     "created_at": "2026-11-17T08:17:17.319Z",
     "updated_at": "2026-11-17T08:17:17.319Z"
-  }
-},
-{
-  "model": "chat.conversation",
-  "pk": 12,
-  "fields": {
-    "company": 15,
-    "type": "direct",
-    "title": null,
-    "avatar": "",
-    "department": null,
-    "created_by": 10,
-    "last_message_text": "T",
-    "last_message_at": "2026-11-17T09:44:12.016Z",
-    "last_sender_name": "Bùi Hoài Thương",
-    "is_active": true,
-    "created_at": "2026-11-17T09:04:00.974Z",
-    "updated_at": "2026-11-17T09:44:12.037Z"
   }
 },
 {
@@ -997537,8 +997594,8 @@
     "conversation": 4,
     "user": 4,
     "joined_at": "2026-11-17T08:17:17.219Z",
-    "last_read_message_id": 0,
-    "last_read_at": null,
+    "last_read_message_id": 27,
+    "last_read_at": "2026-11-17T10:01:13.992Z",
     "is_admin": false,
     "is_muted": false,
     "is_hidden": false,
@@ -997622,28 +997679,223 @@
 },
 {
   "model": "chat.conversationparticipant",
-  "pk": 16,
+  "pk": 18,
   "fields": {
-    "conversation": 12,
+    "conversation": 1,
     "user": 10,
-    "joined_at": "2026-11-17T09:04:00.988Z",
-    "last_read_message_id": 26,
-    "last_read_at": "2026-11-17T09:44:12.128Z",
+    "joined_at": "2026-11-18T02:28:49.958Z",
+    "last_read_message_id": 0,
+    "last_read_at": null,
     "is_admin": false,
     "is_muted": false,
     "is_hidden": false,
-    "cleared_at": "2026-11-17T09:38:07.976Z"
+    "cleared_at": null
   }
 },
 {
   "model": "chat.conversationparticipant",
-  "pk": 17,
+  "pk": 20,
   "fields": {
-    "conversation": 12,
-    "user": 4,
-    "joined_at": "2026-11-17T09:04:01.000Z",
-    "last_read_message_id": 26,
-    "last_read_at": "2026-11-17T09:44:12.016Z",
+    "conversation": 2,
+    "user": 2,
+    "joined_at": "2026-11-18T02:50:37.134Z",
+    "last_read_message_id": 0,
+    "last_read_at": null,
+    "is_admin": false,
+    "is_muted": false,
+    "is_hidden": false,
+    "cleared_at": null
+  }
+},
+{
+  "model": "chat.conversationparticipant",
+  "pk": 21,
+  "fields": {
+    "conversation": 2,
+    "user": 10,
+    "joined_at": "2026-11-18T02:50:37.144Z",
+    "last_read_message_id": 0,
+    "last_read_at": null,
+    "is_admin": false,
+    "is_muted": false,
+    "is_hidden": false,
+    "cleared_at": null
+  }
+},
+{
+  "model": "chat.conversationparticipant",
+  "pk": 22,
+  "fields": {
+    "conversation": 3,
+    "user": 2,
+    "joined_at": "2026-11-18T02:50:37.197Z",
+    "last_read_message_id": 0,
+    "last_read_at": null,
+    "is_admin": false,
+    "is_muted": false,
+    "is_hidden": false,
+    "cleared_at": null
+  }
+},
+{
+  "model": "chat.conversationparticipant",
+  "pk": 23,
+  "fields": {
+    "conversation": 3,
+    "user": 10,
+    "joined_at": "2026-11-18T02:50:37.227Z",
+    "last_read_message_id": 0,
+    "last_read_at": null,
+    "is_admin": false,
+    "is_muted": false,
+    "is_hidden": false,
+    "cleared_at": null
+  }
+},
+{
+  "model": "chat.conversationparticipant",
+  "pk": 24,
+  "fields": {
+    "conversation": 4,
+    "user": 2,
+    "joined_at": "2026-11-18T02:50:37.252Z",
+    "last_read_message_id": 0,
+    "last_read_at": null,
+    "is_admin": false,
+    "is_muted": false,
+    "is_hidden": false,
+    "cleared_at": null
+  }
+},
+{
+  "model": "chat.conversationparticipant",
+  "pk": 25,
+  "fields": {
+    "conversation": 4,
+    "user": 10,
+    "joined_at": "2026-11-18T02:50:37.296Z",
+    "last_read_message_id": 28,
+    "last_read_at": "2026-11-18T03:35:23.270Z",
+    "is_admin": false,
+    "is_muted": false,
+    "is_hidden": false,
+    "cleared_at": null
+  }
+},
+{
+  "model": "chat.conversationparticipant",
+  "pk": 26,
+  "fields": {
+    "conversation": 5,
+    "user": 2,
+    "joined_at": "2026-11-18T02:50:37.370Z",
+    "last_read_message_id": 0,
+    "last_read_at": null,
+    "is_admin": false,
+    "is_muted": false,
+    "is_hidden": false,
+    "cleared_at": null
+  }
+},
+{
+  "model": "chat.conversationparticipant",
+  "pk": 27,
+  "fields": {
+    "conversation": 5,
+    "user": 10,
+    "joined_at": "2026-11-18T02:50:37.384Z",
+    "last_read_message_id": 0,
+    "last_read_at": null,
+    "is_admin": false,
+    "is_muted": false,
+    "is_hidden": false,
+    "cleared_at": null
+  }
+},
+{
+  "model": "chat.conversationparticipant",
+  "pk": 28,
+  "fields": {
+    "conversation": 6,
+    "user": 2,
+    "joined_at": "2026-11-18T02:50:37.394Z",
+    "last_read_message_id": 0,
+    "last_read_at": null,
+    "is_admin": false,
+    "is_muted": false,
+    "is_hidden": false,
+    "cleared_at": null
+  }
+},
+{
+  "model": "chat.conversationparticipant",
+  "pk": 29,
+  "fields": {
+    "conversation": 6,
+    "user": 10,
+    "joined_at": "2026-11-18T02:50:37.418Z",
+    "last_read_message_id": 0,
+    "last_read_at": null,
+    "is_admin": false,
+    "is_muted": false,
+    "is_hidden": false,
+    "cleared_at": null
+  }
+},
+{
+  "model": "chat.conversationparticipant",
+  "pk": 30,
+  "fields": {
+    "conversation": 7,
+    "user": 2,
+    "joined_at": "2026-11-18T02:50:37.436Z",
+    "last_read_message_id": 0,
+    "last_read_at": null,
+    "is_admin": false,
+    "is_muted": false,
+    "is_hidden": false,
+    "cleared_at": null
+  }
+},
+{
+  "model": "chat.conversationparticipant",
+  "pk": 31,
+  "fields": {
+    "conversation": 7,
+    "user": 10,
+    "joined_at": "2026-11-18T02:50:37.471Z",
+    "last_read_message_id": 0,
+    "last_read_at": null,
+    "is_admin": false,
+    "is_muted": false,
+    "is_hidden": false,
+    "cleared_at": null
+  }
+},
+{
+  "model": "chat.conversationparticipant",
+  "pk": 32,
+  "fields": {
+    "conversation": 8,
+    "user": 2,
+    "joined_at": "2026-11-18T02:50:37.490Z",
+    "last_read_message_id": 0,
+    "last_read_at": null,
+    "is_admin": false,
+    "is_muted": false,
+    "is_hidden": false,
+    "cleared_at": null
+  }
+},
+{
+  "model": "chat.conversationparticipant",
+  "pk": 33,
+  "fields": {
+    "conversation": 8,
+    "user": 10,
+    "joined_at": "2026-11-18T02:50:37.514Z",
+    "last_read_message_id": 0,
+    "last_read_at": null,
     "is_admin": false,
     "is_muted": false,
     "is_hidden": false,
@@ -997652,77 +997904,39 @@
 },
 {
   "model": "chat.chatmessage",
-  "pk": 15,
+  "pk": 27,
   "fields": {
-    "conversation": 12,
-    "sender": 10,
-    "message_type": "context_doc",
-    "content": "[Chứng từ CRM] Đơn hàng: FT-DH-748 - Vũ Ba Duy",
+    "conversation": 4,
+    "sender": 4,
+    "message_type": "text",
+    "content": "Tin nhắn đã được thu hồi",
     "file": "",
     "file_name": "",
     "file_size": 0,
-    "context_data": "{\"doc_type\":\"order\",\"doc_id\":166,\"doc_code\":\"FT-DH-748\",\"title\":\"Đơn hàng: FT-DH-748 - Vũ Ba Duy\",\"extra\":\"14,350,000 đ\",\"badge_color\":\"blue\"}",
+    "context_data": {},
     "is_deleted": false,
     "deleted_at": null,
-    "is_recalled": false,
-    "recalled_at": null,
-    "created_at": "2026-11-17T09:04:27.210Z"
+    "is_recalled": true,
+    "recalled_at": "2026-11-17T10:01:18.751Z",
+    "created_at": "2026-11-17T10:01:13.992Z"
   }
 },
 {
   "model": "chat.chatmessage",
-  "pk": 16,
+  "pk": 28,
   "fields": {
-    "conversation": 12,
+    "conversation": 4,
     "sender": 10,
     "message_type": "context_doc",
-    "content": "[Chứng từ CRM] Đơn hàng: FT-DH-748 - Vũ Ba Duy",
-    "file": "",
-    "file_name": "",
-    "file_size": 0,
-    "context_data": "{\"doc_type\":\"order\",\"doc_id\":166,\"doc_code\":\"FT-DH-748\",\"title\":\"Đơn hàng: FT-DH-748 - Vũ Ba Duy\",\"extra\":\"14,350,000 đ\",\"badge_color\":\"blue\"}",
-    "is_deleted": false,
-    "deleted_at": null,
-    "is_recalled": false,
-    "recalled_at": null,
-    "created_at": "2026-11-17T09:04:35.957Z"
-  }
-},
-{
-  "model": "chat.chatmessage",
-  "pk": 17,
-  "fields": {
-    "conversation": 12,
-    "sender": 10,
-    "message_type": "context_doc",
-    "content": "test",
-    "file": "",
-    "file_name": "",
-    "file_size": 0,
-    "context_data": "test_str",
-    "is_deleted": false,
-    "deleted_at": null,
-    "is_recalled": false,
-    "recalled_at": null,
-    "created_at": "2026-11-17T09:06:39.423Z"
-  }
-},
-{
-  "model": "chat.chatmessage",
-  "pk": 18,
-  "fields": {
-    "conversation": 12,
-    "sender": 10,
-    "message_type": "context_doc",
-    "content": "[Chứng từ CRM] Đơn hàng: FT-DH-748 - Vũ Ba Duy",
+    "content": "[Chứng từ CRM] Đơn hàng: FT-DH-741 - Anh Hải",
     "file": "",
     "file_name": "",
     "file_size": 0,
     "context_data": {
-      "extra": "14,350,000 đ",
-      "title": "Đơn hàng: FT-DH-748 - Vũ Ba Duy",
-      "doc_id": 166,
-      "doc_code": "FT-DH-748",
+      "extra": "13,700,000 đ",
+      "title": "Đơn hàng: FT-DH-741 - Anh Hải",
+      "doc_id": 159,
+      "doc_code": "FT-DH-741",
       "doc_type": "order",
       "badge_color": "blue"
     },
@@ -997730,159 +997944,7 @@
     "deleted_at": null,
     "is_recalled": false,
     "recalled_at": null,
-    "created_at": "2026-11-17T09:10:27.001Z"
-  }
-},
-{
-  "model": "chat.chatmessage",
-  "pk": 19,
-  "fields": {
-    "conversation": 12,
-    "sender": 4,
-    "message_type": "text",
-    "content": "Tin nhắn đã được thu hồi",
-    "file": "",
-    "file_name": "",
-    "file_size": 0,
-    "context_data": {},
-    "is_deleted": false,
-    "deleted_at": null,
-    "is_recalled": true,
-    "recalled_at": "2026-11-17T09:37:13.477Z",
-    "created_at": "2026-11-17T09:12:11.624Z"
-  }
-},
-{
-  "model": "chat.chatmessage",
-  "pk": 20,
-  "fields": {
-    "conversation": 12,
-    "sender": 10,
-    "message_type": "text",
-    "content": "đơn này sao sửa",
-    "file": "",
-    "file_name": "",
-    "file_size": 0,
-    "context_data": {},
-    "is_deleted": false,
-    "deleted_at": null,
-    "is_recalled": false,
-    "recalled_at": null,
-    "created_at": "2026-11-17T09:12:34.903Z"
-  }
-},
-{
-  "model": "chat.chatmessage",
-  "pk": 21,
-  "fields": {
-    "conversation": 12,
-    "sender": 10,
-    "message_type": "text",
-    "content": "hihi",
-    "file": "",
-    "file_name": "",
-    "file_size": 0,
-    "context_data": {},
-    "is_deleted": false,
-    "deleted_at": null,
-    "is_recalled": false,
-    "recalled_at": null,
-    "created_at": "2026-11-17T09:12:38.412Z"
-  }
-},
-{
-  "model": "chat.chatmessage",
-  "pk": 22,
-  "fields": {
-    "conversation": 12,
-    "sender": 4,
-    "message_type": "text",
-    "content": "Tin nhắn đã được thu hồi",
-    "file": "",
-    "file_name": "",
-    "file_size": 0,
-    "context_data": {},
-    "is_deleted": false,
-    "deleted_at": null,
-    "is_recalled": true,
-    "recalled_at": "2026-11-17T09:36:33.544Z",
-    "created_at": "2026-11-17T09:12:49.777Z"
-  }
-},
-{
-  "model": "chat.chatmessage",
-  "pk": 23,
-  "fields": {
-    "conversation": 12,
-    "sender": 4,
-    "message_type": "text",
-    "content": "hi",
-    "file": "",
-    "file_name": "",
-    "file_size": 0,
-    "context_data": {},
-    "is_deleted": false,
-    "deleted_at": null,
-    "is_recalled": false,
-    "recalled_at": null,
-    "created_at": "2026-11-17T09:37:25.722Z"
-  }
-},
-{
-  "model": "chat.chatmessage",
-  "pk": 24,
-  "fields": {
-    "conversation": 12,
-    "sender": 4,
-    "message_type": "text",
-    "content": "1",
-    "file": "",
-    "file_name": "",
-    "file_size": 0,
-    "context_data": {},
-    "is_deleted": false,
-    "deleted_at": null,
-    "is_recalled": false,
-    "recalled_at": null,
-    "created_at": "2026-11-17T09:40:18.686Z"
-  }
-},
-{
-  "model": "chat.chatmessage",
-  "pk": 25,
-  "fields": {
-    "conversation": 12,
-    "sender": 10,
-    "message_type": "text",
-    "content": "Tin nhắn đã được thu hồi",
-    "file": "",
-    "file_name": "",
-    "file_size": 0,
-    "context_data": {},
-    "is_deleted": false,
-    "deleted_at": null,
-    "is_recalled": true,
-    "recalled_at": "2026-11-17T09:44:18.971Z",
-    "created_at": "2026-11-17T09:44:02.649Z"
-  }
-},
-{
-  "model": "chat.chatmessage",
-  "pk": 26,
-  "fields": {
-    "conversation": 12,
-    "sender": 4,
-    "message_type": "text",
-    "content": "T",
-    "file": "",
-    "file_name": "",
-    "file_size": 0,
-    "context_data": {},
-    "is_deleted": false,
-    "deleted_at": null,
-    "is_recalled": false,
-    "recalled_at": null,
-    "created_at": "2026-11-17T09:44:12.016Z"
+    "created_at": "2026-11-18T03:35:23.270Z"
   }
 }
 ]

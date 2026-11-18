@@ -158,6 +158,12 @@ class UserSerializer(serializers.ModelSerializer):
     company_name = serializers.CharField(source="company.name", read_only=True)
     role_name = serializers.CharField(source="role.name", read_only=True)
     department_name = serializers.CharField(source="department.name", read_only=True)
+    extra_departments = serializers.PrimaryKeyRelatedField(
+        queryset=Department.objects.all(),
+        many=True,
+        required=False,
+    )
+    extra_department_names = serializers.SerializerMethodField()
     permissions = serializers.SerializerMethodField()
     active_modules = serializers.SerializerMethodField()
     pipeline_status_labels = serializers.SerializerMethodField()
@@ -190,6 +196,8 @@ class UserSerializer(serializers.ModelSerializer):
             "is_active",
             "department",
             "department_name",
+            "extra_departments",
+            "extra_department_names",
             "created_at",
             "company_id",
             "managed_department_ids",
@@ -220,6 +228,9 @@ class UserSerializer(serializers.ModelSerializer):
             except CompanySettings.DoesNotExist:
                 return []
         return []
+
+    def get_extra_department_names(self, obj):
+        return list(obj.extra_departments.values_list("name", flat=True))
 
     def get_managed_department_ids(self, obj):
         return list(obj.managed_departments.values_list("id", flat=True))
@@ -257,6 +268,14 @@ class UserSerializer(serializers.ModelSerializer):
                 {"department": "Phòng ban không thuộc công ty của nhân viên."}
             )
 
+        extra_depts = attrs.get("extra_departments")
+        if extra_depts and company:
+            for ed in extra_depts:
+                if ed.company_id != company.id:
+                    raise serializers.ValidationError(
+                        {"extra_departments": f"Phòng ban kiêm nhiệm '{ed.name}' không thuộc công ty của nhân viên."}
+                    )
+
         return attrs
 
     def create(self, validated_data):
@@ -264,9 +283,12 @@ class UserSerializer(serializers.ModelSerializer):
         if not password:
             raise serializers.ValidationError({"password": "Mật khẩu là bắt buộc."})
         validate_strong_password(password)
+        extra_departments = validated_data.pop("extra_departments", None)
         user = User(**validated_data)
         user.set_password(password)
         user.save()
+        if extra_departments is not None:
+            user.extra_departments.set(extra_departments)
         return user
 
     def update(self, instance, validated_data):

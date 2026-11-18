@@ -150,12 +150,19 @@ export default function InternalChat() {
   const currentMessages = (activeConversation && messagesByConv[activeConversation.id]) || []
   const currentTyping = (activeConversation && typingUsers[activeConversation.id]) || []
 
-  // Tự động chọn cuộc trò chuyện đầu tiên nếu chưa chọn hội thoại nào
+  // Trên Mobile: Mặc định hiển thị danh sách hội thoại khi mới mở trang
   useEffect(() => {
-    if (!activeConversation && filteredConversations.length > 0) {
+    if (isMobile) {
+      setActiveConversation(null)
+    }
+  }, [isMobile, setActiveConversation])
+
+  // Tự động chọn cuộc trò chuyện đầu tiên nếu chưa chọn hội thoại nào (chỉ áp dụng trên Desktop)
+  useEffect(() => {
+    if (!isMobile && !activeConversation && filteredConversations.length > 0) {
       setActiveConversation(filteredConversations[0])
     }
-  }, [filteredConversations, activeConversation, setActiveConversation])
+  }, [isMobile, filteredConversations, activeConversation, setActiveConversation])
 
   // Tự động cuộn xuống cuối khi có tin nhắn mới hoặc đổi hội thoại
   useEffect(() => {
@@ -541,13 +548,14 @@ export default function InternalChat() {
             background: '#ffffff',
           }}
         >
-          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: isMobile ? 8 : 12, minWidth: 0 }}>
             {isMobile && (
               <Button
                 type="text"
-                icon={<LeftOutlined />}
+                icon={<LeftOutlined style={{ fontSize: 18, color: '#334155' }} />}
                 onClick={() => setActiveConversation(null)}
-                style={{ padding: 0, marginRight: 4 }}
+                style={{ padding: '4px', marginRight: 4, height: 36, width: 36, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                title="Quay lại danh sách hội thoại"
               />
             )}
             <div style={{ position: 'relative' }}>

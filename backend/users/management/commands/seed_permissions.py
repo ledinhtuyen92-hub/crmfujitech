@@ -159,6 +159,7 @@ PERMISSIONS = [
     # 💬 Chat Nội Bộ (Internal Chat)
     {"code": "chat.view", "name": "Sử dụng Chat nội bộ", "module": "chat"},
     {"code": "chat.manage_groups", "name": "Tạo & Quản lý nhóm chat", "module": "chat"},
+    {"code": "chat.view_all_departments", "name": "Tham gia & Theo dõi tất cả các nhóm chat phòng ban", "module": "chat"},
     {"code": "chat.admin", "name": "Quản trị chat & Cấu hình lưu trữ", "module": "chat"},
 ]
 

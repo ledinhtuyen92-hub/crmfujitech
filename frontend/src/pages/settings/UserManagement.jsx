@@ -113,6 +113,7 @@ export default function UserManagement() {
             job_title: user.job_title,
             role: user.role,
             department: user.department,
+            extra_departments: user.extra_departments || [],
             is_active: user.is_active,
             is_company_admin: user.is_company_admin,
             is_auto_assign_target: user.is_auto_assign_target,
@@ -126,6 +127,7 @@ export default function UserManagement() {
             job_title: '',
             role: undefined,
             department: undefined,
+            extra_departments: [],
             is_active: true,
             is_company_admin: false,
             is_auto_assign_target: false,
@@ -143,6 +145,7 @@ export default function UserManagement() {
     // Ant Design clears select as undefined, which PATCH ignores. Explicitly set to null to clear.
     if (payload.department === undefined) payload.department = null;
     if (payload.role === undefined) payload.role = null;
+    if (payload.extra_departments === undefined) payload.extra_departments = [];
 
     try {
       if (editingUser) {
@@ -250,6 +253,15 @@ export default function UserManagement() {
             ) : (
               <Text type="secondary" style={{ fontSize: 12 }}>Chưa gán phòng</Text>
             )}
+            {record.extra_department_names?.length > 0 && (
+              <Space wrap size={2}>
+                {record.extra_department_names.map((name) => (
+                  <Tag key={name} color="cyan" style={{ fontSize: 11, margin: 0 }}>
+                    {name} (Kiêm nhiệm)
+                  </Tag>
+                ))}
+              </Space>
+            )}
             {record.role_name ? (
               <Tag color="purple" style={{ fontWeight: 600 }}>
                 {record.role_name}
@@ -331,7 +343,7 @@ export default function UserManagement() {
   ]
 
   const filteredUsers = users.filter((u) => {
-    if (selectedDepId && u.department !== selectedDepId) return false
+    if (selectedDepId && u.department !== selectedDepId && !(u.extra_departments || []).includes(selectedDepId)) return false
     if (!searchText) return true
     const searchLower = searchText.toLowerCase()
     return (
@@ -433,12 +445,15 @@ export default function UserManagement() {
                     {record.phone && <div style={{ fontSize: 13 }}><PhoneOutlined style={{ marginRight: 6, color: token.colorTextSecondary }} />{record.phone}</div>}
                   </div>
 
-                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: 12 }}>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 12 }}>
                     {record.department_name ? (
                       <Tag color="geekblue" style={{ fontWeight: 600, margin: 0 }}>{record.department_name}</Tag>
                     ) : (
                       <Tag style={{ margin: 0 }}>Chưa gán phòng</Tag>
                     )}
+                    {record.extra_department_names?.map((name) => (
+                      <Tag key={name} color="cyan" style={{ fontSize: 11, margin: 0 }}>{name} (Kiêm nhiệm)</Tag>
+                    ))}
                     {record.role_name ? (
                       <Tag color="purple" style={{ fontWeight: 600, margin: 0 }}>{record.role_name}</Tag>
                     ) : (
@@ -545,10 +560,10 @@ export default function UserManagement() {
 
           <Row gutter={12}>
             <Col xs={24} md={12}>
-              <Form.Item name="department" label="Phòng ban">
+              <Form.Item name="department" label="Phòng ban chính">
                 <Select
                   size="large"
-                  placeholder="Chọn phòng ban..."
+                  placeholder="Chọn phòng ban chính..."
                   options={departments.map((d) => ({ value: d.id, label: d.name }))}
                   allowClear
                 />
@@ -560,6 +575,24 @@ export default function UserManagement() {
                   size="large"
                   placeholder="Chọn vai trò..."
                   options={roles.map((r) => ({ value: r.id, label: r.name }))}
+                  allowClear
+                />
+              </Form.Item>
+            </Col>
+          </Row>
+
+          <Row gutter={12}>
+            <Col xs={24} md={24}>
+              <Form.Item
+                name="extra_departments"
+                label="Phòng ban kiêm nhiệm (nhiều phòng ban)"
+                tooltip="Chọn thêm các phòng ban mà nhân viên này kiêm nhiệm, hỗ trợ hoặc tham gia nhóm chat nội bộ"
+              >
+                <Select
+                  mode="multiple"
+                  size="large"
+                  placeholder="Chọn thêm các phòng ban kiêm nhiệm..."
+                  options={departments.map((d) => ({ value: d.id, label: d.name }))}
                   allowClear
                 />
               </Form.Item>
