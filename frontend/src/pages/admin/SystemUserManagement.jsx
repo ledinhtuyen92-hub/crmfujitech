@@ -3,7 +3,9 @@ import {
   DeleteOutlined,
   EditOutlined,
   KeyOutlined,
+  LockOutlined,
   PlusOutlined,
+  SafetyCertificateOutlined,
   StopOutlined,
 } from '@ant-design/icons'
 import {
@@ -51,6 +53,7 @@ export default function SystemUserManagement() {
   const [users, setUsers] = useState([])
   const [companies, setCompanies] = useState([])
   const [roles, setRoles] = useState([])
+  const [departments, setDepartments] = useState([])
   const [loading, setLoading] = useState(false)
   
   // States for Modals
@@ -92,28 +95,36 @@ export default function SystemUserManagement() {
     fetchData()
   }, [fetchData])
 
-  // Lấy roles khi chọn company trong form tạo/sửa
-  const fetchRolesByCompany = async (companyId) => {
+  // Lấy roles và departments khi chọn company trong form tạo/sửa
+  const fetchCompanyDetails = async (companyId) => {
     if (!companyId) {
       setRoles([])
+      setDepartments([])
       return
     }
     try {
-      const { data } = await api.get('users/roles/')
-      const allRoles = Array.isArray(data) ? data : data?.results ?? []
-      setRoles(allRoles.filter(r => r.company === companyId))
+      const [rolesRes, depsRes] = await Promise.all([
+        api.get(`users/roles/?company=${companyId}`),
+        api.get(`users/departments/?company=${companyId}`),
+      ])
+      const allRoles = Array.isArray(rolesRes.data) ? rolesRes.data : rolesRes.data?.results ?? []
+      const allDeps = Array.isArray(depsRes.data) ? depsRes.data : depsRes.data?.results ?? []
+      setRoles(allRoles.filter(r => !r.company || r.company === companyId))
+      setDepartments(allDeps.filter(d => !d.company || d.company === companyId))
     } catch {
-      messageApi.error('Không thể tải danh sách vai trò của công ty này.')
+      messageApi.error('Không thể tải danh sách vai trò và phòng ban của công ty này.')
     }
   }
 
   // ── Modals ─────────────────────────────────────────────────────────
   const openModal = async (user = null) => {
     setEditingUser(user)
-    if (user && user.company) {
-      await fetchRolesByCompany(user.company)
+    const compId = user?.company || selectedCompanyId
+    if (compId) {
+      await fetchCompanyDetails(compId)
     } else {
       setRoles([])
+      setDepartments([])
     }
     
     form.setFieldsValue(
@@ -126,8 +137,11 @@ export default function SystemUserManagement() {
             job_title: user.job_title,
             company_id: user.company,
             role: user.role,
+            department: user.department,
+            extra_departments: user.extra_departments || [],
             is_active: user.is_active,
             is_company_admin: user.is_company_admin,
+            is_auto_assign_target: user.is_auto_assign_target,
             password: '',
           }
         : {
@@ -136,10 +150,13 @@ export default function SystemUserManagement() {
             username: '',
             phone: '',
             job_title: '',
-            company_id: null,
+            company_id: selectedCompanyId || null,
             role: undefined,
+            department: undefined,
+            extra_departments: [],
             is_active: true,
             is_company_admin: false,
+            is_auto_assign_target: false,
             password: '',
           },
     )
@@ -147,8 +164,8 @@ export default function SystemUserManagement() {
   }
 
   const handleCompanyChange = (value) => {
-    form.setFieldsValue({ role: undefined })
-    fetchRolesByCompany(value)
+    form.setFieldsValue({ role: undefined, department: undefined, extra_departments: [] })
+    fetchCompanyDetails(value)
   }
 
   const handleSubmit = async (values) => {
@@ -158,6 +175,7 @@ export default function SystemUserManagement() {
     // explicitly clear undefined select values for DRF PATCH
     if (payload.department === undefined) payload.department = null;
     if (payload.role === undefined) payload.role = null;
+    if (payload.extra_departments === undefined) payload.extra_departments = [];
 
     try {
       if (editingUser) {
@@ -269,14 +287,46 @@ export default function SystemUserManagement() {
       dataIndex: 'company_name',
       key: 'company_name',
       render: (company_name) => (
-        <span style={{ fontWeight: 500, color: '#1649c9' }}>{company_name || 'N/A'}</span>
+        <span style={{ fontWeight: 500, color: '#1649c9' }}>{company_name || 'Hệ thống'}</span>
       ),
     },
     {
-      title: 'Vai trò',
-      dataIndex: 'role_name',
-      key: 'role_name',
-      render: (role) => <Tag color="geekblue">{role || 'Mặc định'}</Tag>,
+      title: 'Vị trí / Vai trò',
+      key: 'role',
+      render: (_, record) => (
+        <div>
+          <Space direction="vertical" size={2}>
+            {record.department_name ? (
+              <Tag color="geekblue" style={{ fontWeight: 600 }}>
+                {record.department_name}
+              </Tag>
+            ) : (
+              <Text type="secondary" style={{ fontSize: 12 }}>Chưa gán phòng</Text>
+            )}
+            {record.extra_department_names?.length > 0 && (
+              <Space wrap size={2}>
+                {record.extra_department_names.map((name) => (
+                  <Tag key={name} color="cyan" style={{ fontSize: 11, margin: 0 }}>
+                    {name} (Kiêm nhiệm)
+                  </Tag>
+                ))}
+              </Space>
+            )}
+            {record.role_name ? (
+              <Tag color="purple" style={{ fontWeight: 600 }}>
+                {record.role_name}
+              </Tag>
+            ) : (
+              <Text type="secondary" style={{ fontSize: 12 }}>Chưa gán quyền</Text>
+            )}
+          </Space>
+          {record.job_title && (
+            <div style={{ fontSize: 12, color: token.colorTextSecondary, marginTop: 4 }}>
+              {record.job_title}
+            </div>
+          )}
+        </div>
+      ),
     },
     {
       title: 'Trạng thái',
@@ -328,7 +378,7 @@ export default function SystemUserManagement() {
           )}
           {record.is_superuser && (
             <Tooltip title="Tài khoản này được bảo vệ — không thể khoá hoặc xoá">
-              <Tag color="gold" style={{ margin: 0 }}>🛡️ Bảo vệ</Tag>
+              <Tag color="gold" style={{ margin: 0 }} icon={<SafetyCertificateOutlined />}>Bảo vệ</Tag>
             </Tooltip>
           )}
         </Space>
@@ -397,22 +447,23 @@ export default function SystemUserManagement() {
 
       {/* Modal Add/Edit User */}
       <Modal
-        title={editingUser ? 'Chỉnh sửa tài khoản' : 'Tạo tài khoản mới'}
+        title={editingUser ? `Chỉnh sửa tài khoản: ${editingUser.full_name || editingUser.username}` : 'Tạo tài khoản mới'}
         open={modalOpen}
         onCancel={() => setModalOpen(false)}
         footer={null}
         destroyOnClose
-        width={600}
+        width={620}
+        styles={{ body: { maxHeight: '75vh', overflowY: 'auto' } }}
       >
-        <Form form={form} layout="vertical" onFinish={handleSubmit} requiredMark={false} style={{ marginTop: 24 }}>
-          <Row gutter={16}>
+        <Form form={form} layout="vertical" onFinish={handleSubmit} requiredMark={false} style={{ marginTop: 20 }}>
+          <Row gutter={12}>
             <Col xs={24} md={24}>
               {editingUser?.is_superuser ? (
                 <Form.Item label="Thuộc Công ty (Workspace)">
                   <Input
                     size="large"
                     disabled
-                    value="🛡️ Hệ thống Quản trị SaaS (Không thuộc doanh nghiệp nào)"
+                    value="Hệ thống Quản trị SaaS (Không thuộc doanh nghiệp nào)"
                     style={{ color: '#1649c9', fontWeight: 600, backgroundColor: '#f0f5ff' }}
                   />
                 </Form.Item>
@@ -424,7 +475,7 @@ export default function SystemUserManagement() {
                 >
                   <Select
                     size="large"
-                    placeholder="Chọn công ty"
+                    placeholder="Chọn công ty..."
                     onChange={handleCompanyChange}
                     options={companies.map(c => ({ value: c.id, label: c.name }))}
                     disabled={!!editingUser}
@@ -432,13 +483,14 @@ export default function SystemUserManagement() {
                 </Form.Item>
               )}
             </Col>
+
             <Col xs={24} md={12}>
               <Form.Item
                 name="username"
                 label="Tên đăng nhập"
                 rules={[{ required: true, message: 'Vui lòng nhập tên đăng nhập' }]}
               >
-                <Input size="large" />
+                <Input size="large" placeholder="nguyenvanan" />
               </Form.Item>
             </Col>
             <Col xs={24} md={12}>
@@ -447,63 +499,97 @@ export default function SystemUserManagement() {
                 label={editingUser ? 'Mật khẩu mới (Để trống nếu không đổi)' : 'Mật khẩu'}
                 rules={[{ required: !editingUser, message: 'Vui lòng nhập mật khẩu', min: 6 }]}
               >
-                <Input.Password size="large" />
+                <Input.Password size="large" placeholder={editingUser ? '••••••••' : 'Tối thiểu 6 ký tự'} />
               </Form.Item>
             </Col>
-            <Col xs={24} md={12}>
+
+            <Col xs={24} md={14}>
               <Form.Item
                 name="full_name"
                 label="Họ và tên"
                 rules={[{ required: true, message: 'Vui lòng nhập họ tên' }]}
               >
-                <Input size="large" />
+                <Input size="large" placeholder="Nguyễn Văn An" />
               </Form.Item>
             </Col>
+            <Col xs={24} md={10}>
+              <Form.Item name="phone" label="Số điện thoại">
+                <Input size="large" placeholder="0901234567" />
+              </Form.Item>
+            </Col>
+
             <Col xs={24} md={12}>
               <Form.Item
                 name="email"
                 label="Email"
                 rules={[{ type: 'email', message: 'Email không hợp lệ' }]}
               >
-                <Input size="large" />
+                <Input size="large" placeholder="nhanvien@congty.vn" />
               </Form.Item>
             </Col>
             <Col xs={24} md={12}>
-              <Form.Item name="phone" label="Số điện thoại">
-                <Input size="large" />
+              <Form.Item name="job_title" label="Chức danh">
+                <Input size="large" placeholder="Vd: Giám đốc Kinh doanh" />
               </Form.Item>
             </Col>
-            <Col xs={24} md={12}>
-              {editingUser?.is_superuser ? (
-                <Form.Item label="Vai trò / Chức danh">
-                  <Input
-                    size="large"
-                    disabled
-                    value="Superuser (Toàn quyền hệ thống)"
-                    style={{ color: '#52c41a', fontWeight: 600, backgroundColor: '#f6ffed' }}
-                  />
-                </Form.Item>
-              ) : (
-                <Form.Item name="role" label="Vai trò / Chức danh">
-                  <Select
-                    size="large"
-                    placeholder="Chọn vai trò"
-                    allowClear
-                    options={roles.map((r) => ({ value: r.id, label: r.name }))}
-                  />
-                </Form.Item>
-              )}
-            </Col>
+
             {!editingUser?.is_superuser && (
-              <Col xs={24} md={24}>
-                <Form.Item
-                  name="is_company_admin"
-                  valuePropName="checked"
-                  help="Bật để cấp quyền Quản trị viên Công ty (Toàn quyền quản lý tài khoản, cấu hình doanh nghiệp)."
-                >
-                  <Switch checkedChildren="Quản trị viên Công ty" unCheckedChildren="Tài khoản thường" />
-                </Form.Item>
-              </Col>
+              <>
+                <Col xs={24} md={12}>
+                  <Form.Item name="department" label="Phòng ban chính">
+                    <Select
+                      size="large"
+                      placeholder="Chọn phòng ban chính..."
+                      allowClear
+                      options={departments.map((d) => ({ value: d.id, label: d.name }))}
+                    />
+                  </Form.Item>
+                </Col>
+                <Col xs={24} md={12}>
+                  <Form.Item name="role" label="Vai trò (nhóm quyền)">
+                    <Select
+                      size="large"
+                      placeholder="Chọn vai trò..."
+                      allowClear
+                      options={roles.map((r) => ({ value: r.id, label: r.name }))}
+                    />
+                  </Form.Item>
+                </Col>
+                <Col xs={24} md={24}>
+                  <Form.Item
+                    name="extra_departments"
+                    label="Phòng ban kiêm nhiệm (nhiều phòng ban)"
+                    tooltip="Chọn thêm các phòng ban mà nhân sự này kiêm nhiệm, hỗ trợ hoặc tham gia nhóm chat"
+                  >
+                    <Select
+                      mode="multiple"
+                      size="large"
+                      placeholder="Chọn thêm các phòng ban kiêm nhiệm..."
+                      allowClear
+                      options={departments.map((d) => ({ value: d.id, label: d.name }))}
+                    />
+                  </Form.Item>
+                </Col>
+
+                <Col xs={24} md={12}>
+                  <Form.Item
+                    name="is_company_admin"
+                    valuePropName="checked"
+                    help="Bật để cấp quyền Quản trị viên Công ty (Toàn quyền quản lý tài khoản, cấu hình doanh nghiệp)."
+                  >
+                    <Switch checkedChildren="Admin công ty" unCheckedChildren="Tài khoản thường" />
+                  </Form.Item>
+                </Col>
+                <Col xs={24} md={12}>
+                  <Form.Item
+                    name="is_auto_assign_target"
+                    valuePropName="checked"
+                    help="Nếu bật, tài khoản này sẽ được tự động chia khách hàng từ các kênh Marketing/Zalo."
+                  >
+                    <Switch checkedChildren="Nhận khách tự động: Bật" unCheckedChildren="Nhận khách tự động: Tắt" />
+                  </Form.Item>
+                </Col>
+              </>
             )}
           </Row>
 
