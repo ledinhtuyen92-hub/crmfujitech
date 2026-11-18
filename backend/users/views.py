@@ -159,9 +159,13 @@ class TenantQuerySetMixin:
                 {"company": "Superadmin hệ thống phải được gán công ty để tạo dữ liệu."}
             )
         dept = serializer.validated_data.get("department")
-        # Nếu không truyền tường minh is_auto_assign_target, kế thừa mặc định từ phòng ban
-        if "is_auto_assign_target" not in serializer.validated_data and dept:
-            serializer.save(company=company, is_auto_assign_target=dept.is_auto_assign_target)
+        extra_depts = serializer.validated_data.get("extra_departments", [])
+        # Nếu không truyền tường minh is_auto_assign_target, kế thừa mặc định từ phòng ban (chính hoặc kiêm nhiệm)
+        if "is_auto_assign_target" not in serializer.validated_data:
+            has_auto = (dept and dept.is_auto_assign_target) or any(
+                ed.is_auto_assign_target for ed in extra_depts
+            )
+            serializer.save(company=company, is_auto_assign_target=bool(has_auto))
         else:
             serializer.save(company=company)
 
@@ -326,17 +330,30 @@ class DepartmentViewSet(TenantQuerySetMixin, viewsets.ModelViewSet):
         serializer.save(company=company)
 
     def perform_update(self, serializer):
-        old_instance = self.get_object()
-        old_auto_assign = old_instance.is_auto_assign_target
+        old_auto_assign = serializer.instance.is_auto_assign_target
         instance = serializer.save()
 
         # Nếu trạng thái nhận khách tự động của phòng ban thay đổi:
         if old_auto_assign != instance.is_auto_assign_target:
             from users.models import User
-            # Đồng bộ toàn bộ nhân sự trực thuộc phòng ban này
-            User.objects.filter(department=instance).update(
-                is_auto_assign_target=instance.is_auto_assign_target
-            )
+            from django.db.models import Q
+            affected_users = User.objects.filter(
+                Q(department=instance) | Q(extra_departments=instance)
+            ).distinct()
+
+            if instance.is_auto_assign_target:
+                # Phòng ban được BẬT: Tất cả thành viên (chính hoặc kiêm nhiệm) đều được bật
+                affected_users.update(is_auto_assign_target=True)
+            else:
+                # Phòng ban bị TẮT: Tắt những người KHÔNG CÒN phòng ban nào khác (chính hoặc kiêm nhiệm) đang bật
+                for u in affected_users:
+                    has_other_auto_dept = (
+                        (u.department and u.department.is_auto_assign_target and u.department_id != instance.id)
+                        or u.extra_departments.exclude(id=instance.id).filter(is_auto_assign_target=True).exists()
+                    )
+                    if not has_other_auto_dept:
+                        u.is_auto_assign_target = False
+                        u.save(update_fields=['is_auto_assign_target'])
 
 
 # ─────────────────────────────────────────────

@@ -566,9 +566,14 @@ export default function UserManagement() {
                   placeholder="Chọn phòng ban chính..."
                   options={departments.map((d) => ({ value: d.id, label: d.name }))}
                   onChange={(deptId) => {
-                    const dept = departments.find((d) => d.id === deptId)
-                    if (dept) {
-                      form.setFieldsValue({ is_auto_assign_target: !!dept.is_auto_assign_target })
+                    const primaryDept = departments.find((d) => d.id === deptId)
+                    const currentExtras = form.getFieldValue('extra_departments') || []
+                    const hasAutoInExtras = currentExtras.some((extraId) => {
+                      const d = departments.find((item) => item.id === extraId)
+                      return !!d?.is_auto_assign_target
+                    })
+                    if (primaryDept?.is_auto_assign_target || hasAutoInExtras) {
+                      form.setFieldsValue({ is_auto_assign_target: true })
                     } else {
                       form.setFieldsValue({ is_auto_assign_target: false })
                     }
@@ -601,6 +606,19 @@ export default function UserManagement() {
                   size="large"
                   placeholder="Chọn thêm các phòng ban kiêm nhiệm..."
                   options={departments.map((d) => ({ value: d.id, label: d.name }))}
+                  onChange={(extraVals) => {
+                    const currentPrimaryId = form.getFieldValue('department')
+                    const primaryDept = departments.find((d) => d.id === currentPrimaryId)
+                    const hasAutoInExtras = (extraVals || []).some((extraId) => {
+                      const d = departments.find((item) => item.id === extraId)
+                      return !!d?.is_auto_assign_target
+                    })
+                    if (primaryDept?.is_auto_assign_target || hasAutoInExtras) {
+                      form.setFieldsValue({ is_auto_assign_target: true })
+                    } else {
+                      form.setFieldsValue({ is_auto_assign_target: false })
+                    }
+                  }}
                   allowClear
                 />
               </Form.Item>

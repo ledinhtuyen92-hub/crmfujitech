@@ -44,8 +44,6 @@ def auto_assign_customer(sender, instance, **kwargs):
                     User.objects.filter(
                         company=company,
                         is_active=True,
-                        is_company_admin=False,
-                        is_superuser=False,
                         is_auto_assign_target=True,
                     )
                     .distinct()
