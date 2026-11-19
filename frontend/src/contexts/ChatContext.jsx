@@ -1,5 +1,13 @@
 import React, { createContext, useContext, useState, useEffect, useRef, useCallback } from 'react'
-import { message, notification } from 'antd'
+import { message, notification, Avatar } from 'antd'
+import {
+  MessageOutlined,
+  UserOutlined,
+  RightOutlined,
+  PictureOutlined,
+  PaperClipOutlined,
+  TagOutlined,
+} from '@ant-design/icons'
 import api from '../utils/api'
 import { useAuth } from './AuthContext'
 
@@ -173,20 +181,139 @@ export function ChatProvider({ children }) {
       (isWidgetOpenRef.current && widgetConvIdRef.current === conversationId)
 
     if (!isTabActive || !isThisConvActive) {
-      notification.info({
-        message: senderName,
-        description: contentText.length > 70 ? `${contentText.slice(0, 70)}...` : contentText,
+      let previewNode = contentText
+      if (newMsg.message_type === 'image') {
+        previewNode = (
+          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, color: '#2563eb' }}>
+            <PictureOutlined /> [Hình ảnh]
+          </span>
+        )
+      } else if (newMsg.message_type === 'file') {
+        previewNode = (
+          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, color: '#2563eb' }}>
+            <PaperClipOutlined /> {newMsg.file_name || '[Tệp tin]'}
+          </span>
+        )
+      } else if (newMsg.message_type === 'context_doc') {
+        const docCode = (newMsg.context_data || {}).doc_code || 'Chứng từ'
+        previewNode = (
+          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, color: '#059669' }}>
+            <TagOutlined /> [Chứng từ: {docCode}]
+          </span>
+        )
+      } else if (typeof contentText === 'string' && contentText.length > 70) {
+        previewNode = `${contentText.slice(0, 70)}...`
+      }
+
+      const notifKey = `chat_msg_${newMsg.id}`
+
+      const handleClick = () => {
+        notification.destroy(notifKey)
+        if (window.location.pathname === '/internal-chat') {
+          setActiveConversation((prev) => (prev?.id === conversationId ? prev : { id: conversationId }))
+        } else {
+          setIsWidgetOpen(true)
+          setWidgetConvId(conversationId)
+        }
+      }
+
+      notification.open({
+        key: notifKey,
         placement: 'topRight',
-        duration: 4,
-        key: `chat_msg_${newMsg.id}`,
-        onClick: () => {
-          if (window.location.pathname === '/internal-chat') {
-            setActiveConversation((prev) => (prev?.id === conversationId ? prev : { id: conversationId }))
-          } else {
-            setIsWidgetOpen(true)
-            setWidgetConvId(conversationId)
-          }
+        duration: 4.5,
+        style: {
+          padding: '12px 14px',
+          borderRadius: 14,
+          boxShadow: '0 12px 30px -4px rgba(15, 23, 42, 0.12), 0 4px 12px -2px rgba(15, 23, 42, 0.06)',
+          border: '1px solid #e2e8f0',
+          borderLeft: '4px solid #1649c9',
+          background: '#ffffff',
+          cursor: 'pointer',
         },
+        message: null,
+        description: (
+          <div onClick={handleClick} style={{ display: 'flex', alignItems: 'flex-start', gap: 12 }}>
+            <div style={{ position: 'relative', flexShrink: 0 }}>
+              <Avatar
+                src={newMsg.sender?.avatar}
+                icon={<UserOutlined />}
+                size={40}
+                style={{
+                  backgroundColor: '#1649c9',
+                  boxShadow: '0 2px 8px rgba(22, 73, 201, 0.25)',
+                }}
+              />
+              <span
+                style={{
+                  position: 'absolute',
+                  bottom: -2,
+                  right: -2,
+                  width: 17,
+                  height: 17,
+                  borderRadius: '50%',
+                  backgroundColor: '#ffffff',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  boxShadow: '0 1px 3px rgba(0,0,0,0.15)',
+                }}
+              >
+                <MessageOutlined style={{ fontSize: 9.5, color: '#1649c9' }} />
+              </span>
+            </div>
+
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 2 }}>
+                <span
+                  style={{
+                    fontWeight: 650,
+                    fontSize: 13.5,
+                    color: '#0f172a',
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis',
+                    whiteSpace: 'nowrap',
+                  }}
+                >
+                  {senderName}
+                </span>
+                <span style={{ fontSize: 11, color: '#94a3b8', marginLeft: 8, flexShrink: 0 }}>
+                  Vừa xong
+                </span>
+              </div>
+
+              <div
+                style={{
+                  fontSize: 12.5,
+                  color: '#334155',
+                  lineHeight: 1.45,
+                  wordBreak: 'break-word',
+                  background: '#f8fafc',
+                  padding: '6px 10px',
+                  borderRadius: 8,
+                  border: '1px solid #f1f5f9',
+                  marginTop: 4,
+                }}
+              >
+                {previewNode}
+              </div>
+
+              <div
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 4,
+                  marginTop: 6,
+                  fontSize: 11,
+                  color: '#1649c9',
+                  fontWeight: 600,
+                }}
+              >
+                <span>Nhấp để mở cuộc trò chuyện</span>
+                <RightOutlined style={{ fontSize: 8.5 }} />
+              </div>
+            </div>
+          </div>
+        ),
       })
     }
   }, [playNotificationSound])
