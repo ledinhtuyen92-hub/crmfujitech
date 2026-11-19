@@ -413492,6 +413492,19 @@
   }
 },
 {
+  "model": "zalo_integration.zalotokenrefreshlog",
+  "pk": 872,
+  "fields": {
+    "oa_config": 1,
+    "status": "failed",
+    "trigger": "auto",
+    "error_message": "Zalo error=-14014: Invalid refresh token.",
+    "old_expires_at": "2026-10-14T07:34:06.715Z",
+    "new_expires_at": null,
+    "created_at": "2026-11-19T10:00:00.184Z"
+  }
+},
+{
   "model": "zalo_integration.sociallead",
   "pk": 4,
   "fields": {
@@ -998102,96 +998115,6 @@
     "conversation": 16,
     "user": 4,
     "joined_at": "2026-11-19T08:48:04.556Z",
-    "last_read_message_id": 0,
-    "last_read_at": null,
-    "is_admin": false,
-    "is_muted": false,
-    "is_hidden": false,
-    "cleared_at": null
-  }
-},
-{
-  "model": "chat.conversationparticipant",
-  "pk": 68,
-  "fields": {
-    "conversation": 2,
-    "user": 10,
-    "joined_at": "2026-11-19T09:55:53.510Z",
-    "last_read_message_id": 0,
-    "last_read_at": null,
-    "is_admin": false,
-    "is_muted": false,
-    "is_hidden": false,
-    "cleared_at": null
-  }
-},
-{
-  "model": "chat.conversationparticipant",
-  "pk": 69,
-  "fields": {
-    "conversation": 3,
-    "user": 10,
-    "joined_at": "2026-11-19T09:55:53.522Z",
-    "last_read_message_id": 0,
-    "last_read_at": null,
-    "is_admin": false,
-    "is_muted": false,
-    "is_hidden": false,
-    "cleared_at": null
-  }
-},
-{
-  "model": "chat.conversationparticipant",
-  "pk": 70,
-  "fields": {
-    "conversation": 5,
-    "user": 10,
-    "joined_at": "2026-11-19T09:55:53.552Z",
-    "last_read_message_id": 0,
-    "last_read_at": null,
-    "is_admin": false,
-    "is_muted": false,
-    "is_hidden": false,
-    "cleared_at": null
-  }
-},
-{
-  "model": "chat.conversationparticipant",
-  "pk": 71,
-  "fields": {
-    "conversation": 6,
-    "user": 10,
-    "joined_at": "2026-11-19T09:55:53.577Z",
-    "last_read_message_id": 0,
-    "last_read_at": null,
-    "is_admin": false,
-    "is_muted": false,
-    "is_hidden": false,
-    "cleared_at": null
-  }
-},
-{
-  "model": "chat.conversationparticipant",
-  "pk": 72,
-  "fields": {
-    "conversation": 7,
-    "user": 10,
-    "joined_at": "2026-11-19T09:55:53.599Z",
-    "last_read_message_id": 0,
-    "last_read_at": null,
-    "is_admin": false,
-    "is_muted": false,
-    "is_hidden": false,
-    "cleared_at": null
-  }
-},
-{
-  "model": "chat.conversationparticipant",
-  "pk": 73,
-  "fields": {
-    "conversation": 8,
-    "user": 10,
-    "joined_at": "2026-11-19T09:55:53.606Z",
     "last_read_message_id": 0,
     "last_read_at": null,
     "is_admin": false,

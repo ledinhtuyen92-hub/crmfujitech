@@ -25,11 +25,24 @@ class InteractionAttachmentSerializer(serializers.ModelSerializer):
         read_only_fields = ["id", "uploaded_at", "interaction"]
 
 
+class AssignedUserSerializer(serializers.Serializer):
+    """Serializer nhỏ để trả về thông tin nhân viên được phân công."""
+    id = serializers.IntegerField()
+    full_name = serializers.CharField()
+    username = serializers.CharField()
+
+
 class CustomerInteractionSerializer(serializers.ModelSerializer):
     type_display = serializers.CharField(source="get_type_display", read_only=True)
     result_display = serializers.CharField(source="get_result_display", read_only=True)
-    created_by_name = serializers.CharField(source="created_by.full_name", read_only=True)
+    created_by_name = serializers.SerializerMethodField()
+    created_by = AssignedUserSerializer(read_only=True)
     attachments = InteractionAttachmentSerializer(many=True, read_only=True)
+
+    def get_created_by_name(self, obj):
+        if not obj.created_by:
+            return "Hệ thống"
+        return obj.created_by.full_name or obj.created_by.username
 
     class Meta:
         model = CustomerInteraction
@@ -48,13 +61,6 @@ class CustomerInteractionSerializer(serializers.ModelSerializer):
             "created_at",
         ]
         read_only_fields = ["id", "created_by", "created_at", "type_display", "result_display", "created_by_name", "attachments"]
-
-
-class AssignedUserSerializer(serializers.Serializer):
-    """Serializer nhỏ để trả về thông tin nhân viên được phân công."""
-    id = serializers.IntegerField()
-    full_name = serializers.CharField()
-    username = serializers.CharField()
 
 
 class CustomerSerializer(serializers.ModelSerializer):

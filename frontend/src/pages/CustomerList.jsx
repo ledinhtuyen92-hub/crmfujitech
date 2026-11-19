@@ -1932,7 +1932,7 @@ function CustomerList() {
                               )}
                               
                               <Text type="secondary" style={{ fontSize: 11 }}>
-                                Thực hiện bởi: {item.created_by?.full_name || item.created_by?.username || 'Admin'}
+                                Thực hiện bởi: {item.isZnsLog ? 'Hệ thống (ZNS)' : (item.created_by_name || item.created_by?.full_name || item.created_by?.username || (typeof item.created_by === 'string' ? item.created_by : 'Hệ thống'))}
                               </Text>
                             </Card>
                           ),
