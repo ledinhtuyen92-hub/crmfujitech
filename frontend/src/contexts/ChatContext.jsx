@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect, useRef, useCallback } from 'react'
-import { message } from 'antd'
+import { message, notification } from 'antd'
 import api from '../utils/api'
 import { useAuth } from './AuthContext'
 
@@ -18,13 +18,18 @@ export function ChatProvider({ children }) {
 
   const wsRef = useRef(null)
   const reconnectTimeoutRef = useRef(null)
-  const audioRef = useRef(null)
+  const audioContextRef = useRef(null)
 
   // Lưu trữ các giá trị state trong refs để tránh reconnect WebSocket khi state thay đổi
   const activeConversationRef = useRef(activeConversation)
   const widgetConvIdRef = useRef(widgetConvId)
   const isWidgetOpenRef = useRef(isWidgetOpen)
   const userRef = useRef(user)
+  const conversationsRef = useRef(conversations)
+
+  useEffect(() => {
+    conversationsRef.current = conversations
+  }, [conversations])
 
   useEffect(() => {
     activeConversationRef.current = activeConversation
@@ -42,33 +47,149 @@ export function ChatProvider({ children }) {
     userRef.current = user
   }, [user])
 
-  // Âm thanh thông báo tin nhắn nhẹ nhàng
-  useEffect(() => {
+  // ── Quản lý AudioContext dùng chung, chống cạn kiệt Hardware Context & vượt Autoplay Policy ──
+  const getAudioContext = useCallback(() => {
     try {
-      audioRef.current = () => {
+      if (!audioContextRef.current) {
+        const AudioCtx = window.AudioContext || window.webkitAudioContext
+        if (AudioCtx) {
+          audioContextRef.current = new AudioCtx()
+        }
+      }
+      if (audioContextRef.current && audioContextRef.current.state === 'suspended') {
+        audioContextRef.current.resume().catch(() => {})
+      }
+      return audioContextRef.current
+    } catch (_) {
+      return null
+    }
+  }, [])
+
+  // Tự động mở khóa âm thanh khi người dùng click/chạm vào màn hình lần đầu
+  useEffect(() => {
+    const unlockAudio = () => {
+      try {
+        const ctx = getAudioContext()
+        if (ctx && ctx.state === 'suspended') {
+          ctx.resume().catch(() => {})
+        }
+      } catch (_) {}
+      window.removeEventListener('click', unlockAudio)
+      window.removeEventListener('keydown', unlockAudio)
+      window.removeEventListener('touchstart', unlockAudio)
+    }
+    window.addEventListener('click', unlockAudio, { passive: true })
+    window.addEventListener('keydown', unlockAudio, { passive: true })
+    window.addEventListener('touchstart', unlockAudio, { passive: true })
+    return () => {
+      window.removeEventListener('click', unlockAudio)
+      window.removeEventListener('keydown', unlockAudio)
+      window.removeEventListener('touchstart', unlockAudio)
+    }
+  }, [getAudioContext])
+
+  // Phát âm thanh chuông nhẹ nhàng khi có tin nhắn mới
+  const playNotificationSound = useCallback(() => {
+    try {
+      const ctx = getAudioContext()
+      if (!ctx) return
+
+      const playChime = (c) => {
         try {
-          const ctx = new (window.AudioContext || window.webkitAudioContext)()
-          const osc = ctx.createOscillator()
-          const gain = ctx.createGain()
+          const now = c.currentTime
+          const osc = c.createOscillator()
+          const gain = c.createGain()
           osc.type = 'sine'
-          osc.frequency.setValueAtTime(587.33, ctx.currentTime) // D5
-          osc.frequency.setValueAtTime(880, ctx.currentTime + 0.08) // A5
-          gain.gain.setValueAtTime(0.12, ctx.currentTime)
-          gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.35)
+          osc.frequency.setValueAtTime(587.33, now) // D5
+          osc.frequency.setValueAtTime(880, now + 0.08) // A5
+          gain.gain.setValueAtTime(0.15, now)
+          gain.gain.exponentialRampToValueAtTime(0.001, now + 0.35)
           osc.connect(gain)
-          gain.connect(ctx.destination)
-          osc.start()
-          osc.stop(ctx.currentTime + 0.35)
+          gain.connect(c.destination)
+          osc.start(now)
+          osc.stop(now + 0.35)
         } catch (_) {}
+      }
+
+      if (ctx.state === 'suspended') {
+        ctx.resume().then(() => playChime(ctx)).catch(() => {})
+      } else {
+        playChime(ctx)
+      }
+    } catch (_) {}
+  }, [getAudioContext])
+
+  // Xin quyền thông báo màn hình (Desktop Notification) của hệ điều hành
+  const requestDesktopNotificationPermission = useCallback(() => {
+    try {
+      if (typeof window !== 'undefined' && 'Notification' in window) {
+        if (Notification.permission === 'default') {
+          Notification.requestPermission().catch(() => {})
+        }
       }
     } catch (_) {}
   }, [])
 
-  const playNotificationSound = useCallback(() => {
-    if (audioRef.current) {
-      audioRef.current()
+  useEffect(() => {
+    if (user) {
+      requestDesktopNotificationPermission()
     }
-  }, [])
+  }, [user, requestDesktopNotificationPermission])
+
+  // Thông báo tin nhắn đa kênh (Âm thanh + Desktop Notification + Toast Ant Design)
+  const notifyIncomingMessage = useCallback((newMsg, conversationId) => {
+    // 1. Luôn phát âm thanh thông báo
+    playNotificationSound()
+
+    const senderName = newMsg.sender?.full_name || 'Đồng nghiệp'
+    const contentText = newMsg.content || (newMsg.message_type === 'image' ? '[Hình ảnh]' : '[Tệp tin]')
+
+    // 2. Nếu tab đang ở chế độ ẩn/thu nhỏ (document.hidden): kích hoạt Desktop Notification
+    if (typeof document !== 'undefined' && document.hidden) {
+      try {
+        if ('Notification' in window && Notification.permission === 'granted') {
+          const notif = new Notification(`Tin nhắn từ ${senderName}`, {
+            body: contentText,
+            icon: newMsg.sender?.avatar || '/favicon.png',
+            tag: `chat_${conversationId}`,
+          })
+          notif.onclick = () => {
+            window.focus()
+            if (window.location.pathname === '/internal-chat') {
+              setActiveConversation((prev) => (prev?.id === conversationId ? prev : { id: conversationId }))
+            } else {
+              setIsWidgetOpen(true)
+              setWidgetConvId(conversationId)
+            }
+          }
+        }
+      } catch (_) {}
+    }
+
+    // 3. Nếu người dùng đang làm việc ở trang khác (không phải đang nhìn trực diện cuộc trò chuyện này)
+    const isTabActive = typeof document !== 'undefined' && !document.hidden
+    const isThisConvActive =
+      (activeConversationRef.current?.id === conversationId) ||
+      (isWidgetOpenRef.current && widgetConvIdRef.current === conversationId)
+
+    if (!isTabActive || !isThisConvActive) {
+      notification.info({
+        message: senderName,
+        description: contentText.length > 70 ? `${contentText.slice(0, 70)}...` : contentText,
+        placement: 'topRight',
+        duration: 4,
+        key: `chat_msg_${newMsg.id}`,
+        onClick: () => {
+          if (window.location.pathname === '/internal-chat') {
+            setActiveConversation((prev) => (prev?.id === conversationId ? prev : { id: conversationId }))
+          } else {
+            setIsWidgetOpen(true)
+            setWidgetConvId(conversationId)
+          }
+        },
+      })
+    }
+  }, [playNotificationSound])
 
   const [colleagues, setColleagues] = useState([])
 
@@ -78,6 +199,12 @@ export function ChatProvider({ children }) {
     try {
       const res = await api.get('/chat/conversations/')
       const list = Array.isArray(res.data) ? res.data : (res.data.results || [])
+      // Nếu WebSocket mất kết nối mà polling phát hiện có thêm tin nhắn chưa đọc mới: kích hoạt chuông báo
+      const prevUnread = (conversationsRef.current || []).reduce((sum, c) => sum + (c.unread_count || 0), 0)
+      const currentUnread = list.reduce((sum, c) => sum + (c.unread_count || 0), 0)
+      if (currentUnread > prevUnread && (!wsRef.current || wsRef.current.readyState !== WebSocket.OPEN)) {
+        playNotificationSound()
+      }
       setConversations(list)
       const onlineFromConvs = list
         .filter((c) => c.type === 'direct' && c.direct_partner?.is_online)
@@ -276,9 +403,11 @@ export function ChatProvider({ children }) {
               return { ...prev, [conversation_id]: [...currentList, newMsg] }
             })
 
+            const isTabFocused = typeof document !== 'undefined' && !document.hidden
             const activeId = activeConversationRef.current?.id
             const isWidgetActive = isWidgetOpenRef.current && widgetConvIdRef.current === conversation_id
-            const isActive = (activeId === conversation_id) || isWidgetActive
+            const isViewingThisConv = (activeId === conversation_id) || isWidgetActive
+            const isReallyReading = isViewingThisConv && isTabFocused
             const isSelf = newMsg.sender?.id === userRef.current?.id
 
             // Cập nhật thông tin tin nhắn cuối cùng và sắp xếp lại hội thoại
@@ -290,7 +419,8 @@ export function ChatProvider({ children }) {
               }
               return prev.map((c) => {
                 if (c.id === conversation_id) {
-                  const unread = isActive || isSelf ? 0 : (c.unread_count || 0) + 1
+                  // Chỉ coi là unread=0 nếu người dùng thực sự đang nhìn vào cuộc trò chuyện trên màn hình
+                  const unread = isReallyReading || isSelf ? 0 : (c.unread_count || 0) + 1
                   return {
                     ...c,
                     last_message_text: newMsg.content || (newMsg.message_type === 'image' ? '[Hình ảnh]' : '[Tệp tin]'),
@@ -303,13 +433,13 @@ export function ChatProvider({ children }) {
               }).sort((a, b) => new Date(b.last_message_at || 0) - new Date(a.last_message_at || 0))
             })
 
-            // Phát âm thanh nếu là tin nhắn từ người khác
+            // Kích hoạt thông báo đa kênh nếu là tin nhắn từ người khác
             if (!isSelf) {
-              playNotificationSound()
+              notifyIncomingMessage(newMsg, conversation_id)
             }
 
-            // Nếu đang xem cuộc trò chuyện này, tự động đánh dấu đã đọc
-            if (isActive && !isSelf) {
+            // Nếu người dùng thực sự đang mở và nhìn vào màn hình cuộc trò chuyện này, đánh dấu đã đọc
+            if (isReallyReading && !isSelf) {
               markAsRead(conversation_id)
             }
           } else if (data.type === 'user_typing') {
@@ -391,7 +521,7 @@ export function ChatProvider({ children }) {
     } catch (e) {
       console.warn('Cannot establish WS:', e)
     }
-  }, [token, user, fetchConversations, markAsRead, playNotificationSound])
+  }, [token, user, fetchConversations, markAsRead, notifyIncomingMessage])
 
   useEffect(() => {
     connectWebSocket()
@@ -403,6 +533,27 @@ export function ChatProvider({ children }) {
       }
     }
   }, [connectWebSocket])
+
+  // Khi người dùng quay lại tab (window focus / visibilitychange), đánh dấu đã đọc cuộc trò chuyện đang mở
+  useEffect(() => {
+    const handleFocus = () => {
+      const activeId = activeConversationRef.current?.id || widgetConvIdRef.current
+      if (activeId) {
+        markAsRead(activeId)
+      }
+    }
+    window.addEventListener('focus', handleFocus)
+    const onVisibilityChange = () => {
+      if (typeof document !== 'undefined' && !document.hidden) {
+        handleFocus()
+      }
+    }
+    document.addEventListener('visibilitychange', onVisibilityChange)
+    return () => {
+      window.removeEventListener('focus', handleFocus)
+      document.removeEventListener('visibilitychange', onVisibilityChange)
+    }
+  }, [markAsRead])
 
   // ── 5. Gửi tin nhắn qua REST API đảm bảo lưu trữ và broadcast ─────────────
   const sendMessage = async ({ conversationId, content, messageType = 'text', contextData = null, file = null }) => {

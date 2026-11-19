@@ -218,15 +218,6 @@ class ChatConsumer(AsyncWebsocketConsumer):
                                 "conversation_id": conv_id,
                             }
                         )
-                    # Và gửi tới phòng hội thoại nếu có client đang join
-                    await self.channel_layer.group_send(
-                        f"chat_conversation_{conv_id}",
-                        {
-                            "type": "chat_message_broadcast",
-                            "message": msg_data,
-                            "conversation_id": conv_id,
-                        }
-                    )
 
         elif action == "typing" and conv_id:
             is_typing = bool(data.get("is_typing", True))

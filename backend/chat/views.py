@@ -546,15 +546,6 @@ class ConversationViewSet(viewsets.ModelViewSet):
                             "message": msg_data,
                         }
                     )
-                # Gửi tới phòng hội thoại
-                async_to_sync(channel_layer.group_send)(
-                    f"chat_conversation_{conv.id}",
-                    {
-                        "type": "chat_message_broadcast",
-                        "conversation_id": conv.id,
-                        "message": msg_data,
-                    }
-                )
         except Exception:
             pass
 
