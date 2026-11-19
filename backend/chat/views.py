@@ -39,13 +39,9 @@ class ConversationViewSet(viewsets.ModelViewSet):
         if not user or not user.is_authenticated or not user.company_id:
             return
 
-        # 1. Nếu user có quyền chat.view_all_departments hoặc là admin công ty / superuser:
+        # 1. Nếu user có quyền chat.view_all_departments (tuân thủ nghiêm ngặt theo Role, admin không ngoại lệ):
         # Tự động có quyền tham gia TẤT CẢ các nhóm phòng ban trong công ty để điều hành & giám sát
-        can_view_all = (
-            user.is_company_admin
-            or user.is_superuser
-            or user.has_perm_code("chat.view_all_departments")
-        )
+        can_view_all = user.has_perm_code("chat.view_all_departments")
 
         if can_view_all:
             dept_ids = set(Department.objects.filter(company_id=user.company_id).values_list("id", flat=True))
@@ -144,6 +140,9 @@ class ConversationViewSet(viewsets.ModelViewSet):
             return Response(serializer.data, status=status.HTTP_201_CREATED)
 
         elif conv_type == Conversation.TYPE_GROUP:
+            if not user.has_perm_code("chat.manage_groups"):
+                return Response({"detail": "Bạn không có quyền tạo nhóm trò chuyện."}, status=status.HTTP_403_FORBIDDEN)
+
             if not title:
                 return Response({"detail": "Vui lòng nhập tên nhóm trò chuyện."}, status=status.HTTP_400_BAD_REQUEST)
 
@@ -214,8 +213,8 @@ class ConversationViewSet(viewsets.ModelViewSet):
         conv_id = conv.id
 
         if conv.type == Conversation.TYPE_DEPARTMENT:
-            if not (user.is_company_admin or user.is_superuser):
-                return Response({"detail": "Nhóm phòng ban do hệ thống quản lý, chỉ Quản trị viên mới được xóa."}, status=status.HTTP_403_FORBIDDEN)
+            if not user.has_perm_code("chat.admin"):
+                return Response({"detail": "Nhóm phòng ban do hệ thống quản lý, chỉ người có quyền Quản trị chat mới được xóa."}, status=status.HTTP_403_FORBIDDEN)
             participant_ids = list(conv.participants.values_list("user_id", flat=True))
             self._purge_conversation(conv)
             self._broadcast_deleted(conv_id, participant_ids)
@@ -246,7 +245,7 @@ class ConversationViewSet(viewsets.ModelViewSet):
         elif conv.type == Conversation.TYPE_GROUP:
             is_creator = conv.created_by_id == user.id
             is_grp_admin = conv.participants.filter(user=user, is_admin=True).exists()
-            is_admin = is_creator or is_grp_admin or user.is_company_admin or user.is_superuser
+            is_admin = is_creator or is_grp_admin or user.has_perm_code("chat.manage_groups") or user.has_perm_code("chat.admin")
 
             if is_admin:
                 # Giải tán nhóm triệt để
@@ -286,7 +285,7 @@ class ConversationViewSet(viewsets.ModelViewSet):
         elif conv.type == Conversation.TYPE_GROUP:
             is_creator = conv.created_by_id == user.id
             is_grp_admin = conv.participants.filter(user=user, is_admin=True).exists()
-            is_admin = is_creator or is_grp_admin or user.is_company_admin or user.is_superuser
+            is_admin = is_creator or is_grp_admin or user.has_perm_code("chat.manage_groups") or user.has_perm_code("chat.admin")
 
             if not is_admin:
                 p = conv.participants.filter(user=user).first()
@@ -663,17 +662,17 @@ def get_department_groups(request):
     Hỗ trợ:
     - Nhân sự thuộc phòng ban chính (department)
     - Nhân sự kiêm nhiệm nhiều phòng ban (extra_departments)
-    - Người dùng có quyền xem/tham gia toàn bộ phòng ban (chat.view_all_departments / is_company_admin)
+    - Người dùng có quyền xem/tham gia toàn bộ phòng ban (chat.view_all_departments)
     """
     user = request.user
     departments = Department.objects.filter(company_id=user.company_id)
     results = []
 
-    # Danh sách user có quyền tham gia tất cả các nhóm phòng ban (dựa trên quyền RBAC & cờ Admin)
+    # Danh sách user có quyền tham gia tất cả các nhóm phòng ban (dựa trên quyền RBAC, admin không ngoại lệ)
     company_users = User.objects.filter(company_id=user.company_id, is_active=True).prefetch_related("role__permissions", "extra_departments")
     view_all_user_ids = {
         u.id for u in company_users
-        if u.is_company_admin or u.is_superuser or u.has_perm_code("chat.view_all_departments")
+        if u.has_perm_code("chat.view_all_departments")
     }
 
     for dept in departments:
@@ -830,6 +829,8 @@ class ChatCompanyConfigView(APIView):
     permission_classes = [permissions.IsAuthenticated]
 
     def get(self, request):
+        if not request.user.has_perm_code("chat.admin"):
+            return Response({"detail": "Bạn không có quyền xem cấu hình Chat."}, status=status.HTTP_403_FORBIDDEN)
         config, _ = ChatCompanyConfig.objects.get_or_create(company=request.user.company)
         serializer = ChatCompanyConfigSerializer(config)
         return Response(serializer.data)
@@ -839,8 +840,8 @@ class ChatCompanyConfigView(APIView):
         if user.company_id:
             from chat.presence import record_user_heartbeat
             record_user_heartbeat(user.company_id, user.id)
-        if not (user.is_company_admin or user.is_superuser or (user.permissions or []).count("chat.admin")):
-            return Response({"detail": "Chỉ Quản trị viên mới có quyền thay đổi cấu hình Chat."}, status=status.HTTP_403_FORBIDDEN)
+        if not user.has_perm_code("chat.admin"):
+            return Response({"detail": "Chỉ Quản trị viên có quyền 'Quản trị chat & Cấu hình lưu trữ' mới có thể thay đổi cấu hình Chat."}, status=status.HTTP_403_FORBIDDEN)
 
         config, _ = ChatCompanyConfig.objects.get_or_create(company=user.company)
         serializer = ChatCompanyConfigSerializer(config, data=request.data, partial=True)
@@ -855,8 +856,8 @@ class ChatCompanyConfigView(APIView):
 def trigger_clean_old_chat_files(request):
     """Thao tác thủ công của Admin: Dọn dẹp tệp tin cũ để giải phóng dung lượng ổ cứng."""
     user = request.user
-    if not (user.is_company_admin or user.is_superuser or (user.permissions or []).count("chat.admin")):
-        return Response({"detail": "Bạn không có quyền thực hiện hành động này."}, status=status.HTTP_403_FORBIDDEN)
+    if not user.has_perm_code("chat.admin"):
+        return Response({"detail": "Bạn không có quyền thực hiện hành động này (cần quyền Quản trị chat)."}, status=status.HTTP_403_FORBIDDEN)
 
     days = int(request.data.get("days", 30))
     from .tasks import clean_old_files_only

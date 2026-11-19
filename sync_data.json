@@ -1496,7 +1496,6 @@
       162,
       161,
       160,
-      163,
       6,
       45,
       43,
@@ -1886,7 +1885,7 @@
   "pk": 10,
   "fields": {
     "password": "pbkdf2_sha256$1000000$halV050DEgRX2pqBbGQ613$nW5p+jMCYj5NJLie14+dIPK/l987cKEMs2CU4IJPNLU=",
-    "last_login": "2026-11-18T06:47:27.728Z",
+    "last_login": "2026-11-19T06:49:48.987Z",
     "is_superuser": false,
     "username": "dinhtuyen_fuji",
     "first_name": "",
@@ -413399,6 +413398,97 @@
     "old_expires_at": "2026-10-14T07:34:06.715Z",
     "new_expires_at": null,
     "created_at": "2026-11-18T08:00:00.211Z"
+  }
+},
+{
+  "model": "zalo_integration.zalotokenrefreshlog",
+  "pk": 865,
+  "fields": {
+    "oa_config": 1,
+    "status": "failed",
+    "trigger": "auto",
+    "error_message": "Zalo error=-14014: Invalid refresh token.",
+    "old_expires_at": "2026-10-14T07:34:06.715Z",
+    "new_expires_at": null,
+    "created_at": "2026-11-18T09:00:00.271Z"
+  }
+},
+{
+  "model": "zalo_integration.zalotokenrefreshlog",
+  "pk": 866,
+  "fields": {
+    "oa_config": 1,
+    "status": "failed",
+    "trigger": "auto",
+    "error_message": "Zalo error=-14014: Invalid refresh token.",
+    "old_expires_at": "2026-10-14T07:34:06.715Z",
+    "new_expires_at": null,
+    "created_at": "2026-11-18T10:00:00.373Z"
+  }
+},
+{
+  "model": "zalo_integration.zalotokenrefreshlog",
+  "pk": 867,
+  "fields": {
+    "oa_config": 1,
+    "status": "failed",
+    "trigger": "auto",
+    "error_message": "Zalo error=-14014: Invalid refresh token.",
+    "old_expires_at": "2026-10-14T07:34:06.715Z",
+    "new_expires_at": null,
+    "created_at": "2026-11-19T05:35:24.880Z"
+  }
+},
+{
+  "model": "zalo_integration.zalotokenrefreshlog",
+  "pk": 868,
+  "fields": {
+    "oa_config": 1,
+    "status": "failed",
+    "trigger": "auto",
+    "error_message": "Zalo error=-14014: Invalid refresh token.",
+    "old_expires_at": "2026-10-14T07:34:06.715Z",
+    "new_expires_at": null,
+    "created_at": "2026-11-19T06:00:00.235Z"
+  }
+},
+{
+  "model": "zalo_integration.zalotokenrefreshlog",
+  "pk": 869,
+  "fields": {
+    "oa_config": 1,
+    "status": "failed",
+    "trigger": "auto",
+    "error_message": "Zalo error=-14014: Invalid refresh token.",
+    "old_expires_at": "2026-10-14T07:34:06.715Z",
+    "new_expires_at": null,
+    "created_at": "2026-11-19T07:00:00.243Z"
+  }
+},
+{
+  "model": "zalo_integration.zalotokenrefreshlog",
+  "pk": 870,
+  "fields": {
+    "oa_config": 1,
+    "status": "failed",
+    "trigger": "auto",
+    "error_message": "Zalo error=-14014: Invalid refresh token.",
+    "old_expires_at": "2026-10-14T07:34:06.715Z",
+    "new_expires_at": null,
+    "created_at": "2026-11-19T08:00:00.400Z"
+  }
+},
+{
+  "model": "zalo_integration.zalotokenrefreshlog",
+  "pk": 871,
+  "fields": {
+    "oa_config": 1,
+    "status": "failed",
+    "trigger": "auto",
+    "error_message": "Zalo error=-14014: Invalid refresh token.",
+    "old_expires_at": "2026-10-14T07:34:06.715Z",
+    "new_expires_at": null,
+    "created_at": "2026-11-19T09:00:00.201Z"
   }
 },
 {
@@ -897264,6 +897354,24 @@
   }
 },
 {
+  "model": "facebook_integration.facebookbotactivitylog",
+  "pk": 62,
+  "fields": {
+    "company": 15,
+    "page_config": 13,
+    "post_id": "1479626525616019_1784291963697201",
+    "fb_sender_id": "26857972853808597",
+    "customer_name": "Thuy Nguyen",
+    "event_type": "comment",
+    "trigger_content": "Ib",
+    "action_taken": "Like cmt + Reply cmt mặc định",
+    "status": "success",
+    "details": "Tầng 4: Cấu hình mặc định",
+    "fb_item_id": "1784291963697201_1375893777815687",
+    "created_at": "2026-11-19T05:46:59.795Z"
+  }
+},
+{
   "model": "ai_agents.companyaisettings",
   "pk": 1,
   "fields": {
@@ -997664,6 +997772,60 @@
   }
 },
 {
+  "model": "chat.conversation",
+  "pk": 14,
+  "fields": {
+    "company": 15,
+    "type": "direct",
+    "title": null,
+    "avatar": "",
+    "department": null,
+    "created_by": 10,
+    "last_message_text": "",
+    "last_message_at": null,
+    "last_sender_name": "",
+    "is_active": true,
+    "created_at": "2026-11-19T07:30:06.692Z",
+    "updated_at": "2026-11-19T07:30:06.692Z"
+  }
+},
+{
+  "model": "chat.conversation",
+  "pk": 15,
+  "fields": {
+    "company": 15,
+    "type": "direct",
+    "title": null,
+    "avatar": "",
+    "department": null,
+    "created_by": 10,
+    "last_message_text": "",
+    "last_message_at": null,
+    "last_sender_name": "",
+    "is_active": true,
+    "created_at": "2026-11-19T07:33:21.727Z",
+    "updated_at": "2026-11-19T07:33:21.727Z"
+  }
+},
+{
+  "model": "chat.conversation",
+  "pk": 16,
+  "fields": {
+    "company": 15,
+    "type": "direct",
+    "title": null,
+    "avatar": "",
+    "department": null,
+    "created_by": 10,
+    "last_message_text": "",
+    "last_message_at": null,
+    "last_sender_name": "",
+    "is_active": true,
+    "created_at": "2026-11-19T08:48:04.465Z",
+    "updated_at": "2026-11-19T08:48:04.465Z"
+  }
+},
+{
   "model": "chat.conversationparticipant",
   "pk": 1,
   "fields": {
@@ -997815,81 +997977,6 @@
 },
 {
   "model": "chat.conversationparticipant",
-  "pk": 20,
-  "fields": {
-    "conversation": 2,
-    "user": 2,
-    "joined_at": "2026-11-18T02:50:37.134Z",
-    "last_read_message_id": 0,
-    "last_read_at": null,
-    "is_admin": false,
-    "is_muted": false,
-    "is_hidden": false,
-    "cleared_at": null
-  }
-},
-{
-  "model": "chat.conversationparticipant",
-  "pk": 21,
-  "fields": {
-    "conversation": 2,
-    "user": 10,
-    "joined_at": "2026-11-18T02:50:37.144Z",
-    "last_read_message_id": 0,
-    "last_read_at": null,
-    "is_admin": false,
-    "is_muted": false,
-    "is_hidden": false,
-    "cleared_at": null
-  }
-},
-{
-  "model": "chat.conversationparticipant",
-  "pk": 22,
-  "fields": {
-    "conversation": 3,
-    "user": 2,
-    "joined_at": "2026-11-18T02:50:37.197Z",
-    "last_read_message_id": 0,
-    "last_read_at": null,
-    "is_admin": false,
-    "is_muted": false,
-    "is_hidden": false,
-    "cleared_at": null
-  }
-},
-{
-  "model": "chat.conversationparticipant",
-  "pk": 23,
-  "fields": {
-    "conversation": 3,
-    "user": 10,
-    "joined_at": "2026-11-18T02:50:37.227Z",
-    "last_read_message_id": 0,
-    "last_read_at": null,
-    "is_admin": false,
-    "is_muted": false,
-    "is_hidden": false,
-    "cleared_at": null
-  }
-},
-{
-  "model": "chat.conversationparticipant",
-  "pk": 24,
-  "fields": {
-    "conversation": 4,
-    "user": 2,
-    "joined_at": "2026-11-18T02:50:37.252Z",
-    "last_read_message_id": 0,
-    "last_read_at": null,
-    "is_admin": false,
-    "is_muted": false,
-    "is_hidden": false,
-    "cleared_at": null
-  }
-},
-{
-  "model": "chat.conversationparticipant",
   "pk": 25,
   "fields": {
     "conversation": 4,
@@ -997897,126 +997984,6 @@
     "joined_at": "2026-11-18T02:50:37.296Z",
     "last_read_message_id": 28,
     "last_read_at": "2026-11-18T03:35:23.270Z",
-    "is_admin": false,
-    "is_muted": false,
-    "is_hidden": false,
-    "cleared_at": null
-  }
-},
-{
-  "model": "chat.conversationparticipant",
-  "pk": 26,
-  "fields": {
-    "conversation": 5,
-    "user": 2,
-    "joined_at": "2026-11-18T02:50:37.370Z",
-    "last_read_message_id": 0,
-    "last_read_at": null,
-    "is_admin": false,
-    "is_muted": false,
-    "is_hidden": false,
-    "cleared_at": null
-  }
-},
-{
-  "model": "chat.conversationparticipant",
-  "pk": 27,
-  "fields": {
-    "conversation": 5,
-    "user": 10,
-    "joined_at": "2026-11-18T02:50:37.384Z",
-    "last_read_message_id": 0,
-    "last_read_at": null,
-    "is_admin": false,
-    "is_muted": false,
-    "is_hidden": false,
-    "cleared_at": null
-  }
-},
-{
-  "model": "chat.conversationparticipant",
-  "pk": 28,
-  "fields": {
-    "conversation": 6,
-    "user": 2,
-    "joined_at": "2026-11-18T02:50:37.394Z",
-    "last_read_message_id": 0,
-    "last_read_at": null,
-    "is_admin": false,
-    "is_muted": false,
-    "is_hidden": false,
-    "cleared_at": null
-  }
-},
-{
-  "model": "chat.conversationparticipant",
-  "pk": 29,
-  "fields": {
-    "conversation": 6,
-    "user": 10,
-    "joined_at": "2026-11-18T02:50:37.418Z",
-    "last_read_message_id": 0,
-    "last_read_at": null,
-    "is_admin": false,
-    "is_muted": false,
-    "is_hidden": false,
-    "cleared_at": null
-  }
-},
-{
-  "model": "chat.conversationparticipant",
-  "pk": 30,
-  "fields": {
-    "conversation": 7,
-    "user": 2,
-    "joined_at": "2026-11-18T02:50:37.436Z",
-    "last_read_message_id": 0,
-    "last_read_at": null,
-    "is_admin": false,
-    "is_muted": false,
-    "is_hidden": false,
-    "cleared_at": null
-  }
-},
-{
-  "model": "chat.conversationparticipant",
-  "pk": 31,
-  "fields": {
-    "conversation": 7,
-    "user": 10,
-    "joined_at": "2026-11-18T02:50:37.471Z",
-    "last_read_message_id": 0,
-    "last_read_at": null,
-    "is_admin": false,
-    "is_muted": false,
-    "is_hidden": false,
-    "cleared_at": null
-  }
-},
-{
-  "model": "chat.conversationparticipant",
-  "pk": 32,
-  "fields": {
-    "conversation": 8,
-    "user": 2,
-    "joined_at": "2026-11-18T02:50:37.490Z",
-    "last_read_message_id": 0,
-    "last_read_at": null,
-    "is_admin": false,
-    "is_muted": false,
-    "is_hidden": false,
-    "cleared_at": null
-  }
-},
-{
-  "model": "chat.conversationparticipant",
-  "pk": 33,
-  "fields": {
-    "conversation": 8,
-    "user": 10,
-    "joined_at": "2026-11-18T02:50:37.514Z",
-    "last_read_message_id": 0,
-    "last_read_at": null,
     "is_admin": false,
     "is_muted": false,
     "is_hidden": false,
@@ -998035,7 +998002,7 @@
     "is_admin": false,
     "is_muted": false,
     "is_hidden": true,
-    "cleared_at": "2026-11-18T07:12:46.994Z"
+    "cleared_at": "2026-11-19T07:53:28.061Z"
   }
 },
 {
@@ -998045,6 +998012,186 @@
     "conversation": 13,
     "user": 2,
     "joined_at": "2026-11-18T07:12:43.703Z",
+    "last_read_message_id": 0,
+    "last_read_at": null,
+    "is_admin": false,
+    "is_muted": false,
+    "is_hidden": false,
+    "cleared_at": null
+  }
+},
+{
+  "model": "chat.conversationparticipant",
+  "pk": 43,
+  "fields": {
+    "conversation": 14,
+    "user": 10,
+    "joined_at": "2026-11-19T07:30:06.782Z",
+    "last_read_message_id": 0,
+    "last_read_at": null,
+    "is_admin": false,
+    "is_muted": false,
+    "is_hidden": true,
+    "cleared_at": "2026-11-19T07:53:26.562Z"
+  }
+},
+{
+  "model": "chat.conversationparticipant",
+  "pk": 44,
+  "fields": {
+    "conversation": 14,
+    "user": 9,
+    "joined_at": "2026-11-19T07:30:06.824Z",
+    "last_read_message_id": 0,
+    "last_read_at": null,
+    "is_admin": false,
+    "is_muted": false,
+    "is_hidden": false,
+    "cleared_at": null
+  }
+},
+{
+  "model": "chat.conversationparticipant",
+  "pk": 45,
+  "fields": {
+    "conversation": 15,
+    "user": 10,
+    "joined_at": "2026-11-19T07:33:21.747Z",
+    "last_read_message_id": 0,
+    "last_read_at": null,
+    "is_admin": false,
+    "is_muted": false,
+    "is_hidden": true,
+    "cleared_at": "2026-11-19T07:53:25.003Z"
+  }
+},
+{
+  "model": "chat.conversationparticipant",
+  "pk": 46,
+  "fields": {
+    "conversation": 15,
+    "user": 7,
+    "joined_at": "2026-11-19T07:33:21.761Z",
+    "last_read_message_id": 0,
+    "last_read_at": null,
+    "is_admin": false,
+    "is_muted": false,
+    "is_hidden": false,
+    "cleared_at": null
+  }
+},
+{
+  "model": "chat.conversationparticipant",
+  "pk": 47,
+  "fields": {
+    "conversation": 16,
+    "user": 10,
+    "joined_at": "2026-11-19T08:48:04.506Z",
+    "last_read_message_id": 0,
+    "last_read_at": null,
+    "is_admin": false,
+    "is_muted": false,
+    "is_hidden": true,
+    "cleared_at": "2026-11-19T09:43:33.067Z"
+  }
+},
+{
+  "model": "chat.conversationparticipant",
+  "pk": 48,
+  "fields": {
+    "conversation": 16,
+    "user": 4,
+    "joined_at": "2026-11-19T08:48:04.556Z",
+    "last_read_message_id": 0,
+    "last_read_at": null,
+    "is_admin": false,
+    "is_muted": false,
+    "is_hidden": false,
+    "cleared_at": null
+  }
+},
+{
+  "model": "chat.conversationparticipant",
+  "pk": 68,
+  "fields": {
+    "conversation": 2,
+    "user": 10,
+    "joined_at": "2026-11-19T09:55:53.510Z",
+    "last_read_message_id": 0,
+    "last_read_at": null,
+    "is_admin": false,
+    "is_muted": false,
+    "is_hidden": false,
+    "cleared_at": null
+  }
+},
+{
+  "model": "chat.conversationparticipant",
+  "pk": 69,
+  "fields": {
+    "conversation": 3,
+    "user": 10,
+    "joined_at": "2026-11-19T09:55:53.522Z",
+    "last_read_message_id": 0,
+    "last_read_at": null,
+    "is_admin": false,
+    "is_muted": false,
+    "is_hidden": false,
+    "cleared_at": null
+  }
+},
+{
+  "model": "chat.conversationparticipant",
+  "pk": 70,
+  "fields": {
+    "conversation": 5,
+    "user": 10,
+    "joined_at": "2026-11-19T09:55:53.552Z",
+    "last_read_message_id": 0,
+    "last_read_at": null,
+    "is_admin": false,
+    "is_muted": false,
+    "is_hidden": false,
+    "cleared_at": null
+  }
+},
+{
+  "model": "chat.conversationparticipant",
+  "pk": 71,
+  "fields": {
+    "conversation": 6,
+    "user": 10,
+    "joined_at": "2026-11-19T09:55:53.577Z",
+    "last_read_message_id": 0,
+    "last_read_at": null,
+    "is_admin": false,
+    "is_muted": false,
+    "is_hidden": false,
+    "cleared_at": null
+  }
+},
+{
+  "model": "chat.conversationparticipant",
+  "pk": 72,
+  "fields": {
+    "conversation": 7,
+    "user": 10,
+    "joined_at": "2026-11-19T09:55:53.599Z",
+    "last_read_message_id": 0,
+    "last_read_at": null,
+    "is_admin": false,
+    "is_muted": false,
+    "is_hidden": false,
+    "cleared_at": null
+  }
+},
+{
+  "model": "chat.conversationparticipant",
+  "pk": 73,
+  "fields": {
+    "conversation": 8,
+    "user": 10,
+    "joined_at": "2026-11-19T09:55:53.606Z",
     "last_read_message_id": 0,
     "last_read_at": null,
     "is_admin": false,

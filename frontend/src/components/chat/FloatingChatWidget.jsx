@@ -40,7 +40,7 @@ import api from '../../utils/api'
 const { TextArea } = Input
 
 export default function FloatingChatWidget() {
-  const { user, isModuleActive, isCompanyAdmin, isSuperAdmin } = useAuth()
+  const { user, isModuleActive, isCompanyAdmin, isSuperAdmin, hasPermission } = useAuth()
   const navigate = useNavigate()
   const location = useLocation()
   const { isMobile } = useResponsive()
@@ -318,8 +318,8 @@ export default function FloatingChatWidget() {
     }
   }
 
-  // Không hiển thị widget nếu chưa đăng nhập, module chat bị tắt, hoặc đang ở trang /internal-chat
-  if (!user || isDedicatedChatPage || !isModuleActive('chat')) return null
+  // Không hiển thị widget nếu chưa đăng nhập, module chat bị tắt, không có quyền chat.view, hoặc đang ở trang /internal-chat
+  if (!user || isDedicatedChatPage || !isModuleActive('chat') || !hasPermission('chat.view')) return null
 
   return (
     <>

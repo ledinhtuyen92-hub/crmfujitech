@@ -126,7 +126,8 @@ export default function InternalChat() {
     }
   }, [])
 
-  const canManageConfig = isSuperAdmin || isCompanyAdmin || hasPermission('chat.admin')
+  const canManageConfig = hasPermission('chat.admin')
+  const canManageGroups = hasPermission('chat.manage_groups')
 
   // Tải danh sách đồng nghiệp
   const fetchColleagues = () => {
@@ -549,13 +550,15 @@ export default function InternalChat() {
                 onClick={openDirectChatModal}
               />
             </Tooltip>
-            <Tooltip title="Tạo nhóm chat mới">
-              <Button
-                type="text"
-                icon={<PlusOutlined style={{ fontSize: 16, color: '#16a34a' }} />}
-                onClick={() => setCreateGroupModalOpen(true)}
-              />
-            </Tooltip>
+            {canManageGroups && (
+              <Tooltip title="Tạo nhóm chat mới">
+                <Button
+                  type="text"
+                  icon={<PlusOutlined style={{ fontSize: 16, color: '#16a34a' }} />}
+                  onClick={() => setCreateGroupModalOpen(true)}
+                />
+              </Tooltip>
+            )}
             {canManageConfig && (
               <Tooltip title="Cấu hình lưu trữ & dọn dẹp">
                 <Button
@@ -759,7 +762,7 @@ export default function InternalChat() {
                 Nhắn tin với đồng nghiệp
               </Button>
             )}
-            {activeTab === 'group' && (
+            {activeTab === 'group' && canManageGroups && (
               <Button
                 type="primary"
                 icon={<PlusOutlined />}
