@@ -63,6 +63,7 @@ import {
 import { useAuth } from '../contexts/AuthContext'
 import { useChat } from '../contexts/ChatContext'
 import FloatingChatWidget from './chat/FloatingChatWidget'
+import ErrorBoundary from './common/ErrorBoundary'
 
 const { Header, Sider, Content } = Layout
 const { Text, Title } = Typography
@@ -918,7 +919,9 @@ function MainLayout({ children, isDarkMode, toggleTheme }) {
       </Layout>
 
       {/* Widget Chat Nội Bộ nổi (Floating) toàn hệ thống */}
-      <FloatingChatWidget />
+      <ErrorBoundary fallback={null}>
+        <FloatingChatWidget />
+      </ErrorBoundary>
 
       {/* Modal Đổi Mật Khẩu */}
       <Modal

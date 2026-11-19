@@ -118,6 +118,7 @@ export default function InternalChat() {
   const messagesEndRef = useRef(null)
   const fileInputRef = useRef(null)
   const searchTimeoutRef = useRef(null)
+  const initialMobileSetRef = useRef(false)
 
   useEffect(() => {
     return () => {
@@ -239,9 +240,10 @@ export default function InternalChat() {
   const currentMessages = (activeConversation && messagesByConv[activeConversation.id]) || []
   const currentTyping = (activeConversation && typingUsers[activeConversation.id]) || []
 
-  // Trên Mobile: Mặc định hiển thị danh sách hội thoại khi mới mở trang
+  // Trên Mobile: Mặc định hiển thị danh sách hội thoại khi mới mở trang lần đầu
   useEffect(() => {
-    if (isMobile) {
+    if (isMobile && !initialMobileSetRef.current) {
+      initialMobileSetRef.current = true
       setActiveConversation(null)
     }
   }, [isMobile, setActiveConversation])
@@ -260,12 +262,13 @@ export default function InternalChat() {
     }
   }, [currentMessages.length, activeConversation?.id])
 
-  // Đánh dấu đã đọc khi chọn hội thoại
+  // Tải tin nhắn và đánh dấu đã đọc khi chọn hội thoại
   useEffect(() => {
     if (activeConversation?.id) {
-      markAsRead(activeConversation.id)
+      if (fetchMessages) fetchMessages(activeConversation.id)
+      if (markAsRead) markAsRead(activeConversation.id)
     }
-  }, [activeConversation?.id, markAsRead])
+  }, [activeConversation?.id, fetchMessages, markAsRead])
 
   // Gửi tin nhắn text
   const handleSend = async () => {
@@ -634,7 +637,11 @@ export default function InternalChat() {
                           <List.Item
                             onClick={async () => {
                               setSearchText('')
-                              await startDirectChat(col.id)
+                              const conv = await startDirectChat(col.id)
+                              if (conv?.id) {
+                                setActiveConversation(conv)
+                                if (fetchMessages) fetchMessages(conv.id)
+                              }
                             }}
                             style={{
                               padding: '10px 16px',
@@ -783,9 +790,9 @@ export default function InternalChat() {
 
     const isDirect = activeConversation.type === 'direct'
     const isDept = activeConversation.type === 'department'
-    const partner = activeConversation.direct_partner
-    const title = isDirect ? partner?.full_name : activeConversation.title
-    const isOnline = isDirect && onlineUserIds.has(partner?.id)
+    const partner = activeConversation.direct_partner || {}
+    const title = isDirect ? (partner.full_name || 'Đồng nghiệp') : (activeConversation.title || 'Hội thoại')
+    const isOnline = isDirect && (onlineUserIds.has(partner.id) || !!partner.is_online)
 
     return (
       <div style={{ display: 'flex', flexDirection: 'column', height: '100%', background: '#ffffff' }}>
@@ -1277,7 +1284,11 @@ export default function InternalChat() {
                   onClick={async () => {
                     setDirectChatModalOpen(false)
                     setColleagueSearchText('')
-                    await startDirectChat(c.id)
+                    const conv = await startDirectChat(c.id)
+                    if (conv?.id) {
+                      setActiveConversation(conv)
+                      if (fetchMessages) fetchMessages(conv.id)
+                    }
                   }}
                   style={{
                     cursor: 'pointer',

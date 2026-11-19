@@ -70,6 +70,8 @@ export function ChatProvider({ children }) {
     }
   }, [])
 
+  const [colleagues, setColleagues] = useState([])
+
   // ── 1. Tải danh sách cuộc trò chuyện ──────────────────────────────────────
   const fetchConversations = useCallback(async () => {
     if (!user) return
@@ -88,15 +90,67 @@ export function ChatProvider({ children }) {
     }
   }, [user])
 
+  // Đồng bộ nhóm phòng ban và tải hội thoại
+  const syncDepartmentGroups = useCallback(async () => {
+    if (!user) return
+    try {
+      await api.get('/chat/department-groups/').catch(() => {})
+      await fetchConversations()
+    } catch (_) {}
+  }, [user, fetchConversations])
+
+  // Tải danh sách đồng nghiệp
+  const fetchColleagues = useCallback(async () => {
+    if (!user) return
+    try {
+      const res = await api.get('/chat/colleagues/')
+      const list = Array.isArray(res.data) ? res.data : (res.data.results || [])
+      setColleagues(list)
+      const onlineFromColleagues = list.filter((c) => c.is_online).map((c) => c.id)
+      if (onlineFromColleagues.length > 0) {
+        setOnlineUserIds((prev) => new Set([...prev, ...onlineFromColleagues]))
+      }
+    } catch (err) {
+      console.error('Lỗi tải danh sách đồng nghiệp:', err)
+    }
+  }, [user])
+
   useEffect(() => {
     if (user) {
-      fetchConversations()
+      syncDepartmentGroups()
+      fetchColleagues()
     } else {
       setConversations([])
+      setColleagues([])
       setActiveConversation(null)
       setMessagesByConv({})
     }
-  }, [user, fetchConversations])
+  }, [user, syncDepartmentGroups, fetchColleagues])
+
+  // Polling fallback mỗi 8 giây: Đảm bảo đồng bộ tin nhắn mới, hội thoại và trạng thái online ngay cả khi WebSocket gián đoạn
+  useEffect(() => {
+    if (!user) return
+
+    let tick = 0
+    const pollInterval = setInterval(() => {
+      tick += 1
+      // 1. Tải lại danh sách hội thoại để cập nhật badge số tin chưa đọc và tin mới nhất
+      fetchConversations()
+
+      // 2. Nếu đang mở một cuộc trò chuyện, tải thêm tin nhắn mới nhất
+      const currentActiveId = activeConversationRef.current?.id || widgetConvIdRef.current
+      if (currentActiveId) {
+        fetchMessages(currentActiveId)
+      }
+
+      // 3. Mỗi 24 giây, làm mới danh sách đồng nghiệp và trạng thái online
+      if (tick % 3 === 0) {
+        fetchColleagues()
+      }
+    }, 8000)
+
+    return () => clearInterval(pollInterval)
+  }, [user, fetchConversations, fetchMessages, fetchColleagues])
 
   // ── 2. Tải tin nhắn trong hội thoại từ REST API ───────────────────────────
   const fetchMessages = useCallback(async (convId, beforeId = null) => {
@@ -415,7 +469,9 @@ export function ChatProvider({ children }) {
       })
       setActiveConversation(conv)
       setWidgetConvId(conv.id)
-      setIsWidgetOpen(true)
+      if (typeof window !== 'undefined' && window.location.pathname !== '/internal-chat') {
+        setIsWidgetOpen(true)
+      }
       return conv
     } catch (err) {
       message.error(err.response?.data?.detail || 'Không thể tạo cuộc trò chuyện.')
@@ -435,6 +491,9 @@ export function ChatProvider({ children }) {
       setConversations((prev) => [conv, ...prev])
       setActiveConversation(conv)
       setWidgetConvId(conv.id)
+      if (typeof window !== 'undefined' && window.location.pathname !== '/internal-chat') {
+        setIsWidgetOpen(true)
+      }
       message.success(`Đã tạo nhóm chat "${title}" thành công!`)
       return conv
     } catch (err) {
@@ -532,6 +591,9 @@ export function ChatProvider({ children }) {
         onlineUserIds,
         typingUsers,
         totalUnreadCount,
+        colleagues,
+        setColleagues,
+        fetchColleagues,
         isWidgetOpen,
         setIsWidgetOpen,
         widgetConvId,

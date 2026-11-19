@@ -1,8 +1,7 @@
-import React, { useState, useEffect, useRef } from 'react'
+import React, { useState, useEffect, useRef, useMemo } from 'react'
 import {
   Badge,
   Button,
-  Card,
   Input,
   Space,
   Avatar,
@@ -11,15 +10,13 @@ import {
   Tag,
   Tooltip,
   Modal,
-  Select,
   Image,
-  Upload,
   Popconfirm,
+  Empty,
   message,
 } from 'antd'
 import {
   MessageOutlined,
-  CloseOutlined,
   MinusOutlined,
   FullscreenOutlined,
   LeftOutlined,
@@ -29,10 +26,6 @@ import {
   UserOutlined,
   TeamOutlined,
   ApartmentOutlined,
-  FileDoneOutlined,
-  ShoppingCartOutlined,
-  DatabaseOutlined,
-  CheckCircleOutlined,
   PlusOutlined,
   DeleteOutlined,
   RollbackOutlined,
@@ -44,7 +37,6 @@ import { useAuth } from '../../contexts/AuthContext'
 import { useResponsive } from '../../hooks/useResponsive'
 import api from '../../utils/api'
 
-const { Text } = Typography
 const { TextArea } = Input
 
 export default function FloatingChatWidget() {
@@ -65,23 +57,27 @@ export default function FloatingChatWidget() {
     sendTyping,
     markAsRead,
     startDirectChat,
-    createGroupChat,
     deleteConversation,
     recallMessage,
     onlineUserIds,
     typingUsers,
-    fetchConversations,
+    fetchMessages,
+    colleagues: globalColleagues = [],
+    fetchColleagues,
   } = useChat()
 
   const [inputContent, setInputContent] = useState('')
-  const [activeTab, setActiveTab] = useState('all') // 'all' | 'direct' | 'group'
+  const [activeTab, setActiveTab] = useState('all') // 'all' | 'direct' | 'department' | 'group'
   const [searchText, setSearchText] = useState('')
+  const [colleagueSearchText, setColleagueSearchText] = useState('')
+  const [colleagueFilterTab, setColleagueFilterTab] = useState('all') // 'all' | 'online' | 'offline'
   const [newChatModalOpen, setNewChatModalOpen] = useState(false)
   const [crmDocModalOpen, setCrmDocModalOpen] = useState(false)
-  const [colleagues, setColleagues] = useState([])
   const [crmDocs, setCrmDocs] = useState([])
   const [searchingDocs, setSearchingDocs] = useState(false)
   const [docSearchKeyword, setDocSearchKeyword] = useState('')
+
+  const colleagues = globalColleagues || []
 
   const messagesEndRef = useRef(null)
   const fileInputRef = useRef(null)
@@ -93,6 +89,14 @@ export default function FloatingChatWidget() {
     }
   }, [])
 
+  // Nếu là Mobile và widget đang mở: Tự động đóng widget và chuyển sang trang /internal-chat toàn màn hình
+  useEffect(() => {
+    if (isMobile && isWidgetOpen) {
+      setIsWidgetOpen(false)
+      navigate('/internal-chat')
+    }
+  }, [isMobile, isWidgetOpen, navigate, setIsWidgetOpen])
+
   // Không hiển thị widget nếu đang ở ngay trang /internal-chat toàn màn hình
   const isDedicatedChatPage = location.pathname === '/internal-chat'
 
@@ -103,28 +107,105 @@ export default function FloatingChatWidget() {
     }
   }, [messagesByConv, widgetConvId, isWidgetOpen])
 
-  // Khi mở hội thoại trong widget, đánh dấu đã đọc
+  // Khi mở hội thoại trong widget, đánh dấu đã đọc và tải tin nhắn
   useEffect(() => {
     if (isWidgetOpen && widgetConvId) {
       markAsRead(widgetConvId)
+      if (fetchMessages) fetchMessages(widgetConvId)
     }
-  }, [isWidgetOpen, widgetConvId, markAsRead])
+  }, [isWidgetOpen, widgetConvId, markAsRead, fetchMessages])
 
-  if (!user || isDedicatedChatPage || !isModuleActive('chat')) return null
+  // Tìm cuộc trò chuyện đang được chọn trong widget
+  const activeConv = useMemo(() => {
+    if (!widgetConvId) return null
+    return conversations.find((c) => c.id === widgetConvId) || null
+  }, [conversations, widgetConvId])
 
-  const activeConv = conversations.find((c) => c.id === widgetConvId)
-  const activeMessages = (widgetConvId && messagesByConv[widgetConvId]) || []
-  const activeTyping = (widgetConvId && typingUsers[widgetConvId]) || []
+  const activeMessages = (activeConv && messagesByConv[activeConv.id]) || []
+  const activeTyping = (activeConv && typingUsers[activeConv.id]) || []
 
-  // Lọc hội thoại theo tab và tìm kiếm
-  const filteredConversations = conversations.filter((c) => {
-    if (activeTab === 'direct' && c.type !== 'direct') return false
-    if (activeTab === 'group' && c.type === 'direct') return false
-    if (!searchText) return true
+  const searchLower = searchText.trim().toLowerCase()
 
-    const title = c.type === 'direct' ? c.direct_partner?.full_name || '' : c.title || ''
-    return title.toLowerCase().includes(searchText.toLowerCase())
-  })
+  // 1. Lọc hội thoại theo tab và tìm kiếm
+  const filteredConversations = useMemo(() => {
+    return conversations.filter((c) => {
+      if (activeTab === 'direct' && c.type !== 'direct') return false
+      if (activeTab === 'department' && c.type !== 'department') return false
+      if (activeTab === 'group' && c.type !== 'group') return false
+      if (!searchLower) return true
+
+      if (c.type === 'direct') {
+        const partner = c.direct_partner || {}
+        return (
+          (partner.full_name || '').toLowerCase().includes(searchLower) ||
+          (partner.username || '').toLowerCase().includes(searchLower) ||
+          (partner.department_name || '').toLowerCase().includes(searchLower) ||
+          (partner.role_name || '').toLowerCase().includes(searchLower)
+        )
+      }
+      return (
+        (c.title || '').toLowerCase().includes(searchLower) ||
+        (c.department_name || '').toLowerCase().includes(searchLower)
+      )
+    })
+  }, [conversations, activeTab, searchLower])
+
+  // 2. Lọc đồng nghiệp phù hợp với từ khóa tìm kiếm (để gợi ý chat trực tiếp ngay trên widget)
+  const matchingColleagues = useMemo(() => {
+    if (!searchLower || activeTab === 'department' || activeTab === 'group') return []
+    return colleagues
+      .filter((col) => {
+        if (col.id === user?.id) return false
+        const name = (col.full_name || '').toLowerCase()
+        const uname = (col.username || '').toLowerCase()
+        const dept = (col.department_name || '').toLowerCase()
+        const role = (col.role_name || '').toLowerCase()
+        return (
+          name.includes(searchLower) ||
+          uname.includes(searchLower) ||
+          dept.includes(searchLower) ||
+          role.includes(searchLower)
+        )
+      })
+      .map((col) => ({
+        ...col,
+        isOnline: onlineUserIds.has(col.id) || !!col.is_online,
+      }))
+      .sort((a, b) => {
+        if (a.isOnline !== b.isOnline) return a.isOnline ? -1 : 1
+        return (a.full_name || '').localeCompare(b.full_name || '', 'vi')
+      })
+  }, [searchLower, colleagues, activeTab, onlineUserIds, user?.id])
+
+  // 3. Lọc đồng nghiệp trong modal Nhắn tin
+  const filteredColleaguesInModal = useMemo(() => {
+    let list = colleagues.filter((c) => c.id !== user?.id)
+    if (colleagueSearchText.trim()) {
+      const q = colleagueSearchText.trim().toLowerCase()
+      list = list.filter((c) =>
+        (c.full_name || '').toLowerCase().includes(q) ||
+        (c.username || '').toLowerCase().includes(q) ||
+        (c.department_name || '').toLowerCase().includes(q) ||
+        (c.role_name || '').toLowerCase().includes(q)
+      )
+    }
+    if (colleagueFilterTab === 'online') {
+      list = list.filter((c) => onlineUserIds.has(c.id) || !!c.is_online)
+    } else if (colleagueFilterTab === 'offline') {
+      list = list.filter((c) => !onlineUserIds.has(c.id) && !c.is_online)
+    }
+    return list.map((c) => ({
+      ...c,
+      isOnline: onlineUserIds.has(c.id) || !!c.is_online,
+    })).sort((a, b) => {
+      if (a.isOnline !== b.isOnline) return a.isOnline ? -1 : 1
+      return (a.full_name || '').localeCompare(b.full_name || '', 'vi')
+    })
+  }, [colleagues, user?.id, colleagueSearchText, colleagueFilterTab, onlineUserIds])
+
+  const onlineCount = useMemo(() => {
+    return colleagues.filter((c) => c.id !== user?.id && (onlineUserIds.has(c.id) || !!c.is_online)).length
+  }, [colleagues, user?.id, onlineUserIds])
 
   // Gửi tin nhắn văn bản
   const handleSend = async () => {
@@ -203,13 +284,37 @@ export default function FloatingChatWidget() {
   }
 
   // Mở modal tạo chat mới
-  const handleOpenNewChatModal = async () => {
-    try {
-      const res = await api.get('/chat/colleagues/')
-      setColleagues(res.data || [])
-      setNewChatModalOpen(true)
-    } catch (_) {}
+  const handleOpenNewChatModal = () => {
+    setColleagueSearchText('')
+    setColleagueFilterTab('all')
+    setNewChatModalOpen(true)
+    if (fetchColleagues) fetchColleagues()
   }
+
+  const getAvatarAndIcon = (conv) => {
+    if (conv.type === 'direct') {
+      return {
+        src: conv.direct_partner?.avatar,
+        icon: <UserOutlined />,
+        bg: '#3b82f6',
+      }
+    }
+    if (conv.type === 'department') {
+      return {
+        src: conv.avatar,
+        icon: <ApartmentOutlined />,
+        bg: '#8b5cf6',
+      }
+    }
+    return {
+      src: conv.avatar,
+      icon: <TeamOutlined />,
+      bg: '#10b981',
+    }
+  }
+
+  // Không hiển thị widget nếu chưa đăng nhập, module chat bị tắt, hoặc đang ở trang /internal-chat
+  if (!user || isDedicatedChatPage || !isModuleActive('chat')) return null
 
   return (
     <>
@@ -223,7 +328,13 @@ export default function FloatingChatWidget() {
                 shape="circle"
                 size="large"
                 icon={<MessageOutlined style={{ fontSize: 24 }} />}
-                onClick={() => setIsWidgetOpen(true)}
+                onClick={() => {
+                  if (isMobile) {
+                    navigate('/internal-chat')
+                  } else {
+                    setIsWidgetOpen(true)
+                  }
+                }}
                 style={{
                   width: 56,
                   height: 56,
@@ -240,22 +351,22 @@ export default function FloatingChatWidget() {
         </div>
       )}
 
-      {/* ── 2. Floating Chat Window ── */}
-      {isWidgetOpen && (
+      {/* ── 2. Floating Chat Window (Desktop) ── */}
+      {isWidgetOpen && !isMobile && (
         <div
           style={{
             position: 'fixed',
-            bottom: isMobile ? 0 : 20,
-            right: isMobile ? 0 : 24,
-            width: isMobile ? '100vw' : 380,
-            height: isMobile ? '100vh' : 530,
+            bottom: 20,
+            right: 24,
+            width: 380,
+            height: 530,
             zIndex: 1050,
             display: 'flex',
             flexDirection: 'column',
             background: '#ffffff',
-            borderRadius: isMobile ? 0 : 16,
+            borderRadius: 16,
             boxShadow: '0 12px 36px rgba(15, 23, 42, 0.2), 0 4px 12px rgba(15, 23, 42, 0.08)',
-            border: isMobile ? 'none' : '1px solid #e2e8f0',
+            border: '1px solid #e2e8f0',
             overflow: 'hidden',
           }}
         >
@@ -283,9 +394,9 @@ export default function FloatingChatWidget() {
                 <div style={{ position: 'relative' }}>
                   <Avatar
                     src={activeConv.type === 'direct' ? activeConv.direct_partner?.avatar : activeConv.avatar}
-                    icon={activeConv.type === 'direct' ? <UserOutlined /> : <TeamOutlined />}
+                    icon={activeConv.type === 'direct' ? <UserOutlined /> : (activeConv.type === 'department' ? <ApartmentOutlined /> : <TeamOutlined />)}
                     size={32}
-                    style={{ background: '#3b82f6' }}
+                    style={{ background: activeConv.type === 'direct' ? '#3b82f6' : (activeConv.type === 'department' ? '#8b5cf6' : '#10b981') }}
                   />
                   {activeConv.type === 'direct' && onlineUserIds.has(activeConv.direct_partner?.id) && (
                     <span
@@ -304,11 +415,13 @@ export default function FloatingChatWidget() {
                 </div>
                 <div style={{ minWidth: 0, flex: 1 }}>
                   <div style={{ fontWeight: 600, fontSize: 13, color: '#fff', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                    {activeConv.type === 'direct' ? activeConv.direct_partner?.full_name : activeConv.title}
+                    {activeConv.type === 'direct' ? (activeConv.direct_partner?.full_name || 'Đồng nghiệp') : activeConv.title}
                   </div>
                   <div style={{ fontSize: 10.5, color: '#bfdbfe', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                     {activeConv.type === 'direct'
                       ? onlineUserIds.has(activeConv.direct_partner?.id) ? 'Đang hoạt động' : 'Ngoại tuyến'
+                      : activeConv.type === 'department'
+                      ? 'Nhóm phòng ban'
                       : `${activeConv.participants?.length || 0} thành viên`}
                   </div>
                 </div>
@@ -414,69 +527,149 @@ export default function FloatingChatWidget() {
                   />
                 </div>
                 <div style={{ display: 'flex', gap: 4 }}>
-                  <Button
-                    size="small"
-                    type={activeTab === 'all' ? 'primary' : 'text'}
-                    onClick={() => setActiveTab('all')}
-                    style={{ fontSize: 11, padding: '0 8px', height: 22 }}
-                  >
-                    Tất cả
-                  </Button>
-                  <Button
-                    size="small"
-                    type={activeTab === 'direct' ? 'primary' : 'text'}
-                    onClick={() => setActiveTab('direct')}
-                    style={{ fontSize: 11, padding: '0 8px', height: 22 }}
-                  >
-                    1-1
-                  </Button>
-                  <Button
-                    size="small"
-                    type={activeTab === 'group' ? 'primary' : 'text'}
-                    onClick={() => setActiveTab('group')}
-                    style={{ fontSize: 11, padding: '0 8px', height: 22 }}
-                  >
-                    Nhóm
-                  </Button>
+                  {[
+                    { key: 'all', label: 'Tất cả' },
+                    { key: 'direct', label: '1-1' },
+                    { key: 'department', label: 'Phòng ban' },
+                    { key: 'group', label: 'Nhóm' },
+                  ].map((tab) => (
+                    <Button
+                      key={tab.key}
+                      size="small"
+                      type={activeTab === tab.key ? 'primary' : 'text'}
+                      onClick={() => setActiveTab(tab.key)}
+                      style={{
+                        fontSize: 11,
+                        padding: '0 8px',
+                        height: 22,
+                        background: activeTab === tab.key ? '#2563eb' : undefined,
+                      }}
+                    >
+                      {tab.label}
+                    </Button>
+                  ))}
                 </div>
               </div>
 
               {/* List */}
               <div style={{ flex: 1, overflowY: 'auto' }}>
-                <List
-                  dataSource={filteredConversations}
-                  locale={{ emptyText: 'Chưa có cuộc trò chuyện nào' }}
-                  renderItem={(item) => {
-                    const isDirect = item.type === 'direct'
-                    const partner = item.direct_partner
-                    const title = isDirect ? partner?.full_name : item.title
-                    const isOnline = isDirect && onlineUserIds.has(partner?.id)
+                {/* 1. Danh sách cuộc trò chuyện phù hợp */}
+                {filteredConversations.length > 0 && (
+                  <div>
+                    {searchLower && matchingColleagues.length > 0 && (
+                      <div style={{ padding: '8px 12px 4px', fontSize: 11, fontWeight: 700, color: '#64748b', textTransform: 'uppercase' }}>
+                        Cuộc trò chuyện ({filteredConversations.length})
+                      </div>
+                    )}
+                    <List
+                      dataSource={filteredConversations}
+                      renderItem={(item) => {
+                        const isDirect = item.type === 'direct'
+                        const partner = item.direct_partner || {}
+                        const title = isDirect ? (partner.full_name || 'Đồng nghiệp') : item.title
+                        const isOnline = isDirect && (onlineUserIds.has(partner.id) || !!partner.is_online)
+                        const avatarInfo = getAvatarAndIcon(item)
 
-                    return (
-                      <List.Item
-                        onClick={() => {
-                          setWidgetConvId(item.id)
-                          fetchMessages(item.id)
-                        }}
-                        style={{
-                          padding: '10px 14px',
-                          cursor: 'pointer',
-                          transition: 'background 0.2s',
-                          borderBottom: '1px solid #f8fafc',
-                          background: item.unread_count > 0 ? '#f0f9ff' : '#fff',
-                        }}
-                        onMouseEnter={(e) => (e.currentTarget.style.background = '#f1f5f9')}
-                        onMouseLeave={(e) => (e.currentTarget.style.background = item.unread_count > 0 ? '#f0f9ff' : '#fff')}
-                      >
-                        <List.Item.Meta
-                          avatar={
+                        return (
+                          <List.Item
+                            onClick={() => {
+                              setWidgetConvId(item.id)
+                              if (fetchMessages) fetchMessages(item.id)
+                            }}
+                            style={{
+                              padding: '10px 14px',
+                              cursor: 'pointer',
+                              transition: 'background 0.2s',
+                              borderBottom: '1px solid #f8fafc',
+                              background: item.unread_count > 0 ? '#f0f9ff' : '#fff',
+                            }}
+                            onMouseEnter={(e) => (e.currentTarget.style.background = '#f1f5f9')}
+                            onMouseLeave={(e) => (e.currentTarget.style.background = item.unread_count > 0 ? '#f0f9ff' : '#fff')}
+                          >
+                            <List.Item.Meta
+                              avatar={
+                                <div style={{ position: 'relative' }}>
+                                  <Avatar
+                                    src={isDirect ? partner.avatar : item.avatar}
+                                    icon={avatarInfo.icon}
+                                    style={{ background: avatarInfo.bg }}
+                                  />
+                                  {isOnline && (
+                                    <span
+                                      style={{
+                                        position: 'absolute',
+                                        bottom: 0,
+                                        right: 0,
+                                        width: 9,
+                                        height: 9,
+                                        background: '#22c55e',
+                                        border: '2px solid #fff',
+                                        borderRadius: '50%',
+                                      }}
+                                    />
+                                  )}
+                                </div>
+                              }
+                              title={
+                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                  <span style={{ fontWeight: item.unread_count > 0 ? 700 : 600, fontSize: 13, color: '#0f172a' }}>
+                                    {title}
+                                  </span>
+                                  {item.unread_count > 0 && (
+                                    <Badge count={item.unread_count} size="small" style={{ backgroundColor: '#ef4444' }} />
+                                  )}
+                                </div>
+                              }
+                              description={
+                                <div style={{ fontSize: 11.5, color: item.unread_count > 0 ? '#0284c7' : '#64748b', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', fontWeight: item.unread_count > 0 ? 600 : 400 }}>
+                                  {item.last_sender_name ? `${item.last_sender_name}: ` : ''}
+                                  {item.last_message_text || 'Bắt đầu cuộc trò chuyện'}
+                                </div>
+                              }
+                            />
+                          </List.Item>
+                        )
+                      }}
+                    />
+                  </div>
+                )}
+
+                {/* 2. Danh sách đồng nghiệp gợi ý khi tìm kiếm */}
+                {searchLower && matchingColleagues.length > 0 && (
+                  <div>
+                    <div style={{ padding: '10px 12px 4px', fontSize: 11, fontWeight: 700, color: '#64748b', textTransform: 'uppercase', background: '#f8fafc', borderTop: '1px solid #f1f5f9' }}>
+                      Đồng nghiệp ({matchingColleagues.length})
+                    </div>
+                    <List
+                      dataSource={matchingColleagues}
+                      renderItem={(col) => (
+                        <List.Item
+                          onClick={async () => {
+                            const conv = await startDirectChat(col.id)
+                            if (conv?.id) {
+                              setWidgetConvId(conv.id)
+                              if (fetchMessages) fetchMessages(conv.id)
+                            }
+                            setSearchText('')
+                          }}
+                          style={{
+                            padding: '9px 12px',
+                            cursor: 'pointer',
+                            borderBottom: '1px solid #f1f5f9',
+                            transition: 'all 0.15s ease',
+                          }}
+                          onMouseEnter={(e) => (e.currentTarget.style.background = '#eff6ff')}
+                          onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
+                        >
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 10, width: '100%' }}>
                             <div style={{ position: 'relative' }}>
                               <Avatar
-                                src={isDirect ? partner?.avatar : item.avatar}
-                                icon={isDirect ? <UserOutlined /> : <TeamOutlined />}
-                                style={{ background: isDirect ? '#3b82f6' : '#10b981' }}
+                                src={col.avatar}
+                                icon={<UserOutlined />}
+                                size={32}
+                                style={{ background: '#3b82f6' }}
                               />
-                              {isOnline && (
+                              {col.isOnline && (
                                 <span
                                   style={{
                                     position: 'absolute',
@@ -491,28 +684,54 @@ export default function FloatingChatWidget() {
                                 />
                               )}
                             </div>
-                          }
-                          title={
-                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                              <span style={{ fontWeight: item.unread_count > 0 ? 700 : 600, fontSize: 13, color: '#0f172a' }}>
-                                {title}
-                              </span>
-                              {item.unread_count > 0 && (
-                                <Badge count={item.unread_count} size="small" style={{ backgroundColor: '#ef4444' }} />
-                              )}
+                            <div style={{ flex: 1, minWidth: 0 }}>
+                              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                <span style={{ fontWeight: 600, fontSize: 13, color: '#0f172a' }}>{col.full_name}</span>
+                                {col.isOnline && (
+                                  <span style={{ fontSize: 10.5, color: '#16a34a', fontWeight: 600 }}>Online</span>
+                                )}
+                              </div>
+                              <div style={{ fontSize: 11, color: '#64748b', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                {col.department_name || col.role_name || col.username}
+                              </div>
                             </div>
-                          }
-                          description={
-                            <div style={{ fontSize: 11.5, color: item.unread_count > 0 ? '#0284c7' : '#64748b', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', fontWeight: item.unread_count > 0 ? 600 : 400 }}>
-                              {item.last_sender_name ? `${item.last_sender_name}: ` : ''}
-                              {item.last_message_text || 'Bắt đầu cuộc trò chuyện'}
-                            </div>
-                          }
-                        />
-                      </List.Item>
-                    )
-                  }}
-                />
+                          </div>
+                        </List.Item>
+                      )}
+                    />
+                  </div>
+                )}
+
+                {/* 3. Trạng thái trống */}
+                {filteredConversations.length === 0 && matchingColleagues.length === 0 && (
+                  <div style={{ padding: '36px 16px', textAlign: 'center' }}>
+                    <Empty
+                      description={
+                        searchLower
+                          ? `Không tìm thấy cuộc trò chuyện hoặc đồng nghiệp nào phù hợp với "${searchText}"`
+                          : activeTab === 'direct'
+                          ? 'Chưa có cuộc trò chuyện 1-1 nào'
+                          : activeTab === 'department'
+                          ? 'Chưa có nhóm phòng ban nào'
+                          : activeTab === 'group'
+                          ? 'Chưa có nhóm trò chuyện nào'
+                          : 'Chưa có cuộc trò chuyện nào'
+                      }
+                      image={Empty.PRESENTED_IMAGE_SIMPLE}
+                    />
+                    {!searchLower && (
+                      <Button
+                        type="primary"
+                        size="small"
+                        icon={<PlusOutlined />}
+                        onClick={handleOpenNewChatModal}
+                        style={{ marginTop: 8, background: '#2563eb', borderRadius: 6 }}
+                      >
+                        Nhắn tin với đồng nghiệp
+                      </Button>
+                    )}
+                  </div>
+                )}
               </div>
             </div>
           )}
@@ -544,7 +763,7 @@ export default function FloatingChatWidget() {
                     >
                       {!isMine && activeConv.type !== 'direct' && (
                         <span style={{ fontSize: 10.5, color: '#64748b', marginBottom: 2, marginLeft: 4 }}>
-                          {msg.sender?.full_name}
+                          {msg.sender?.full_name || msg.sender?.username}
                         </span>
                       )}
 
@@ -615,7 +834,7 @@ export default function FloatingChatWidget() {
                               }}
                             >
                               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 2 }}>
-                                <Tag color="blue" style={{ fontSize: 10, margin: 0, padding: '0 4px', lineHeight: '16px' }}>
+                                <Tag color={msg.context_data.badge_color || 'blue'} style={{ fontSize: 10, margin: 0, padding: '0 4px', lineHeight: '16px' }}>
                                   {msg.context_data.doc_code}
                                 </Tag>
                                 <span style={{ fontSize: 11, fontWeight: 700 }}>{msg.context_data.extra}</span>
@@ -744,31 +963,132 @@ export default function FloatingChatWidget() {
 
       {/* ── Modal Bắt đầu trò chuyện với đồng nghiệp ── */}
       <Modal
-        title="Nhắn tin với đồng nghiệp"
+        title={
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <UserOutlined style={{ color: '#2563eb' }} />
+            <span>Nhắn tin với đồng nghiệp</span>
+          </div>
+        }
         open={newChatModalOpen}
-        onCancel={() => setNewChatModalOpen(false)}
+        onCancel={() => {
+          setNewChatModalOpen(false)
+          setColleagueSearchText('')
+        }}
         footer={null}
-        width={400}
+        width={440}
         centered
         destroyOnClose
+        zIndex={2000}
       >
+        <Input
+          placeholder="Tìm theo tên, phòng ban, chức danh..."
+          prefix={<MessageOutlined style={{ color: '#94a3b8' }} />}
+          value={colleagueSearchText}
+          onChange={(e) => setColleagueSearchText(e.target.value)}
+          allowClear
+          style={{ borderRadius: 8, marginBottom: 10 }}
+        />
+
+        <div style={{ display: 'flex', gap: 6, marginBottom: 12 }}>
+          <Button
+            size="small"
+            type={colleagueFilterTab === 'all' ? 'primary' : 'default'}
+            onClick={() => setColleagueFilterTab('all')}
+            style={{ borderRadius: 6, fontSize: 12 }}
+          >
+            Tất cả ({colleagues.filter((c) => c.id !== user?.id).length})
+          </Button>
+          <Button
+            size="small"
+            type={colleagueFilterTab === 'online' ? 'primary' : 'default'}
+            onClick={() => setColleagueFilterTab('online')}
+            style={{
+              borderRadius: 6,
+              fontSize: 12,
+              background: colleagueFilterTab === 'online' ? '#16a34a' : undefined,
+              borderColor: colleagueFilterTab === 'online' ? '#16a34a' : undefined,
+            }}
+          >
+            Đang online ({onlineCount})
+          </Button>
+          <Button
+            size="small"
+            type={colleagueFilterTab === 'offline' ? 'primary' : 'default'}
+            onClick={() => setColleagueFilterTab('offline')}
+            style={{ borderRadius: 6, fontSize: 12 }}
+          >
+            Ngoại tuyến ({colleagues.filter((c) => c.id !== user?.id).length - onlineCount})
+          </Button>
+        </div>
+
         <div style={{ maxHeight: 380, overflowY: 'auto' }}>
           <List
-            dataSource={colleagues}
+            dataSource={filteredColleaguesInModal}
+            locale={{
+              emptyText: (
+                <Empty
+                  description={
+                    colleagueSearchText
+                      ? 'Không tìm thấy đồng nghiệp phù hợp'
+                      : colleagueFilterTab === 'online'
+                      ? 'Hiện không có đồng nghiệp nào online'
+                      : 'Không có dữ liệu'
+                  }
+                  image={Empty.PRESENTED_IMAGE_SIMPLE}
+                />
+              ),
+            }}
             renderItem={(colleague) => (
               <List.Item
                 onClick={async () => {
                   setNewChatModalOpen(false)
-                  await startDirectChat(colleague.id)
+                  setColleagueSearchText('')
+                  const conv = await startDirectChat(colleague.id)
+                  if (conv?.id) {
+                    setWidgetConvId(conv.id)
+                    if (fetchMessages) fetchMessages(conv.id)
+                  }
                 }}
-                style={{ cursor: 'pointer', padding: '8px 12px', borderRadius: 6 }}
-                onMouseEnter={(e) => (e.currentTarget.style.background = '#f1f5f9')}
+                style={{ cursor: 'pointer', padding: '10px 12px', borderRadius: 8, borderBottom: '1px solid #f1f5f9' }}
+                onMouseEnter={(e) => (e.currentTarget.style.background = '#eff6ff')}
                 onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
               >
                 <List.Item.Meta
-                  avatar={<Avatar src={colleague.avatar} icon={<UserOutlined />} style={{ background: '#3b82f6' }} />}
-                  title={<strong style={{ fontSize: 13 }}>{colleague.full_name}</strong>}
-                  description={<span style={{ fontSize: 11, color: '#64748b' }}>{colleague.department_name || colleague.role_name || colleague.username}</span>}
+                  avatar={
+                    <div style={{ position: 'relative' }}>
+                      <Avatar src={colleague.avatar} icon={<UserOutlined />} style={{ background: '#3b82f6' }} />
+                      {colleague.isOnline && (
+                        <span
+                          style={{
+                            position: 'absolute',
+                            bottom: 0,
+                            right: 0,
+                            width: 9,
+                            height: 9,
+                            background: '#22c55e',
+                            border: '2px solid #fff',
+                            borderRadius: '50%',
+                          }}
+                        />
+                      )}
+                    </div>
+                  }
+                  title={
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <strong style={{ fontSize: 13, color: '#0f172a' }}>{colleague.full_name}</strong>
+                      {colleague.isOnline ? (
+                        <span style={{ fontSize: 11, color: '#16a34a', fontWeight: 600 }}>Online</span>
+                      ) : (
+                        <span style={{ fontSize: 11, color: '#94a3b8' }}>Ngoại tuyến</span>
+                      )}
+                    </div>
+                  }
+                  description={
+                    <span style={{ fontSize: 11, color: '#64748b' }}>
+                      {colleague.department_name ? `${colleague.department_name}` : ''}
+                      {colleague.role_name ? ` • ${colleague.role_name}` : ` • ${colleague.username}`}
+                    </span>
+                  }
                 />
               </List.Item>
             )}
@@ -785,6 +1105,7 @@ export default function FloatingChatWidget() {
         width={480}
         centered
         destroyOnClose
+        zIndex={2000}
       >
         <Input
           placeholder="Nhập mã ĐH (747), Báo giá, hoặc tên khách hàng..."

@@ -154,6 +154,26 @@ echo "✅ Backend va Celery da duoc khoi dong lai!"
 # 7. Reload Nginx de phuc vu file moi nhat
 echo ""
 echo "🔥 [6/6] Dang reload Nginx de ap dung giao dien moi..."
+# Kiem tra va bo sung cau hinh WebSocket (/ws/) vao Nginx crm site neu chua co
+if [ -f /etc/nginx/sites-available/crm ] && ! grep -q "location /ws/" /etc/nginx/sites-available/crm; then
+    sed -i '/location ~ \^\/(api|sys-admin|media|static)\/ {/i \
+    # WebSocket Real-time (Chat & Thong bao)\
+    location /ws/ {\
+        proxy_pass http://127.0.0.1:8000;\
+        proxy_http_version 1.1;\
+        proxy_set_header Upgrade $http_upgrade;\
+        proxy_set_header Connection "upgrade";\
+        proxy_set_header Host $host;\
+        proxy_set_header X-Real-IP $remote_addr;\
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;\
+        proxy_set_header X-Forwarded-Proto $scheme;\
+        proxy_read_timeout 86400s;\
+        proxy_send_timeout 86400s;\
+    }\
+' /etc/nginx/sites-available/crm
+    echo "⚡ Da tu dong bo sung cau hinh WebSocket (/ws/) vao Nginx crm site!"
+fi
+
 # Bat tinh nang GZIP cua Nginx de giam thoi gian load ReactJS / API payload
 if [ -f /etc/nginx/sites-available/crm ] && ! grep -q "gzip_types" /etc/nginx/sites-available/crm; then
     sed -i '/client_max_body_size/a \

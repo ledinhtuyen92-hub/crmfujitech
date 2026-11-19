@@ -7,6 +7,7 @@ import { AuthProvider } from './contexts/AuthContext'
 import { useAuth } from './contexts/AuthContext'
 import { ChatProvider } from './contexts/ChatContext'
 import MainLayout from './components/MainLayout'
+import ErrorBoundary from './components/common/ErrorBoundary'
 import {
   CompanyAdminRoute,
   ProtectedRoute,
@@ -232,7 +233,9 @@ function App() {
               <Route path="/internal-chat" element={
                 <ModuleRoute moduleCode="chat">
                   <PermissionRoute permissionCode="chat.view">
-                    <InternalChat />
+                    <ErrorBoundary>
+                      <InternalChat />
+                    </ErrorBoundary>
                   </PermissionRoute>
                 </ModuleRoute>
               } />
