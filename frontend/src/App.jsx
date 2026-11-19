@@ -138,9 +138,10 @@ function App() {
         <DynamicTitle />
         {/* AuthProvider must be inside BrowserRouter so useNavigate works */}
         <AuthProvider>
-          <ChatProvider>
-            <Suspense fallback={<PageLoader />}>
-            <Routes>
+          <ErrorBoundary>
+            <ChatProvider>
+              <Suspense fallback={<PageLoader />}>
+                <Routes>
             {/* ── Public routes ──────────────────────────────────── */}
             <Route path="/login" element={<Login />} />
             <Route path="/register" element={<RegisterCompany />} />
@@ -431,6 +432,7 @@ function App() {
           </Routes>
           </Suspense>
           </ChatProvider>
+          </ErrorBoundary>
         </AuthProvider>
       </BrowserRouter>
     </ConfigProvider>

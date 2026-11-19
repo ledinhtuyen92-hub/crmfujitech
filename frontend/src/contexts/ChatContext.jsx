@@ -83,10 +83,54 @@ export function ChatProvider({ children }) {
         .filter((c) => c.type === 'direct' && c.direct_partner?.is_online)
         .map((c) => c.direct_partner.id)
       if (onlineFromConvs.length > 0) {
-        setOnlineUserIds((prev) => new Set([...prev, ...onlineFromConvs]))
+        setOnlineUserIds((prev) => new Set([...(prev instanceof Set ? prev : []), ...onlineFromConvs]))
       }
     } catch (err) {
       console.error('Lỗi tải danh sách hội thoại chat:', err)
+    }
+  }, [user])
+
+  // ── 2. Tải tin nhắn trong hội thoại từ REST API ───────────────────────────
+  const fetchMessages = useCallback(async (convId, beforeId = null) => {
+    if (!convId) return
+    setLoadingMessages(true)
+    try {
+      const res = await api.get(`/chat/conversations/${convId}/messages/`, {
+        params: { before_id: beforeId, limit: 40 },
+      })
+      const newMsgs = res.data.results || []
+      setMessagesByConv((prev) => {
+        const existing = prev[convId] || []
+        if (beforeId) {
+          return { ...prev, [convId]: [...newMsgs, ...existing] }
+        } else {
+          return { ...prev, [convId]: newMsgs }
+        }
+      })
+      // Đánh dấu đã đọc trong state local
+      setConversations((prev) =>
+        prev.map((c) => (c.id === convId ? { ...c, unread_count: 0 } : c))
+      )
+    } catch (err) {
+      console.error('Lỗi tải tin nhắn chat:', err)
+    } finally {
+      setLoadingMessages(false)
+    }
+  }, [])
+
+  // Tải danh sách đồng nghiệp
+  const fetchColleagues = useCallback(async () => {
+    if (!user) return
+    try {
+      const res = await api.get('/chat/colleagues/')
+      const list = Array.isArray(res.data) ? res.data : (res.data.results || [])
+      setColleagues(list)
+      const onlineFromColleagues = list.filter((c) => c.is_online).map((c) => c.id)
+      if (onlineFromColleagues.length > 0) {
+        setOnlineUserIds((prev) => new Set([...(prev instanceof Set ? prev : []), ...onlineFromColleagues]))
+      }
+    } catch (err) {
+      console.error('Lỗi tải danh sách đồng nghiệp:', err)
     }
   }, [user])
 
@@ -98,22 +142,6 @@ export function ChatProvider({ children }) {
       await fetchConversations()
     } catch (_) {}
   }, [user, fetchConversations])
-
-  // Tải danh sách đồng nghiệp
-  const fetchColleagues = useCallback(async () => {
-    if (!user) return
-    try {
-      const res = await api.get('/chat/colleagues/')
-      const list = Array.isArray(res.data) ? res.data : (res.data.results || [])
-      setColleagues(list)
-      const onlineFromColleagues = list.filter((c) => c.is_online).map((c) => c.id)
-      if (onlineFromColleagues.length > 0) {
-        setOnlineUserIds((prev) => new Set([...prev, ...onlineFromColleagues]))
-      }
-    } catch (err) {
-      console.error('Lỗi tải danh sách đồng nghiệp:', err)
-    }
-  }, [user])
 
   useEffect(() => {
     if (user) {
@@ -151,34 +179,6 @@ export function ChatProvider({ children }) {
 
     return () => clearInterval(pollInterval)
   }, [user, fetchConversations, fetchMessages, fetchColleagues])
-
-  // ── 2. Tải tin nhắn trong hội thoại từ REST API ───────────────────────────
-  const fetchMessages = useCallback(async (convId, beforeId = null) => {
-    if (!convId) return
-    setLoadingMessages(true)
-    try {
-      const res = await api.get(`/chat/conversations/${convId}/messages/`, {
-        params: { before_id: beforeId, limit: 40 },
-      })
-      const newMsgs = res.data.results || []
-      setMessagesByConv((prev) => {
-        const existing = prev[convId] || []
-        if (beforeId) {
-          return { ...prev, [convId]: [...newMsgs, ...existing] }
-        } else {
-          return { ...prev, [convId]: newMsgs }
-        }
-      })
-      // Đánh dấu đã đọc trong state local
-      setConversations((prev) =>
-        prev.map((c) => (c.id === convId ? { ...c, unread_count: 0 } : c))
-      )
-    } catch (err) {
-      console.error('Lỗi tải tin nhắn chat:', err)
-    } finally {
-      setLoadingMessages(false)
-    }
-  }, [])
 
   // Tự động tải tin nhắn khi hội thoại active hoặc widget thay đổi
   useEffect(() => {
@@ -314,12 +314,12 @@ export function ChatProvider({ children }) {
               return prev
             })
           } else if (data.type === 'initial_presence') {
-            const ids = data.online_user_ids || []
+            const ids = Array.isArray(data.online_user_ids) ? data.online_user_ids : []
             setOnlineUserIds(new Set(ids))
           } else if (data.type === 'presence_update') {
             const { user_id, status: presStatus } = data
             setOnlineUserIds((prev) => {
-              const next = new Set(prev)
+              const next = new Set(prev instanceof Set ? prev : [])
               if (presStatus === 'online') next.add(user_id)
               else next.delete(user_id)
               return next

@@ -79,6 +79,11 @@ export default function FloatingChatWidget() {
 
   const colleagues = globalColleagues || []
 
+  const checkIsOnline = (userId, defaultOnline = false) => {
+    if (!userId) return false
+    return (onlineUserIds instanceof Set && onlineUserIds.has(userId)) || !!defaultOnline
+  }
+
   const messagesEndRef = useRef(null)
   const fileInputRef = useRef(null)
   const searchTimeoutRef = useRef(null)
@@ -169,7 +174,7 @@ export default function FloatingChatWidget() {
       })
       .map((col) => ({
         ...col,
-        isOnline: onlineUserIds.has(col.id) || !!col.is_online,
+        isOnline: checkIsOnline(col.id, col.is_online),
       }))
       .sort((a, b) => {
         if (a.isOnline !== b.isOnline) return a.isOnline ? -1 : 1
@@ -190,13 +195,13 @@ export default function FloatingChatWidget() {
       )
     }
     if (colleagueFilterTab === 'online') {
-      list = list.filter((c) => onlineUserIds.has(c.id) || !!c.is_online)
+      list = list.filter((c) => checkIsOnline(c.id, c.is_online))
     } else if (colleagueFilterTab === 'offline') {
-      list = list.filter((c) => !onlineUserIds.has(c.id) && !c.is_online)
+      list = list.filter((c) => !checkIsOnline(c.id, c.is_online))
     }
     return list.map((c) => ({
       ...c,
-      isOnline: onlineUserIds.has(c.id) || !!c.is_online,
+      isOnline: checkIsOnline(c.id, c.is_online),
     })).sort((a, b) => {
       if (a.isOnline !== b.isOnline) return a.isOnline ? -1 : 1
       return (a.full_name || '').localeCompare(b.full_name || '', 'vi')
@@ -204,7 +209,7 @@ export default function FloatingChatWidget() {
   }, [colleagues, user?.id, colleagueSearchText, colleagueFilterTab, onlineUserIds])
 
   const onlineCount = useMemo(() => {
-    return colleagues.filter((c) => c.id !== user?.id && (onlineUserIds.has(c.id) || !!c.is_online)).length
+    return colleagues.filter((c) => c.id !== user?.id && checkIsOnline(c.id, c.is_online)).length
   }, [colleagues, user?.id, onlineUserIds])
 
   // Gửi tin nhắn văn bản
@@ -398,7 +403,7 @@ export default function FloatingChatWidget() {
                     size={32}
                     style={{ background: activeConv.type === 'direct' ? '#3b82f6' : (activeConv.type === 'department' ? '#8b5cf6' : '#10b981') }}
                   />
-                  {activeConv.type === 'direct' && onlineUserIds.has(activeConv.direct_partner?.id) && (
+                  {activeConv.type === 'direct' && checkIsOnline(activeConv.direct_partner?.id, activeConv.direct_partner?.is_online) && (
                     <span
                       style={{
                         position: 'absolute',
@@ -419,7 +424,7 @@ export default function FloatingChatWidget() {
                   </div>
                   <div style={{ fontSize: 10.5, color: '#bfdbfe', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                     {activeConv.type === 'direct'
-                      ? onlineUserIds.has(activeConv.direct_partner?.id) ? 'Đang hoạt động' : 'Ngoại tuyến'
+                      ? checkIsOnline(activeConv.direct_partner?.id, activeConv.direct_partner?.is_online) ? 'Đang hoạt động' : 'Ngoại tuyến'
                       : activeConv.type === 'department'
                       ? 'Nhóm phòng ban'
                       : `${activeConv.participants?.length || 0} thành viên`}
@@ -567,7 +572,7 @@ export default function FloatingChatWidget() {
                         const isDirect = item.type === 'direct'
                         const partner = item.direct_partner || {}
                         const title = isDirect ? (partner.full_name || 'Đồng nghiệp') : item.title
-                        const isOnline = isDirect && (onlineUserIds.has(partner.id) || !!partner.is_online)
+                        const isOnline = isDirect && checkIsOnline(partner.id, partner.is_online)
                         const avatarInfo = getAvatarAndIcon(item)
 
                         return (

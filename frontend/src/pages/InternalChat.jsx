@@ -152,16 +152,21 @@ export default function InternalChat() {
     fetchColleagues()
   }
 
+  const checkIsOnline = (userId, defaultOnline = false) => {
+    if (!userId) return false
+    return (onlineUserIds instanceof Set && onlineUserIds.has(userId)) || !!defaultOnline
+  }
+
   // Số lượng đồng nghiệp online
   const onlineCount = useMemo(() => {
-    return colleagues.filter((c) => onlineUserIds.has(c.id) || !!c.is_online).length
+    return colleagues.filter((c) => checkIsOnline(c.id, c.is_online)).length
   }, [colleagues, onlineUserIds])
 
   // Danh sách đồng nghiệp hiển thị trong modal Nhắn tin trực tiếp
   const filteredColleaguesInModal = useMemo(() => {
     let list = colleagues.map((c) => ({
       ...c,
-      isOnline: onlineUserIds.has(c.id) || !!c.is_online,
+      isOnline: checkIsOnline(c.id, c.is_online),
     }))
 
     if (colleagueSearchText.trim()) {
@@ -229,7 +234,7 @@ export default function InternalChat() {
       })
       .map((col) => ({
         ...col,
-        isOnline: onlineUserIds.has(col.id) || !!col.is_online,
+        isOnline: checkIsOnline(col.id, col.is_online),
       }))
       .sort((a, b) => {
         if (a.isOnline !== b.isOnline) return a.isOnline ? -1 : 1
@@ -383,7 +388,7 @@ export default function InternalChat() {
         const isDept = item.type === 'department'
         const partner = item.direct_partner
         const title = isDirect ? partner?.full_name : item.title
-        const isOnline = isDirect && (onlineUserIds.has(partner?.id) || !!partner?.is_online)
+        const isOnline = isDirect && checkIsOnline(partner?.id, partner?.is_online)
         const isSelected = activeConversation?.id === item.id
 
         return (
@@ -792,7 +797,7 @@ export default function InternalChat() {
     const isDept = activeConversation.type === 'department'
     const partner = activeConversation.direct_partner || {}
     const title = isDirect ? (partner.full_name || 'Đồng nghiệp') : (activeConversation.title || 'Hội thoại')
-    const isOnline = isDirect && (onlineUserIds.has(partner.id) || !!partner.is_online)
+    const isOnline = isDirect && checkIsOnline(partner.id, partner.is_online)
 
     return (
       <div style={{ display: 'flex', flexDirection: 'column', height: '100%', background: '#ffffff' }}>
@@ -1415,7 +1420,7 @@ export default function InternalChat() {
               onChange={setSelectedMemberIds}
               style={{ width: '100%', marginTop: 6 }}
               options={colleagues.map((c) => ({
-                label: `${c.full_name} ${onlineUserIds.has(c.id) || !!c.is_online ? '(Online)' : ''} (${c.department_name || c.username})`,
+                label: `${c.full_name} ${checkIsOnline(c.id, c.is_online) ? '(Online)' : ''} (${c.department_name || c.username})`,
                 value: c.id,
               }))}
             />
