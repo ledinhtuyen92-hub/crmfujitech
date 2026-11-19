@@ -82,9 +82,15 @@ export function ChatProvider({ children }) {
       const onlineFromConvs = list
         .filter((c) => c.type === 'direct' && c.direct_partner?.is_online)
         .map((c) => c.direct_partner.id)
-      if (onlineFromConvs.length > 0) {
-        setOnlineUserIds((prev) => new Set([...(prev instanceof Set ? prev : []), ...onlineFromConvs]))
-      }
+      const offlineFromConvs = list
+        .filter((c) => c.type === 'direct' && c.direct_partner && !c.direct_partner.is_online)
+        .map((c) => c.direct_partner.id)
+      setOnlineUserIds((prev) => {
+        const next = new Set(prev instanceof Set ? prev : [])
+        onlineFromConvs.forEach((id) => next.add(id))
+        offlineFromConvs.forEach((id) => next.delete(id))
+        return next
+      })
     } catch (err) {
       console.error('Lỗi tải danh sách hội thoại chat:', err)
     }
@@ -126,9 +132,13 @@ export function ChatProvider({ children }) {
       const list = Array.isArray(res.data) ? res.data : (res.data.results || [])
       setColleagues(list)
       const onlineFromColleagues = list.filter((c) => c.is_online).map((c) => c.id)
-      if (onlineFromColleagues.length > 0) {
-        setOnlineUserIds((prev) => new Set([...(prev instanceof Set ? prev : []), ...onlineFromColleagues]))
-      }
+      const offlineFromColleagues = list.filter((c) => !c.is_online).map((c) => c.id)
+      setOnlineUserIds((prev) => {
+        const next = new Set(prev instanceof Set ? prev : [])
+        onlineFromColleagues.forEach((id) => next.add(id))
+        offlineFromColleagues.forEach((id) => next.delete(id))
+        return next
+      })
     } catch (err) {
       console.error('Lỗi tải danh sách đồng nghiệp:', err)
     }

@@ -83,6 +83,9 @@ class ConversationViewSet(viewsets.ModelViewSet):
         ).exclude(conversation__department_id__in=dept_ids).delete()
 
     def list(self, request, *args, **kwargs):
+        if request.user and request.user.is_authenticated and request.user.company_id:
+            from chat.presence import record_user_heartbeat
+            record_user_heartbeat(request.user.company_id, request.user.id)
         self._sync_user_department_conversations(request.user)
         return super().list(request, *args, **kwargs)
 
@@ -97,6 +100,9 @@ class ConversationViewSet(viewsets.ModelViewSet):
 
     def create(self, request, *args, **kwargs):
         user = request.user
+        if user.company_id:
+            from chat.presence import record_user_heartbeat
+            record_user_heartbeat(user.company_id, user.id)
         conv_type = request.data.get("type", Conversation.TYPE_DIRECT)
         title = request.data.get("title", "").strip()
         partner_id = request.data.get("partner_id")
@@ -202,6 +208,9 @@ class ConversationViewSet(viewsets.ModelViewSet):
         """
         conv = self.get_object()
         user = request.user
+        if user.company_id:
+            from chat.presence import record_user_heartbeat
+            record_user_heartbeat(user.company_id, user.id)
         conv_id = conv.id
 
         if conv.type == Conversation.TYPE_DEPARTMENT:
@@ -263,6 +272,9 @@ class ConversationViewSet(viewsets.ModelViewSet):
         """Xóa lịch sử tin nhắn trong cuộc trò chuyện."""
         conv = self.get_object()
         user = request.user
+        if user.company_id:
+            from chat.presence import record_user_heartbeat
+            record_user_heartbeat(user.company_id, user.id)
 
         if conv.type == Conversation.TYPE_DIRECT:
             p = conv.participants.filter(user=user).first()
@@ -321,6 +333,9 @@ class ConversationViewSet(viewsets.ModelViewSet):
         """Lấy danh sách tin nhắn theo phân trang Cursor (trước ID chỉ định), tôn trọng cleared_at."""
         conv = self.get_object()
         user = request.user
+        if user.company_id:
+            from chat.presence import record_user_heartbeat
+            record_user_heartbeat(user.company_id, user.id)
 
         p = conv.participants.filter(user=user).first()
         cleared_at = p.cleared_at if p else None
@@ -361,6 +376,9 @@ class ConversationViewSet(viewsets.ModelViewSet):
         """
         conv = self.get_object()
         user = request.user
+        if user.company_id:
+            from chat.presence import record_user_heartbeat
+            record_user_heartbeat(user.company_id, user.id)
 
         msg = conv.messages.filter(id=message_id, is_deleted=False).first()
         if not msg:
@@ -432,6 +450,9 @@ class ConversationViewSet(viewsets.ModelViewSet):
         """Gửi tin nhắn qua REST API (hỗ trợ cả văn bản, file đính kèm và thẻ chứng từ CRM)."""
         conv = self.get_object()
         user = request.user
+        if user.company_id:
+            from chat.presence import record_user_heartbeat
+            record_user_heartbeat(user.company_id, user.id)
 
         content = request.data.get("content", "").strip()
         message_type = request.data.get("message_type", ChatMessage.MSG_TEXT)
@@ -544,6 +565,9 @@ class ConversationViewSet(viewsets.ModelViewSet):
         """Đánh dấu đã đọc tất cả tin nhắn trong cuộc trò chuyện."""
         conv = self.get_object()
         user = request.user
+        if user.company_id:
+            from chat.presence import record_user_heartbeat
+            record_user_heartbeat(user.company_id, user.id)
         last_msg = conv.messages.filter(is_deleted=False).last()
         last_id = last_msg.id if last_msg else 0
 
@@ -621,7 +645,8 @@ def get_colleagues(request):
     if q:
         qs = qs.filter(Q(full_name__icontains=q) | Q(username__icontains=q) | Q(email__icontains=q))
 
-    from chat.presence import get_online_user_ids_sync
+    from chat.presence import get_online_user_ids_sync, record_user_heartbeat
+    record_user_heartbeat(user.company_id, user.id)
     online_ids = get_online_user_ids_sync(user.company_id)
 
     results = []
@@ -820,6 +845,9 @@ class ChatCompanyConfigView(APIView):
 
     def post(self, request):
         user = request.user
+        if user.company_id:
+            from chat.presence import record_user_heartbeat
+            record_user_heartbeat(user.company_id, user.id)
         if not (user.is_company_admin or user.is_superuser or (user.permissions or []).count("chat.admin")):
             return Response({"detail": "Chỉ Quản trị viên mới có quyền thay đổi cấu hình Chat."}, status=status.HTTP_403_FORBIDDEN)
 

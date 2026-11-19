@@ -106,6 +106,28 @@ async def remove_user_presence(company_id: int, user_id: int, channel_name: str)
         return True
 
 
+def record_user_heartbeat(company_id: int, user_id: int) -> None:
+    """
+    Ghi nhận hoạt động HTTP (heartbeat) của user.
+    Key này tự động hết hạn sau 75 giây.
+    Đảm bảo user luôn hiển thị Online ngay cả khi WebSocket đang kết nối lại hoặc mạng chập chờn.
+    """
+    if not company_id or not user_id:
+        return
+    try:
+        r = get_sync_redis()
+        heartbeat_key = f"chat:user_heartbeat:{user_id}"
+        company_online_key = f"chat:company_online:{company_id}"
+
+        pipe = r.pipeline()
+        pipe.set(heartbeat_key, "1", ex=75)
+        pipe.sadd(company_online_key, str(user_id))
+        pipe.expire(company_online_key, 86400)
+        pipe.execute()
+    except Exception as e:
+        logger.warning("Redis presence error in record_user_heartbeat: %s", e)
+
+
 async def get_online_user_ids(company_id: int) -> set[int]:
     """
     Lấy danh sách ID các người dùng đang online trong công ty (Async).
@@ -116,7 +138,35 @@ async def get_online_user_ids(company_id: int) -> set[int]:
         r = get_async_redis()
         company_online_key = f"chat:company_online:{company_id}"
         members = await r.smembers(company_online_key)
-        return {int(uid) for uid in members if uid.isdigit()}
+        if not members:
+            return set()
+
+        valid_uids = [uid for uid in members if uid.isdigit()]
+        if not valid_uids:
+            return set()
+
+        pipe = r.pipeline()
+        for uid in valid_uids:
+            pipe.scard(f"chat:user_channels:{uid}")
+            pipe.exists(f"chat:user_heartbeat:{uid}")
+        results = await pipe.execute()
+
+        online_ids = set()
+        stale_ids = []
+        idx = 0
+        for uid in valid_uids:
+            channel_count = results[idx]
+            has_heartbeat = results[idx + 1]
+            idx += 2
+            if channel_count > 0 or has_heartbeat:
+                online_ids.add(int(uid))
+            else:
+                stale_ids.append(uid)
+
+        if stale_ids:
+            await r.srem(company_online_key, *stale_ids)
+
+        return online_ids
     except Exception as e:
         logger.warning("Redis presence error in get_online_user_ids: %s", e)
         return set()
@@ -132,7 +182,35 @@ def get_online_user_ids_sync(company_id: int) -> set[int]:
         r = get_sync_redis()
         company_online_key = f"chat:company_online:{company_id}"
         members = r.smembers(company_online_key)
-        return {int(uid) for uid in members if uid.isdigit()}
+        if not members:
+            return set()
+
+        valid_uids = [uid for uid in members if uid.isdigit()]
+        if not valid_uids:
+            return set()
+
+        pipe = r.pipeline()
+        for uid in valid_uids:
+            pipe.scard(f"chat:user_channels:{uid}")
+            pipe.exists(f"chat:user_heartbeat:{uid}")
+        results = pipe.execute()
+
+        online_ids = set()
+        stale_ids = []
+        idx = 0
+        for uid in valid_uids:
+            channel_count = results[idx]
+            has_heartbeat = results[idx + 1]
+            idx += 2
+            if channel_count > 0 or has_heartbeat:
+                online_ids.add(int(uid))
+            else:
+                stale_ids.append(uid)
+
+        if stale_ids:
+            r.srem(company_online_key, *stale_ids)
+
+        return online_ids
     except Exception as e:
         logger.warning("Redis presence error in get_online_user_ids_sync: %s", e)
         return set()
